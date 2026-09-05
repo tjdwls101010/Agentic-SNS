@@ -6,7 +6,7 @@
 
 ## Goals
 
-페이스북과 레딧의 피드→글→댓글→작성자 탐색을 밀도 높은 텍스트와 다음 홉 핸들로 수행한다. 실계정 읽기 전용이며 요청 예산과 차단 상태는 코드로 강제한다.
+페이스북·레딧·Threads의 피드→글→댓글→작성자 탐색을 밀도 높은 텍스트와 다음 홉 핸들로 수행한다. 실계정 읽기 전용이며 요청 예산과 차단 상태는 코드로 강제한다.
 
 ## Behavior inventory
 
@@ -19,11 +19,17 @@
 | B5 | 레딧 게시·댓글 작성·추천·저장·구독 변경 | skill | — | declined |
 | B6 | 레딧 메시지함·알림 | skill | — | declined |
 
+| B7 | Threads 읽기·탐색·수집·쿼리 복구 | skill | `.claude/skills/threads/SKILL.md` | approved |
+| B8 | Threads 쓰기·좋아요·답글·팔로우·저장 변경 | skill | — | declined |
+| B9 | Threads 활동·알림(열람 시 읽음 처리) | skill | — | declined |
+
 ## Component specs
 
 facebook은 scripts/ 아래의 독립 CLI와 브라우저 스니펫을 포함한다. 기존 `.tmp/Agentic Facebook`의 검증된 파서만 이식하고 브라우저 세션은 Aside에 맡긴다. 테스트 경계와 단계별 완료 기준은 [승인 계획](plans/facebook%20스킬%20구현%20계획.md)을 따른다. 사용자 스코프에는 레포 스킬 심볼릭 링크로 배포한다. 다른 스킬과 코드를 공유하지 않는다.
 
 reddit은 [승인 계획](plans/reddit%20스킬%20구현%20계획.md)의 D1–D8과 테스트 경계·P0–P5 완료 기준을 따른다. Aside u0 실계정, 읽기 전용, Python 표준 라이브러리, 독립 scripts/를 사용하고 사용자 스코프 심볼릭 링크로 배포한다. 본문·도움말·주석은 영어이고 description에 한국어 트리거를 포함한다. Claude 헤드리스 e2e는 실행하지 않는다.
+
+threads는 [승인 계획](plans/threads%20스킬%20구현%20계획.md)의 D1–D9·P0–P6와 확정된 테스트 경계를 따른다. Python 표준 라이브러리·Aside u0·독립 스킬·사용자 스코프 심볼릭 링크, 영어 본문/도움말/주석과 한국어 description 트리거를 사용한다. SSR 직접 답글의 미수집 추정치와 로컬 예산을 출력에서 구분한다. Claude 헤드리스 e2e는 실행하지 않는다.
 
 ## Design rationale
 
