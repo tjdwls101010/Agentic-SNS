@@ -57,10 +57,13 @@ def parser():
             if name == 'doctor':
                 sub.add_argument('--unblock', action='store_true', help='Clear a challenge/lock after checking X in Aside; rate limits still apply.')
             continue
-        sub.add_argument('--limit', type=int, default=None, help='Display target: 10 items; single post 20 replies. Unavailable for about/batch post (all results). Explicit limits allow 40 requests.')
+        sub.set_defaults(limit=None, after=None)
+        if name != 'about':
+            sub.add_argument('--limit', type=int, default=None, help='Display target: 10 items; single post 20 replies. Batch posts return all results without this option. Explicit limits allow 40 requests.')
         sub.add_argument('--chars', type=int, default=None, help='Text characters per item, default 280; the focal post is always full.')
         sub.add_argument('--out', default=None, metavar='FILE', help='Commit whole date-eligible pages as private NDJSON; repeat the same command to resume.')
-        sub.add_argument('--after', type=int, default=None, metavar='N', help='Resume a numbered more: handle, consuming cached items before requesting another page.')
+        if name not in ('about', 'trends'):
+            sub.add_argument('--after', type=int, default=None, metavar='N', help='Resume a numbered more: handle, consuming cached items before requesting another page.')
         if name in ('user', 'home', 'list'):
             for flag in ('since', 'until'):
                 sub.add_argument('--' + flag, default=None, help=f'Client date filter ({flag} ISO date/time); chronological tabs only. until is exclusive.')
@@ -70,7 +73,7 @@ def parser():
             sub.add_argument('--feed', choices=['foryou', 'following'], default=None, help='Feed to read, default foryou.')
         if name in ('post', 'search', 'community'):
             choices = ['top', 'latest'] if name == 'search' else ['top', 'recent']
-            sub.add_argument('--sort', choices=choices, default=None, help='Server ranking; default latest for search, top otherwise.')
+            sub.add_argument('--sort', choices=choices, default=None, help='Post ranking; default latest for search, top otherwise. Account search uses People ranking and has no sort option.')
         if name == 'search':
             sub.add_argument('target', help='Search text, including X from:, since:, until: or engagement operators.')
             sub.add_argument('--type', choices=['posts', 'users', 'media'], default=None, help='Search product, default posts; all share one operation bucket.')
@@ -106,8 +109,10 @@ def validate(args):
         raise TwitterError(2, 'Sorting only applies to community posts.')
     if args.command == 'post' and len(args.target) > 1 and (args.sort is not None or args.after is not None):
         raise TwitterError(2, 'Batch post lookup has no replies or continuation.')
-    args.sort = args.sort or ('latest' if args.command == 'search' else 'top' if args.command in ('post', 'community') else None)
     args.type = args.type or ('posts' if args.command == 'search' else None)
+    if args.command == 'search' and args.type == 'users' and args.sort is not None:
+        raise TwitterError(2, 'Account search uses X People ranking, not top/latest post sorting.', 'Omit --sort for --type users.')
+    args.sort = args.sort or ('latest' if args.command == 'search' and args.type != 'users' else 'top' if args.command in ('post', 'community') else None)
     if args.scope and (args.type != 'posts' or args.sort != 'latest'):
         raise TwitterError(2, 'Community search only supports posts/latest.')
     if args.after and (args.command in ('about', 'trends') or args.command in ('list', 'community') and args.tab == 'about'):

@@ -389,6 +389,10 @@ P2–P5 독립 리뷰 `20260905-180332-twitter-browse-review-e2f1`가 8건을 �
 - `doctor`: Aside u0 로그인 핸들·Viewer 버킷·레지스트리/서명 나이 정상. A5 북마크는 유효한 빈 타임라인으로 항목 형태 미검증이다. 사용자가 직접 하나 추가하면 남은 가드 범위에서 해당 항목만 확인할 수 있다. 쓰기 요청은 수행하지 않았다.
 - P2–P5 리뷰 재검증 `20260905-180828-twitter-browse-review-3e87`: 기존 8건 모두 해결. 별도 Claude headless e2e는 D8에 따라 실행하지 않았다.
 
+사용성 검토 `20260905-181246-twitter-usability-6cf7`는 구현/테스트 소스 없이 SKILL.md·도움말·실제 CLI 출력만으로 V1 홈 캐시, V2 실제 글/답글, V3 `@X` 프로필 캐시(계획의 `@karpathy`와 같은 명령 경계), V4 계정 검색 캐시→반환 핸들 2개 일괄 조회를 수행해 모두 exit 0이었다. 새 API 요청은 2회였다. 계정 검색의 latest 오해를 없애 `rank=people`로 표시하고 명시적 post sort를 거절했다. 요청 수와 account window를 분리해 표시하고 For you 개인화 라벨을 추가했다. about/trends에 불가능한 continuation 옵션은 도움말에서 제거했고 프로필 카드 `--chars`도 실제 적용하도록 실패 테스트 후 수정했다. 강제 예산을 더 낮추는 별도 플래그와 캐시 시각 확장은 승인 범위에 추가하지 않았다. 24시간 세션 재확인과 캐시가 현재 시점 전체 최신 목록이 아니라는 원리는 본문에 유지했다. 사용성 실행과 동시에 doctor 1회를 상위 세션이 실행했으므로 리뷰어의 추정 장부 값 대신 실제 장부를 최종 근거로 쓴다.
+
+CI 최초 실행에서 `tests/twitter/live/test_live.py`와 Facebook live 모듈의 이름 충돌을 발견했다. 전체 `python3 -m pytest tests/ --collect-only -q`로 같은 오류를 재현하고, Twitter live 디렉터리에 `__init__.py`를 추가해 독립 네임스페이스로 수집되도록 수정했다. 스킬별 테스트만 통과했다는 이유로 CI 실패를 넘기지 않았다.
+
 ## 레지스트리 스냅샷
 
 구현의 갱신 가능한 레지스트리는 스킬 안의 `scripts/registry.json`이고, 이 블록은 2026-09-05 조사 근거로 보존한다. `vars`의 `<…>`와 `a|b`는 템플릿 표기이며 `cursor: null`은 첫 페이지다. 모든 `root`는 실측 응답에서 `instructions[]`(또는 단일 노드)를 찾은 경로다.

@@ -96,7 +96,8 @@ def run(args):
                 state['user_id'] = state['metadata']['user_id']
             if output.complete:
                 return dict(ok=True, results=[], stop_reason=state.get('terminal', 'exhausted'), stored=output.count,
-                            shown=0, out=str(output.path), already_complete=True, operation=op, code=0)
+                            shown=0, out=str(output.path), already_complete=True, operation=op, code=0,
+                            budget=transport.budget.summary(), fetched_bytes=transport.fetched_bytes)
         card = state.get('card') or state.get('metadata', {}).get('card')
         if args.command in ('user', 'graph'):
             if not state.get('user_id'):

@@ -31,7 +31,7 @@ def badge(user):
     return ' ✓gov' if kind == 'Government' else ' ✓business' if kind == 'Business' else ' ✓blue' if user.get('is_blue_verified') else ''
 
 
-def user_card(user):
+def user_card(user, chars=280):
     pieces = [f'@{user.get("screen_name", "?")} ({user.get("name") or ""}{badge(user)})',
               f'followers {number(user.get("followers_count"))}', f'following {number(user.get("following_count"))}',
               f'posts {number(user.get("tweet_count"))}']
@@ -41,7 +41,7 @@ def user_card(user):
         if user.get(key):
             pieces.append(label)
     if user.get('description'):
-        pieces.append('bio: ' + json.dumps(_text(user), ensure_ascii=False))
+        pieces.append('bio: ' + json.dumps(_text(user, chars), ensure_ascii=False))
     affiliate = user.get('affiliate', {}).get('label', {})
     if affiliate:
         pieces.append('affiliate ' + str(affiliate.get('description', affiliate.get('url', {}).get('url', ''))))
@@ -98,6 +98,10 @@ def render(result, args):
         header.append(f'{result["stored"]} stored')
     if args.sort:
         header.append('sort=' + args.sort)
+    if args.command == 'search' and getattr(args, 'type', None) == 'users':
+        header.append('rank=people')
+    if args.command == 'home':
+        header.append('feed=' + args.feed + (' (personalized)' if args.feed == 'foryou' else ''))
     header.extend([f'stopped={result.get("stop_reason")}', f'fetched {result.get("fetched_bytes", 0) / 1048576:.2f}MB'])
     if 'direct_shown' in result:
         header.append(f'replies: {result["direct_shown"]} direct shown of {result.get("reported")} reported · +{result["nested_shown"]} nested · hidden branches {result["hidden_branches"]}')
@@ -107,20 +111,21 @@ def render(result, args):
     for name, bucket in budget.get('operations', {}).items():
         if bucket:
             header.append(f'budget {name} {bucket.get("remaining")} of {bucket.get("limit")} (resets in {max(0, round((bucket.get("reset_at", 0) - time.time()) / 60))}m)')
-    header.append(f'window {budget.get("window", 0)}/200')
+    header.append(f'requests {budget.get("requests", 0)}')
+    header.append(f'account window {budget.get("window", 0)}/200')
     if result.get('warnings'):
         header.append(f'warnings={len(result["warnings"])}')
     if result.get('viewer_changed'):
         header.append('viewer changed')
     lines, labels = [' · '.join(header)], {}
     if card := result.get('card'):
-        lines.append(user_card(card) if card['kind'] == 'user' else place_card(card))
+        lines.append(user_card(card, args.chars) if card['kind'] == 'user' else place_card(card))
     for index, row in enumerate(result.get('results', []), 1):
         kind = row.get('kind')
         if kind == 'tweet':
             lines.extend(tweet_lines(row, index, args.chars, labels))
         elif kind == 'user':
-            lines.append(user_card(row))
+            lines.append(user_card(row, args.chars))
         elif kind in ('list', 'community'):
             lines.append(place_card(row))
         else:
