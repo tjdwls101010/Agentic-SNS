@@ -65,7 +65,7 @@ Reddit 추가 후 최종 검증:
 
 - Reddit P3·P5 뒤 Graphify를 두 번 갱신했다. 최종 960노드·2,358간선·63커뮤니티이며 Codex가 전체 커뮤니티를 명명하고 HTML 내보내기를 검증했다. 그래프는 기존 로컬 제외 정책을 유지했다.
 
-X 검증: Twitter 오프라인 158개·JavaScript 9개, 기존 Facebook/Reddit 435개 통과. Ruff·PII·하네스 검사 통과. 실계정 탐색과 33종 발견/2종 재생 복구를 확인했다. 북마크는 빈 목록이며 실제 항목 형태는 미검증이다. 단계별 실패·수정·실제 명령은 Twitter 승인 계획의 최종 검증 기록에 둔다.
+X 검증: Twitter 오프라인 160개·JavaScript 9개, 기존 Facebook/Reddit 435개 통과. 전체 실행은 595 passed·15 deselected다. Ruff·PII·하네스 검사 통과. 실계정 탐색과 33종 발견/2종 재생 복구를 확인했다. 북마크는 빈 목록이며 실제 항목 형태는 미검증이다. 단계별 실패·수정·실제 명령은 Twitter 승인 계획의 최종 검증 기록에 둔다.
 
 ## Change history
 

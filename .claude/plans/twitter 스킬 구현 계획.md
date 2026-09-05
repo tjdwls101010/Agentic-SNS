@@ -369,7 +369,7 @@ description: Read X (Twitter, x.com) through the user's logged-in Aside browser:
 | P3 | 완료 | 부모·focal·직접/중첩 답글·관련 글 제외·분기 누적·관계망 구현 및 회귀 검증. 실계정 스레드/관계 검증 통과. P3 그래프 1,224노드·2,895간선·92커뮤니티를 Codex가 명명하고 HTML 검증. |
 | P4 | 구현 완료·A5 미검증 | 검색/개인 목록/리스트/트렌드/커뮤니티/날짜 창/파일 재개 구현·통합 테스트 통과. 실계정 커뮤니티 URL 객체를 문자열로 보정하고 새 응답→카드/글 3건 재검증. 북마크 빈 응답은 확인했으나 실제 항목 형태는 미검증. |
 | P5 | 완료 | 실제 번들의 shared~·i18n/ 이름을 빠뜨리던 필터를 재현 테스트 후 수정. 수정본 refresh: discovered 33·changed 0·unchanged 33·missing []·features 39·txid ok. 2개 검증 요청 통과. |
-| P6 | 진행 중 | SKILL.md·README·CI 연결. validate 오류 0·경고 0, audit 드리프트 0. 최종 사용성·회귀·PR·머지 대기. |
+| P6 | 완료 | SKILL.md·README·CI·사용성 검토 완료. 전체 로컬 595 passed, Twitter 160 passed·JS 9 passed, 하네스 오류/경고 0·드리프트 0. 최초 CI 수집 오류 수정 후 Linux push CI 통과. PR #3의 checks·merge 상태가 배포 확인 표면이다. |
 
 구현 실행: Codex `20260905-175118-twitter-implementation-f3e1` (`gpt-6-astra`, medium, priority). 소유 범위는 `.claude/skills/twitter/`와 `tests/twitter/`이며, 상위 세션이 계획·하네스·CI·Git 통합과 결과 검증을 담당한다. Threads 구현과 원본 브랜치 변경은 금지했다. 라이브 가드는 계획 최종 정정의 40회이며 refresh는 별도다.
 
@@ -381,7 +381,7 @@ P2–P5 독립 리뷰 `20260905-180332-twitter-browse-review-e2f1`가 8건을 �
 
 ## 최종 검증 기록
 
-- `python3 -m pytest tests/twitter -q`: 158 passed, 3 live deselected (30.71s). `python3 -m pytest tests/facebook tests/reddit -q`: 435 passed, 12 live deselected (155.01s). 작업 중인 원본 Threads 코드·테스트는 가져오거나 수정하지 않았다.
+- `python3 -m pytest tests/twitter -q`: 최종 160 passed, 3 live deselected (30.85s). `python3 -m pytest tests/facebook tests/reddit -q`: 435 passed, 12 live deselected (155.01s). 작업 중인 원본 Threads 코드·테스트는 가져오거나 수정하지 않았다.
 - `node --test tests/twitter/js/*.js`: 9 passed. `uvx ruff check --config pyproject.toml .claude/skills/twitter/scripts tests/twitter`: All checks passed. `python3 tests/twitter/tools/check_fixtures_pii.py`: passed. `git diff --check`: 통과.
 - `validate_harness.py --path .`: 오류 0·경고 0. `audit_harness.py --path .`: 격리 main 기반에서 skill 3개·드리프트 0. Threads가 main에 머지되면 skill 4개가 되는 구성이다.
 - 라이브는 `TWITTER_ASIDE_BIN=…/tests/twitter/live/guard_aside.py`를 통해 실행했다. 최초 합쳐진 시나리오는 관련 글을 답글로 세는 단언 실패를 발견했고, 재현 테스트 후 관련 모듈을 제외했다. 분리한 `test_live_threads_and_relationships`는 통과했다. 검색·개인 목록·리스트·트렌드·커뮤니티 탐색 뒤 커뮤니티 URL 객체가 subprocess 인자로 전달되는 실패를 발견했다(`1 failed, 1 passed, 1 deselected`). URL 정규화 재현 테스트 후 새 `communities --limit 3 --json`(1요청)에서 문자열 링크를 받아 `community <반환 URL> --limit 3 --json`(2요청)을 실행해 exit 0·글 3건·멤버 수를 확인했다. 이미 통과한 표면은 불필요하게 재실행하지 않았고 전체 live suite 통과로 표기하지 않는다.
@@ -392,6 +392,10 @@ P2–P5 독립 리뷰 `20260905-180332-twitter-browse-review-e2f1`가 8건을 �
 사용성 검토 `20260905-181246-twitter-usability-6cf7`는 구현/테스트 소스 없이 SKILL.md·도움말·실제 CLI 출력만으로 V1 홈 캐시, V2 실제 글/답글, V3 `@X` 프로필 캐시(계획의 `@karpathy`와 같은 명령 경계), V4 계정 검색 캐시→반환 핸들 2개 일괄 조회를 수행해 모두 exit 0이었다. 새 API 요청은 2회였다. 계정 검색의 latest 오해를 없애 `rank=people`로 표시하고 명시적 post sort를 거절했다. 요청 수와 account window를 분리해 표시하고 For you 개인화 라벨을 추가했다. about/trends에 불가능한 continuation 옵션은 도움말에서 제거했고 프로필 카드 `--chars`도 실제 적용하도록 실패 테스트 후 수정했다. 강제 예산을 더 낮추는 별도 플래그와 캐시 시각 확장은 승인 범위에 추가하지 않았다. 24시간 세션 재확인과 캐시가 현재 시점 전체 최신 목록이 아니라는 원리는 본문에 유지했다. 사용성 실행과 동시에 doctor 1회를 상위 세션이 실행했으므로 리뷰어의 추정 장부 값 대신 실제 장부를 최종 근거로 쓴다.
 
 CI 최초 실행에서 `tests/twitter/live/test_live.py`와 Facebook live 모듈의 이름 충돌을 발견했다. 전체 `python3 -m pytest tests/ --collect-only -q`로 같은 오류를 재현하고, Twitter live 디렉터리에 `__init__.py`를 추가해 독립 네임스페이스로 수집되도록 수정했다. 스킬별 테스트만 통과했다는 이유로 CI 실패를 넘기지 않았다.
+
+최종 전체 실행 `python3 -m pytest tests/ -q`: **595 passed, 15 deselected (178.92s)**. P6 그래프는 사용성 보정 후 다시 갱신해 **1,262노드·2,910간선·93커뮤니티**이며 Codex `20260905-181713-twitter-graph-labels-7969`가 현재 멤버 기준 모든 이름과 HTML 반영을 검증했다. 그래프는 격리 worktree의 로컬 제외 파일로 유지했다. 사용자 링크로 `/tmp`에서 `twitter.py --help`와 `schema --json`도 실행해 작업 디렉터리 독립성을 확인했다.
+
+최종 실계정 누적 장부는 일반 GraphQL **37/40**, 별도 최초 refresh 검증 **2회**, 탭/HTML/CDN 묶음 **6회**다(전체 X API 합계 39회). 사용자 승인 없는 쓰기·북마크 추가는 수행하지 않았다. A5의 실제 북마크 항목 형태는 데이터 부재로 미검증을 유지하며 P4 전체 라이브 완료로 표기하지 않는다. [PR #3](https://github.com/tjdwls101010/Agentic-SNS/pull/3)에 한국어 변경 이유·영향·실행 결과를 남겼고, CI와 스쿼시 머지의 최종 상태는 해당 PR에서 확인한다. 원본 Threads 브랜치·코드·계획서·캐시는 수정하지 않았다.
 
 ## 레지스트리 스냅샷
 
