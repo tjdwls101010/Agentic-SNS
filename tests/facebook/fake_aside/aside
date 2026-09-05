@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+"""Process-boundary fake. Never connects to Aside or Facebook."""
+import json
+import os
+import sys
+import time
+from pathlib import Path
+
+if len(sys.argv) != 5 or sys.argv[1:4] != ['--account', 'u0', 'repl']:
+    sys.exit(2)
+code = sys.argv[4]
+mode = os.environ.get('FAKE_ASIDE_MODE', '')
+if mode == 'fail':
+    print(code)
+    print(code, file=sys.stderr)
+    sys.exit(1)
+if mode == 'timeout':
+    print('daemon is not reachable ' + code, file=sys.stderr)
+    sys.exit(1)
+if mode == 'malformed':
+    print('{broken')
+    sys.exit(0)
+name = next((n for n in ('tokens', 'graphql', 'page', 'mine') if '// facebook-snippet: ' + n in code), None)
+if name is None and 'const actions = ARGS.actions' in code:
+    name = 'capture'
+if name is None:
+    sys.exit(2)
+expected = json.loads(os.environ.get('FAKE_ASIDE_EXPECTED_ARGS', '{}')).get(name, {})
+arguments = json.loads(code.split('\n', 1)[0][len('const ARGS = '):-1])
+if any(arguments.get(key) != value for key, value in expected.items()):
+    sys.exit(2)
+log = os.environ.get('FAKE_ASIDE_LOG')
+if log:
+    with open(log, 'a') as f:
+        f.write(json.dumps({'name': name, 'time': time.time()}) + '\n')
+responses = os.environ.get('FAKE_ASIDE_RESPONSES')
+if responses:
+    path = Path(responses)
+    records = json.loads(path.read_text())
+    response = records.pop(0)
+    path.write_text(json.dumps(records))
+else:
+    response = {'status': 200, 'url': 'https://www.facebook.com/', 'body': 'synthetic'}
+print(json.dumps(response))
+if mode == 'duplicate':
+    print(json.dumps(response))

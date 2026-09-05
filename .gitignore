@@ -1,3 +1,13 @@
 .DS_Store
 .tmp/
-.claude/
+.claude/histories
+.claude/settings.local.json
+.codex-runs/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.ndjson
+!tests/facebook/fixtures/*.ndjson
+!.claude/plans/
+.claude/plans/*
+!.claude/plans/facebook 스킬 구현 계획.md
