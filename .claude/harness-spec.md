@@ -19,7 +19,7 @@
 | B5 | 레딧 게시·댓글 작성·추천·저장·구독 변경 | skill | — | declined |
 | B6 | 레딧 메시지함·알림 | skill | — | declined |
 
-| B10 | X 읽기·탐색·수집·쿼리 복구 | skill | `.claude/skills/twitter/SKILL.md` | approved |
+| B10 | X 읽기·탐색·수집·쿼리 복구 | skill | `.claude/skills/twitter/SKILL.md` | generated |
 | B11 | X 게시·답글·좋아요·리포스트·팔로우·북마크 변경 | skill | — | declined |
 | B12 | X 알림·DM | skill | — | declined |
 

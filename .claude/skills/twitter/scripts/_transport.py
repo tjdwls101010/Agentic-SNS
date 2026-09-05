@@ -61,7 +61,12 @@ def classify(envelope, operation, expect):
     root = root_at(body, expect)
     if operation == 'UserByScreenName' and body.get('data') == {} or isinstance(root, dict) and root.get('__typename') in ('UserUnavailable', 'TweetTombstone'):
         raise TwitterError(9, 'The target is unavailable.', 'Check its handle, visibility, or URL.', 'unavailable')
-    if root is None:
+    malformed = expect.endswith('instructions') and (not isinstance(root, list) or any(not isinstance(item, dict) for item in root))
+    if operation in ('UserByScreenName', 'Viewer', 'UsersByScreenNames') and root is not None:
+        nodes = root if operation == 'UsersByScreenNames' and isinstance(root, list) else [root]
+        malformed = malformed or any(node is not None and (not isinstance(node, dict) or
+            node.get('__typename') != 'UserUnavailable' and not str(node.get('rest_id', '')).isdigit()) for node in nodes)
+    if root is None or malformed:
         raise TwitterError(6, f'Expected response root is missing for {operation}.', 'The response shape changed; update the envelope parser.', 'envelope_drift')
     return root, scrub(errors)
 
@@ -137,7 +142,11 @@ class Transport:
             except TwitterError as error:
                 if error.error == 'csrf' and not csrf_retry:
                     csrf_retry = True
+                    previous_viewer = session['viewer_id']
                     session = self.session(force=True)
+                    if session['viewer_id'] != previous_viewer:
+                        raise TwitterError(2, 'The X account changed while recovering the session.',
+                                           'Start a new query and use a new output file for this account.', 'viewer_changed')
                     continue
                 if error.error == 'transaction_rejected' and not signature_retry:
                     signature_retry = True

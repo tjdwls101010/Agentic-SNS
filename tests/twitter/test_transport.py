@@ -24,3 +24,12 @@ def test_classify(status,body,error,code):
 def test_data_and_warning():
     data,warnings=classify({'status':200,'body':json.dumps({'data':{'list':{'name':'Example'}},'errors':[{'code':214}]})}, 'ListByRestId','data.list')
     assert data['name']=='Example' and len(warnings)==1
+
+@pytest.mark.parametrize('operation,root,body', [
+    ('UserByScreenName', 'data.user.result', {'data': {'user': {'result': {'unexpected': 'shape'}}}}),
+    ('UserTweets', 'data.user.result.timeline.timeline.instructions', {'data': {'user': {'result': {'timeline': {'timeline': {'instructions': {}}}}}}}),
+])
+def test_present_but_malformed_root_is_drift(operation, root, body):
+    with pytest.raises(TwitterError) as exc:
+        classify({'status': 200, 'body': json.dumps(body)}, operation, root)
+    assert exc.value.error == 'envelope_drift'

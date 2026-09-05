@@ -179,3 +179,13 @@ def test_transient_failure_does_not_poison_next_read(transport):
     assert exc.value.error == 'transient'
     assert profile(client)['rest_id'] == '100'
     assert not read_state('budget.json').get('block')
+
+
+def test_csrf_account_change_stops_before_replaying_old_account_query(transport):
+    client, calls, responses = transport
+    responses.extend([response({'errors': [{'code': 353}]}, 403),
+                      response({'ct0': 'new-account', 'twid': 'u%3D200'})])
+    with pytest.raises(TwitterError) as exc:
+        client.query('Likes', {'userId': '100'})
+    assert (exc.value.code, exc.value.error) == (2, 'viewer_changed')
+    assert [name for name, _ in calls] == ['graphql', 'cookie']
