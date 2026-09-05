@@ -381,3 +381,7 @@ description: Read Reddit through the user's logged-in Aside browser: the home fe
 - `python3 -m pytest -m live tests/reddit/live/test_live.py::test_morechildren_top_sort_keeps_the_flat_envelope -q`
 
 - P5 Graphify 최종: 960노드·2,358간선·63커뮤니티. `graphify extract . --code-only --no-cluster` → `graphify cluster-only . --no-label --no-viz` → Codex 명명 → `graphify export html --graph graphify-out/graph.json --labels graphify-out/.graphify_labels.json`. 전체 이름·HTML 반영을 확인했고 로컬 산출물로 유지했다.
+
+### Git 마무리
+
+P0–P5를 `feat/reddit-skill`에서 단계별 커밋했고 P2 이후 단계마다 푸시했다. 구현·로컬 검증은 완료됐으며 [PR #2 — feat: Reddit 읽기 전용 스킬 구현](https://github.com/tjdwls101010/Agentic-SNS/pull/2)에서 원격 CI와 스쿼시 머지 상태를 확인할 수 있다.
