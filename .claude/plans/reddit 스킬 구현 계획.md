@@ -348,7 +348,7 @@ description: Read Reddit through the user's logged-in Aside browser: the home fe
 | P2 | 완료 (A3 표본 제외) | 모델·렌더·schema·CLI 연결 완료. 실제 home·sub r/python(+after)·user u/spez·me subs·r/ClaudeAI 통과. 공유 링크 /s/ 표본 미확보. t2 사용자명/fullname 차이 재현·수정. 모델·렌더·목록·출력 33개 테스트 통과. |
 | P3 | 완료 | 순수 코어 26개 통과, 독립 리뷰 6건 재현·수정. 실제 대형 글 1요청→캐시 0요청→morechildren 1요청·부모 연결·댓글 앵커 통과. Graphify 950노드·2,373간선·59커뮤니티 추출, Codex 명명 진행. |
 | P4 | 완료 | 검색 재시도·파일 재실행·캐시 소실 복구·계정 문맥·시간대 비교·창 미달 빈 결과를 CLI로 검증. 실계정 검색→커뮤니티·소개·2일 창 수집→0요청 재실행 통과. 리뷰 4건 재현·수정. |
-| P5 | 진행 중 | 본문·README·CI 연결, 하네스 오류/경고 0. 합성 fixture 5개·도구 테스트 20개 통과. 실제 출력 사용성 V1–V4 수행(활동 빈 결과 exit 7 포함); 소스 열람 불필요. 최종 검사·PR·머지 대기. |
+| P5 | 구현·검증 완료 | 본문·README·CI 연결. Python 435개·JS 36개 통과, ruff·PII·하네스 오류/경고 0, drift 0. 실제 출력 V1–V4 수행(활동 빈 결과 exit 7 포함). Git 마무리는 아래 PR 기록에서 추적한다. |
 
 ### 실행 결정·보정
 
@@ -361,3 +361,23 @@ description: Read Reddit through the user's logged-in Aside browser: the home fe
 
 - A4: 기존 대형 스레드 포인터로 `morechildren sort=top`을 1회 호출하여 평탄한 t1/more·parent_id 형태를 확인했다.
 - 사용성 검토는 가드 포함 누적 총 30요청에서 종료했다. CLI의 Reddit 잔여 예산과 테스트의 30요청 상한은 별개다. 새 댓글 수와 문맥 행을 헤더에서 분리했고 수집 시각을 ISO로 통일했다.
+
+### 최종 검증 기록
+
+- 라이브 검증은 `python3 -m pytest -m live tests/reddit/live/test_live.py::<각 시나리오> -q`로 P1–P4 진행 중 나누어 실행했다. doctor, 목록/서버 after, 대형 스레드/앵커, 검색/소개/파일 창, top 정렬 morechildren의 5개 시나리오가 최종 통과했다. 대형 스레드 첫 시도는 서버가 자손을 함께 반환해 잘못된 계획 단언이 실패했고, 관측 계약으로 보정 후 통과했다. top 정렬 첫 선택은 빈 포인터만 골라 1회 skip됐고, ID가 있는 포인터 표본으로 바꿔 통과했다.
+- Codex 사용성 검토 V1은 이전 홈 캐시를 0요청으로 읽었다. V2 글·댓글, V3 커뮤니티 검색 후 글 2개, V4 프로필·활동을 수행했다. 마지막 활동은 검증된 빈 Listing으로 exit 7이며 재시도하지 않았다. 본문·help·실제 출력만 사용했고 구현 소스는 열지 않았다. 자동 description 트리거 자체의 실행 검증은 하지 않고 Facebook·ultra-search 설명과 근접 오발을 대조했다.
+- 실계정 검증·실제 출력 사용성 검토 합계는 30요청이다. 저장된 일별 가드가 요청 직전 검사하며, 사용성 검토의 별도 CLI에도 동일 가드를 사용했다. 요청 31은 fake Aside 경계 테스트로 차단을 확인했다.
+- A1 익명 modhash와 A3 실제 /s/ 공유 링크는 이번에 실측하지 못했다. 현재 계정에서 로그아웃하지 않았고, 받은 URL은 r/ClaudeAI 커뮤니티 주소였다. 공유 링크는 합성 JS/Python 리다이렉트·예산·URL 경계 테스트로 검증했다. A2 raw_json 전달/잔여 HTML 엔티티 처리는 JS·렌더 테스트로 검증했고, 동일 표본의 옵션 유무 비교는 미실행이다. A4 top 정렬 평탄 응답은 실측했다. A5는 js_challenge 표식이 있을 때만 영구 차단하며 미표식 HTML 403은 오류 6이다.
+- Claude headless e2e는 D4에 따라 미실행이다. 런타임은 표준 라이브러리와 Aside만 사용한다. 각 런타임 Python 모듈은 400줄 미만이며 스킬 밖 코드를 import하지 않는다.
+
+- 최종 `python3 -m pytest tests/ -q`: 435 passed, 12 deselected in 157.79s. `node --test tests/facebook/js/*.js tests/reddit/js/*.js`: 36 passed. `uvx ruff check --config pyproject.toml .claude/skills/reddit/scripts tests/reddit`: All checks passed. `python3 tests/reddit/tools/check_fixtures_pii.py`: 5파일 통과. `validate_harness.py --path .`: 오류 0·경고 0. `audit_harness.py --path .`: skill 2·drift 0.
+
+실제로 개별 실행한 라이브 명령(각 최종 1 passed):
+
+- `python3 -m pytest -m live tests/reddit/live/test_live.py::test_doctor -q`
+- `python3 -m pytest -m live tests/reddit/live/test_live.py::test_browse_real_listings_and_server_continuation -q`
+- `python3 -m pytest -m live tests/reddit/live/test_live.py::test_large_thread_cache_expansion_and_comment_anchor -q`
+- `python3 -m pytest -m live tests/reddit/live/test_live.py::test_search_about_and_file_window -q`
+- `python3 -m pytest -m live tests/reddit/live/test_live.py::test_morechildren_top_sort_keeps_the_flat_envelope -q`
+
+- P5 Graphify 최종: 960노드·2,358간선·63커뮤니티. `graphify extract . --code-only --no-cluster` → `graphify cluster-only . --no-label --no-viz` → Codex 명명 → `graphify export html --graph graphify-out/graph.json --labels graphify-out/.graphify_labels.json`. 전체 이름·HTML 반영을 확인했고 로컬 산출물로 유지했다.

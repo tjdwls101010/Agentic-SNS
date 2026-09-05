@@ -1,7 +1,7 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-m 'not live'"
-markers = ["live: reads the real logged-in Facebook account"]
+markers = ["live: reads the real logged-in account"]
 
 [tool.ruff]
 line-length = 120
