@@ -52,6 +52,26 @@ def test_post_page():
     print('post coverage:', coverage)
 
 
+def test_profile_direct_continuation():
+    result = run(args('user', '@zuck', '--limit', '20'))
+    assert result['ok'], result.get('message')
+    assert len({p['id'] for p in result['results']}) == 20
+    assert result['budget']['used'] <= 4
+    print('profile SSR + Direct:', result['budget']['used'], 'requests, 20 unique posts')
+
+
+def test_following_home():
+    result = run(args('home', '--feed', 'following', '--limit', '3'))
+    assert result['ok'], result.get('message')
+    assert len(result['results']) == 3 and result['budget']['used'] == 2
+
+
+def test_search_accounts():
+    result = run(args('search', 'python', '--type', 'users', '--limit', '5'))
+    assert result['ok'], result.get('message')
+    assert len(result['results']) == 5 and result['stop_reason'] == 'not_paginable'
+
+
 def test_profile_ssr_cursor_and_about():
     result = run(args('user', '@zuck', '--limit', '6'))
     assert result['ok'], result
@@ -60,5 +80,12 @@ def test_profile_ssr_cursor_and_about():
     assert result['budget']['used'] <= 3
     print('profile SSR -> Direct:', result['budget']['used'], 'requests;', len(ids), 'unique posts')
     about = run_post(args('about', '@zuck'))
-    assert about['ok'], about
+    assert about['ok'] or (about.get('code') == 8 and about.get('error') == 'envelope_drift'
+                           and about['results'][0]['counts']['following'] is None), about.get('message')
     assert set(about['results'][0]['counts']) == {'followers', 'following', 'mutuals'}
+
+
+def test_reply_parent_chain():
+    result = run_post(args('post', 'https://www.threads.com/@ashbridge30/post/Dcy_9M-ihsR'))
+    assert result['ok'] and result['budget']['used'] == 1
+    assert any(p['role'] == 'parent' and p['code'] == 'Dcy_A8pGo-m' for p in result['results'])

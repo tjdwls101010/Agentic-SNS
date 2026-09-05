@@ -141,7 +141,14 @@ class CursorStore:
             raise ThreadsError(2, 'Continuation handle is missing or incomplete.', 'Restart the original query.') from None
         if not isinstance(data, dict) or data.get('context') != context:
             raise ThreadsError(2, 'Continuation context does not match this query.', 'Copy the full more: command.')
-        if 'cursor' not in data or not isinstance(data.get('pending'), list):
+        if not isinstance(data.get('cursor'), dict) or not isinstance(data.get('pending'), list):
             raise ThreadsError(2, 'Continuation handle is incomplete.', 'Restart the original query.')
+        state = data['cursor']
+        if (not isinstance(state.get('pending', []), list) or
+                any(not isinstance(item, dict) for item in state.get('pending', [])) or
+                not isinstance(state.get('seen', []), list) or
+                any(not isinstance(item, str) for item in state.get('seen', [])) or
+                type(state.get('done', False)) is not bool or
+                state.get('after') is not None and not isinstance(state['after'], str)):
+            raise ThreadsError(2, 'Continuation progress is malformed.', 'Restart the original query.')
         return data
-

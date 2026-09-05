@@ -544,7 +544,7 @@
       },
       "flag_count": 4,
       "captured_at": "2026-09-05",
-      "notes": "Server caps at 20; report server_capped.",
+      "notes": "Initial capture returned 20; server batch size can vary. Report server_capped.",
       "flags": {
         "__relay_internal__pv__BarcelonaIsInternalUserrelayprovider": false,
         "__relay_internal__pv__BarcelonaIsLoggedInrelayprovider": true,

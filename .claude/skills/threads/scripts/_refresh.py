@@ -36,6 +36,9 @@ def refresh(transport, args):
     candidates, documents, failed, updated = {}, {}, {}, {}
     wanted = set(CAPTURE if args.capture else transport.registry.operations.keys() - set(CAPTURE))
     post = parse_target(args.post, 'post') if args.post else None
+    if args.capture and (not post or not post.username):
+        raise ThreadsError(2, 'Capture needs a canonical public post URL to start the SPA flow.',
+                           'Run refresh --capture --post <post URL>.')
     html = transport.page('/')
     viewer = transport.session.viewer
     def discover(html):
@@ -74,8 +77,6 @@ def refresh(transport, args):
         else:
             failed['post_route'] = 'No own post in SSR; supply --post URL to verify the three post operations.'
     else:
-        if not post:
-            raise ThreadsError(2, 'Capture needs a public post page to start the SPA flow.', 'Run refresh --capture --post <post URL>.')
         capture = transport.capture(post, CAPTURE)
         for candidate in capture['queries']:
             if candidate['name'] in wanted:

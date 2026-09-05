@@ -1,10 +1,26 @@
 """SSR reply completeness never pretends an unreplayable cursor is pagination."""
+from dataclasses import asdict, dataclass
 from ._cmds_common import context
 from ._errors import ThreadsError
 from ._models import build_post
 from ._output import OutFile
 from ._ssr import SSR
 from ._walk import at, drift
+
+
+@dataclass
+class Completeness:
+    reported_direct: int | None = None
+    received_direct: int = 0
+    shown_direct: int = 0
+    shown_descendants: int = 0
+    unshown_received: int = 0
+    unavailable: int = 0
+    unfetched: int | None = None
+    unfetched_is_estimate: bool = False
+
+    def to_dict(self):
+        return asdict(self)
 
 
 def read_thread(html, session, args):
@@ -70,9 +86,8 @@ def read_thread(html, session, args):
             records.append(record)
     reported = post.reply_count
     estimate = max(reported - received - unavailable, 0) if reported is not None and reported >= received + unavailable else None
-    coverage = {'reported_direct': reported, 'received_direct': received, 'shown_direct': shown,
-                'shown_descendants': descendants, 'unshown_received': received - shown,
-                'unavailable': unavailable, 'unfetched': estimate, 'unfetched_is_estimate': estimate is not None}
+    coverage = Completeness(reported, received, shown, descendants, received - shown,
+                            unavailable, estimate, estimate is not None).to_dict()
     result = {'ok': True, 'results': records, 'stop_reason': 'not_paginable', 'next': None,
               'completeness': coverage, 'context': {'sort': args.sort or 'top'}, 'post_id': target_id}
     if args.out:

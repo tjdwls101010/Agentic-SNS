@@ -50,7 +50,7 @@ def collect(fetch, *, limit, state=None, initial=None, since=None, until=None, m
         try:
             page = initial if initial is not None else fetch(state['after'])
             initial = None
-            if page.has_next and (page.cursor == state['after'] or page.cursor in cursors):
+            if page.has_next and not page.restarted and (page.cursor == state['after'] or page.cursor in cursors):
                 raise ThreadsError(6, 'The server repeated a continuation cursor.', 'Run refresh.', error='envelope_drift')
             if page.cursor:
                 cursors.add(page.cursor)
@@ -81,6 +81,7 @@ def collect(fetch, *, limit, state=None, initial=None, since=None, until=None, m
                                       and not state['unordered'])
             state.update(after=page.cursor, pending=records, done=not page.has_next or window_reached,
                          terminal='window_reached' if window_reached else page.stop)
+            state.update(page.state_updates)
             if page.reported_total is not None:
                 state['reported_total'] = page.reported_total
             if commit and not records:

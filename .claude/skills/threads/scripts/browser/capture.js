@@ -55,9 +55,9 @@ if (!Number.isInteger(ARGS.request_budget) || ARGS.request_budget < 1 || ARGS.re
           return request;
         };
         state.drain = async () => {let previous; do {previous = tail; await previous;} while (previous !== tail);};
-        const observe = (status, url, body) => {
+        const observe = (status, url, body, html = false) => {
           let payload = {};
-          try {payload = JSON.parse(body);} catch (_) {}
+          try {payload = JSON.parse(body.replace(/^\s*for\s*\(;;\);/, ''));} catch (_) {}
           const errors = {errors: payload.errors, error: payload.error, error_code: payload.error_code, error_subcode: payload.error_subcode};
           const codes = [], messages = [];
           const walk = (value, key = '') => {
@@ -69,7 +69,7 @@ if (!Number.isInteger(ARGS.request_budget) || ARGS.request_budget < 1 || ARGS.re
           walk(errors);
           const message = messages.join(' ');
           const checkpoint = /\/(?:checkpoint|challenge)(?:\/|\?|$)/.test(url || '') || codes.some(c => [368, 459].includes(c)) ||
-            /checkpoint|challenge|consent_required/.test(message) || Boolean(payload.checkpoint_url || payload.challenge_url) || /<form\b[^>]*action=["'][^"']*\/(?:challenge|checkpoint)/i.test(body);
+            /checkpoint|challenge|consent_required/.test(message) || Boolean(payload.checkpoint_url || payload.challenge_url) || html && /<form\b[^>]*action=["'][^"']*\/(?:challenge|checkpoint)/i.test(body);
           const limited = status === 429 || codes.some(c => [4, 17, 613, 80004].includes(c)) || /rate limit|too many request|try again later/.test(message);
           if (!(checkpoint || limited) || (state.envelopes.length && !checkpoint)) return;
           if (checkpoint) state.envelopes.length = 0;
@@ -79,7 +79,7 @@ if (!Number.isInteger(ARGS.request_budget) || ARGS.request_budget < 1 || ARGS.re
             body: JSON.stringify({error: {code: checkpoint ? 368 : 4}})});
         };
         state.observe = observe;
-        observe(200, location.href, document.documentElement ? document.documentElement.outerHTML : '');
+        observe(200, location.href, document.documentElement ? document.documentElement.outerHTML : '', true);
         window.__threadsRefresh = state;
         const record = body => {
           try {
@@ -238,7 +238,7 @@ if (!Number.isInteger(ARGS.request_budget) || ARGS.request_budget < 1 || ARGS.re
           const state = window.__threadsRefresh;
           if (!state) return null;
           state.stopped = true;
-          return {request_count: state.request_count, envelopes: state.envelopes};
+          return {request_count: state.request_count, envelopes: state.envelopes, queries: state.queries, attempts: state.attempts, observed_names: state.observed_names};
         }), sleep(250).then(() => null)]);
         if (snapshot) Object.assign(result, snapshot, {count_complete: true});
       } catch (_) { /* Python retains the reservation if no complete count is available. */ }

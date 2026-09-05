@@ -14,10 +14,12 @@ def context(args):
     for key, value in {'feed': 'foryou', 'tab': 'threads', 'sort': 'top', 'type': 'posts'}.items():
         if key in result and result[key] is None:
             result[key] = value
+    if result['command'] == 'search' and result.get('type') == 'users':
+        result.pop('sort', None)
     return result
 
 
-def more_command(ctx, handle):
+def more_command(ctx, handle, output=None, json_mode=False):
     parts = ['python3', str(Path(__file__).with_name('threads.py').resolve()), ctx['command']]
     for key in ('target', 'query', 'relation', 'collection'):
         if key in ctx:
@@ -28,6 +30,10 @@ def more_command(ctx, handle):
     if ctx.get('tag'):
         parts.append('--tag')
     parts.extend(['--after', str(handle)])
+    if output is not None:
+        parts.extend(['--out', str(Path(output).resolve())])
+    if json_mode:
+        parts.append('--json')
     return shlex.join(parts)
 
 

@@ -17,6 +17,18 @@ def test_cursor_binds_context_and_preserves_pending_without_credentials():
         store.load('../1', context)
 
 
+def test_corrupt_cursor_state_is_rejected_before_the_reader_uses_it():
+    store = CursorStore()
+    number = store.save({'command': 'home'}, {'after': 'A', 'pending': []})
+    path = store.directory / f'{number}.json'
+    record = json.loads(path.read_text())
+    record['cursor'] = 42
+    path.write_text(json.dumps(record))
+    with pytest.raises(ThreadsError) as error:
+        store.load(number, {'command': 'home'})
+    assert error.value.code == 2
+
+
 def test_output_discards_uncommitted_tail_and_does_not_claim_ssr_is_exhausted(tmp_path):
     path = tmp_path / 'posts.ndjson'
     file = OutFile(path, {'command': 'post'})
@@ -41,3 +53,15 @@ def test_output_rejects_symlink_without_touching_target(tmp_path):
     with pytest.raises(ThreadsError):
         OutFile(link, {})
     assert original.read_text() == 'valuable data'
+
+
+def test_file_continuation_keeps_path_and_rejects_a_handle_advanced_without_the_file(fake_aside, tmp_path):
+    from .test_cli import run_cli
+    file = tmp_path / 'collection.ndjson'
+    first = json.loads(run_cli('home', '--limit', '1', '--out', str(file), '--json').stdout)
+    assert '--out' in first['next'] and str(file) in first['next']
+    second = json.loads(run_cli('home', '--limit', '1', '--after', str(first['next_handle']), '--json').stdout)
+    before = file.read_bytes()
+    conflict = run_cli('home', '--after', str(second['next_handle']), '--out', str(file), '--json')
+    assert conflict.returncode == 2, conflict.stdout + conflict.stderr
+    assert file.read_bytes() == before

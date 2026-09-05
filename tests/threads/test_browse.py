@@ -81,3 +81,24 @@ def test_private_tabs_are_unavailable_even_when_profile_ssr_is_null(fake_aside, 
     monkeypatch.setenv('THREADS_FIXTURES', str(path))
     result = run_cli('user', '@fixture_user', '--tab', tab, '--json')
     assert result.returncode == 9, result.stdout + result.stderr
+
+
+def test_incompatible_ssr_cursor_restarts_direct_once_and_deduplicates(fake_aside, tmp_path, monkeypatch):
+    import os
+    from pathlib import Path
+    from .test_models import raw_post
+    rows = [json.loads(line) for line in Path(os.environ['THREADS_FIXTURES']).read_text().splitlines()]
+    for row in rows:
+        if row['key'] == 'BarcelonaProfileThreadsTabDirectQuery:after':
+            row['envelope']['body'] = json.dumps({'data': None, 'errors': [{'message': 'execution error', 'severity': 'CRITICAL'}]})
+        elif row['key'] == 'BarcelonaProfileThreadsTabDirectQuery':
+            row['envelope']['body'] = json.dumps({'data': {'mediaData': {'edges': [{'node': {'thread_items': [{'post': raw_post(str(i))}]}} for i in range(1, 8)],
+                                                                      'page_info': {'has_next_page': True, 'end_cursor': 'B'}}}})
+    path = tmp_path / 'cursor-fallback.ndjson'
+    path.write_text(''.join(json.dumps(row) + '\n' for row in rows))
+    monkeypatch.setenv('THREADS_FIXTURES', str(path))
+    result = run_cli('user', '@fixture_user', '--limit', '6', '--json')
+    assert result.returncode == 0, result.stdout + result.stderr
+    body = json.loads(result.stdout)
+    assert [p['id'] for p in body['results']] == ['1', '2', '3', '4', '5', '6']
+    assert body['budget']['used'] == 3

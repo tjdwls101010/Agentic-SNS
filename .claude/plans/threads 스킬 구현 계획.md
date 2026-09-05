@@ -336,17 +336,29 @@ description: Read Threads (threads.com) through the user's logged-in Aside brows
 |---|---|---|
 | P0 | 완료 | audit skill 3개·드리프트 0, 초기 pytest 0개 수집(exit 5), 사용자 스코프 링크 확인. 스냅샷 16종 전체를 아래 JSON 블록으로 통합하고 단독 파일 제거. |
 | P1 | 완료 | Python 경계 테스트 43개(P2 선행 7개 포함 전체 50), JS 4개 통과. 실계정 doctor: 1요청·661,226바이트·로그인 확인. Codex P1 리뷰 5건을 재현하여 오류 코드 키 보존·path 숫자 제외·잠금 내 unblock·Relay 구조 검사·오퍼레이션 리프 검증으로 수정. 빈 페이지의 exit 7은 목록 출력 경계에서 판정한다. |
-| P2 | 진행 중 | 순수 모델·SSR·리프 워커 완료, 목록·출력·브라우징 수직 구현 중. |
-| P3 | 진행 중 | 게시물·팔로잉 라이브 통과, Codex 2건 수정, 그래프 갱신 대기. |
-| P4 | 진행 중 | 검색·개인 목록·날짜 창·페이지 파일을 공통 경로에 연결, 추가 경계 검증 중. |
-| P5 | 진행 중 | 라우트 발견·재생 검증·원자 병합 구현, 캡처 계수·차단·정리 구현 및 테스트 중. |
-| P6 | 대기 | 위 P6 완료 판정·CI·PR 머지 |
+| P2 | 완료 | SSR·모델·목록·출력 구현 및 Codex 4건 수정. 홈 추천/팔로잉·프로필·about 응답 확인. SSR→Direct 불호환(A6)은 실측, 첫 Direct 재시작·중복 제거 대체는 오프라인 CLI로 검증. about 관계 수 누락은 부분 결과로 보존. |
+| P3 | 완료 | 글·답글 자기 페이지의 부모 체인·팔로잉 25명 라이브 통과, Codex 2건 수정. Graphify 1,242노드·3,077간선·87커뮤니티를 Codex가 명명하고 HTML 검증. |
+| P4 | 완료 | 검색3표면·계정 검색·단일 개인 배치·날짜 창·파일/핸들 검증. 계정 검색 라이브 통과. Codex 2건(검색 sort 이어읽기, 파일/핸들 진행 불일치) 수정. 비어 있지 않은 저장 목록은 미확인. |
+| P5 | 완료 | 기본 refresh 14요청·10종 갱신·failed 0. 캡처는 관측 6요청+bootstrap 비용 미확정·CLI 로컬10회, 좋아요/저장 2종 검증·4종 missing·탭 정리 확인. Codex 3건 수정, 합성 JS 차단/계수/정리 검증. |
+| P6 | 진행 중 | SKILL·README·CI·스펙·PII 도구·사용성 검증 완료, 최종 그래프·CI·PR 머지 대기. |
 
 P0 리뷰 `20260905-170532-threads-p0-review-7a38`: 16항목 보존·필드 차이 0 확인, 빈 tests 디렉터리 Git 미포함 지적은 P1 테스트 파일 추가로 해소. P1 리뷰 `20260905-171312-threads-p1-review-f536`: 위 5건 수정. 테스트 실패 후 통과를 단계별 기록으로 남긴다.
 
 2026-09-05 P2–P3: 라이브에서 actorID가 preloaderID보다 먼저 오는 JSON 객체와 중첩 bootstrap __bbox.require 구조를 발견하여 JSON 스크립트 순회로 수정했다. Aside REPL의 URL/URLSearchParams 부재를 실제 확인하고 폼 직렬화를 encodeURIComponent 기반으로 이식했다. SSR 프로필 user:null은 간헐적이며 about은 ProfilePage Direct로 보완한다. user는 정상 게시물이 있으면 추가 프로필 요청 없이 읽고, 빈 탭일 때만 프로필 Direct로 비공개 여부를 확정한다. FollowingTab의 counts에는 이번 응답에서 fediverse 수 두 필드만 있어 about은 following=unknown·exit 8을 유지하며 복구 단계에서 확인한다. 최초 라이브 실패·진단 요청도 누적 가드에 포함한다.
 
 P2 Codex 리뷰 `20260905-172458-threads-p2-review-079c`의 4건(SSR 대상 연결, about --out, 다른 비공개 탭, User counts 스키마)을 수정했다. P3 리뷰 `20260905-173458-threads-p3-review-6b20`의 2건(삭제된 답글 아래 정상 자손 보존, null SSR 프로필의 비공개 오판)을 재현 테스트로 수정했다. 라이브 게시물: 1요청, reported_direct=173·received_direct=10·shown_descendants=1·unfetched≈163. 팔로잉: 3요청·25명·id 중복 0. 팔로워는 서버 배치가 표시 제한보다 커 limit_reached가 우선되던 것을 server_capped 표기와 로컬 pending 이어읽기를 함께 제공하도록 수정했다.
+
+2026-09-05 최종 구현 검증: `python3 -m pytest tests/ -q`는 525 passed, 20 deselected, 199.27초. `node --test tests/facebook/js/*.js tests/reddit/js/*.js tests/threads/js/*.js`는 52 passed. 후속 schema 설명의 중복 키 린트 1건은 수정하고 ruff 통과를 확인했다. `validate_harness.py --path .`는 오류 0·경고 0. 합성 fixture는 중첩 JSON/HTML 내부의 이름·본문·식별자·토큰까지 게이트로 검사하며 직접 작성한 구조만 커밋한다. 모든 런타임 모듈은 400줄 이하이고 Python+JS 실행 코드는 약 2,400줄이다.
+
+P4 리뷰 `20260905-175057-threads-p4-review-99b5`의 2건과 P5 리뷰 `20260905-174331-threads-p5-review-3161`의 3건을 재현 테스트로 수정했다. P5에서는 for (;;); 접두 오류·정상 게시물의 HTML 같은 텍스트 오탐·예산 종료 시 캡처 후보 유실을 검증했다. 기본 refresh는 5,533,024바이트·14요청으로 10종을 갱신했고 doc_id와 플래그 수는 기존 10종과 동일했다. 캡처는 시작 시 다른 Aside REPL 클라이언트 0개를 확인한 뒤 소유 탭 하나만 열었다. 작성자/검색/좋아요/저장 이동은 성공했고 팔로워/팔로잉 컨트롤을 찾지 못했다. 좋아요/저장만 재생 검증하여 저장했고 나머지 네 오퍼레이션은 이전 값을 유지하며 missing으로 보고했다. 캡처가 관측한 GraphQL은 6회, 전체 명령의 로컬 비용은 10회, 탭 닫힘을 확인했다.
+
+사용성 1차 `20260905-180030-threads-usability-a448`는 read-only sandbox가 임시 캐시 생성을 거절해 V1/V3 실행이 막혔고, 도움말/스키마 검토에서 검색 sort 문구·구조화된 완전성 설명을 개선했다. 2차 `20260905-180324-threads-usability-executed-5ab6`는 임시 합성 데이터만 쓰는 sandbox에서 구현 소스를 읽지 않고 V1–V4를 전부 실행했다. 피드→more의 1–7번 누락/중복 0, 게시물 전문·부모·직접/하위 답글·추정치, 프로필 6건→about, 계정 검색1→남은2, 파일 수집1–7→already_complete 요청0, JSON 객체28개 키 검증을 통과했다. 마지막 지적한 next의 --json 보존을 CLI 재현 테스트로 수정했다. recent 경로는 해당 합성 픽스처에 없어 도구 오류3이었으며, 이를 라이브 검증 성공으로 세지 않았다.
+
+라이브 읽기 검증·초기 실패·구조 진단은 모두 `~/.cache/threads-skill/live-validation.json`의 30회 가드에 누적했고 최종 30회다. 홈 추천/팔로잉·프로필 첫 배치·계정 검색·게시물·답글 자기 페이지(부모 원글 코드 일치)·팔로잉 25명을 확인했다. 별도 실행한 P5 복구는 위 예산 기록을 따른다. A6 SSR 커서의 Direct 연결은 실패하여 대체 경로를 구현했지만 예산 소진 후 추가 라이브 재시도는 하지 않았다. 같은 방식으로 비어 있지 않은 저장 배치(A3), 익명(A1), 비공개 실계정(A4), 팔로잉/리포스트 단조성(A9), 모든 프로필 탭의 두 번째 라이브 페이지는 미확인이다. 날짜 창·저장 재개·검색 표면 변수는 오프라인 경계에서 검증했다. 이는 skip을 성공으로 센 것이 아니라 실제 검증 범위의 한계다. Claude 헤드리스 e2e는 D5에 따라 실행하지 않았다.
+
+최종 후속 검증: `python3 -m pytest tests/threads -q` 91 passed, 9 deselected, 48.92초 이후 캡처 seed 인자의 요청 전 거절 테스트 1개를 추가해 개별 통과했다. `uvx ruff check --config pyproject.toml .claude/skills/threads/scripts tests/threads`, `python3 tests/threads/tools/check_fixtures_pii.py`, `git diff --check` 모두 통과. 마지막 감사는 skill 3개·드리프트 0·오류 0·경고 0이다. 캡처는 명시적인 정식 게시물 --post를 요구하는 인터페이스로 두고, 누락/shortcode는 요청 전에 거절한다. 팔로워의 이번 반환 배치가 표시 제한 20보다 컸으므로 도움말에서 고정 20명 주장도 제거했다.
+
+P6 Graphify: code-only 갱신 후 Codex run `20260905-181652-threads-p6-graph-labels-4cf4`가 92개 커뮤니티를 검토해 37개 이름을 수정했다. 스냅샷은 1,274노드·3,101간선이며 labels·analysis·report·graph·HTML의 이름·구조 일치를 확인했다. 그래프 산출물은 기존 로컬 제외 정책을 유지한다.
 
 ## 레지스트리 스냅샷
 

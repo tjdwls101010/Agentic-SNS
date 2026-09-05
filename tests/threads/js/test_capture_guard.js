@@ -5,14 +5,14 @@ const path = require('node:path');
 const test = require('node:test');
 const source = fs.readFileSync(path.resolve(__dirname, '../../../.claude/skills/threads/scripts/browser/capture.js'), 'utf8');
 
-async function capture({budget = 4, kind = 'fetch', status = 200, checkpoint = false} = {}) {
+async function capture({budget = 4, kind = 'fetch', status = 200, checkpoint = false, responseBody} = {}) {
   const sent = [], output = [], pending = [];
   let closed = 0;
   const timers = new Set();
   const timer = (fn, ms) => { const id = setTimeout(() => {timers.delete(id); fn();}, ms); timers.add(id); return id; };
   const form = 'fb_api_req_friendly_name=BarcelonaFriendshipsFollowersTabQuery&doc_id=123&variables=%7B%7D';
   const url = 'https://www.threads.com/graphql/query';
-  const body = checkpoint ? '{"checkpoint_url":"/checkpoint/"}' : '{}';
+  const body = responseBody === undefined ? checkpoint ? '{"checkpoint_url":"/checkpoint/"}' : '{}' : responseBody;
   class XHR {
     constructor() {this.listeners = {};}
     open(method, address) {this.address = address;}
@@ -93,6 +93,19 @@ test('fetch and XHR share a single queue and the remaining budget', async () => 
   assert.equal(result.request_count, 3);
   assert.equal(result.failed, 'capture_budget');
   assert.equal(result.count_complete, true);
+  assert.equal(result.queries.length, 1);
+});
+
+test('prefixed checkpoint errors take precedence over HTTP 429', async () => {
+  const {sent, result} = await capture({status: 429, responseBody: 'for (;;);{"error_code":"368"}'});
+  assert.equal(sent.length, 1);
+  assert.equal(result.error.code, 368);
+});
+
+test('HTML-like post content is not a checkpoint form', async () => {
+  const {sent, result} = await capture({responseBody: JSON.stringify({data: {caption: {text: "<form action='/challenge/'>"}}})});
+  assert.equal(sent.length, 3);
+  assert.deepEqual(result.envelopes, []);
 });
 test('checkpoint takes precedence when a 429 body also contains a challenge', async () => {
   const {sent, result, envelope} = await capture({status: 429, checkpoint: true});

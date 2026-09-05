@@ -65,9 +65,11 @@ def parser():
             p.add_argument('--since', default=None, help='Inclusive ISO date/time lower bound, filtered locally; chronological surfaces only')
             p.add_argument('--until', default=None, help='Exclusive ISO date/time upper bound, filtered locally; no server-side filtering')
         if command in ('post', 'search'):
-            p.add_argument('--sort', choices=['top', 'recent'], default=None, help='Default top; recent post replies may overlap with top replies')
+            p.add_argument('--sort', choices=['top', 'recent'], default=None,
+                           help='Post search ranking; default top; unavailable for --type users' if command == 'search'
+                           else 'Reply ordering; default top; recent may overlap with top replies')
         if command == 'graph':
-            p.add_argument('relation', choices=['followers', 'following'], help='Followers is capped at 20 by the server; following can continue')
+            p.add_argument('relation', choices=['followers', 'following'], help='Followers is a server-capped sample whose batch size can vary; following can continue')
         if command == 'search':
             p.add_argument('query', help='Search text')
             p.add_argument('--type', choices=['posts', 'users'], default=None, help='Result kind; default posts; users has one batch only')
@@ -78,7 +80,7 @@ def parser():
             p.add_argument('--unblock', action='store_true', help='After checking Threads in Aside, make one login probe; clear a checkpoint only if it succeeds')
         if command == 'refresh':
             p.add_argument('--capture', action='store_true', help='Observe one app tab for six lazy queries; bootstrap requests and app mutations are outside CLI control')
-            p.add_argument('--post', default=None, help='Public post URL to seed SSR verification and SPA capture when your own profile has no posts')
+            p.add_argument('--post', default=None, help='Canonical public post URL; required for --capture, optional SSR seed when your own profile has no posts')
     return root
 
 
@@ -87,6 +89,8 @@ def main(argv=None):
         args = parser().parse_args(argv)
         if getattr(args, 'chars', 0) < 0:
             raise ThreadsError(2, '--chars cannot be negative.')
+        if args.command == 'search' and args.type == 'users' and (args.tag or args.sort is not None):
+            raise ThreadsError(2, '--tag and --sort apply to post search; account search has one unsorted batch.')
         if hasattr(args, 'target'):
             args.target = parse_target(args.target, 'post' if args.command == 'post' else 'user')
         if args.command in ('doctor', 'refresh', 'schema'):

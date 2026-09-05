@@ -26,6 +26,8 @@ class Page:
     stop: str = 'exhausted'
     groups: list = field(default_factory=list)
     reported_total: int | None = None
+    restarted: bool = False
+    state_updates: dict = field(default_factory=dict)
 
 
 def read_page(response, operation):

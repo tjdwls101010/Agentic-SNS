@@ -18,10 +18,14 @@ def run(args):
     transport = Transport(40 if args.limit or ctx.get('since') or args.out else 10)
     output = OutFile(args.out, ctx) if args.out else None
     try:
+        handle_state = CursorStore().load(args.after, ctx)['cursor'] if args.after else None
+        if output and handle_state is not None and output.cursor != handle_state:
+            raise ThreadsError(2, 'The file and continuation handle describe different committed progress.',
+                               'Resume the same output file without --after; its committed cursor is authoritative.')
         if output and output.complete:
             return finish({'ok': True, 'results': [], 'stop_reason': output.cursor.get('terminal', 'exhausted'),
                            'out': str(output.path), 'count': output.count, 'already_complete': True}, transport)
-        state = CursorStore().load(args.after, ctx)['cursor'] if args.after else (output.cursor if output else None)
+        state = handle_state if handle_state is not None else (output.cursor if output else None)
         state = state or {}
         initial = None
         if state:
@@ -38,6 +42,7 @@ def run(args):
                                                (profile.get('friendship_status') or {}).get('following') is False) if profile else None
             if args.command == 'user' and ctx['tab'] == 'threads':
                 initial = read_page(ssr.select('BarcelonaProfileThreadsTabDirectQuery', state['user_id']), 'BarcelonaProfileThreadsTabDirectQuery')
+                state['ssr_cursor'] = initial.cursor
                 check_access(initial, transport, state)
         else:
             html = transport.page('/')
@@ -53,7 +58,20 @@ def run(args):
                     values['data'] = values['data'] | {'reason': 'pagination'}
                 if args.command == 'graph' and ctx['relation'] == 'following':
                     name, values = 'BarcelonaFriendshipsFollowingTabRefetchableQuery', {'id': state['user_id'], 'first': 10, 'after': after}
-            page = read_page(transport.query(name, values), name)
+            restarted = False
+            try:
+                payload = transport.query(name, values)
+            except ThreadsError as error:
+                if not (args.command == 'user' and after and after == state.get('ssr_cursor') and
+                        error.error in ('operation_rotated', 'envelope_drift')):
+                    raise
+                # The SSR cursor and Direct query are different sources; try the Direct first page once, retaining seen IDs.
+                state['ssr_cursor'] = None
+                payload = transport.query(name, {key: value for key, value in values.items() if key != 'after'})
+                restarted = True
+            page = read_page(payload, name)
+            page.restarted = restarted
+            page.state_updates = {'ssr_cursor': None}
             if args.command == 'user':
                 check_access(page, transport, state)
             return page
@@ -67,9 +85,11 @@ def run(args):
             result['reported_total'] = state.get('reported_total')
         if state['pending'] or not state['done']:
             handle = CursorStore().save(ctx, state)
-            result.update(next_handle=handle, next=more_command(ctx, handle))
+            result.update(next_handle=handle, next=more_command(ctx, handle, output.path if output else None, args.json))
         if output:
             result.update(out=str(output.path), count=output.count, results=[])
+            if result['code'] == 7 and output.count:
+                result.update(code=0, ok=True)
         return finish(result, transport)
     finally:
         if output:

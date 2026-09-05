@@ -22,3 +22,9 @@ def test_refresh_keeps_unobserved_operations_and_never_saves_instance_variables(
     assert 'synthetic-csrf' not in json.dumps(saved)
     assert saved['operations']['BarcelonaProfileThreadsTabDirectQuery']['variables_template']['userID'] == '<pk>'
     assert saved['operations']['BarcelonaProfileThreadsTabDirectQuery']['doc_id'] == '1001'
+
+
+def test_capture_requires_its_seed_before_spending_a_request(fake_aside):
+    result = run_cli('refresh', '--capture', '--json')
+    assert result.returncode == 2
+    assert not fake_aside.exists()

@@ -31,6 +31,9 @@ class Post:
     is_pinned: bool = False
     unavailable: bool = False
     unavailable_reason: str | None = None
+    role: str = 'post'
+    depth: int = 0
+    relation: str | None = None
 
     def to_dict(self):
         return asdict(self)

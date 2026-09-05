@@ -21,3 +21,6 @@ jobs:
       - run: node --test tests/reddit/js/*.js
       - run: python tests/reddit/tools/check_fixtures_pii.py
       - run: ruff check --config pyproject.toml .claude/skills/reddit/scripts tests/reddit
+      - run: node --test tests/threads/js/*.js
+      - run: python tests/threads/tools/check_fixtures_pii.py
+      - run: ruff check --config pyproject.toml .claude/skills/threads/scripts tests/threads
