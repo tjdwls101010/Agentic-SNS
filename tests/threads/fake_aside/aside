@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+"""Deterministic process-boundary replies; never contacts a browser."""
+import json
+import os
+from pathlib import Path
+import re
+import sys
+
+source = sys.argv[-1]
+args = json.JSONDecoder().raw_decode(source.removeprefix('const ARGS = '))[0]
+snippet = re.search(r'// threads-snippet: (\w+)', source)[1]
+log = Path(os.environ['THREADS_FAKE_LOG'])
+with log.open('a') as stream:
+    stream.write(json.dumps({'snippet': snippet, 'path': args.get('path'), 'name': args.get('name'),
+                             'variables': args.get('variables')}) + '\n')
+fixtures = [json.loads(line) for line in Path(os.environ['THREADS_FIXTURES']).read_text().splitlines()]
+key = args.get('path') if snippet == 'page' else args.get('name') + (':after' if (args.get('variables') or {}).get('after') else '')
+matches = [record for record in fixtures if record['key'] == key]
+if not matches:
+    raise SystemExit('No fixture for requested surface')
+print(json.dumps(matches[0]['envelope']))

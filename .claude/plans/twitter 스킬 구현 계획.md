@@ -447,3 +447,7 @@ CI 최초 실행에서 `tests/twitter/live/test_live.py`와 Facebook live 모듈
  "txid_ingredients_2026_09_05": {"key_bytes_len": 48, "frames": {"0": 2, "1": 2, "2": 2, "3": 2}, "indices": [12, 4, 40, 27], "ondemand": "https://abs.twimg.com/responsive-web/client-web/ondemand.s.298568e61a87195ea.js", "main_js": "https://abs.twimg.com/responsive-web/client-web/main.1a27b43fa7bf61a8a.js", "animation_key": "6c0ff0e666666666666806e147ae147ae1406e147ae147ae140e666666666666800"}
 }
 ```
+
+## 원래 작업 디렉터리 통합
+
+2026-09-05: PR #3의 원격 main 머지는 완료됐으나 원래 작업 디렉터리는 Threads 브랜치에 남아 있어 Twitter 파일이 보이지 않았다. 사용자 지적에 따라 깨끗한 `feat/threads-skill` 작업 트리에 `origin/main`을 병합했다. Threads 소스·테스트는 그대로 보존하고 README·하네스 스펙·CI·ignore의 병행 추가를 모두 유지해 충돌을 해결했다. 사용자 스코프 Twitter 링크도 `/Users/seongjin/Coding/Agentic SNS/.claude/skills/twitter`로 옮긴다.
