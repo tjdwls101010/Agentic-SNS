@@ -340,7 +340,7 @@ description: Read Threads (threads.com) through the user's logged-in Aside brows
 | P3 | 완료 | 글·답글 자기 페이지의 부모 체인·팔로잉 25명 라이브 통과, Codex 2건 수정. Graphify 1,242노드·3,077간선·87커뮤니티를 Codex가 명명하고 HTML 검증. |
 | P4 | 완료 | 검색3표면·계정 검색·단일 개인 배치·날짜 창·파일/핸들 검증. 계정 검색 라이브 통과. Codex 2건(검색 sort 이어읽기, 파일/핸들 진행 불일치) 수정. 비어 있지 않은 저장 목록은 미확인. |
 | P5 | 완료 | 기본 refresh 14요청·10종 갱신·failed 0. 캡처는 관측 6요청+bootstrap 비용 미확정·CLI 로컬10회, 좋아요/저장 2종 검증·4종 missing·탭 정리 확인. Codex 3건 수정, 합성 JS 차단/계수/정리 검증. |
-| P6 | 진행 중 | SKILL·README·CI·스펙·PII 도구·사용성 검증 완료, 최종 그래프·CI·PR 머지 대기. |
+| P6 | 완료 | SKILL·CLI·스키마·PII·Codex V1–V4·Graphify·통합 CI 완료. PR #4 스쿼시 머지 3fa0810. Python 687개·JS 61개 통과, 감사 skill 4개·드리프트 0. |
 
 P0 리뷰 `20260905-170532-threads-p0-review-7a38`: 16항목 보존·필드 차이 0 확인, 빈 tests 디렉터리 Git 미포함 지적은 P1 테스트 파일 추가로 해소. P1 리뷰 `20260905-171312-threads-p1-review-f536`: 위 5건 수정. 테스트 실패 후 통과를 단계별 기록으로 남긴다.
 
@@ -359,6 +359,8 @@ P4 리뷰 `20260905-175057-threads-p4-review-99b5`의 2건과 P5 리뷰 `2026090
 최종 후속 검증: `python3 -m pytest tests/threads -q` 91 passed, 9 deselected, 48.92초 이후 캡처 seed 인자의 요청 전 거절 테스트 1개를 추가해 개별 통과했다. `uvx ruff check --config pyproject.toml .claude/skills/threads/scripts tests/threads`, `python3 tests/threads/tools/check_fixtures_pii.py`, `git diff --check` 모두 통과. 마지막 감사는 skill 3개·드리프트 0·오류 0·경고 0이다. 캡처는 명시적인 정식 게시물 --post를 요구하는 인터페이스로 두고, 누락/shortcode는 요청 전에 거절한다. 팔로워의 이번 반환 배치가 표시 제한 20보다 컸으므로 도움말에서 고정 20명 주장도 제거했다.
 
 P6 Graphify: code-only 갱신 후 Codex run `20260905-181652-threads-p6-graph-labels-4cf4`가 92개 커뮤니티를 검토해 37개 이름을 수정했다. 스냅샷은 1,274노드·3,101간선이며 labels·analysis·report·graph·HTML의 이름·구조 일치를 확인했다. 그래프 산출물은 기존 로컬 제외 정책을 유지한다.
+
+최종 완료: [PR #4](https://github.com/tjdwls101010/Agentic-SNS/pull/4)를 2026-09-05 18:36 KST에 `3fa08101c959b3637127efb11cbe04cec26f7dc8`로 스쿼시 머지했다. [통합 CI](https://github.com/tjdwls101010/Agentic-SNS/actions/runs/33958067546)는 `python -m pytest tests/` 687 passed·24 deselected·221.97초, JavaScript Facebook30+Reddit6+Threads16+Twitter9=61 passed, 네 스킬의 ruff/PII 게이트 통과다. Threads 오프라인 경계는 92개이며 감사는 skill 4개·드리프트 0·하네스 오류/경고 0이다. 먼저 main에 들어간 X를 다른 세션이 `1a907ff`로 통합했을 때 Threads 소스·테스트·계획이 `18fd626`과 동일함을 대조했다. 해당 세션의 공용 파일 병합과 Twitter 기록을 보존한 채 검증한 PR head를 지정해 머지했다. 이 마지막 문서 갱신은 승인된 PR의 결과 기록 후속 수정이며 런타임 코드는 바꾸지 않는다.
 
 ## 레지스트리 스냅샷
 
