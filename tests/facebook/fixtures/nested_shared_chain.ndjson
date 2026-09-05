@@ -1,0 +1,1 @@
+{"data":{"node":{"feedback":{"id":"A"},"message":{"text":"Synthetic A"},"attached_story":{"feedback":{"id":"B"},"message":{"text":"Synthetic B"},"permalink_url":"https://example.test/posts/B","attached_story":{"feedback":{"id":"C"},"message":{"text":"Synthetic C cut"},"is_truncated_body":true,"permalink_url":"https://example.test/posts/C"}}}}}

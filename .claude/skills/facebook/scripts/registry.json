@@ -1,0 +1,314 @@
+{
+  "captured_at": "2026-07-26",
+  "validated_at": "2026-09-05",
+  "queries": {
+    "about": {
+      "name": "ProfileCometAboutAppSectionQuery",
+      "doc_id": "38375456425386890",
+      "connection_key": null,
+      "cursor_var": null,
+      "referer": "https://www.facebook.com/",
+      "variables": {
+        "appSectionFeedKey": null,
+        "collectionToken": null,
+        "pageID": null,
+        "rawSectionToken": null,
+        "scale": 2,
+        "sectionToken": null,
+        "showReactions": true,
+        "userID": null
+      },
+      "expected_key": "about_app_sections",
+      "expected_kind": "connection"
+    },
+    "timeline": {
+      "name": "ProfileCometTimelineFeedRefetchQuery",
+      "doc_id": "27676223615330440",
+      "connection_key": "timeline_list_feed_units",
+      "cursor_var": "cursor",
+      "referer": "https://www.facebook.com/me",
+      "variables": {
+        "afterTime": null,
+        "beforeTime": null,
+        "count": 5,
+        "cursor": null,
+        "feedLocation": "TIMELINE",
+        "feedbackSource": 0,
+        "focusCommentID": null,
+        "memorializedSplitTimeFilter": null,
+        "omitPinnedPost": false,
+        "postedBy": null,
+        "privacy": null,
+        "privacySelectorRenderLocation": "COMET_STREAM",
+        "referringStoryRenderLocation": null,
+        "renderLocation": "timeline",
+        "scale": 2,
+        "stream_count": 1,
+        "taggedInOnly": null,
+        "trackingCode": null,
+        "useDefaultActor": false
+      },
+      "expected_key": "timeline_list_feed_units",
+      "expected_kind": "connection"
+    },
+    "newsfeed": {
+      "name": "CometNewsFeedPaginationQuery",
+      "doc_id": "27790894430578947",
+      "connection_key": "news_feed",
+      "cursor_var": "cursor",
+      "referer": "https://www.facebook.com/",
+      "variables": {
+        "RELAY_INCREMENTAL_DELIVERY": true,
+        "clientSession": null,
+        "connectionClass": "EXCELLENT",
+        "count": 5,
+        "cursor": null,
+        "experimentalValues": null,
+        "feedLocation": "NEWSFEED",
+        "feedStyle": "DEFAULT",
+        "feedbackSource": 1,
+        "focusCommentID": null,
+        "orderby": [
+          "TOP_STORIES"
+        ],
+        "privacySelectorRenderLocation": "COMET_STREAM",
+        "recentVPVs": [],
+        "referringStoryRenderLocation": null,
+        "refreshMode": "AUTO",
+        "renderLocation": "homepage_stream",
+        "scale": 2,
+        "shouldChangeBRSLabelFieldName": false,
+        "shouldObfuscateCategoryField": false,
+        "shouldUseBRSLabelFieldNameV1": false,
+        "shouldUseBRSLabelFieldNameV2": false,
+        "useDefaultActor": false
+      },
+      "expected_key": "news_feed",
+      "expected_kind": "connection"
+    },
+    "group": {
+      "name": "GroupsCometFeedRegularStoriesPaginationQuery",
+      "doc_id": "27489248654050164",
+      "connection_key": "group_feed",
+      "cursor_var": "cursor",
+      "referer": "https://www.facebook.com/groups/",
+      "variables": {
+        "count": 5,
+        "cursor": null,
+        "feedLocation": "GROUP",
+        "feedType": "DISCUSSION",
+        "feedbackSource": 0,
+        "filterTopicId": null,
+        "focusCommentID": null,
+        "privacySelectorRenderLocation": "COMET_STREAM",
+        "referringStoryRenderLocation": null,
+        "renderLocation": "group",
+        "scale": 2,
+        "sortingSetting": "TOP_POSTS",
+        "stream_initial_count": 1,
+        "useDefaultActor": false
+      },
+      "expected_key": "group_feed",
+      "expected_kind": "connection"
+    },
+    "search": {
+      "name": "SearchCometResultsPaginatedResultsQuery",
+      "doc_id": "28091046377146459",
+      "connection_key": "results",
+      "cursor_var": "cursor",
+      "referer": "https://www.facebook.com/search/top/",
+      "variables": {
+        "allow_streaming": false,
+        "args": {
+          "callsite": "COMET_GLOBAL_SEARCH",
+          "config": {
+            "exact_match": false,
+            "high_confidence_config": null,
+            "intercept_config": null,
+            "sts_disambiguation": null,
+            "watch_config": null
+          },
+          "context": {
+            "bsid": null,
+            "tsid": null
+          },
+          "experience": {
+            "client_defined_experiences": [
+              "ADS_PARALLEL_FETCH"
+            ],
+            "encoded_server_defined_params": null,
+            "fbid": null,
+            "type": "GLOBAL_SEARCH"
+          },
+          "filters": [],
+          "text": ""
+        },
+        "count": 5,
+        "cursor": null,
+        "feedLocation": "SEARCH",
+        "feedbackSource": 23,
+        "fetch_filters": true,
+        "focusCommentID": null,
+        "locale": null,
+        "privacySelectorRenderLocation": "COMET_STREAM",
+        "referringStoryRenderLocation": null,
+        "renderLocation": "search_results_page",
+        "scale": 2,
+        "stream_initial_count": 0,
+        "useDefaultActor": false
+      },
+      "expected_key": "results",
+      "expected_kind": "connection"
+    },
+    "post": {
+      "name": "CometSinglePostDialogContentQuery",
+      "doc_id": "27371991432470815",
+      "connection_key": null,
+      "cursor_var": null,
+      "referer": "https://www.facebook.com/",
+      "variables": {
+        "feedLocation": "POST_PERMALINK_DIALOG",
+        "feedbackSource": 2,
+        "focusCommentID": null,
+        "privacySelectorRenderLocation": "COMET_STREAM",
+        "renderLocation": "permalink",
+        "scale": 2,
+        "shouldChangeNodeFieldName": true,
+        "useDefaultActor": false
+      },
+      "expected_key": "node",
+      "expected_kind": "object"
+    },
+    "comments": {
+      "name": "CommentListComponentsRootQuery",
+      "doc_id": "27659404140378758",
+      "connection_key": "comments",
+      "cursor_var": null,
+      "referer": "https://www.facebook.com/",
+      "variables": {
+        "commentsIntentToken": null,
+        "feedLocation": "POST_PERMALINK_DIALOG",
+        "feedbackSource": 2,
+        "focusCommentID": null,
+        "scale": 2,
+        "useDefaultActor": false
+      },
+      "expected_key": "comments",
+      "expected_kind": "connection"
+    },
+    "comments_page": {
+      "name": "CommentsListComponentsPaginationQuery",
+      "doc_id": "27806180149070312",
+      "connection_key": "comments",
+      "cursor_var": "commentsAfterCursor",
+      "referer": "https://www.facebook.com/",
+      "variables": {
+        "commentsAfterCount": -1,
+        "commentsAfterCursor": null,
+        "commentsBeforeCount": null,
+        "commentsBeforeCursor": null,
+        "commentsIntentToken": null,
+        "feedLocation": "POST_PERMALINK_DIALOG",
+        "focusCommentID": null,
+        "scale": 2,
+        "useDefaultActor": false
+      },
+      "expected_key": "comments",
+      "expected_kind": "connection"
+    },
+    "replies": {
+      "name": "Depth1CommentsListPaginationQuery",
+      "doc_id": "27888228590762910",
+      "connection_key": null,
+      "cursor_var": null,
+      "referer": "https://www.facebook.com/",
+      "variables": {
+        "clientKey": null,
+        "expansionToken": null,
+        "feedLocation": "POST_PERMALINK_DIALOG",
+        "focusCommentID": null,
+        "repliesAfterCount": null,
+        "repliesAfterCursor": null,
+        "repliesBeforeCount": null,
+        "repliesBeforeCursor": null,
+        "scale": 2,
+        "useDefaultActor": false
+      },
+      "expected_key": "replies_connection",
+      "expected_kind": "connection"
+    }
+  },
+  "relay_provider_flags": {
+    "__relay_internal__pv__CometFeedShareMedia_shouldPrefetchShareImagerelayprovider": true,
+    "__relay_internal__pv__CometFeedStory_enable_post_permalink_white_space_clickrelayprovider": false,
+    "__relay_internal__pv__CometFeedStory_enable_reactor_facepilerelayprovider": false,
+    "__relay_internal__pv__CometFeedStory_enable_social_bubblesrelayprovider": false,
+    "__relay_internal__pv__CometImmersivePhotoCanUserDisable3DMotionrelayprovider": false,
+    "__relay_internal__pv__CometUFICommentActionLinksRewriteEnabledrelayprovider": true,
+    "__relay_internal__pv__CometUFICommentAutoTranslationTyperelayprovider": "AUTO_TRANSLATE",
+    "__relay_internal__pv__CometUFICommentAvatarStickerAnimatedImagerelayprovider": false,
+    "__relay_internal__pv__CometUFIReactionsEnableShortNamerelayprovider": false,
+    "__relay_internal__pv__CometUFIShareActionMigrationrelayprovider": true,
+    "__relay_internal__pv__CometUFISingleLineUFIrelayprovider": true,
+    "__relay_internal__pv__CometUFI_dedicated_comment_routable_dialog_gkrelayprovider": true,
+    "__relay_internal__pv__FBProfile_enable_perf_improv_gkrelayprovider": true,
+    "__relay_internal__pv__FBReelsIFUTileContent_reelsIFUPlayOnHoverrelayprovider": true,
+    "__relay_internal__pv__FBReelsMediaFooter_comet_enable_reels_ads_gkrelayprovider": true,
+    "__relay_internal__pv__FBReels_deprecate_short_form_video_context_gkrelayprovider": true,
+    "__relay_internal__pv__FBReels_enable_view_dubbed_audio_type_gkrelayprovider": true,
+    "__relay_internal__pv__FBUnifiedVideoFeedbackBar_comet_reels_save_button_gkrelayprovider": false,
+    "__relay_internal__pv__FBUnifiedVideoMediaContentContainer_comet_reels_video_footer_defer_loading_gkrelayprovider": true,
+    "__relay_internal__pv__FBUnifiedVideoMediaContentContainer_comet_video_document_picture_in_picture_gkrelayprovider": false,
+    "__relay_internal__pv__FBUnifiedVideoMediaContentContainer_enable_chapters_pill_gkrelayprovider": false,
+    "__relay_internal__pv__FBUnifiedVideoMediaFooter_comet_enable_reels_ads_gkrelayprovider": true,
+    "__relay_internal__pv__FBUnifiedVideoMediaFooter_enable_ai_embodiment_chat_pill_gkrelayprovider": false,
+    "__relay_internal__pv__FBUnifiedVideoMediaFooter_enable_group_character_ai_info_pill_gkrelayprovider": true,
+    "__relay_internal__pv__FBUnifiedVideoMediaFooter_enable_meta_ai_pill_gkrelayprovider": true,
+    "__relay_internal__pv__FBUnifiedVideoMediaFooter_enable_video_augment_pills_gkrelayprovider": false,
+    "__relay_internal__pv__FBUnifiedVideoMediaHeaderControls_enable_chapters_pill_gkrelayprovider": false,
+    "__relay_internal__pv__FBUnifiedVideoMenu_fb_reels_ranking_debug_tool_gkrelayprovider": false,
+    "__relay_internal__pv__GHLShouldChangeAdIdFieldNamerelayprovider": false,
+    "__relay_internal__pv__GHLShouldChangeSponsoredAuctionDistanceFieldNamerelayprovider": false,
+    "__relay_internal__pv__GHLShouldChangeSponsoredDataFieldNamerelayprovider": false,
+    "__relay_internal__pv__GHLShouldUseSponsoredAuctionLabelFieldNameV1relayprovider": false,
+    "__relay_internal__pv__GHLShouldUseSponsoredAuctionLabelFieldNameV2relayprovider": false,
+    "__relay_internal__pv__GroupsCometGYSJFeedItemHeightrelayprovider": 206,
+    "__relay_internal__pv__IsMergQAPollsrelayprovider": false,
+    "__relay_internal__pv__IsWorkUserrelayprovider": false,
+    "__relay_internal__pv__ProfileCometSeoIsViewerLoggedOutrelayprovider": false,
+    "__relay_internal__pv__ReelsIFUCard_reelsIFULikeCountrelayprovider": false,
+    "__relay_internal__pv__ShouldEnableBakedInTextStoriesrelayprovider": false,
+    "__relay_internal__pv__ShouldEnableBakedInTextUnifiedVideorelayprovider": false,
+    "__relay_internal__pv__StoriesShouldIncludeFbNotesrelayprovider": false,
+    "__relay_internal__pv__TestPilotShouldIncludeDemoAdUseCaserelayprovider": false,
+    "__relay_internal__pv__WorkCometIsEmployeeGKProviderrelayprovider": false,
+    "__relay_internal__pv__relay_provider_comet_ufi_ssr_seo_deferrelayprovider": true,
+    "__relay_internal__pv__usePushPipEngagementCounts_comet_video_document_picture_in_picture_gkrelayprovider": false,
+    "__relay_internal__pv__StoriesShouldEnablePhotosensitiveContentWarningrelayprovider": false
+  },
+  "about_section_id": "2327158227",
+  "feed_sort_tokens": {
+    "top": {
+      "orderby": [
+        "TOP_STORIES"
+      ],
+      "feedStyle": "DEFAULT"
+    },
+    "recent": {
+      "orderby": [
+        "MOST_RECENT"
+      ],
+      "feedStyle": "MOST_RECENT_FEED_DEFAULT"
+    }
+  },
+  "group_sort_tokens": {
+    "top": "TOP_POSTS",
+    "recent": "CHRONOLOGICAL",
+    "activity": "RECENT_ACTIVITY"
+  },
+  "comment_sort_tokens": {
+    "top": "RANKED_UNFILTERED_INTENT_V1",
+    "recent": "REVERSE_CHRONOLOGICAL_UNFILTERED_INTENT_V1"
+  },
+  "relay_flags_updated_at": "2026-09-05"
+}
