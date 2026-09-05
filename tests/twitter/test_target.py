@@ -21,3 +21,14 @@ def test_malformed_url_is_an_argument_error(value):
     with pytest.raises(TwitterError) as exc:
         parse(value, 'user')
     assert exc.value.code == 2
+
+@pytest.mark.parametrize('kind,value,field,expected', [
+    ('list', '123', 'list_id', '123'),
+    ('list', 'https://x.com/i/lists/123/?s=20', 'list_id', '123'),
+    ('community', '456', 'community_id', '456'),
+    ('community', 'https://twitter.com/i/communities/456', 'community_id', '456'),
+    ('user', 'https://www.x.com/example/', 'handle', 'example'),
+    ('post', 'https://www.twitter.com/example/status/123/video/1', 'tweet_id', '123'),
+])
+def test_identity_forms_across_read_surfaces(kind, value, field, expected):
+    assert getattr(parse(value, kind), field) == expected

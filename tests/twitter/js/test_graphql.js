@@ -39,3 +39,12 @@ test('ungated requests omit an unavailable signature',async()=>{
     {log:()=>{}});
   assert.equal(Object.hasOwn(headers,'x-client-transaction-id'),false);
 });
+for (const method of ['GET','POST']) test(method+' preserves optional field toggles',async()=>{
+  let call;
+  await new AsyncFunction('ARGS','fetch','console',source('graphql'))(
+    {op:'UserByScreenName',query_id:'abc',method,variables:{screen_name:'example'},features:{},field_toggles:{withAuxiliaryUserLabels:true},ct0:'synthetic',bearer:'public'},
+    async(url,options)=>{call={url,options};return {status:200,url,text:async()=>'{}',headers:{get:()=>null}}},
+    {log:()=>{}});
+  const toggles=method==='GET'?JSON.parse(new URL(call.url).searchParams.get('fieldToggles')):JSON.parse(call.options.body).fieldToggles;
+  assert.deepEqual(toggles,{withAuxiliaryUserLabels:true});
+});

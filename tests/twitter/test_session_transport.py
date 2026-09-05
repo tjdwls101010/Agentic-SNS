@@ -154,3 +154,28 @@ def test_each_request_mints_a_fresh_signature(transport, monkeypatch):
     profile(client)
     signatures = [args['txid'] for name, args in calls if name == 'graphql']
     assert len(signatures) == 2 and signatures[0] != signatures[1]
+
+
+def test_challenge_is_permanent_even_after_rate_header_expiry(transport):
+    client, calls, responses = transport
+    responses.append(response('<!DOCTYPE html><html>challenge</html>', 403))
+    with pytest.raises(TwitterError) as exc:
+        profile(client)
+    assert exc.value.error == 'challenge'
+    client.budget.observe('different', {'limit': 50, 'remaining': 0, 'reset': 1}, 429)
+    client.budget.clock = lambda: time.time() + 100000
+    with pytest.raises(TwitterError) as exc:
+        client.query('Viewer')
+    assert exc.value.error == 'challenge'
+    assert len(calls) == 1
+    assert read_state('budget.json')['block']['expires_at'] is None
+
+
+def test_transient_failure_does_not_poison_next_read(transport):
+    client, calls, responses = transport
+    responses.extend([response('bad gateway', 502), response({'data': {'user': {'result': {'rest_id': '100'}}}})])
+    with pytest.raises(TwitterError) as exc:
+        profile(client)
+    assert exc.value.error == 'transient'
+    assert profile(client)['rest_id'] == '100'
+    assert not read_state('budget.json').get('block')
