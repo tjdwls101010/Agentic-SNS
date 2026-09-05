@@ -15,10 +15,15 @@
 | B1 | 페이스북 읽기·탐색·수집·쿼리 복구 | skill | `.claude/skills/facebook/SKILL.md` | validated |
 | B2 | 좋아요·댓글 작성·게시 | skill | — | declined |
 | B3 | 반응한 사람 목록 | skill | — | declined |
+| B4 | 레딧 읽기·탐색·댓글 상태·수집 | skill | `.claude/skills/reddit/SKILL.md` | approved |
+| B5 | 레딧 게시·댓글 작성·추천·저장·구독 변경 | skill | — | declined |
+| B6 | 레딧 메시지함·알림 | skill | — | declined |
 
 ## Component specs
 
 facebook은 scripts/ 아래의 독립 CLI와 브라우저 스니펫을 포함한다. 기존 `.tmp/Agentic Facebook`의 검증된 파서만 이식하고 브라우저 세션은 Aside에 맡긴다. 테스트 경계와 단계별 완료 기준은 [승인 계획](plans/facebook%20스킬%20구현%20계획.md)을 따른다. 사용자 스코프에는 레포 스킬 심볼릭 링크로 배포한다. 다른 스킬과 코드를 공유하지 않는다.
+
+reddit은 [승인 계획](plans/reddit%20스킬%20구현%20계획.md)의 D1–D8과 테스트 경계·P0–P5 완료 기준을 따른다. Aside u0 실계정, 읽기 전용, Python 표준 라이브러리, 독립 scripts/를 사용하고 사용자 스코프 심볼릭 링크로 배포한다. 본문·도움말·주석은 영어이고 description에 한국어 트리거를 포함한다. Claude 헤드리스 e2e는 실행하지 않는다.
 
 ## Design rationale
 
