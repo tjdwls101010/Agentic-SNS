@@ -345,7 +345,7 @@ description: Read Reddit through the user's logged-in Aside browser: the home fe
 |---|---|---|
 | P0 | 완료 | audit skill 2개·drift 0, pytest tests/reddit 0개 exit 5, 사용자 스코프 심볼릭 링크 확인. ab671b1. 독립 리뷰는 P1 작업과 함께 진행 중. |
 | P1 | 완료 | Python 114개·JS 6개·ruff 통과. 실제 doctor 1요청 통과. 독립 리뷰 3건(공유 링크 홉별 예산·중첩 replies 검증·인코딩 slug)을 재현·수정했다. |
-| P2 | 진행 중 | 모델·렌더·schema·CLI 연결 완료. 실제 home·sub r/python(+after)·user u/spez·me subs·r/ClaudeAI 통과. 공유 링크 /s/ 표본 미확보. t2 사용자명/fullname 차이 재현·수정. |
+| P2 | 완료 (A3 표본 제외) | 모델·렌더·schema·CLI 연결 완료. 실제 home·sub r/python(+after)·user u/spez·me subs·r/ClaudeAI 통과. 공유 링크 /s/ 표본 미확보. t2 사용자명/fullname 차이 재현·수정. 모델·렌더·목록·출력 33개 테스트 통과. |
 | P3 | 진행 중 | 순수 코어 13개 테스트 통과. 실제 대형 글 1요청→캐시 0요청→morechildren 1요청·부모 연결·댓글 앵커 통과. 독립 리뷰 6건 수정 중. |
 | P4 | 진행 중 | 목록·출력 경계 26개 통과. 검색 재시도·파일 재실행·캐시 소실 후 스레드 파일 복구를 CLI에서 검증 중. |
 | P5 | 대기 | 최종 문서·CI·사용성 리뷰·PR·머지. |
