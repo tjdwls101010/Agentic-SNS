@@ -206,3 +206,9 @@ def test_malformed_nested_shapes_are_error_six_without_partial_expansion():
             merge_more(state, [comment('valid'), bad], exp['ids'], exp['pointer'])
         assert error.value.code == 6
         assert state == before
+
+
+def test_anchor_ancestors_are_not_claimed_as_previously_seen():
+    state = create_state(pair(comment('a', replies=(comment('b', 't1_a'),))), Target('comment', post_id='p', comment_id='b'))
+    rows = select_batch(state, limit=1, depth=0)['records']
+    assert rows[0]['context'] and rows[0].get('shown_earlier') is False

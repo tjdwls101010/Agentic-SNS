@@ -347,8 +347,8 @@ description: Read Reddit through the user's logged-in Aside browser: the home fe
 | P1 | 완료 | Python 114개·JS 6개·ruff 통과. 실제 doctor 1요청 통과. 독립 리뷰 3건(공유 링크 홉별 예산·중첩 replies 검증·인코딩 slug)을 재현·수정했다. |
 | P2 | 완료 (A3 표본 제외) | 모델·렌더·schema·CLI 연결 완료. 실제 home·sub r/python(+after)·user u/spez·me subs·r/ClaudeAI 통과. 공유 링크 /s/ 표본 미확보. t2 사용자명/fullname 차이 재현·수정. 모델·렌더·목록·출력 33개 테스트 통과. |
 | P3 | 완료 | 순수 코어 26개 통과, 독립 리뷰 6건 재현·수정. 실제 대형 글 1요청→캐시 0요청→morechildren 1요청·부모 연결·댓글 앵커 통과. Graphify 950노드·2,373간선·59커뮤니티 추출, Codex 명명 진행. |
-| P4 | 진행 중 | 목록·출력 경계 26개 통과. 검색 재시도·파일 재실행·캐시 소실 후 스레드 파일 복구를 CLI에서 검증 중. |
-| P5 | 대기 | 최종 문서·CI·사용성 리뷰·PR·머지. |
+| P4 | 완료 | 검색 재시도·파일 재실행·캐시 소실 복구·계정 문맥·시간대 비교·창 미달 빈 결과를 CLI로 검증. 실계정 검색→커뮤니티·소개·2일 창 수집→0요청 재실행 통과. 리뷰 4건 재현·수정. |
+| P5 | 진행 중 | 본문·README·CI 연결, 하네스 오류/경고 0. 합성 fixture 5개·도구 테스트 20개 통과. 실제 출력 사용성 V1–V4 수행(활동 빈 결과 exit 7 포함); 소스 열람 불필요. 최종 검사·PR·머지 대기. |
 
 ### 실행 결정·보정
 
@@ -358,3 +358,6 @@ description: Read Reddit through the user's logged-in Aside browser: the home fe
 - P3 라이브에서 morechildren 요청 ID 1개에 t1 3개(요청 댓글+자손)가 반환됐다. 계획의 “반환 id ⊆ 요청 id” 조건은 실제 서버 계약과 달라 폐기한다. 요청 ID 수신 여부와 모든 반환 노드의 부모 연결을 검증하고, 실제 삭제·검열로 미수신한 요청은 missing으로 보존한다. 자손을 버리지 않는 현재 병합 방식은 유지한다.
 
 - 첫 전체 오프라인 실행: `python3 -m pytest tests/ -q` → 363 passed, 8 deselected, 143.54초. 이후 리뷰 회귀 테스트를 추가 중이므로 최종 수치는 다시 기록한다.
+
+- A4: 기존 대형 스레드 포인터로 `morechildren sort=top`을 1회 호출하여 평탄한 t1/more·parent_id 형태를 확인했다.
+- 사용성 검토는 가드 포함 누적 총 30요청에서 종료했다. CLI의 Reddit 잔여 예산과 테스트의 30요청 상한은 별개다. 새 댓글 수와 문맥 행을 헤더에서 분리했고 수집 시각을 ISO로 통일했다.

@@ -35,7 +35,8 @@ def count(value):
 def render_item(item, index, chars=180, full=False):
     kind = item['kind']
     if kind == 'comment' and item.get('context'):
-        return f'[c{index} shown earlier] u/{item.get("author", "[deleted]")}: {quote(normalize_text(item.get("text"))[:chars])}'
+        label = 'shown earlier' if item.get('shown_earlier', True) else 'ancestor context'
+        return f'[c{index} {label}] u/{item.get("author", "[deleted]")}: {quote(normalize_text(item.get("text"))[:chars])}'
     labels = [key for key in ('nsfw', 'spoiler', 'locked', 'pinned', 'undated', 'admin', 'moderator') if item.get(key)]
     if item.get('window_excluded') and item['window_excluded'] not in labels:
         labels.append(item['window_excluded'])

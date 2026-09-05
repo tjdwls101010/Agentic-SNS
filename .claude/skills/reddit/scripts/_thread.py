@@ -79,7 +79,7 @@ def select_batch(state, limit=25, depth=2, anchor=None):
             ancestors.append(parent)
             parent = state['nodes'][parent]['parent']
         for ancestor in reversed(ancestors):
-            records.append(dict(state['nodes'][ancestor]['data'], context=True, anchor=False, orphan=orphan))
+            records.append(dict(state['nodes'][ancestor]['data'], context=True, shown_earlier=state['nodes'][ancestor]['shown'], anchor=False, orphan=orphan))
             emitted.add(ancestor)
         records.append(dict(state['nodes'][name]['data'], context=False, anchor=name == anchor, orphan=orphan))
         emitted.add(name)
