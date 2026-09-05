@@ -364,14 +364,17 @@ description: Read X (Twitter, x.com) through the user's logged-in Aside browser:
 | 단계 | 상태 | 완료 근거·남은 검증 |
 |---|---|---|
 | P0 | 진행 중 | 원본 하네스 audit: skill 3개·드리프트 0. 격리 worktree·계획 복사 완료. Twitter 레지스트리·스킬 생성 대기. |
-| P1 | 진행 중 | 승인된 CLI·통신·요청 예산·세션·서명 경계에서 red→green 구현 시작. |
-| P2 | 대기 | 워커·모델·출력·꼬리 우선 이어읽기 및 홈·프로필 라이브 검증 필요. |
+| P1 | 진행 중 | 중간 검증: `python3 -m pytest tests/twitter/test_target.py tests/twitter/test_transport.py -q` 26 passed, `node --test tests/twitter/js/*.js` 4 passed. 실제 HTML·서명 청크·Viewer 1요청 성공. 독립 P1 리뷰와 동시성·복구 테스트 보강 대기. |
+| P2 | 진행 중 | 새 사용자 필드·리포스트·장문·인용·모듈 워커 수직 구현. 꼬리 우선 이어읽기·부분 결과 테스트부터 출력 경로 연결 중. |
 | P3 | 대기 | 부모·focal·직접/중첩 답글·관계망 검증과 Graphify 갱신 필요. |
 | P4 | 대기 | 검색·개인 목록·리스트·트렌드·커뮤니티·날짜 창·파일 재개 검증 필요. |
 | P5 | 대기 | 읽기 쿼리 발견·검증 실패 시 미저장·실제 refresh 검증 필요. |
 | P6 | 대기 | 본문/도움말 사용성·CI·하네스 검증·독립 리뷰·PR·머지 필요. |
 
 구현 실행: Codex `20260905-175118-twitter-implementation-f3e1` (`gpt-6-astra`, medium, priority). 소유 범위는 `.claude/skills/twitter/`와 `tests/twitter/`이며, 상위 세션이 계획·하네스·CI·Git 통합과 결과 검증을 담당한다. Threads 구현과 원본 브랜치 변경은 금지했다. 라이브 가드는 계획 최종 정정의 40회이며 refresh는 별도다.
+
+P1 독립 리뷰 `20260905-175554-twitter-p1-review-acdb`: URL 포트/IPv6 파싱 예외, 특수문자 검색어 템플릿 오인, 누락 feature 덮어쓰기 3건을 확인했다. 각 실패 테스트를 먼저 실행해 재현하고 공통 경계에서 수정했다. 상위 세션이 P1 모듈과 테스트 소유권을 받아 동시 프로세스·오퍼레이션 버킷 격리·창/호출 상한·영구 차단·CSRF 재취득·계정 전환·서명 재생성과 gated 학습·Aside subprocess/조각 봉투를 보강했다. `python3 -m pytest tests/twitter/test_target.py tests/twitter/test_registry.py tests/twitter/test_budget.py tests/twitter/test_session_transport.py tests/twitter/test_transport.py tests/twitter/test_txid.py tests/twitter/test_aside.py -q`: 59 passed. `node --test tests/twitter/js/test_graphql.js`: 5 passed. 같은 P1 파일 대상 `uvx ruff check --config pyproject.toml …`: All checks passed. 서명 fixture의 animation key·완성 txid는 기존 `.tmp/Agentic X`의 `ClientTransaction`으로 독립 재계산해 일치했고, 고정 시각·noise·검증 출처를 fixture에 기록했다. 전체 CLI·부분 결과·doctor 라이브 경계는 후속 통합 검증에서 판정한다.
+
 
 ## 레지스트리 스냅샷
 

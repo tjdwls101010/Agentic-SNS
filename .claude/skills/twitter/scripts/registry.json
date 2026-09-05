@@ -1,0 +1,584 @@
+{
+  "captured_at": "2026-09-05",
+  "bearer": "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA",
+  "operations": {
+    "UserByScreenName": {
+      "query_id": "Gb-d6r0vxPOADdG62OEBpQ",
+      "method": "GET",
+      "gated": false,
+      "rate": 150,
+      "kind": "user_single",
+      "root": "data.user.result",
+      "vars": {
+        "screen_name": "<handle>",
+        "withSafetyModeUserFields": true
+      },
+      "verified": "200; missing handle -> {\"data\":{}}"
+    },
+    "UsersByScreenNames": {
+      "query_id": "BQEP-w59kdVKv7CSLsSSiw",
+      "method": "GET",
+      "gated": false,
+      "rate": 50,
+      "kind": "user_list",
+      "root": "data.users[].result",
+      "vars": {
+        "screen_names": [
+          "<handle>",
+          "\u2026"
+        ],
+        "withSafetyModeUserFields": true
+      },
+      "verified": "200; unresolved handle -> element without result"
+    },
+    "Viewer": {
+      "query_id": "5XShkXk2oO2J7SYmTu6pvw",
+      "method": "GET",
+      "gated": false,
+      "rate": 100,
+      "kind": "user_single",
+      "root": "data.viewer.user_results.result",
+      "vars": {
+        "withCommunitiesMemberships": true
+      },
+      "verified": "200 (@radamshi99)"
+    },
+    "UserTweets": {
+      "query_id": "eviprbEPLvNG88V3smUngQ",
+      "method": "GET",
+      "gated": false,
+      "rate": 50,
+      "kind": "tweets",
+      "root": "data.user.result.timeline.timeline.instructions",
+      "vars": {
+        "userId": "<id>",
+        "count": 20,
+        "includePromotedContent": true,
+        "withQuickPromoteEligibilityTweetFields": true,
+        "withVoice": true,
+        "cursor": null
+      },
+      "verified": "200; 21 tweets incl. 1 pinned; page 2 overlap 1 (the pin repeats)"
+    },
+    "UserTweetsAndReplies": {
+      "query_id": "3NGdaaeHbLRmVlbbJ-eBgg",
+      "method": "GET",
+      "gated": true,
+      "rate": 500,
+      "kind": "tweets",
+      "root": "data.user.result.timeline.timeline.instructions",
+      "vars": {
+        "userId": "<id>",
+        "count": 20,
+        "includePromotedContent": true,
+        "withCommunity": true,
+        "withVoice": true,
+        "cursor": null
+      },
+      "fieldToggles": {
+        "withArticlePlainText": false
+      },
+      "verified": "404 without txid, 200 with (26 tweets)"
+    },
+    "UserRepliesTimeline": {
+      "query_id": "dRUXRSlEIPlVmPgOQ8Z43g",
+      "method": "GET",
+      "gated": false,
+      "rate": 50,
+      "kind": "tweets",
+      "root": "data.user.result.timeline.timeline.instructions",
+      "vars": {
+        "userId": "<id>",
+        "count": 20,
+        "includePromotedContent": false,
+        "withClientEventToken": false,
+        "withBirdwatchNotes": false,
+        "withVoice": true,
+        "cursor": null
+      },
+      "verified": "200; 40 tweets, 23 replies"
+    },
+    "UserMedia": {
+      "query_id": "VyudDWQnr9vJNw7GasFz2g",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "tweets",
+      "root": "data.user.result.timeline.timeline.instructions",
+      "vars": {
+        "userId": "<id>",
+        "count": 20,
+        "includePromotedContent": false,
+        "withClientEventToken": false,
+        "withBirdwatchNotes": false,
+        "withVoice": true,
+        "cursor": null
+      },
+      "verified": "200; 11 tweets"
+    },
+    "UserHighlightsTweets": {
+      "query_id": "p1UTbncXKApPssa4EpqKvw",
+      "method": "GET",
+      "gated": false,
+      "rate": 50,
+      "kind": "tweets",
+      "root": "data.user.result.timeline.timeline.instructions",
+      "vars": {
+        "userId": "<id>",
+        "count": 20,
+        "includePromotedContent": false,
+        "withVoice": true,
+        "cursor": null
+      },
+      "verified": "200; 20 tweets"
+    },
+    "UserArticlesTweets": {
+      "query_id": "ZmMjUyrTpwYfTGAdylEyMw",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "tweets",
+      "root": "data.user.result.timeline.timeline.instructions",
+      "vars": {
+        "userId": "<id>",
+        "count": 20,
+        "includePromotedContent": false,
+        "withClientEventToken": false,
+        "withBirdwatchNotes": false,
+        "withVoice": true,
+        "cursor": null
+      },
+      "verified": "200; empty (cursors only) on a user without articles"
+    },
+    "Likes": {
+      "query_id": "xA8fDIbrJfy4ojjjXmSR-A",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "tweets",
+      "root": "data.user.result.timeline.timeline.instructions",
+      "vars": {
+        "userId": "<viewer id>",
+        "count": 20,
+        "includePromotedContent": false,
+        "withClientEventToken": false,
+        "withBirdwatchNotes": false,
+        "withVoice": true,
+        "cursor": null
+      },
+      "verified": "200; 4 tweets (viewer only)"
+    },
+    "Bookmarks": {
+      "query_id": "iblrFnKr6PZUR-dWpfXG6g",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "tweets",
+      "root": "data.bookmark_timeline_v2.timeline.instructions",
+      "vars": {
+        "count": 20,
+        "includePromotedContent": false,
+        "cursor": null
+      },
+      "verified": "200; instructions [] on an account with no bookmarks (A5)"
+    },
+    "HomeTimeline": {
+      "query_id": "wp06oo3fRGU4P1sK8rECqQ",
+      "method": "POST",
+      "gated": false,
+      "rate": 500,
+      "kind": "tweets",
+      "root": "data.home.home_timeline_urt.instructions",
+      "vars": {
+        "count": 20,
+        "includePromotedContent": true,
+        "latestControlAvailable": true,
+        "requestContext": "launch",
+        "withCommunity": true,
+        "cursor": null
+      },
+      "verified": "200; ~60 tweets + 7-9 promoted"
+    },
+    "HomeLatestTimeline": {
+      "query_id": "BLQWpfVqtgBqAqwRRJcJjA",
+      "method": "POST",
+      "gated": false,
+      "rate": 500,
+      "kind": "tweets",
+      "root": "data.home.home_timeline_urt.instructions",
+      "vars": {
+        "count": 20,
+        "includePromotedContent": true,
+        "latestControlAvailable": true,
+        "requestContext": "launch",
+        "withCommunity": true,
+        "cursor": null
+      },
+      "verified": "200; 61 tweets, page 2 28 tweets overlap 1"
+    },
+    "TweetDetail": {
+      "query_id": "XMOz5h24KAZ86qKffKTLdQ",
+      "method": "GET",
+      "gated": false,
+      "rate": 150,
+      "kind": "thread",
+      "root": "data.threaded_conversation_with_injections_v2.instructions",
+      "vars": {
+        "focalTweetId": "<id>",
+        "with_rux_injections": false,
+        "rankingMode": "Relevance|Recency",
+        "includePromotedContent": true,
+        "withCommunity": true,
+        "withQuickPromoteEligibilityTweetFields": true,
+        "withBirdwatchNotes": true,
+        "withVoice": true,
+        "cursor": null
+      },
+      "fieldToggles": {
+        "withArticleRichContentState": true,
+        "withArticlePlainText": false,
+        "withArticleSummaryText": true,
+        "withArticleVoiceOver": true,
+        "withGrokAnalyze": false,
+        "withDisallowedReplyControls": false
+      },
+      "verified": "200; focal + 40 conversationthread modules + Bottom cursor; page 2 40 modules overlap 1; reply as focal -> parent first; Recency 26 newest-first; unknown id -> tweet_results {}"
+    },
+    "TweetResultsByRestIds": {
+      "query_id": "Pho4sg8jLcrVlMeclMayrg",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "tweet_list",
+      "root": "data.tweetResult[].result",
+      "vars": {
+        "tweetIds": [
+          "<id>",
+          "\u2026"
+        ],
+        "includePromotedContent": false,
+        "withCommunity": false,
+        "withVoice": false
+      },
+      "verified": "200; 5/5"
+    },
+    "SearchTimeline": {
+      "query_id": "hyPfJYJ_XAtDYoslQc-Rgg",
+      "method": "GET",
+      "gated": true,
+      "rate": 50,
+      "kind": "tweets|users (product=People)",
+      "root": "data.search_by_raw_query.search_timeline.timeline.instructions",
+      "vars": {
+        "rawQuery": "<query>",
+        "count": 20,
+        "querySource": "typed_query",
+        "product": "Latest|Top|People|Media",
+        "withGrokTranslatedBio": true,
+        "withQuickPromoteEligibilityTweetFields": false,
+        "cursor": null
+      },
+      "verified": "404 without txid; 200 with: Latest 20, Top 20, People 20 users, quoted_tweet_id:<id> 20, page 2 overlap 0; one 50/15min bucket shared by all products"
+    },
+    "Following": {
+      "query_id": "qGZZDF3mp91q7X22s3HxpA",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "users",
+      "root": "data.user.result.timeline.timeline.instructions",
+      "vars": {
+        "userId": "<id>",
+        "count": 20,
+        "includePromotedContent": false,
+        "cursor": null
+      },
+      "verified": "200; 70 users"
+    },
+    "Followers": {
+      "query_id": "JNyQdTISpzCkj_1fqxDvFg",
+      "method": "GET",
+      "gated": true,
+      "rate": 50,
+      "kind": "users",
+      "root": "data.user.result.timeline.timeline.instructions",
+      "vars": {
+        "userId": "<id>",
+        "count": 20,
+        "includePromotedContent": false,
+        "cursor": null
+      },
+      "verified": "404 without txid; 200 with: 70 users, page 2 49 overlap 0"
+    },
+    "BlueVerifiedFollowers": {
+      "query_id": "u3PkPbg--arppBcwNbF1ig",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "users",
+      "root": "data.user.result.timeline.timeline.instructions",
+      "vars": {
+        "userId": "<id>",
+        "count": 20,
+        "includePromotedContent": false,
+        "cursor": null
+      },
+      "verified": "200; 20 users"
+    },
+    "FollowersYouKnow": {
+      "query_id": "VFqixXkwK2VqJ9PedvCNqg",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "users",
+      "root": "data.user.result.timeline.timeline.instructions",
+      "vars": {
+        "userId": "<id>",
+        "count": 20,
+        "includePromotedContent": false,
+        "cursor": null
+      },
+      "verified": "200; 3 users"
+    },
+    "Retweeters": {
+      "query_id": "ROjiuYueotTnWoI8m2YaiQ",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "users",
+      "root": "data.retweeters_timeline.timeline.instructions",
+      "vars": {
+        "tweetId": "<id>",
+        "count": 20,
+        "includePromotedContent": true,
+        "cursor": null
+      },
+      "verified": "200; 20 users"
+    },
+    "Favoriters": {
+      "query_id": "yObihOW0q78g0PONS3QWVw",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "users",
+      "root": "data.favoriters_timeline.timeline.instructions",
+      "vars": {
+        "tweetId": "<id>",
+        "count": 20,
+        "includePromotedContent": true
+      },
+      "verified": "200 but only TimelineTerminateTimeline: not offered as a command"
+    },
+    "ListLatestTweetsTimeline": {
+      "query_id": "1LE3u14FJjPZUHKFGzos2g",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "tweets",
+      "root": "data.list.tweets_timeline.timeline.instructions",
+      "vars": {
+        "listId": "<id>",
+        "count": 20,
+        "cursor": null
+      },
+      "verified": "200; 81 tweets, 970KB"
+    },
+    "ListByRestId": {
+      "query_id": "niz0TtOxL2zIcbq6_NQiNw",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "list_single",
+      "root": "data.list",
+      "vars": {
+        "listId": "<id>"
+      },
+      "verified": "200 with a harmless errors[214] alongside data: name, description, member_count, subscriber_count, mode"
+    },
+    "ListMembers": {
+      "query_id": "8rYmkvWQe9jRRZdy_-vkGA",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "users",
+      "root": "data.list.members_timeline.timeline.instructions",
+      "vars": {
+        "listId": "<id>",
+        "count": 20,
+        "cursor": null
+      },
+      "verified": "200; 20 users"
+    },
+    "ExplorePage": {
+      "query_id": "jo4rJIWiO5pQlMk6FYphZQ",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "explore",
+      "root": "data.explore_page.body",
+      "vars": {
+        "withCommunitiesMemberships": true
+      },
+      "verified": "200; initialTimeline (for_you) + timelines[] ids for_you/trending/news/sports/entertainment with timeline.id for GenericTimelineById"
+    },
+    "GenericTimelineById": {
+      "query_id": "ee4dBLWL8a8qg6n19m1htQ",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "trends",
+      "root": "data.timeline.timeline.instructions",
+      "vars": {
+        "timelineId": "<from ExplorePage timelines[].timeline.id>",
+        "count": 20,
+        "withCommunity": true
+      },
+      "verified": "200; trending: 62 TimelineTrend items"
+    },
+    "CommunitiesExploreTimeline": {
+      "query_id": "ydRsG-hZZ7p8ylwe1BdtSw",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "tweets",
+      "root": "data.viewer.explore_communities_timeline.timeline.instructions",
+      "vars": {
+        "count": 20,
+        "cursor": null
+      },
+      "verified": "200; 20 community tweets, ids in socialContext.landingUrl /i/communities/<id>"
+    },
+    "CommunityTweetsTimeline": {
+      "query_id": "EwftYyqQemkckQ0wzGM6uw",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "tweets",
+      "root": "data.communityResults.result.ranked_community_timeline.timeline.instructions",
+      "vars": {
+        "communityId": "<id>",
+        "count": 20,
+        "displayLocation": "Community",
+        "rankingMode": "Relevance|Recency",
+        "withCommunity": true,
+        "cursor": null
+      },
+      "verified": "200; 19 tweets + pin; Recency 28"
+    },
+    "CommunityMediaTimeline": {
+      "query_id": "ESJtwnI_apuGesbJncpc0Q",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "tweets",
+      "root": "data.communityResults.result.community_media_timeline.timeline.instructions",
+      "vars": {
+        "communityId": "<id>",
+        "count": 20,
+        "withCommunity": true,
+        "cursor": null
+      },
+      "verified": "200; 35 tweets"
+    },
+    "CommunityByRestId": {
+      "query_id": "KW2CcDlT6D26JLajPjL5KA",
+      "method": "GET",
+      "gated": false,
+      "rate": 500,
+      "kind": "community_single",
+      "root": "data.communityResults.result",
+      "vars": {
+        "communityId": "<id>"
+      },
+      "verified": "200; name, description, member_count, moderator_count, join_policy, is_nsfw, role, rules"
+    },
+    "CommunityAboutTimeline": {
+      "query_id": "H-QOvucTlztqr3leGYpg7g",
+      "method": "GET",
+      "gated": false,
+      "rate": 50,
+      "kind": "users",
+      "root": "data.communityResults.result.about_timeline.timeline.instructions",
+      "vars": {
+        "communityId": "<id>",
+        "count": 20,
+        "withCommunity": true
+      },
+      "verified": "200; communityModerators + communityMembers modules"
+    },
+    "GlobalCommunitiesLatestPostSearchTimeline": {
+      "query_id": "OLcWToLopIqEtIQLgMeH9g",
+      "method": "GET",
+      "gated": false,
+      "rate": 50,
+      "kind": "tweets",
+      "root": "data.search_by_raw_query.communities_latest_posts_search_page.timeline.instructions",
+      "vars": {
+        "rawQuery": "<query>",
+        "count": 20,
+        "withCommunity": true,
+        "cursor": null
+      },
+      "verified": "200; 33 tweets. `searchQuery` -> 422 must be defined"
+    }
+  },
+  "features": {
+    "rweb_video_screen_enabled": false,
+    "rweb_cashtags_enabled": true,
+    "profile_label_improvements_pcf_label_in_post_enabled": true,
+    "responsive_web_profile_redirect_enabled": true,
+    "rweb_tipjar_consumption_enabled": false,
+    "verified_phone_label_enabled": false,
+    "creator_subscriptions_tweet_preview_api_enabled": true,
+    "responsive_web_graphql_timeline_navigation_enabled": true,
+    "responsive_web_graphql_skip_user_profile_image_extensions_enabled": false,
+    "premium_content_api_read_enabled": false,
+    "communities_web_enable_tweet_community_results_fetch": true,
+    "c9s_tweet_anatomy_moderator_badge_enabled": true,
+    "responsive_web_grok_analyze_button_fetch_trends_enabled": false,
+    "responsive_web_grok_analyze_post_followups_enabled": false,
+    "rweb_cashtags_composer_attachment_enabled": true,
+    "responsive_web_jetfuel_frame": true,
+    "responsive_web_grok_share_attachment_enabled": true,
+    "responsive_web_grok_annotations_enabled": true,
+    "articles_preview_enabled": true,
+    "responsive_web_edit_tweet_api_enabled": true,
+    "rweb_conversational_replies_downvote_enabled": false,
+    "graphql_is_translatable_rweb_tweet_is_translatable_enabled": true,
+    "view_counts_everywhere_api_enabled": true,
+    "longform_notetweets_consumption_enabled": true,
+    "responsive_web_twitter_article_tweet_consumption_enabled": true,
+    "content_disclosure_indicator_enabled": true,
+    "content_disclosure_ai_generated_indicator_enabled": true,
+    "responsive_web_grok_show_grok_translated_post": true,
+    "responsive_web_grok_analysis_button_from_backend": true,
+    "post_ctas_fetch_enabled": false,
+    "freedom_of_speech_not_reach_fetch_enabled": true,
+    "standardized_nudges_misinfo": true,
+    "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": true,
+    "longform_notetweets_rich_text_read_enabled": true,
+    "longform_notetweets_inline_media_enabled": false,
+    "responsive_web_grok_image_annotation_enabled": true,
+    "responsive_web_grok_imagine_annotation_enabled": true,
+    "responsive_web_grok_community_note_auto_translation_is_enabled": true,
+    "responsive_web_enhance_cards_enabled": false
+  },
+  "txid_ingredients_2026_09_05": {
+    "key_bytes_len": 48,
+    "frames": {
+      "0": 2,
+      "1": 2,
+      "2": 2,
+      "3": 2
+    },
+    "indices": [
+      12,
+      4,
+      40,
+      27
+    ],
+    "ondemand": "https://abs.twimg.com/responsive-web/client-web/ondemand.s.298568e61a87195ea.js",
+    "main_js": "https://abs.twimg.com/responsive-web/client-web/main.1a27b43fa7bf61a8a.js",
+    "animation_key": "6c0ff0e666666666666806e147ae147ae1406e147ae147ae140e666666666666800"
+  }
+}
