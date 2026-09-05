@@ -1,40 +1,15 @@
 """Read only Relay bbox results from JSON scripts, with operation/identity checks."""
-import json
-from html.parser import HTMLParser
 
 from ._errors import ThreadsError
-from ._session import preloaders
+from ._session import Scripts, preloaders
 
-
-class Scripts(HTMLParser):
-    def __init__(self, html):
-        super().__init__(convert_charrefs=False)
-        self.active, self.buffer, self.documents = False, [], []
-        self.feed(html)
-
-    def handle_starttag(self, tag, attrs):
-        if tag == 'script':
-            self.active = dict(attrs).get('type') == 'application/json'
-            self.buffer = []
-
-    def handle_data(self, data):
-        if self.active:
-            self.buffer.append(data)
-
-    def handle_endtag(self, tag):
-        if tag == 'script' and self.active:
-            try:
-                self.documents.append(json.loads(''.join(self.buffer)))
-            except ValueError:
-                pass
-            self.active = False
 
 
 def matches(data, operation):
     if operation == 'BarcelonaFeedDirectQuery':
         return 'feedData' in data
     if operation == 'BarcelonaProfilePageDirectQuery':
-        return isinstance(data.get('user'), dict) and 'username' in data['user']
+        return 'user' in data
     if operation.startswith('BarcelonaProfile') and 'Tab' in operation:
         return 'mediaData' in data
     if operation == 'BarcelonaSearchResultsQuery':
@@ -64,7 +39,7 @@ class SSR:
                 if isinstance(result, dict) and isinstance(result.get('data'), dict):
                     self.results.append((name, variables, result['data']))
                 for key, child in value.items():
-                    if key != '__bbox':
+                    if key != '__bbox' or result is None:
                         walk(child, name, variables)
             elif isinstance(value, list):
                 for child in value:
@@ -83,8 +58,13 @@ class SSR:
             entity = data.get('media') if 'StrongId' in operation else data.get('user')
             if isinstance(entity, dict) and entity.get('pk') is not None:
                 ids.add(str(entity['pk']))
-            if identity is not None and ids and ids != {str(identity)}:
-                continue
+            if identity is not None:
+                loaders = [p for p in self.preloaders if p['name'] == operation]
+                loader_ids = {str(p['variables'][key]) for p in loaders for key in ('userID', 'postID') if key in p['variables']}
+                if ids and ids != {str(identity)} or loader_ids and loader_ids != {str(identity)}:
+                    continue
+                if not ids and not loader_ids:
+                    continue
             if data not in candidates:
                 candidates.append(data)
         if len(candidates) != 1:

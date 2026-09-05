@@ -7,7 +7,7 @@ from threads_skill._errors import ThreadsError
 
 
 def route(user_id='42'):
-    loader = {'preloaderID': 'adp_BarcelonaProfilePageDirectQueryRelayPreloader_hash',
+    loader = {'actorID': '100', 'preloaderID': 'adp_BarcelonaProfilePageDirectQueryRelayPreloader_hash',
               'queryID': '1001', 'variables': {'userID': user_id, 'flag': {'nested': 'a}b'}}}
     return ('<html><script type="application/json">' + json.dumps({'DTSGInitialData': [],
         'csrf_token': 'synthetic-csrf', 'NON_FACEBOOK_USER_ID': '100', 'username': 'fixture_viewer',

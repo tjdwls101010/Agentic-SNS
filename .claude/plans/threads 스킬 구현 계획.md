@@ -337,12 +337,16 @@ description: Read Threads (threads.com) through the user's logged-in Aside brows
 | P0 | 완료 | audit skill 3개·드리프트 0, 초기 pytest 0개 수집(exit 5), 사용자 스코프 링크 확인. 스냅샷 16종 전체를 아래 JSON 블록으로 통합하고 단독 파일 제거. |
 | P1 | 완료 | Python 경계 테스트 43개(P2 선행 7개 포함 전체 50), JS 4개 통과. 실계정 doctor: 1요청·661,226바이트·로그인 확인. Codex P1 리뷰 5건을 재현하여 오류 코드 키 보존·path 숫자 제외·잠금 내 unblock·Relay 구조 검사·오퍼레이션 리프 검증으로 수정. 빈 페이지의 exit 7은 목록 출력 경계에서 판정한다. |
 | P2 | 진행 중 | 순수 모델·SSR·리프 워커 완료, 목록·출력·브라우징 수직 구현 중. |
-| P3 | 대기 | 위 P3 완료 판정 |
-| P4 | 대기 | 위 P4 완료 판정 |
-| P5 | 대기 | 위 P5 완료 판정 |
+| P3 | 진행 중 | 게시물·팔로잉 라이브 통과, Codex 2건 수정, 그래프 갱신 대기. |
+| P4 | 진행 중 | 검색·개인 목록·날짜 창·페이지 파일을 공통 경로에 연결, 추가 경계 검증 중. |
+| P5 | 진행 중 | 라우트 발견·재생 검증·원자 병합 구현, 캡처 계수·차단·정리 구현 및 테스트 중. |
 | P6 | 대기 | 위 P6 완료 판정·CI·PR 머지 |
 
 P0 리뷰 `20260905-170532-threads-p0-review-7a38`: 16항목 보존·필드 차이 0 확인, 빈 tests 디렉터리 Git 미포함 지적은 P1 테스트 파일 추가로 해소. P1 리뷰 `20260905-171312-threads-p1-review-f536`: 위 5건 수정. 테스트 실패 후 통과를 단계별 기록으로 남긴다.
+
+2026-09-05 P2–P3: 라이브에서 actorID가 preloaderID보다 먼저 오는 JSON 객체와 중첩 bootstrap __bbox.require 구조를 발견하여 JSON 스크립트 순회로 수정했다. Aside REPL의 URL/URLSearchParams 부재를 실제 확인하고 폼 직렬화를 encodeURIComponent 기반으로 이식했다. SSR 프로필 user:null은 간헐적이며 about은 ProfilePage Direct로 보완한다. user는 정상 게시물이 있으면 추가 프로필 요청 없이 읽고, 빈 탭일 때만 프로필 Direct로 비공개 여부를 확정한다. FollowingTab의 counts에는 이번 응답에서 fediverse 수 두 필드만 있어 about은 following=unknown·exit 8을 유지하며 복구 단계에서 확인한다. 최초 라이브 실패·진단 요청도 누적 가드에 포함한다.
+
+P2 Codex 리뷰 `20260905-172458-threads-p2-review-079c`의 4건(SSR 대상 연결, about --out, 다른 비공개 탭, User counts 스키마)을 수정했다. P3 리뷰 `20260905-173458-threads-p3-review-6b20`의 2건(삭제된 답글 아래 정상 자손 보존, null SSR 프로필의 비공개 오판)을 재현 테스트로 수정했다. 라이브 게시물: 1요청, reported_direct=173·received_direct=10·shown_descendants=1·unfetched≈163. 팔로잉: 3요청·25명·id 중복 0. 팔로워는 서버 배치가 표시 제한보다 커 limit_reached가 우선되던 것을 server_capped 표기와 로컬 pending 이어읽기를 함께 제공하도록 수정했다.
 
 ## 레지스트리 스냅샷
 

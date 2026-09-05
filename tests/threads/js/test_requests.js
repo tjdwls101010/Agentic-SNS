@@ -9,7 +9,7 @@ async function run(name, args, response = {}) {
   const calls = [], logs = [];
   const source = fs.readFileSync(path.join(root, name + '.js'), 'utf8');
   await vm.runInNewContext('(async()=>{' + source + '})()', {
-    ARGS: args, URL, URLSearchParams, Buffer,
+    ARGS: args, Buffer,
     console: {log: text => logs.push(JSON.parse(text))},
     fetch: async (url, options) => {
       calls.push({url, options});

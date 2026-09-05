@@ -2,22 +2,49 @@
 import json
 import re
 from dataclasses import dataclass
+from html.parser import HTMLParser
 
 from ._errors import ThreadsError
 
 
+class Scripts(HTMLParser):
+    def __init__(self, html):
+        super().__init__(convert_charrefs=False)
+        self.active, self.buffer, self.documents = False, [], []
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'script':
+            self.active = dict(attrs).get('type') == 'application/json'
+            self.buffer = []
+
+    def handle_data(self, data):
+        if self.active:
+            self.buffer.append(data)
+
+    def handle_endtag(self, tag):
+        if tag == 'script' and self.active:
+            try:
+                self.documents.append(json.loads(''.join(self.buffer)))
+            except ValueError:
+                pass
+            self.active = False
+
 def preloaders(html):
     found = {}
-    decoder = json.JSONDecoder()
-    for match in re.finditer(r'\{\s*"preloaderID"\s*:', html):
-        try:
-            value, _ = decoder.raw_decode(html[match.start():])
-            name = re.fullmatch(r'adp_(.+?)RelayPreloader_.*', value['preloaderID'])
+    def walk(value):
+        if isinstance(value, dict):
+            name = re.fullmatch(r'adp_(.+?)RelayPreloader_.*', str(value.get('preloaderID', '')))
             if name and str(value.get('queryID', '')).isdigit() and isinstance(value.get('variables'), dict):
-                entry = dict(name=name[1], doc_id=str(value['queryID']), variables=value['variables'])
-                found[(name[1], json.dumps(value['variables'], sort_keys=True))] = entry
-        except (ValueError, KeyError, TypeError):
-            continue
+                entry = dict(name=value.get('queryName') or name[1], doc_id=str(value['queryID']), variables=value['variables'])
+                found[(entry['name'], json.dumps(value['variables'], sort_keys=True))] = entry
+            for child in value.values():
+                walk(child)
+        elif isinstance(value, list):
+            for child in value:
+                walk(child)
+    for document in Scripts(html).documents:
+        walk(document)
     return list(found.values())
 
 

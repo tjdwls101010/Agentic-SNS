@@ -17,3 +17,13 @@ spec.loader.exec_module(module)
 def isolated_state(monkeypatch, tmp_path, request):
     if request.node.get_closest_marker('live') is None:
         monkeypatch.setenv('THREADS_HOME', str(tmp_path / 'threads'))
+
+
+@pytest.fixture
+def fake_aside(monkeypatch, tmp_path):
+    base = Path(__file__).parent
+    monkeypatch.setenv('THREADS_ASIDE_BIN', str(base / 'fake_aside/aside'))
+    monkeypatch.setenv('THREADS_FIXTURES', str(base / 'fixtures/routes.ndjson'))
+    log = tmp_path / 'requests.ndjson'
+    monkeypatch.setenv('THREADS_FAKE_LOG', str(log))
+    return log

@@ -17,6 +17,7 @@ class User:
     friendship_status: dict = field(default_factory=dict)
     profile_pic_url: str | None = None
     url: str | None = None
+    counts: dict | None = None
 
     def to_dict(self):
         return asdict(self)

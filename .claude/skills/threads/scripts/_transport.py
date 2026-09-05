@@ -87,6 +87,10 @@ class Transport:
         self.fetched_bytes = 0
         self.route = '/'
 
+    def capture(self, post, targets):
+        from ._capture import capture
+        return capture(self, post, targets)
+
     def _request(self, snippet, args, *, unblock=False):
         with self.budget.request(unblock=unblock):
             response = run_snippet(snippet, args)
@@ -120,7 +124,7 @@ class Transport:
                 continue
             self.session = Session.from_html(html)
             self.route = path
-            if original.startswith('/@') and '/post/' not in original:
+            if re.fullmatch(r'/@[A-Za-z0-9_.]+/?', original):
                 if not any(p['name'] == 'BarcelonaProfilePageDirectQuery' for p in self.session.preloaders):
                     raise ThreadsError(9, 'Authenticated route has no requested profile.')
             return html
