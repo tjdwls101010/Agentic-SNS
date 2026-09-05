@@ -335,12 +335,14 @@ description: Read Threads (threads.com) through the user's logged-in Aside brows
 | 단계 | 상태 | 증거·남은 작업 |
 |---|---|---|
 | P0 | 완료 | audit skill 3개·드리프트 0, 초기 pytest 0개 수집(exit 5), 사용자 스코프 링크 확인. 스냅샷 16종 전체를 아래 JSON 블록으로 통합하고 단독 파일 제거. |
-| P1 | 진행 중 | 승인된 transport·budget·session·target·registry·브라우저 seam에서 TDD. |
-| P2 | 대기 | 위 P2 완료 판정 |
+| P1 | 완료 | Python 경계 테스트 43개(P2 선행 7개 포함 전체 50), JS 4개 통과. 실계정 doctor: 1요청·661,226바이트·로그인 확인. Codex P1 리뷰 5건을 재현하여 오류 코드 키 보존·path 숫자 제외·잠금 내 unblock·Relay 구조 검사·오퍼레이션 리프 검증으로 수정. 빈 페이지의 exit 7은 목록 출력 경계에서 판정한다. |
+| P2 | 진행 중 | 순수 모델·SSR·리프 워커 완료, 목록·출력·브라우징 수직 구현 중. |
 | P3 | 대기 | 위 P3 완료 판정 |
 | P4 | 대기 | 위 P4 완료 판정 |
 | P5 | 대기 | 위 P5 완료 판정 |
 | P6 | 대기 | 위 P6 완료 판정·CI·PR 머지 |
+
+P0 리뷰 `20260905-170532-threads-p0-review-7a38`: 16항목 보존·필드 차이 0 확인, 빈 tests 디렉터리 Git 미포함 지적은 P1 테스트 파일 추가로 해소. P1 리뷰 `20260905-171312-threads-p1-review-f536`: 위 5건 수정. 테스트 실패 후 통과를 단계별 기록으로 남긴다.
 
 ## 레지스트리 스냅샷
 
