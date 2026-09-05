@@ -1,4 +1,4 @@
-name: Facebook skill checks
+name: Social skill checks
 on: [push, pull_request]
 permissions:
   contents: read
@@ -18,3 +18,6 @@ jobs:
       - run: node --test tests/facebook/js/*.js
       - run: python tests/facebook/tools/check_fixtures_pii.py
       - run: ruff check --config pyproject.toml .claude/skills/facebook/scripts tests/facebook
+      - run: node --test tests/reddit/js/*.js
+      - run: python tests/reddit/tools/check_fixtures_pii.py
+      - run: ruff check --config pyproject.toml .claude/skills/reddit/scripts tests/reddit

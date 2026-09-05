@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+"""External process fixture: explicit canned output, never performs networking."""
+import json
+import os
+import sys
+import time
+
+assert sys.argv[1:4] == ['--account', 'u0', 'repl']
+source = sys.argv[4]
+args = json.loads(source.split('const ARGS = ', 1)[1].split(';\n', 1)[0])
+if os.environ.get('REDDIT_FAKE_LOG'):
+    with open(os.environ['REDDIT_FAKE_LOG'], 'a') as stream:
+        stream.write(json.dumps(args) + '\n')
+time.sleep(float(os.environ.get('REDDIT_FAKE_DELAY', '0')))
+if os.environ.get('REDDIT_FAKE_EXIT'):
+    print('cookie=secret modhash=secret', file=sys.stderr)
+    sys.exit(int(os.environ['REDDIT_FAKE_EXIT']))
+if os.environ.get('REDDIT_FAKE_OUTPUT'):
+    print(os.environ['REDDIT_FAKE_OUTPUT'])
+else:
+    responses = json.loads(os.environ.get('REDDIT_FAKE_RESPONSES', '{}'))
+    envelope = responses.get(args.get('path', args.get('url')))
+    if envelope is None:
+        envelope = {'status': 200, 'url': 'https://www.reddit.com' + args.get('path', '/'),
+                    'body': '{"kind":"Listing","data":{"children":[{"kind":"t3","data":{"name":"t3_abc"}}]}}',
+                    'ratelimit': {}}
+    print(json.dumps(envelope))
