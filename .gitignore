@@ -15,3 +15,5 @@ __pycache__/
 !tests/reddit/fixtures/*.ndjson
 !.claude/plans/threads 스킬 구현 계획.md
 !tests/threads/fixtures/*.ndjson
+!.claude/plans/twitter 스킬 구현 계획.md
+!tests/twitter/fixtures/*.ndjson
