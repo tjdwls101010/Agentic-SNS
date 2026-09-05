@@ -306,5 +306,7 @@ TaskCreate/ToolSearch가 이 세션에 제공되지 않아 이 계획서에서 �
 - 모든 런타임 모듈은 400줄 미만이다. 런타임은 Python 3.11+ 표준 라이브러리와 Aside만 사용한다.
 - 최종 새 레지스트리의 댓글 답글: 부모 3개·답글 23개, 더 남은 배치 2개는 부분 결과로 명시. 피드 텍스트는 3건/11줄이다.
 - 캡처에서 root/page 새 ID 2종은 이번 실계정 UI에서 관찰하지 못했다. 검증되지 않은 ID를 저장하지 않고 기존 유효 ID와 missing 보고를 유지한다. 새 답글 ID의 캡처·재생 및 기존 root/page의 읽기·커서 호환은 확인했다.
-- 추가 모델 e2e는 비용 동의 답변을 받지 않아 실행하지 않았다. 본문+도움말+출력에 대한 독립 검토는 수행했다.
-- Graphify 마지막 AST: 558노드·1,315간선. 커뮤니티 자동 명명은 Claude 세션 한도로 실패했으며 기본 이름을 사용한다.
+- 별도 Claude 세션 e2e는 실행하지 않았다. 본문+도움말+출력에 대한 Codex 독립 검토와 실제 CLI 라이브 검증은 수행했다.
+- Graphify 마지막 AST: 558노드·1,315간선. 기본 래퍼의 Claude 명명은 한도 오류가 있었으나, 사용자 지시에 따라 Codex가 28개 커뮤니티 이름을 직접 부여하고 graph.json·보고서·HTML을 갱신했다.
+
+- 성진 추가 지시: 구현 과정에서 Claude 대신 Codex를 사용한다. 구현·단계별 리뷰는 처음부터 Codex(gpt-6-astra)였으며, 이후 Graphify 명명도 Codex로 전환했다. 다음 그래프 갱신은 `graphify extract . --code-only --no-cluster` 후 Codex 명명 및 `graphify export html --graph graphify-out/graph.json --labels graphify-out/.graphify_labels.json`을 사용해 Claude 호출을 피한다.
