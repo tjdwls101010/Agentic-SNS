@@ -364,11 +364,11 @@ description: Read X (Twitter, x.com) through the user's logged-in Aside browser:
 | 단계 | 상태 | 완료 근거·남은 검증 |
 |---|---|---|
 | P0 | 완료 | 33종 레지스트리·독립 스킬·사용자 링크 생성. 격리 worktree audit는 main에 Threads가 아직 없어 skill 3개·드리프트 0, validator 오류 0·경고 0. 원본 Threads 작업은 보존했다. 초기 0개 테스트 수집은 별도 실행하지 않았으며 대신 실제 경계 테스트를 검증했다. |
-| P1 | 진행 중 | 중간 검증: `python3 -m pytest tests/twitter/test_target.py tests/twitter/test_transport.py -q` 26 passed, `node --test tests/twitter/js/*.js` 4 passed. 실제 HTML·서명 청크·Viewer 1요청 성공. 독립 P1 리뷰와 동시성·복구 테스트 보강 대기. |
-| P2 | 진행 중 | 새 사용자 필드·리포스트·장문·인용·모듈 워커 수직 구현. 꼬리 우선 이어읽기·부분 결과 테스트부터 출력 경로 연결 중. |
-| P3 | 진행 중 | 부모·focal·완전성 구현. 실제 관련 글 모듈이 답글로 섞이는 문제를 재현해 수정 중. Graphify P3 추출 1,224노드·3,521간선, 클러스터 결과 2,895간선·92커뮤니티; Codex 명명 진행 중. |
-| P4 | 진행 중 | 모든 읽기 명령 배선·가짜 Aside CLI 통합 완료, 실제 표면 검증과 저장/날짜 창 리뷰 수정 중. |
-| P5 | 진행 중 | 번들 query 채굴·검증 후 저장 구현과 합성 테스트 완료, 실제 refresh 검증 대기. |
+| P1 | 완료 | 중간 검증: `python3 -m pytest tests/twitter/test_target.py tests/twitter/test_transport.py -q` 26 passed, `node --test tests/twitter/js/*.js` 4 passed. 실제 HTML·서명 청크·Viewer 1요청 성공. 독립 P1 리뷰와 동시성·복구 테스트 보강 대기. |
+| P2 | 완료 | 새 사용자 필드·리포스트·장문·인용·모듈·출력·꼬리 우선 이어읽기 검증. 실계정 홈/Following/프로필/미디어/배치 카드, 캐시 0요청과 실제 다음 페이지·중복 제거 확인. |
+| P3 | 완료 | 부모·focal·직접/중첩 답글·관련 글 제외·분기 누적·관계망 구현 및 회귀 검증. 실계정 스레드/관계 검증 통과. P3 그래프 1,224노드·2,895간선·92커뮤니티를 Codex가 명명하고 HTML 검증. |
+| P4 | 구현 완료·A5 미검증 | 검색/개인 목록/리스트/트렌드/커뮤니티/날짜 창/파일 재개 구현·통합 테스트 통과. 실계정 커뮤니티 URL 객체를 문자열로 보정하고 새 응답→카드/글 3건 재검증. 북마크 빈 응답은 확인했으나 실제 항목 형태는 미검증. |
+| P5 | 완료 | 실제 번들의 shared~·i18n/ 이름을 빠뜨리던 필터를 재현 테스트 후 수정. 수정본 refresh: discovered 33·changed 0·unchanged 33·missing []·features 39·txid ok. 2개 검증 요청 통과. |
 | P6 | 진행 중 | SKILL.md·README·CI 연결. validate 오류 0·경고 0, audit 드리프트 0. 최종 사용성·회귀·PR·머지 대기. |
 
 구현 실행: Codex `20260905-175118-twitter-implementation-f3e1` (`gpt-6-astra`, medium, priority). 소유 범위는 `.claude/skills/twitter/`와 `tests/twitter/`이며, 상위 세션이 계획·하네스·CI·Git 통합과 결과 검증을 담당한다. Threads 구현과 원본 브랜치 변경은 금지했다. 라이브 가드는 계획 최종 정정의 40회이며 refresh는 별도다.
@@ -378,6 +378,16 @@ P1 독립 리뷰 `20260905-175554-twitter-p1-review-acdb`: URL 포트/IPv6 파�
 
 
 P2–P5 독립 리뷰 `20260905-180332-twitter-browse-review-e2f1`가 8건을 확인했다. 상위 세션은 CSRF 복구 중 viewer 변경 시 재시도를 중단하고, 사용자/타임라인 루트가 존재해도 최소 형태가 틀리면 envelope_drift로 구분하도록 재현 테스트 후 수정했다. 구현 실행은 날짜 창 내 전체 페이지 저장, about/batch 비페이지 조회의 잘림 방지, 파일의 답글 완전성 기록, 숨은 분기 누적, 양수 continuation 번호를 보강한다. 여기서 “페이지 전체 저장”은 표시 수에는 잘리지 않되 사용자가 지정한 날짜 창 안의 전체 페이지라는 뜻으로 명확히 한다. 사용자 스코프 링크는 다른 세션을 방해하지 않도록 현재 격리 worktree의 스킬을 가리킨다.
+
+## 최종 검증 기록
+
+- `python3 -m pytest tests/twitter -q`: 158 passed, 3 live deselected (30.71s). `python3 -m pytest tests/facebook tests/reddit -q`: 435 passed, 12 live deselected (155.01s). 작업 중인 원본 Threads 코드·테스트는 가져오거나 수정하지 않았다.
+- `node --test tests/twitter/js/*.js`: 9 passed. `uvx ruff check --config pyproject.toml .claude/skills/twitter/scripts tests/twitter`: All checks passed. `python3 tests/twitter/tools/check_fixtures_pii.py`: passed. `git diff --check`: 통과.
+- `validate_harness.py --path .`: 오류 0·경고 0. `audit_harness.py --path .`: 격리 main 기반에서 skill 3개·드리프트 0. Threads가 main에 머지되면 skill 4개가 되는 구성이다.
+- 라이브는 `TWITTER_ASIDE_BIN=…/tests/twitter/live/guard_aside.py`를 통해 실행했다. 최초 합쳐진 시나리오는 관련 글을 답글로 세는 단언 실패를 발견했고, 재현 테스트 후 관련 모듈을 제외했다. 분리한 `test_live_threads_and_relationships`는 통과했다. 검색·개인 목록·리스트·트렌드·커뮤니티 탐색 뒤 커뮤니티 URL 객체가 subprocess 인자로 전달되는 실패를 발견했다(`1 failed, 1 passed, 1 deselected`). URL 정규화 재현 테스트 후 새 `communities --limit 3 --json`(1요청)에서 문자열 링크를 받아 `community <반환 URL> --limit 3 --json`(2요청)을 실행해 exit 0·글 3건·멤버 수를 확인했다. 이미 통과한 표면은 불필요하게 재실행하지 않았고 전체 live suite 통과로 표기하지 않는다.
+- 첫 `refresh --json`은 검증 2회 성공·28종 발견·5종 미발견이었다. 실제 HTML 확인으로 `shared~…`와 `i18n/…` 번들 이름이 검증 필터에서 제외된 원인을 찾았다. 허용 호스트와 `.`/`..` 경로 요소 거부를 유지하면서 정상 이름을 허용한 뒤 JavaScript 실패 테스트가 통과했다. 수정본 `refresh --json`은 전체 33종 발견·변경 0·누락 0·플래그 39·txid 정상. 첫 refresh 2회는 별도 장부이며 수정 후 검증 2회는 일반 40회 장부의 남은 범위에서 차감했다. 장부를 초기화하거나 상한을 높이지 않았다.
+- `doctor`: Aside u0 로그인 핸들·Viewer 버킷·레지스트리/서명 나이 정상. A5 북마크는 유효한 빈 타임라인으로 항목 형태 미검증이다. 사용자가 직접 하나 추가하면 남은 가드 범위에서 해당 항목만 확인할 수 있다. 쓰기 요청은 수행하지 않았다.
+- P2–P5 리뷰 재검증 `20260905-180828-twitter-browse-review-3e87`: 기존 8건 모두 해결. 별도 Claude headless e2e는 D8에 따라 실행하지 않았다.
 
 ## 레지스트리 스냅샷
 
