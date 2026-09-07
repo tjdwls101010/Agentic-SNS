@@ -162,3 +162,27 @@ def test_a_post_written_to_a_file_actually_reaches_it(cli_env, tmp_path):
     saved = [line for line in lines if line.get('id', '').startswith('post:')]
     assert any(record['id'] == 'post:testblog/99900000101' for record in saved)
     assert saved[0]['body']['text']
+
+
+def test_a_file_written_from_a_partial_post_read_says_it_was_partial(cli_env, tmp_path):
+    """A file holding only what worked reads later as a post that simply had no comments."""
+    out = tmp_path / 'partial.ndjson'
+    code, _ = run(['post', 'testblog/99900000101', '--comments', '--out', str(out), '--json'],
+                  using_fixtures(cli_env, 'blockedcomments'))
+    assert code == 5
+    lines = [json.loads(line) for line in out.read_text().splitlines()]
+    failure = [line for line in lines if line.get('id') == 'section:comments']
+    assert failure and failure[0]['error']['code'] == 5
+    marker = [line for line in lines if line.get('kind') == 'page'][-1]
+    assert marker['stop_reason'] == 'query_failure'
+
+
+def test_a_post_file_records_whether_comments_were_asked_for(cli_env, tmp_path):
+    out = tmp_path / 'one.ndjson'
+    run(['post', 'testblog/99900000101', '--out', str(out), '--json'], cli_env)
+    header = json.loads(out.read_text().splitlines()[0])
+    assert header['comments'] is False
+    # Rerunning with a different question is a different collection, and is refused.
+    code, payload = run(['post', 'testblog/99900000101', '--comments', '--out', str(out),
+                         '--json'], cli_env)
+    assert code == 2 and 'different query' in payload['message']

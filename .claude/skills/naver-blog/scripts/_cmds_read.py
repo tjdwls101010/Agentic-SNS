@@ -268,11 +268,21 @@ def post(args, transport):
 
     if args.out:
         # One post is one page of records; the file is written whole rather than page by page.
-        out = OutFile(args.out, {'command': 'post', 'post': f'{blog_id}/{log_no}'})
+        # A section that failed is written too, because a file that shows only what worked
+        # reads later as a post that simply had no comments.
+        out = OutFile(args.out, {'command': 'post', 'post': f'{blog_id}/{log_no}',
+                                 'comments': bool(args.comments)})
         try:
-            rows = [row for entry in sections.as_list() if entry.get('ok')
-                    for row in (entry.get('data') or [])]
-            out.commit(rows, {'page': 1, 'pending': [], 'seen': []}, 'not_paginable')
+            rows = []
+            for entry in sections.as_list():
+                if entry.get('ok'):
+                    rows.extend(entry.get('data') or [])
+                else:
+                    rows.append({'id': f'section:{entry["name"]}', 'section': entry['name'],
+                                 'ok': False, 'error': entry['error']})
+            complete = sections.exit_code() == 0
+            out.commit(rows, {'page': 1, 'pending': [], 'seen': []},
+                       'not_paginable' if complete else 'query_failure')
         finally:
             out.close()
 

@@ -26,7 +26,7 @@
 | B11 | X 게시·답글·좋아요·리포스트·팔로우·북마크 변경 | skill | — | declined |
 | B12 | X 알림·DM | skill | — | declined |
 
-| B13 | 네이버 블로그 읽기·탐색·본문 파싱·수집 | skill | `.claude/skills/naver-blog/SKILL.md` | planned |
+| B13 | 네이버 블로그 읽기·탐색·본문 파싱·수집 | skill | `.claude/skills/naver-blog/SKILL.md` | validated |
 | B14 | 네이버 블로그 쓰기(댓글·공감·이웃추가·스크랩·신고) | skill | — | declined |
 | B15 | 내 블로그 통계·알림·내소식·안부글 | skill | — | declined |
 

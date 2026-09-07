@@ -169,10 +169,13 @@ def check(args):
                                  'Drop --since/--until/--after/--out.')
     if args.command == 'find' and args.tag and args.explicit_sort:
         raise NaverBlogError(2, 'Tag search inside a blog ignores ordering.', 'Drop --sort, or drop --tag.')
-    if args.command == 'topic' and args.top and (args.after or args.since or args.until):
-        raise NaverBlogError(2, 'Featured posts are one page with no dates.', 'Drop --top, or drop the window.')
-    if args.command == 'topic' and args.target is None and (args.after or args.top):
-        raise NaverBlogError(2, 'The topic directory is one page.', 'Name a topic to read its posts.')
+    if args.command == 'topic' and args.top and (args.after or args.since or args.until or args.out):
+        raise NaverBlogError(2, 'Featured posts are one page: no dates, no continuation, no file.',
+                             'Drop --top, or drop --since/--until/--after/--out.')
+    if args.command == 'topic' and args.target is None and (args.after or args.top or args.out
+                                                            or args.since or args.until):
+        raise NaverBlogError(2, 'The topic directory is one page of names.',
+                             'Name a topic to read its posts, with a window or a file.')
     if args.command == 'monthly' and args.month is not None and not 1 <= args.month <= 12:
         raise NaverBlogError(2, '--month is 1 to 12.')
     return args

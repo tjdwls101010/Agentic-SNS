@@ -2,7 +2,7 @@
 name: naver-blog
 allowed-tools: Bash(python3 "${CLAUDE_SKILL_DIR}/scripts/naver_blog.py" *)
 description: >-
-  Read Naver Blog (blog.naver.com) through the user's logged-in Aside browser: search posts, blogs and tags across Naver, open a post in full with its tags and same-category posts, read a blog's card, category tree, post lists, notices and popular posts, read comments and replies, search inside one blog, browse topic directories and blogs of the month, and read the user's own neighbor feed and neighbor list. Use whenever the request is to read or explore something on Naver Blog — 네이버 블로그에서, 블로그 글 읽어줘, 이 블로그 카테고리, 댓글 봐줘, 이웃새글, 블로그 검색, 후기·리뷰·내돈내산 찾아줘 — including a bare blog.naver.com or m.blog.naver.com URL. Not for Naver Cafe, Naver News, Naver 지식iN, Naver Shopping, other Naver services, Tistory or Brunch, general web pages, or writing posts, comments, likes and neighbor requests.
+  Read Naver Blog (blog.naver.com) through the user's logged-in Aside browser: search posts, blogs and tags across Naver, open a post in full with its tags and same-category posts, read a blog's card, category tree, post lists, notices and popular posts, read comments and replies, search inside one blog, browse topic directories and blogs of the month, and read the user's own neighbor feed and neighbor list. Use whenever the request is to read or explore something on Naver Blog — 네이버 블로그에서, 이 블로그 글 읽어줘, 이 블로그 카테고리, 이 블로그 글 댓글, 이웃새글, 네이버 블로그 검색, 블로그 후기·리뷰·내돈내산 찾아줘 — including a bare blog.naver.com or m.blog.naver.com URL. Not for Naver Cafe, Naver News, Naver 지식iN, Naver Shopping, other Naver services, Tistory or Brunch, general web pages, or writing posts, comments, likes and neighbor requests.
 ---
 
 # Naver Blog through the user's own browser

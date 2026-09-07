@@ -23,6 +23,9 @@ VOID = {'br', 'img', 'hr', 'input', 'meta', 'link', 'source', 'area', 'base', 'c
 # an embed and a map keep everything worth reading, so the node itself is kept.
 SKIP = {'script', 'style'}
 BLOCK = {'p', 'div', 'br', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'blockquote', 'section'}
+# Elements that never end a paragraph, so an open <p> can still be found underneath them.
+INLINE = {'span', 'b', 'strong', 'i', 'em', 'u', 's', 'a', 'font', 'small', 'sub', 'sup',
+          'mark', 'code', 'abbr', 'cite', 'q', 'label', 'wbr'}
 # Every SmartEditor component carries exactly one family class alongside se-component.
 FAMILY = re.compile(r'(?:^|\s)se-(?!component\b|section\b|module\b)([a-zA-Z]+)(?:\s|$)')
 # The families with a rule written for them; everything else goes through the general fallback.
@@ -105,10 +108,21 @@ class Nodes(HTMLParser):
     leave them open and treating that as nesting builds a stack thousands of levels deep.
     """
 
-    # A start tag that implicitly closes an open <p>, per the HTML parsing rules.
-    CLOSES_P = {'p', 'div', 'section', 'article', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th',
-                'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'pre', 'form', 'header',
-                'footer', 'main', 'nav', 'aside', 'figure', 'figcaption'}
+    # Tags whose end tag HTML lets you leave out; a new one of these closes the open one.
+    # Naver's older posts rely on this, and treating it as nesting builds a stack deep
+    # enough to overflow and puts two table cells inside each other.
+    IMPLIED = {
+        'p': {'p', 'div', 'section', 'article', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th',
+              'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'pre', 'form', 'header',
+              'footer', 'main', 'nav', 'aside', 'figure', 'figcaption'},
+        'li': {'li'},
+        'td': {'td', 'th', 'tr'},
+        'th': {'td', 'th', 'tr'},
+        'tr': {'tr'},
+        'option': {'option'},
+        'dd': {'dd', 'dt'},
+        'dt': {'dd', 'dt'},
+    }
 
     def __init__(self, source):
         super().__init__(convert_charrefs=False)
@@ -123,10 +137,22 @@ class Nodes(HTMLParser):
         parent['children'].append(child)
         parent['parts'].append(child)
 
+    def _close_implied(self, tag):
+        """Close the innermost element this tag implicitly ends, inline markup notwithstanding.
+
+        `<p><span>one<p>two` leaves the p open under a span, so looking only at the top of
+        the stack never closes it — and a page with a thousand of them nests a thousand deep.
+        """
+        for index in range(len(self.stack) - 1, 0, -1):
+            open_tag = self.stack[index]['tag']
+            if tag in self.IMPLIED.get(open_tag, ()):
+                del self.stack[index:]
+                return
+            if open_tag not in INLINE:
+                return
+
     def handle_starttag(self, tag, attrs):
-        if tag in self.CLOSES_P:
-            while len(self.stack) > 1 and self.stack[-1]['tag'] == 'p':
-                self.stack.pop()
+        self._close_implied(tag)
         child = node(tag, attrs)
         if not self.skipping:
             self._append(child)
@@ -168,12 +194,14 @@ def classes(item):
 
 
 def find(root, predicate, *, into_components=True):
-    """Depth-first search; stops descending into a component when ownership matters."""
-    for child in root['children']:
+    """Depth-first search, iteratively: post markup nests deeper than the stack allows."""
+    stack = list(reversed(root['children']))
+    while stack:
+        child = stack.pop()
         if predicate(child):
             yield child
         elif into_components or 'se-component' not in classes(child):
-            yield from find(child, predicate, into_components=into_components)
+            stack.extend(reversed(child['children']))
 
 
 def visible_text(root):
@@ -222,7 +250,7 @@ def image_url(item, enclosing=None):
     for source in (attrs.get('data-linkdata'), enclosing):
         if source:
             try:
-                payload = json.loads(html_module.unescape(source))
+                payload = json.loads(source)
             except ValueError:
                 continue
             if isinstance(payload, dict) and payload.get('src'):
@@ -234,7 +262,7 @@ def module_data(root):
     """A module wraps its fields as {"type": ..., "data": {...}}; the fields are inside data."""
     for script in find(root, lambda child: bool(child['attrs'].get('data-module'))):
         try:
-            payload = json.loads(html_module.unescape(script['attrs']['data-module']))
+            payload = json.loads(script['attrs']['data-module'])
         except ValueError:
             # Broken module JSON reduces this one component; it does not fail the whole read.
             return None
@@ -250,7 +278,7 @@ def module_data(root):
 def link_data(root):
     for child in find(root, lambda item: item['attrs'].get('data-linkdata')):
         try:
-            payload = json.loads(html_module.unescape(child['attrs']['data-linkdata']))
+            payload = json.loads(child['attrs']['data-linkdata'])
         except ValueError:
             return None
         return payload if isinstance(payload, dict) else None
@@ -261,18 +289,33 @@ def is_image(item):
     return item['tag'] == 'img'
 
 
+def image_groups(item):
+    """The smallest nodes that hold exactly one picture, so each caption stays with its own."""
+    groups, stack = [], list(item['children'])
+    while stack:
+        child = stack.pop(0)
+        pictures = sum(1 for _ in find(child, is_image)) + (1 if child['tag'] == 'img' else 0)
+        if pictures == 1:
+            groups.append(child)
+        elif pictures > 1:
+            stack = child['children'] + stack
+    return groups
+
+
 def images_of(root, body, *, caption=None, enclosing=None, skip=None):
+    """Collect pictures in document order, iteratively, carrying the nearest link data down."""
     found = []
-    enclosing = root['attrs'].get('data-linkdata') or enclosing
-    # The root may itself be the picture: a group's members are often bare <img> children.
-    for child in ([root] if root['tag'] == 'img' else []) + root['children']:
-        if child['tag'] == 'img':
-            url = image_url(child, enclosing)
+    stack = [(root, root['attrs'].get('data-linkdata') or enclosing)]
+    while stack:
+        item, link = stack.pop(0)
+        if item['tag'] == 'img':
+            url = image_url(item, link)
             if url and not (skip and url in skip):
                 body.images.append({'url': url, 'caption': caption})
                 found.append(url)
-        elif child is not root:
-            found += images_of(child, body, caption=caption, enclosing=enclosing, skip=skip)
+            continue
+        inherited = item['attrs'].get('data-linkdata') or link
+        stack = [(child, inherited) for child in item['children']] + stack
     return found
 
 
@@ -309,8 +352,7 @@ def render_component(family, item, body):
         lines, before = [], len(body.images)
         # A group holds several pictures with a caption each; one caption for all of them
         # would attach the first picture's words to every other picture.
-        groups = [child for child in item['children'] if any(find(child, is_image))
-                  or child['tag'] == 'img']
+        groups = image_groups(item)
         # A group with its own caption keeps it; one without falls back to the component's,
         # which is where a single picture's caption lives.
         shared = caption_of(item) if len(groups) <= 1 else None
@@ -383,18 +425,6 @@ def render_component(family, item, body):
     return (lines, 'partial' if saved else 'empty')
 
 
-def siblings_after(root, target):
-    """The nodes that follow `target` under its own parent, and nothing from elsewhere."""
-    stack = [root]
-    while stack:
-        item = stack.pop()
-        for index, child in enumerate(item['children']):
-            if child is target:
-                return item['children'][index + 1:]
-            stack.append(child)
-    return []
-
-
 def read_components(container, body):
     for component in find(container, lambda child: 'se-component' in classes(child),
                           into_components=False):
@@ -405,17 +435,33 @@ def read_components(container, body):
         # Owning a nested component means reading it too. A rule that saw a component's text
         # but not the pictures inside it has reduced that component, however sure the rule was.
         present = sum(1 for _ in find(component, is_image))
+        nested = list(find(component, lambda child: 'se-component' in classes(child)))
         before = len(body.images)
         lines, quality = render_component(family, component, body)
         taken = len(body.images) - before
-        if quality == 'full' and taken < present:
+        unread = [tidy(visible_text(child)) for child in nested]
+        missing = [content for content in unread if content and content not in '\n'.join(lines)]
+        modules = any(True for _ in find(component, lambda child: bool(child['attrs'].get('data-module'))))
+        if taken < present or missing or (nested and modules):
+            # Whatever the owner's rule did not reach is salvaged, and the tally says so:
+            # a video inside a text component is content, not a detail of the text.
             for _ in images_of(component, body, skip={image['url'] for image in body.images[before:]}):
                 lines.append('[image]')
+            lines.extend(missing)
+            for child in nested:
+                data = module_data(child)
+                if data:
+                    label = (data.get('mediaMeta') or {}).get('title') or data.get('description') \
+                        or data.get('inputUrl') or 'media'
+                    lines.append(f'[media: {label}]')
+                    body.attachments.append({'kind': 'media', 'title': label,
+                                             'url': data.get('inputUrl'),
+                                             'thumbnail_url': data.get('thumbnail')})
             quality = 'partial'
         if (quality == 'empty' and family in KNOWN and not tidy(visible_text(component))
-                and not present):
-            # A known family with nothing in it is a spacer, not something this reader missed.
-            # An unfamiliar family gets no such benefit: nobody knows what it was holding.
+                and not present and not nested and not modules):
+            # A known family holding literally nothing is a spacer, not something this reader
+            # missed. Anything with a child component or a module in it gets no such benefit.
             quality = 'full'
         setattr(body.coverage, quality, getattr(body.coverage, quality) + 1)
         if quality != 'full' and family not in body.coverage.unhandled:
@@ -476,21 +522,6 @@ def parse(source):
     container = next(find(tree.root, lambda item: 'se-main-container' in classes(item)), None)
     if container is not None and any(find(container, lambda item: 'se-component' in classes(item))):
         read_components(container, body)
-        # A stray </div> closes the container early in a browser too, leaving the rest of the
-        # body as siblings of the container. Those are read anyway and counted as reduced,
-        # because a body that quietly lost its second half must not read as text[full].
-        # Components elsewhere on the page belong to Naver's own widgets and are not this body.
-        for item in siblings_after(tree.root, container):
-            if 'se-component' not in classes(item):
-                continue
-            body.coverage.components += 1
-            body.coverage.partial += 1
-            if 'outside-container' not in body.coverage.unhandled:
-                body.coverage.unhandled.append('outside-container')
-            content = tidy(visible_text(item))
-            if content:
-                body.blocks.append(content)
-            images_of(item, body)
     else:
         # editorversion has been wrong and both containers can coexist, so the fallback is
         # chosen by finding it, not by believing an attribute.

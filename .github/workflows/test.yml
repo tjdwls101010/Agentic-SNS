@@ -27,3 +27,6 @@ jobs:
       - run: node --test tests/twitter/js/*.js
       - run: python tests/twitter/tools/check_fixtures_pii.py
       - run: ruff check --config pyproject.toml .claude/skills/twitter/scripts tests/twitter
+      - run: node --test tests/naver_blog/js/*.js
+      - run: python tests/naver_blog/tools/check_fixtures_pii.py
+      - run: ruff check --config pyproject.toml .claude/skills/naver-blog/scripts tests/naver_blog

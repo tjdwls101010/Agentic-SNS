@@ -153,14 +153,19 @@ def collect(spec, fetch, *, limit, state=None, since=None, until=None, monotonic
 
 
 def _terminal(spec, page, progress, window_reached):
-    """Decide whether this page ended the walk, and under which of the four names."""
-    if window_reached:
-        return True, 'window_reached'
+    """Decide whether this page ended the walk, and under which of the four names.
+
+    A one-page surface is asked first: "the window closed the walk" would claim there were
+    further pages this reader chose not to ask for, and would hide that the server served
+    fewer than it says it holds.
+    """
     if spec.pagination == 'single':
         return True, 'not_paginable'
     if spec.pagination == 'no_paging':
         capped = page.reported_total is not None and page.reported_total > page.raw_count
         return True, 'server_capped' if capped else 'not_paginable'
+    if window_reached:
+        return True, 'window_reached'
     if spec.pagination == 'page_marked':
         if page.next_page is None:
             return True, 'exhausted'

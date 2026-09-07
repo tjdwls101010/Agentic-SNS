@@ -106,3 +106,35 @@ def test_a_date_window_on_the_neighbour_feed_filters_what_is_shown(cli_env):
     assert code in (0, 7)
     for record in payload['results']:
         assert record['created_at'] >= '2025-09-05'
+
+
+def test_a_topic_listing_identifies_its_blog_under_the_name_that_surface_uses(cli_env):
+    """Topic listings say domainIdOrBlogId; requiring blogId would drop every row."""
+    code, payload = cli(['topic', '5', '--limit', '3'], cli_env)
+    assert code in (0, 8), payload
+    assert payload['results'], payload
+    for record in payload['results']:
+        assert record['blog_id'] and record['url'].startswith('https://blog.naver.com/')
+
+
+def test_an_account_that_follows_nobody_is_an_honest_empty_result(cli_env):
+    environment = dict(cli_env, NAVER_BLOG_FIXTURES=str(
+        Path(__file__).parent / 'fixtures/nobuddies'))
+    code, payload = cli(['home'], environment)
+    # Nothing hid these posts; there are none. That is exit 7, not a partial read.
+    assert code == 7, payload
+    assert payload['results'] == []
+
+
+def test_a_date_window_never_hides_that_the_feed_served_fewer_than_it_holds(cli_env):
+    """The feed has no next page, so "the window closed it" would be the wrong reason."""
+    code, payload = cli(['home', '--since', '2099-01-01'], cli_env)
+    assert payload['stop_reason'] in ('not_paginable', 'server_capped')
+
+
+def test_the_topic_directory_refuses_options_it_cannot_apply(cli_env):
+    for arguments in (['topic', '--since', '2026-01-01'], ['topic', '--out', '/tmp/x.ndjson'],
+                      ['topic', '5', '--top', '--out', '/tmp/x.ndjson']):
+        code, payload = cli(arguments, cli_env)
+        assert code == 2, arguments
+        assert payload['fix']

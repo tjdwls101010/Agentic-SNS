@@ -235,14 +235,19 @@ def test_inline_markup_keeps_the_words_in_the_order_they_were_written():
     assert doc.body.text == '앞중간뒤\n다음'
 
 
-def test_a_stray_closing_tag_does_not_hide_the_components_after_it():
-    """It closes the container in a browser too; what matters is not calling the rest text[full]."""
-    inner = TEXT + '</div>' + component('text', '<p>뒤에 오는 문단</p>')
+def test_a_stray_closing_tag_ends_the_container_the_way_a_browser_would():
+    """Reading past it would pull Naver's own widgets into the body, which is worse."""
+    inner = TEXT + '</div>' + component('text', '<p>컨테이너 밖 문단</p>')
     doc = parse(page([inner]))
-    assert '뒤에 오는 문단' in doc.body.text
-    assert doc.body.coverage.components == 2
-    assert doc.body.coverage.label().startswith('text[partial')
-    assert 'outside-container' in doc.body.coverage.unhandled
+    assert '첫 문단입니다.' in doc.body.text
+    assert '컨테이너 밖 문단' not in doc.body.text
+
+
+def test_a_widget_after_the_body_is_not_read_as_part_of_it():
+    widget = component('text', '<p>추천 위젯</p>')
+    doc = parse(page([TEXT], extra=f'<div class="widget">{widget}</div>'))
+    assert doc.body.text == '첫 문단입니다.'
+    assert doc.body.coverage.components == 1
 
 
 def test_a_component_missing_its_closing_tag_loses_no_text():
@@ -330,3 +335,50 @@ def test_entities_are_resolved_once_and_not_twice():
     markup = component('text', '<p>&amp;lt;태그&amp;gt;</p>')
     doc = parse(page([markup]))
     assert doc.body.text == '&lt;태그&gt;'
+
+
+def test_a_thousand_paragraphs_with_inline_markup_do_not_exhaust_the_stack():
+    """An open <p> under a <span> is still an open <p>; missing that nests a thousand deep."""
+    legacy = ('<div id="viewTypeSelector" class="post_ct">'
+              + ''.join(f'<p><span>문단 {index}</span>' for index in range(1200)) + '</div>')
+    doc = parse(page([], container='nothing-here', extra=legacy))
+    assert '문단 0' in doc.body.text and '문단 1199' in doc.body.text
+
+
+def test_table_cells_written_without_closing_tags_stay_separate():
+    markup = component('table', '<table><tr><td>가<td>나</table>')
+    doc = parse(page([markup]))
+    assert '가 | 나' in doc.body.text
+
+
+def test_a_picture_inside_a_text_component_survives_even_without_a_caption():
+    bare = component('text', '<img data-lazy-src="https://a.pstatic.net/bare.jpg">')
+    doc = parse(page([bare]))
+    assert doc.body.images[0]['url'] == 'https://a.pstatic.net/bare.jpg'
+    assert doc.body.coverage.partial == 1
+
+
+def test_a_video_nested_inside_another_component_is_not_lost():
+    data = json.dumps({'type': 'v2_video', 'data': {'mediaMeta': {'title': '안쪽 영상'}}})
+    nested = component('text', component('video', f'<script data-module=\'{data}\'></script>'))
+    doc = parse(page([nested]))
+    assert '안쪽 영상' in doc.body.text
+    assert doc.body.coverage.partial == 1 and doc.body.coverage.full == 0
+
+
+def test_module_attributes_are_not_unescaped_a_second_time():
+    data = '{"type":"v2_oembed","data":{"description":"&amp;lt;태그&amp;gt;","inputUrl":"https://x.test/1"}}'
+    markup = component('oembed', f'<script data-module=\'{data}\'></script>')
+    doc = parse(page([markup]))
+    # The description is the literal text "&lt;태그&gt;", not a less-than sign.
+    assert '&lt;태그&gt;' in doc.body.text
+
+
+def test_each_picture_keeps_its_caption_even_under_a_shared_wrapper():
+    inner = ('<div class="se-section">'
+             '<div><img data-lazy-src="https://a.pstatic.net/1.jpg">'
+             '<div class="se-caption">첫 사진</div></div>'
+             '<div><img data-lazy-src="https://a.pstatic.net/2.jpg">'
+             '<div class="se-caption">둘째 사진</div></div></div>')
+    doc = parse(page([component('imageGroup', f'<div class="se-component-content">{inner}</div>')]))
+    assert [image['caption'] for image in doc.body.images] == ['첫 사진', '둘째 사진']

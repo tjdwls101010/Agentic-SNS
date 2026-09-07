@@ -161,16 +161,26 @@ def read_home(args, transport):
 
     def fetch(page):
         payload = transport.get('buddy_feed')
+        result = payload.get('result') or {}
+        # Only an explicit false means "this account follows nobody"; a missing field does not.
+        if result.get('hasBuddy') is False:
+            raise NaverBlogError(7, 'This account has no neighbours yet.',
+                                 'Follow a blog in Naver, or read one directly with posts <id>.',
+                                 error='empty')
         raw = read_page(spec, payload, page=page)
         raw.items = [item.to_dict() for item in
                      (build_post(row) for row in raw.items) if item]
-        if not (payload.get('result') or {}).get('hasBuddy', True):
-            raw.items = []
         return raw
 
-    result = collect(spec, fetch, limit=args.limit, since=args.since, until=args.until,
-                     # The feed is newest first, so a page below the window closes it.
-                     monotonic=True)
+    try:
+        result = collect(spec, fetch, limit=args.limit, since=args.since, until=args.until,
+                         # The feed is newest first, so a page below the window closes it.
+                         monotonic=True)
+    except NaverBlogError as error:
+        if error.code != 7:
+            raise
+        result = {'ok': True, 'results': [], 'stop_reason': 'exhausted', 'code': 7,
+                  'message': error.message, 'fix': error.fix}
     result['context'] = {'feed': 'neighbours'}
     result['label_prefix'] = 'p'
     result['budget'] = transport.budget.snapshot()
@@ -234,6 +244,10 @@ def read_topic(args, transport):
                    hops=['open: `post <url>`', 'blog: `blog <id>`', f'featured: `topic {seq} --top`'])
 
 
+def next_month(year, month):
+    return (year + 1, 1) if month == 12 else (year, month + 1)
+
+
 def read_monthly(args, transport):
     """Naver clamps a future month to its latest issue, so the answer says which one it is."""
     from datetime import datetime, timedelta, timezone
@@ -251,6 +265,10 @@ def read_monthly(args, transport):
                 if built:
                     rows.append(built.to_dict())
         sections.previous = (result.get('prevYear'), result.get('prevMonth'))
+        # Naver clamps a month it has not published yet to its latest issue, and answers
+        # without saying so. The issue before this one is the only evidence of which it is.
+        if all(sections.previous):
+            sections.actual = next_month(*sections.previous)
         return rows
 
     def picks():
@@ -263,14 +281,20 @@ def read_monthly(args, transport):
         return rows
 
     sections.previous = None
+    sections.actual = None
     sections.add('blogs of the month', blogs, primary=True, prefix='m')
     sections.add('editor picks', picks, prefix='e')
     previous = getattr(sections, 'previous', None)
+    actual = getattr(sections, 'actual', None) or (year, month)
     hops = ['context: `blog <id>`', 'activity: `posts <id>`']
     if previous and all(previous):
         hops.append(f'earlier issue: `monthly --year {previous[0]} --month {previous[1]}`')
+    warnings = []
+    if (actual[0], actual[1]) != (year, month):
+        warnings.append(f'{year}-{month:02d} has not been published; '
+                        f'this is the {actual[0]}-{actual[1]:02d} issue')
     return {'ok': sections.exit_code() == 0, 'code': sections.exit_code(),
             'sections': sections.as_list(), 'results': [], 'stop_reason': 'not_paginable',
-            'context': {'issue': f'{year}-{month:02d}'},
+            'warnings': warnings, 'context': {'issue': f'{actual[0]}-{actual[1]:02d}'},
             'budget': transport.budget.snapshot(), 'fetched_bytes': transport.fetched_bytes,
             'next': None, 'hops': hops}

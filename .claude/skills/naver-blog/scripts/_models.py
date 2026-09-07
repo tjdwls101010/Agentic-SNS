@@ -101,7 +101,8 @@ def build_post(raw, *, blog_id=None, blog_name=None, nickname=None):
     if not isinstance(raw, dict):
         return None
     log_no = first(raw, 'logNo')
-    blog = first(raw, 'blogId') or blog_id
+    # Topic listings name the blog domainIdOrBlogId; everywhere else it is blogId.
+    blog = first(raw, 'blogId', 'domainIdOrBlogId') or blog_id
     if log_no is None or blog is None:
         return None
     log_no, blog = str(log_no), str(blog)
