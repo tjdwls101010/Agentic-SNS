@@ -67,12 +67,13 @@ def check(path):
 
 
 def main():
-    files = sorted(ROOT.glob('*.ndjson')) + sorted(ROOT.glob('*.html'))
+    # rglob, not glob: whole fixture sets live in subdirectories and they ship too.
+    files = sorted(ROOT.rglob('*.ndjson')) + sorted(ROOT.rglob('*.html'))
     failures = 0
     for path in files:
         problems = check(path)
         for problem in problems:
-            print(f'{path.name}: {problem}')
+            print(f'{path.relative_to(ROOT)}: {problem}')
         failures += len(problems)
     print(f'{len(files)} fixture file(s) checked, {failures} problem(s).')
     return 1 if failures else 0

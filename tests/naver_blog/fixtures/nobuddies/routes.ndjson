@@ -1,0 +1,1 @@
+{"key": "section.blog.naver.com/ajax/BuddyPostList.naver?categoryNo=0&countPerPage=30&currentPage=1&groupId=0", "envelope": {"status": 200, "body": ")]}',\n{\"result\": {\"buddyPostList\": [], \"buddyPostTotalCount\": 0, \"hasBuddy\": false, \"hasBuddyPost\": false}}"}}
