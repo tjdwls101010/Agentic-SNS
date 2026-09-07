@@ -128,3 +128,52 @@ def test_comments_never_claim_more_than_naver_reported(live_budget):
         assert record['comment_no']
         if record['reply_level'] > 1:
             assert record['parent_comment_no']
+
+
+def test_your_own_neighbour_list_reads(live_budget):
+    live_budget(2, 'buddies')
+    code, payload = cli('buddies', '--limit', '5')
+    assert code in (0, 7), payload
+    for record in payload['results']:
+        assert record['id'].startswith('buddy:') and record['blog_id']
+
+
+def test_the_neighbour_feed_says_it_serves_one_page(live_budget):
+    live_budget(1, 'home')
+    code, payload = cli('home', '--limit', '5')
+    assert code in (0, 7, 8), payload
+    assert payload['stop_reason'] in ('not_paginable', 'server_capped')
+    assert payload['next'] is None
+
+
+def test_the_topic_directory_and_one_topic_read(live_budget):
+    live_budget(2, 'topic')
+    code, payload = cli('topic')
+    assert code == 0, payload
+    assert len(payload['results']) > 10
+    seq = payload['results'][0]['seq']
+    code, payload = cli('topic', seq, '--limit', '3')
+    assert code in (0, 8), payload
+    assert payload['context']['topic'] == seq
+
+
+def test_the_month_issue_reads_in_two_sections(live_budget):
+    live_budget(2, 'monthly')
+    code, payload = cli('monthly')
+    assert code in (0, 8), payload
+    assert [section['name'] for section in payload['sections']] == \
+        ['blogs of the month', 'editor picks']
+
+
+def test_a_date_window_and_a_collection_file_work_together(live_budget, tmp_path):
+    live_budget(1, 'search with a window into a file')
+    from datetime import datetime, timedelta, timezone
+    week = (datetime.now(timezone(timedelta(hours=9))) - timedelta(days=7)).date().isoformat()
+    out = tmp_path / 'collected.ndjson'
+    code, payload = cli('search', '파이썬', '--since', week, '--limit', '3', '--out', str(out))
+    assert code in (0, 7, 8), payload
+    assert payload['out'] == str(out)
+    lines = [json.loads(line) for line in out.read_text().splitlines()]
+    assert lines[0]['kind'] == 'header'
+    for record in payload['results']:
+        assert record['created_at'][:10] >= week
