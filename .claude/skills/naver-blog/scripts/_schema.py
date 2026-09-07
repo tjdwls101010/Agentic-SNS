@@ -40,6 +40,8 @@ NOTES = {
     'open': 'False for a closed category; its posts are counted but not listed.',
     'mutual': 'True when the neighbour relationship goes both ways.',
     'seq': 'Topic number; the argument the topic command takes.',
+    'body': 'Only a post read fills this; a listing carries summary instead. Its coverage is '
+            'what decides whether a summary may be written as the whole post.',
 }
 
 STOP_REASONS = {
@@ -51,7 +53,9 @@ STOP_REASONS = {
     'query_failure': 'A page failed partway; what came before it is still here.',
     'query_restricted': 'Naver restricted the query. Whatever arrived is included; it is not an empty result.',
     'not_paginable': 'This surface serves one page and Naver offers no second one.',
-    'server_capped': "Naver stopped serving at its own ceiling; narrow the window or the keyword to see more.",
+    'server_capped': 'Naver served fewer than it says it holds and offers no way to ask for the '
+                     'rest. On a search, narrowing the window or the keyword reaches more; on the '
+                     'neighbour feed there is no narrowing, so read a neighbour directly instead.',
     'pagination_stalled': 'A page repeated, so asking again cannot be told apart from the end.',
 }
 
@@ -78,13 +82,46 @@ def schema():
             properties[key] = field_type(annotations[key]) | {'description': note}
         definitions[name] = {'type': 'object', 'properties': properties,
                              'required': list(sample), 'additionalProperties': False}
+    # The post command answers in sections, and its body carries the extraction tally that
+    # decides what a summary may claim. A reader who switches to --json has to find it.
+    definitions['Body'] = {
+        'type': 'object',
+        'required': ['text', 'images', 'links', 'attachments', 'coverage'],
+        'properties': {
+            'text': {'type': 'string', 'description':
+                     'The post body as text, never clipped. Pictures, embeds and dividers '
+                     'appear as [image: caption], [embed: …] and --- in their own place.'},
+            'images': {'type': 'array', 'description':
+                       'Full-size picture URLs with their own captions, not the blurred placeholders.'},
+            'links': {'type': 'array', 'description': 'Links out of the post; page anchors are excluded.'},
+            'attachments': {'type': 'array', 'description':
+                            'Videos, embeds and cards. A video with no playable URL keeps url null '
+                            'rather than passing its thumbnail off as the video.'},
+            'coverage': {'type': 'object', 'description':
+                         'components, and how many were read in full, reduced to text and pictures '
+                         '(partial), or yielded nothing (empty), plus families and unhandled. '
+                         'partial+empty above zero is what text[partial: …] reports: those blocks '
+                         'held more than what is in text, so a summary says it was reduced.'}}}
+    definitions['Section'] = {
+        'type': 'object',
+        'required': ['name', 'ok'],
+        'properties': {
+            'name': {'type': 'string', 'description':
+                     'post, same category, comments, blog, categories, notices, popular, '
+                     'blogs of the month, editor picks.'},
+            'ok': {'type': 'boolean'},
+            'data': {'type': 'array', 'description': 'The records this section produced.'},
+            'error': {'type': 'object', 'description':
+                      'Why this section failed, with its own code and fix. A failed section sits '
+                      'beside the ones that worked; the command exit reports the most serious.'}}}
+    definitions['Post']['properties']['body'] |= {'$ref': '#/$defs/Body'}
     definitions['ReadResult'] = {
         'type': 'object',
         'required': ['ok', 'command', 'stop_reason', 'next', 'budget', 'fetched_bytes'],
         'properties': {
             'ok': {'type': 'boolean'},
             'results': {'type': 'array', 'items': {'anyOf': [{'$ref': '#/$defs/' + name} for name in CLASSES]}},
-            'sections': {'type': 'array', 'description':
+            'sections': {'type': 'array', 'items': {'$ref': '#/$defs/Section'}, 'description':
                          'A composite command answers in sections; a failed one keeps its error '
                          'beside the ones that succeeded.'},
             'stop_reason': {'enum': list(STOP_REASONS)},

@@ -88,7 +88,9 @@ def parser():
             p.add_argument('--since', default=None, help='KST date YYYY-MM-DD, that day included')
             p.add_argument('--until', default=None, help='KST date YYYY-MM-DD, that whole day included')
         if command == 'search':
-            p.add_argument('text', help='Search text')
+            # Korean queries are usually several words; requiring quotes turns the natural
+            # way to type one into an argument error.
+            p.add_argument('text', nargs='+', help='Search text; several words are one query')
             p.add_argument('--type', choices=['posts', 'blogs', 'tags'], default='posts',
                            help='What to search (default posts). Tag results carry no blog name')
             p.add_argument('--sort', choices=['sim', 'date'], default=None,
@@ -111,7 +113,8 @@ def parser():
         if command == 'post':
             p.add_argument('--comments', action='store_true', help='Also read the first page of comments')
         if command == 'find':
-            p.add_argument('text', help='Text to search for inside this blog')
+            p.add_argument('text', nargs='+',
+                           help='Text to search for inside this blog; several words are one query')
             p.add_argument('--tag', action='store_true', help='Search this blog\'s tags instead of its post text')
             p.add_argument('--sort', choices=['sim', 'date'], default=None,
                            help='Relevance or newest (default sim); ignored by tag search, so --tag refuses it')
@@ -131,6 +134,8 @@ def parser():
 
 def defaults(args):
     """Fill the defaults after parsing, so `explicit` stays visible to the request budget."""
+    if isinstance(getattr(args, 'text', None), list):
+        args.text = ' '.join(args.text)
     args.explicit_limit = getattr(args, 'limit', None) is not None
     args.explicit_sort = getattr(args, 'sort', None) is not None
     if args.command in DEFAULT_LIMIT and args.limit is None:

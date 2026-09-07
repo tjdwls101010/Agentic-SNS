@@ -176,3 +176,10 @@ def test_an_unrecognized_status_value_is_shown_even_when_it_is_not_a_number():
 def test_a_zero_status_in_either_spelling_labels_nothing():
     assert build_comment(dict(COMMENTS[0], status=0)).labels == []
     assert build_comment(dict(COMMENTS[0], status='0')).labels == []
+
+
+def test_a_top_level_comment_that_points_at_itself_has_no_parent():
+    """Naver marks a top-level comment by setting parentCommentNo to its own number."""
+    built = build_comment(dict(COMMENTS[0], parentCommentNo='9990001'))
+    assert built.comment_no == '9990001' and built.parent_comment_no is None
+    assert build_comment(COMMENTS[1]).parent_comment_no == '9990001'

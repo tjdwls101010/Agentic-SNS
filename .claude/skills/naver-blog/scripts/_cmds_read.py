@@ -110,7 +110,8 @@ def search(args, transport):
     build = build_blog if args.type == 'blogs' else build_post
     context = {'command': 'search', 'text': args.text, 'type': args.type,
                'sort': args.sort if args.type == 'posts' else None,
-               'own_money': bool(args.own_money), 'since': args.since, 'until': args.until}
+               'own_money': 'own-money only' if args.own_money else None,
+               'since': args.since, 'until': args.until}
     resume = f'search {shlex.quote(args.text)} --type {args.type}'
     if args.type == 'posts':
         resume += f' --sort {args.sort}'
@@ -223,12 +224,13 @@ def post(args, transport):
                              error='envelope_drift')
     # The post page already names the viewer, so the session refreshes without a request.
     _session.note_viewer(html)
-    record = {'id': f'post:{blog_id}/{log_no}', 'blog_id': blog_id, 'log_no': log_no,
-              'url': f'https://blog.naver.com/{blog_id}/{log_no}', 'title': doc.title,
-              'created_at': doc.created_at, 'category_no': doc.category_no,
-              'category_name': doc.category_name, 'tags': doc.tags,
-              'comment_count': doc.comment_count, 'like_count': UNKNOWN,
-              'body': doc.body.to_dict()}
+    from ._models import Post
+    record = Post(id=f'post:{blog_id}/{log_no}', blog_id=blog_id, log_no=log_no,
+                  url=f'https://blog.naver.com/{blog_id}/{log_no}', title=doc.title,
+                  created_at=doc.created_at, category_no=doc.category_no,
+                  category_name=doc.category_name, tags=doc.tags,
+                  comment_count=doc.comment_count, like_count=UNKNOWN,
+                  body=doc.body.to_dict()).to_dict()
     sections.entries.append({'name': 'post', 'ok': True, 'primary': True, 'prefix': 'p',
                              'data': [record]})
 

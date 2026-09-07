@@ -91,6 +91,8 @@ class Post:
     view_count: int | None = None
     tags: list | str = field(default_factory=list)
     labels: list = field(default_factory=list)
+    # Only a post read fills this; a list surface carries summary instead.
+    body: dict | None = None
 
     def to_dict(self):
         return asdict(self)
@@ -183,10 +185,13 @@ def build_comment(raw):
     if status not in (None, 0, '0', '') and not labels:
         labels.append(f'status={status}')
     parent = first(raw, 'parentCommentNo')
+    # Naver points a top-level comment at itself rather than at nothing. Repeating that
+    # would show every comment as a reply to itself.
+    parent = None if parent in (None, '', '0', 0) or str(parent) == comment_no else str(parent)
     author_blog = first(raw, 'profileUserId')
     return Comment(
         id=f'comment:{comment_no}', comment_no=comment_no,
-        parent_comment_no=None if parent in (None, '', '0', 0) else str(parent),
+        parent_comment_no=parent,
         reply_level=number(raw.get('replyLevel')) or 1,
         author=clean(first(raw, 'userName', 'maskedUserName')),
         author_blog_id=str(author_blog) if author_blog else None,

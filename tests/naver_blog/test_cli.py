@@ -99,3 +99,17 @@ def test_an_unknown_command_is_an_argument_error_with_a_fix():
     result = run(['nonsense'])
     assert result.returncode == 2
     assert json.loads(result.stdout)['fix']
+
+
+def test_a_multi_word_query_is_one_query():
+    """Korean searches are usually several words; requiring quotes makes the natural form fail."""
+    from naver_blog_skill.naver_blog import check, defaults, parser
+    args = defaults(parser().parse_args(['search', '강남', '맛집', '--limit', '3']))
+    assert args.text == '강남 맛집'
+    args = check(defaults(parser().parse_args(['find', 'someone', '수제', '버거'])))
+    assert args.text == '수제 버거'
+
+
+def test_a_single_word_query_is_unchanged():
+    from naver_blog_skill.naver_blog import defaults, parser
+    assert defaults(parser().parse_args(['search', '파이썬'])).text == '파이썬'

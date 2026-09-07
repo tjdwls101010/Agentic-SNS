@@ -382,3 +382,9 @@ def test_each_picture_keeps_its_caption_even_under_a_shared_wrapper():
              '<div class="se-caption">둘째 사진</div></div></div>')
     doc = parse(page([component('imageGroup', f'<div class="se-component-content">{inner}</div>')]))
     assert [image['caption'] for image in doc.body.images] == ['첫 사진', '둘째 사진']
+
+
+def test_the_sites_own_name_is_not_part_of_the_post_title():
+    markup = page([TEXT]).replace('var postTitle = "\\uD14C\\uC2A4\\uD2B8 \\uAE00"',
+                                  'var postTitle = "\\uD14C\\uC2A4\\uD2B8 \\uAE00 : \\uB124\\uC774\\uBC84 \\uBE14\\uB85C\\uADF8"')
+    assert parse(markup).title == '테스트 글'

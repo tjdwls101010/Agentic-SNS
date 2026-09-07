@@ -165,7 +165,9 @@ def record_lines(record, label, chars, shown=None):
 def header(result, args):
     budget = result.get('budget') or {}
     parts = [args.command]
-    parts += [str(value) for value in (result.get('context') or {}).values() if value]
+    # A context value is a label, not a flag: "True" in a header tells the reader nothing.
+    parts += [str(value) for value in (result.get('context') or {}).values()
+              if value is not None and not isinstance(value, bool)]
     sections = result.get('sections')
     if sections:
         # A composite command's answer is its sections, so a record count would say nothing.

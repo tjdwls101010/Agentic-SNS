@@ -478,6 +478,14 @@ def read_legacy(container, body):
     links_of(container, body)
 
 
+# The page title Naver puts in the variable ends with the site's own name.
+TITLE_SUFFIX = re.compile(r'\s*:\s*네이버\s*블로그\s*$')
+
+
+def post_title(value):
+    return TITLE_SUFFIX.sub('', clean(value) or '')
+
+
 def variable(source, name):
     match = re.search(r'var\s+' + name + r'\s*=\s*("(?:\\.|[^"\\])*")', source)
     if not match:
@@ -497,7 +505,7 @@ def parse(source):
     doc = PostDoc(blog_id=variable(source, 'blogId'), blog_no=variable(source, 'blogNo'),
                   viewer_id=variable(source, 'userId'), open_type=variable(source, 'openType'),
                   category_name=clean(variable(source, 'gsCategoryName')),
-                  title=clean(variable(source, 'postTitle')) or '')
+                  title=post_title(variable(source, 'postTitle')))
     property_node = next(find(tree.root, lambda item: item['attrs'].get('id') == '_post_property'), None)
     if property_node:
         attrs = property_node['attrs']
@@ -507,7 +515,7 @@ def parse(source):
         count = attrs.get('commentcount')
         doc.comment_count = int(count) if str(count).isdigit() else None
         if not doc.title:
-            doc.title = clean(attrs.get('browsertitle')) or ''
+            doc.title = post_title(attrs.get('browsertitle'))
     if not doc.log_no:
         doc.log_no = re.search(r'logNo=(\d+)', source) and re.search(r'logNo=(\d+)', source)[1]
 
