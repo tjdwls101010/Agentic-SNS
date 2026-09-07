@@ -164,7 +164,7 @@ def classify(spec, response, *, expect=None):
         raise drift('Expected a list at ' + spec.leaf)
     if spec.leaf_type == 'dict' and not isinstance(leaf, dict):
         raise drift('Expected an object at ' + spec.leaf)
-    for path, wanted in (expect or {}).items():
+    for path, wanted in ({} if spec.resolves_identity else (expect or {})).items():
         got = at(payload, path)
         # A list path (result.commentList[].objectId) must have every item agree.
         values = got if isinstance(got, list) else [got]
@@ -204,8 +204,21 @@ class Transport:
         # classify first: a redirect to the login host is a login error, not an unexpected hop.
         payload = classify(spec, response, expect=self._identity_of(spec, values, expect))
         if 300 <= response['status'] < 400:
+            # A blog's own domain address redirects to the canonical id, and Naver answers
+            # that. One hop is followed; anything further is a shape this reader cannot read.
+            canonical = self._canonical_of(spec, path, response)
+            if canonical and canonical != values.get('blogId'):
+                return self.get(name, page=page, expect=expect, **dict(values, blogId=canonical))
             raise drift('Naver redirected a request that should not redirect.')
         return payload
+
+    @staticmethod
+    def _canonical_of(spec, path, response):
+        location = response.get('location') or ''
+        if not location or 'blogId' not in location:
+            return None
+        url = safe_location(spec.host, path, location)
+        return dict(parse_qsl(url.query)).get('blogId')
 
     @staticmethod
     def _identity_of(spec, values, expect):

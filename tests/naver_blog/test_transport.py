@@ -126,11 +126,23 @@ def test_the_ordinary_query_control_object_does_not_restrict_anything():
     assert classify(operation('search_posts'), envelope(body=mblog(payload)))['result']['list'] == []
 
 
+COMMENTS = {'success': True, 'code': '1000',
+            'result': {'commentList': [{'commentNo': '1', 'objectId': '142_201_999'}],
+                       'pageModel': {'totalPages': 1}}}
+
+
 def test_an_answer_about_a_different_target_is_a_contract_error():
     with pytest.raises(NaverBlogError) as caught:
-        classify(operation('blog_card'), envelope(body=mblog(CARD)),
-                 expect={'result.blogId': 'someoneelse'})
+        classify(operation('comments'), envelope(body=mblog(COMMENTS)),
+                 expect={'result.commentList[].objectId': '123'})
     assert caught.value.code == 6 and caught.value.error == 'envelope_drift'
+
+
+def test_a_card_answering_under_another_id_is_naver_resolving_a_domain_address():
+    """A blog's own domain address is answered under the canonical id; that is not drift."""
+    payload = classify(operation('blog_card'), envelope(body=mblog(CARD)),
+                       expect={'result.blogId': 'naver_diary'})
+    assert payload['result']['blogId'] == 'naverofficial'
 
 
 def test_a_wrong_leaf_type_is_a_contract_error():
@@ -202,10 +214,10 @@ def test_the_step_order_decides_which_reading_wins(name, response, expected):
 
 def test_a_contract_error_outranks_a_policy_restriction():
     # A restricted label on an answer this reader cannot read would describe the wrong thing.
-    payload = {'isSuccess': True, 'result': {'blogId': 'naverofficial'}, 'blockedByBifrostShield': True}
+    payload = dict(COMMENTS, blockedByBifrostShield=True)
     with pytest.raises(NaverBlogError) as caught:
-        classify(operation('blog_card'), envelope(body=mblog(payload)),
-                 expect={'result.blogId': 'someoneelse'})
+        classify(operation('comments'), envelope(body=mblog(payload)),
+                 expect={'result.commentList[].objectId': '123'})
     assert caught.value.code == 6
 
 

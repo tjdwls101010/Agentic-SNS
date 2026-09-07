@@ -437,6 +437,8 @@ description: Read Naver Blog (blog.naver.com) through the user's logged-in Aside
 
 **최종 검증 (2026-09-07).** 오프라인 335개·JS 9개, 전체 레포 1,005 passed·39 deselected. Ruff·PII(6파일 0건)·`validate_harness.py`(0/0)·`audit_harness.py`(skill 5개·드리프트 0) 통과. 라이브 15개가 누적 30요청 가드 안에서 통과했다 — `doctor`가 `chunghun1`을 보고했고, `BuddyPostList`가 `countPerPage` 3과 30에 같은 집합을 돌려줬으며(F14 회귀 없음), 실제 SE 리치 글이 33컴포넌트 전부 `full`로 읽혔다. Graphify는 2,290노드·5,282간선·150커뮤니티로 갱신하고 codex가 새 커뮤니티를 명명했다. PR #5.
 
+**P6 콜드 스타트에서 찾은 것.** 심볼릭 링크로 낯선 디렉터리에서 처음 실행해 보니 `blog naver_diary`가 exit 6이었다. 네이버가 도메인 주소를 **서버에서 스스로 해석해** 정식 id로 답하는데, 대상 대조가 그 성공을 드리프트로 거절했다. F10은 "`not_exist_blog`가 오면 302로 해석한다"만 적었고 이 경로는 없었다. 정정: 카드는 응답의 `result.blogId`가 정식 id이고(`resolves_identity`), 글 페이지는 logNo가 맞으면 페이지가 말하는 blogId를 채택하며, 3xx는 `location`의 `blogId`로 한 번 재요청한다. logNo 대조는 그대로 엄격하다 — 다른 글의 본문이 섞이는 것은 도메인 해석이 아니다.
+
 **라이브 미확인으로 남긴 것.** A1(로그아웃 `FeedList` 형태), A6(`naver.me`), A7(로그인 상태 차단 서명), A11(답글 10개 초과 부모의 반환 범위). 코드는 미관측을 근거로 판정을 승격하지 않는다 — 링크 부재는 로그아웃이 아니라 `envelope_drift`이고, 차단은 HTTP 429만이며, 관측 안 된 `errorType`은 원값을 `reason`에 실은 채 6이다.
 
 **P5·P6에서 정정한 것.** ① SKILL.md의 사실 문장은 전부 결과 해석과 함께 쓴다 — 재심사에서 6건 모두 해소를 확인했다. ② description은 소재지로 고르고 주제어로 고르지 않는다고 명시한다("리뷰·후기"만으로 이 스킬을 택하면 형제의 요청을 가져간다). ③ **네이버는 최상위 댓글의 `parentCommentNo`를 자기 자신으로 채운다** — 그대로 쓰면 모든 댓글이 자기 답글로 보인다(실측으로 확인). ④ `schema`는 `Post.body`와 `Section`을 정의한다. `--json`으로 바꿨을 때 본문 완전성을 어디서 보는지 알 수 없었다. ⑤ 검색어는 여러 낱말을 하나의 질의로 받는다 — 한국어 검색은 대개 여러 낱말이고, 따옴표를 강제하면 자연스러운 형태가 인자 오류가 된다. ⑥ 글 제목의 " : 네이버 블로그" 접미사를 벗긴다.

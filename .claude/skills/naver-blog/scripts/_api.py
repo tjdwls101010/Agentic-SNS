@@ -60,6 +60,10 @@ class Operation:
     login: bool = False
     accept: str = 'json'
     role: str = 'primary'
+    # True where the answer's identity is the authoritative one rather than a mismatch:
+    # a blog's own domain address is resolved by Naver, so the card comes back under the
+    # canonical id and rejecting that would refuse a request Naver just answered.
+    resolves_identity: bool = False
     # 'measured' was seen on 2026-09-07 in the logged-in session; 'legacy' comes from the
     # earlier anonymous recon and has not been re-confirmed against a logged-in account.
     source: str = 'measured'
@@ -109,7 +113,7 @@ OPERATIONS = _catalog(
               leaf='result.searchList', leaf_type='list', pagination='page', page_size=30,
               page_param='currentPage', cap=SEARCH_CEILING, role='fallback'),
     Operation('blog_card', 'm.blog.naver.com', '/api/blogs/{blogId}', success='isSuccess',
-              leaf='result', leaf_type='dict', identity='result.blogId'),
+              leaf='result', leaf_type='dict', identity='result.blogId', resolves_identity=True),
     Operation('categories', 'm.blog.naver.com', '/api/blogs/{blogId}/category-list', success='isSuccess',
               leaf='result.mylogCategoryList', leaf_type='list'),
     # itemCount above 30 returns param_is_invalidate, and result.totalCount is always 0.

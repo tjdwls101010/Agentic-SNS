@@ -177,3 +177,13 @@ def test_a_date_window_and_a_collection_file_work_together(live_budget, tmp_path
     assert lines[0]['kind'] == 'header'
     for record in payload['results']:
         assert record['created_at'][:10] >= week
+
+
+def test_a_blogs_own_domain_address_resolves_to_its_canonical_id(live_budget):
+    """blog.naver.com/naver_diary is naverofficial; the answer says which id it really read."""
+    live_budget(2, 'domain address')
+    code, payload = cli('blog', 'naver_diary', '--brief')
+    assert code in (0, 8), payload
+    card = {section['name']: section for section in payload['sections']}['blog']['data'][0]
+    assert card['blog_id'] == 'naverofficial'
+    assert payload['context']['blog'] == 'naverofficial'

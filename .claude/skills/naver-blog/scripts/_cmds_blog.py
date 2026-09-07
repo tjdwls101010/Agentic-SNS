@@ -36,6 +36,8 @@ def read_blog(args, transport):
     entry = build_blog(payload.get('result'))
     if entry is None:
         raise NaverBlogError(6, 'The blog card did not identify a blog.', error='envelope_drift')
+    # The card is what settles a domain address: every later section asks about this id.
+    blog_id = entry.blog_id or blog_id
     sections.entries.append({'name': 'blog', 'ok': True, 'primary': True, 'prefix': 'b',
                              'data': [entry.to_dict()]})
 

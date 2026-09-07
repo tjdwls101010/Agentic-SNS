@@ -213,15 +213,16 @@ def post(args, transport):
                                                                             blogId=name, logNo=log_no))
     blog_id = resolved
     doc = parse(html)
-    if doc.blog_id and doc.blog_id != blog_id:
-        raise NaverBlogError(6, f'That page belongs to {doc.blog_id}, not {blog_id}.',
-                             'Open the URL in Aside and pass the id it lands on.', error='envelope_drift')
     if doc.log_no and str(doc.log_no) != str(log_no):
         # Mixing another post's body with this post's recommendations and counts is worse
         # than refusing, and nothing downstream could tell the two apart.
         raise NaverBlogError(6, f'That page is post {doc.log_no}, not {log_no}.',
                              'Open the URL in Aside and pass the post number it lands on.',
                              error='envelope_drift')
+    if doc.blog_id and doc.blog_id != blog_id:
+        # The post number is what identifies the page; a different blog id beside the right
+        # post number is Naver resolving a domain address, and the page names the real one.
+        blog_id = doc.blog_id
     # The post page already names the viewer, so the session refreshes without a request.
     _session.note_viewer(html)
     from ._models import Post
