@@ -44,11 +44,11 @@ def read_page(spec, payload, *, page=1):
         total = at(payload, spec.total_field)
         result.reported_total = total if isinstance(total, int) and not isinstance(total, bool) else None
     else:
-        for path in ('result.totalCount', 'result.totalPage'):
-            value = at(payload, path)
-            if isinstance(value, int) and not isinstance(value, bool):
-                result.reported_total = value if path.endswith('Count') else result.reported_total
-                break
+        value = at(payload, 'result.totalCount')
+        if isinstance(value, int) and not isinstance(value, bool):
+            # A post list reports 0 forever. A zero next to actual items is provably false,
+            # and repeating it would put a number in the header that means nothing.
+            result.reported_total = None if value == 0 and items else value
     # The comment box is the one surface whose next-page marker has been trustworthy.
     if spec.op == 'comments':
         model = at(payload, 'result.pageModel') or {}

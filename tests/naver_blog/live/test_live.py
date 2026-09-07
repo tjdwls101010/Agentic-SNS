@@ -47,3 +47,39 @@ def test_the_feed_page_still_carries_the_viewer_link_login_detection_relies_on(l
     live_budget(1, 'feed html')
     html = Transport(2).get('feed_html')
     assert read_viewer(html, source='feed') == 'chunghun1'
+
+
+def test_search_answers_in_all_three_kinds(live_budget):
+    live_budget(3, 'three searches')
+    code, payload = cli('search', '파이썬', '--limit', '3')
+    assert code == 0, payload
+    assert all(record['id'].startswith('post:') for record in payload['results'])
+    assert all(record['url'].startswith('https://blog.naver.com/') for record in payload['results'])
+
+    code, payload = cli('search', '파이썬', '--type', 'blogs', '--limit', '3')
+    assert code == 0, payload
+    assert all(record['id'].startswith('blog:') for record in payload['results'])
+
+    code, payload = cli('search', '파이썬', '--type', 'tags', '--limit', '3')
+    assert code in (0, 7), payload
+    # Tag results carry no blog name at all; claiming one would be inventing it.
+    assert all(record['blog_name'] is None for record in payload['results'])
+
+
+def test_a_blog_card_answers_about_the_blog_that_was_asked_for(live_budget):
+    live_budget(4, 'blog naverofficial')
+    code, payload = cli('blog', 'naverofficial')
+    assert code == 0, payload
+    sections = {section['name']: section for section in payload['sections']}
+    assert set(sections) == {'blog', 'categories', 'notices', 'popular'}
+    assert all(section['ok'] for section in sections.values()), sections
+    assert sections['blog']['data'][0]['blog_id'] == 'naverofficial'
+
+
+def test_a_post_list_is_about_the_category_it_was_asked_for(live_budget):
+    live_budget(1, 'posts naverofficial')
+    code, payload = cli('posts', 'naverofficial', '--limit', '3')
+    assert code in (0, 8), payload
+    assert all(record['blog_id'] == 'naverofficial' for record in payload['results'])
+    # A post list's own total is always 0, so it must never reach the reader as a total.
+    assert payload.get('reported_total') != 0

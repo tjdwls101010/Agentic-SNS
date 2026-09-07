@@ -129,8 +129,11 @@ def build_post(raw, *, blog_id=None, blog_name=None, nickname=None):
         category_name=clean(first(raw, 'categoryName')),
         like_count=number(first(raw, 'sympathyCount', 'sympathyCnt')),
         comment_count=number(first(raw, 'commentCount', 'commentCnt')),
-        # readCount is only a number on the viewer's own blog; viewCount only on popular posts.
-        view_count=number(first(raw, 'viewCount', 'readCount')),
+        # viewCount comes only from popular posts. readCount is a real number only on the
+        # viewer's own blog and a constant 0 everywhere else, so a zero there is dropped
+        # rather than reported as "nobody read this".
+        view_count=number(first(raw, 'viewCount')) if 'viewCount' in raw
+        else (number(raw.get('readCount')) or None),
         labels=sorted(set(labels)))
 
 

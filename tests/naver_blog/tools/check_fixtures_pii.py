@@ -15,39 +15,31 @@ ROOT = Path(__file__).resolve().parents[1] / 'fixtures'
 # Everything a fixture may name. Extend deliberately, one invented value at a time.
 ALLOWED_IDS = {'testviewer', 'testblog', 'otherblog', 'legacyblog', 'buddyone', 'buddytwo',
                'commenterone', 'commentertwo', 'naverblog', 'emptyblog', 'domainblog'}
-# Invented post numbers all start with this prefix so a real 12-digit logNo stands out.
-LOG_NO = re.compile(r'\b(\d{7,20})\b')
-ALLOWED_LOG_PREFIX = '9990'
+# Invented identifiers all start with this prefix, so a real one stands out. Only the fields
+# that name a post, a comment or a blog are checked: a timestamp is a long number too.
+ALLOWED_ID_PREFIX = '9990'
+NUMBER_FIELDS = ('logNo', 'commentNo', 'parentCommentNo', 'blogNo', 'groupId')
 FORBIDDEN = [
     (re.compile(r'NID_AUT|NID_SES|NID_JKL|baUserKey', re.I), 'a Naver session cookie name'),
     (re.compile(r'\bhttps?://[^\s"\']*pstatic\.net[^\s"\']*[?&]type='), 'a signed profile or photo URL'),
     (re.compile(r'\b\d{2,3}-\d{3,4}-\d{4}\b'), 'a phone number'),
     (re.compile(r'\b[\w.+-]+@[\w-]+\.[\w.]+\b'), 'an email address'),
 ]
-ID_FIELDS = ('blogId', 'profileUserId', 'blogOwner', 'nickName', 'nickname')
+ID_FIELDS = ('blogId', 'profileUserId', 'blogOwner')
 
 
-def strings(value):
-    if isinstance(value, dict):
-        for key, child in value.items():
-            yield str(key)
-            yield from strings(child)
-    elif isinstance(value, list):
-        for child in value:
-            yield from strings(child)
-    elif isinstance(value, str):
-        yield value
-
-
-def blog_ids(value, found):
+def identifiers(value, found):
+    """Collect the values of the fields that name a person, a blog, a post or a comment."""
     if isinstance(value, dict):
         for key, child in value.items():
             if key in ID_FIELDS and isinstance(child, str) and child:
-                found.add(child)
-            blog_ids(child, found)
+                found.setdefault('blog', set()).add(child)
+            if key in NUMBER_FIELDS and str(child).isdigit():
+                found.setdefault('number', set()).add(str(child))
+            identifiers(child, found)
     elif isinstance(value, list):
         for child in value:
-            blog_ids(child, found)
+            identifiers(child, found)
     return found
 
 
@@ -57,15 +49,16 @@ def check(path):
     for pattern, what in FORBIDDEN:
         for match in pattern.findall(text):
             problems.append(f'{what}: {match if isinstance(match, str) else match[0]}')
-    for number in set(LOG_NO.findall(text)):
-        if len(number) >= 12 and not number.startswith(ALLOWED_LOG_PREFIX):
-            problems.append(f'a post number that is not invented: {number}')
     if path.suffix == '.ndjson':
         for line in text.splitlines():
-            if line.strip():
-                found = blog_ids(json.loads(line), set())
-                problems += [f'a blog id outside the allowlist: {name}'
-                             for name in found - ALLOWED_IDS if not name.isdigit()]
+            if not line.strip():
+                continue
+            found = identifiers(json.loads(line), {})
+            problems += [f'a blog id outside the allowlist: {name}'
+                         for name in found.get('blog', set()) - ALLOWED_IDS if not name.isdigit()]
+            problems += [f'an identifier that is not invented: {number}'
+                         for number in found.get('number', set())
+                         if not number.startswith(ALLOWED_ID_PREFIX)]
     else:
         for match in re.findall(r'var\s+(?:blogId|blogOwner|userId)\s*=\s*"([^"]+)"', text):
             if match not in ALLOWED_IDS:

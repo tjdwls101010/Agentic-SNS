@@ -173,8 +173,14 @@ def main(argv=None):
             from ._cmds_blog import run
         result = run(args)
         code = result.pop('code', 0)
-        if getattr(args, 'json', False) or args.command in ('doctor', 'schema'):
+        if args.command in ('doctor', 'schema'):
             print(json.dumps(result, ensure_ascii=False))
+        elif args.json:
+            from ._output import document
+            print(json.dumps(document(args.command, result, budget=result.get('budget'),
+                                      fetched_bytes=result.get('fetched_bytes', 0),
+                                      next_command=result.get('next'),
+                                      sections=result.get('sections')), ensure_ascii=False))
         else:
             from ._render import render
             print(render(result, args))
