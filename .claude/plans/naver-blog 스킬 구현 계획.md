@@ -145,7 +145,7 @@ naver_blog.py <cmd> ──▶ Python(stdlib) ──spawn──▶ aside --accoun
 | `single` | 카드·카테고리·인기글·공지·추천·주제 목록·주제 인기글·이달·에디터픽 | `not_paginable` |
 | `no_paging` | 이웃새글(F14) | 한 번만 요청. `buddyPostTotalCount > len(list)`면 `server_capped`, 아니면 `not_paginable` |
 
-- **1,000건 상한(F13)**: `page` 정책 중 `cap:1000`인 오퍼레이션은 **누적 요청 위치**(`(page-1)*size + 반환 수`)를 센다. 위치가 1000에 닿아 짧아졌으면 `server_capped`(`reported_total`을 함께 싣되 "서버 보고치"라고 표시). 1000을 넘긴 페이지의 `totalCount:0`은 **진짜 0이 아니므로** 7로 만들지 않는다.
+- **1,000건 상한(F13)**: `page` 정책 중 `cap:1000`인 오퍼레이션은 **누적 요청 위치**(`(page-1)*size + 반환 수`)를 센다. 판정은 "위치가 1000에 닿았나"가 아니라 **"한 페이지를 더 받으면 1000을 넘나"**(`position + page_size > cap`)다 — 글 검색은 위치 1,000에서, 태그 검색은 위치 990에서 짧아졌고 둘 다 상한이기 때문이다(P0 codex 지적으로 정정). 그렇게 짧아졌으면 `server_capped`(`reported_total`을 함께 싣되 "서버 보고치"라고 표시). 1000을 넘긴 페이지의 `totalCount:0`은 **진짜 0이 아니므로** 7로 만들지 않는다.
 - **반복 페이지**: 이전 페이지와 항목 id 집합이 같으면 `exhausted`가 아니라 **`pagination_stalled`(exit 8)**로 멈춘다. 서버가 페이지 인자를 무시하는 상황과 실제 소진은 구별할 수 없다.
 - 모든 `page` 진행은 안정 id(`logNo`·`blogId`·`commentNo`)로 중복 제거하며, 중복 제거된 수는 종료 판정에 쓰지 않고 표시에만 반영한다.
 
@@ -410,6 +410,16 @@ description: Read Naver Blog (blog.naver.com) through the user's logged-in Aside
 - **A9 (확인됨)** 댓글 작성자 blogId는 `profileUserId`(`daddy-challenge`). `userIdNo`는 빈 문자열이라 쓰지 않는다.
 - **A10** 이웃공개 글(`buddyOpen`)의 HTML은 이웃이 아니면 `MobileErrorView`로 간다. `errorType` 원값을 `reason`에 싣는다.
 - **A11** 부모 하나의 답글이 10개(`replyPageSize`)를 넘을 때의 반환 범위. 미확인이므로 "반환된 답글만"으로 표기한다.
+
+## 구현 진행 기록
+
+| 단계 | 커밋 | codex 리뷰 run | 지적/반영 | 먼저 실패한 것 |
+|---|---|---|---|---|
+| P0 | `bbdf4e3` + 후속 | `20260907-214127-nb-p0-7108` | 12건 중 12건 반영 | 경로 플레이스홀더 이름 비교, `comments`의 page_size가 `params.pageSize`에만 있음, `buddy_feed`가 `countPerPage`를 보내면서도 페이지 없음(F14) |
+
+**P0에서 계획을 정정한 것.** ① 1,000건 상한 판정: "위치가 1000에 닿음"은 태그 검색(위치 990에서 짧아짐)을 놓치므로 `position + page_size > cap`으로 바꿨다(위 "페이지 정책" 절 반영). ② P0 완료 판정의 "pytest 0개 수집 exit 5"는 같은 행의 "`_api` 집합 일치" 요구와 모순이므로 후자를 기준으로 삼았다. ③ SKILL.md는 P5 산출물이므로 P0의 감사 기준은 스펙 행 `planned` + 드리프트 0이다. ④ 스냅샷 행의 `verified:true`는 "엔드포인트가 존재한다"이지 "페이지 계약을 로그인 상태에서 재확인했다"가 아니므로, `_api.py`에 `source='measured'|'legacy'` 필드를 두고 블로그 안 태그 검색을 `legacy`로 표시했다(그 `totalPage`는 쓰지 않는다).
+
+**P0에서 설계를 강화한 것.** `_api.build()`가 쿼리 조립을 소유한다 — 호출자는 식별자만 넘기고, 댓글의 `objectId`(`{blogNo}_201_{logNo}`)·`groupId`처럼 파생되는 값은 장부 안에서만 만들어진다. 조용히 틀릴 수 있는 값을 호출자 손에 두지 않기 위해서다. 장부 행은 `frozen`이고 `build`는 `params`를 복사해 쓰므로 호출 간 값이 새지 않는다.
 
 ## codex 리뷰 반영 (2026-09-07, run `20260907-211739-naver-blog-plan-review-bf87`)
 
