@@ -30,13 +30,17 @@ class Sections:
         return data
 
     def exit_code(self):
-        """0 when every section answered; otherwise the most serious failure, as partial."""
+        """0 when every section answered; otherwise the most serious failure, by its own name.
+
+        A gone-or-private target, a login wall and a block each say something the caller must
+        act on, and reporting them as "partial" would hide it. A shape change or a budget stop
+        really is partial: the answer is incomplete but nothing about the target changed.
+        """
         failures = [entry['error']['code'] for entry in self.entries if not entry['ok']]
         if not failures:
             return 0
         worst = max(failures, key=lambda code: PRIORITY.get(code, 1))
-        # A blocked or logged-out account is not "partial"; the next command will fail too.
-        return worst if worst in (4, 5) else 8
+        return worst if worst in (3, 4, 5, 9) else 8
 
     def as_list(self):
         return [{key: value for key, value in entry.items() if key != 'primary'} for entry in self.entries]

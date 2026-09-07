@@ -83,3 +83,48 @@ def test_a_post_list_is_about_the_category_it_was_asked_for(live_budget):
     assert all(record['blog_id'] == 'naverofficial' for record in payload['results'])
     # A post list's own total is always 0, so it must never reach the reader as a total.
     assert payload.get('reported_total') != 0
+
+
+def test_a_post_reads_its_body_tags_and_same_category_posts(live_budget):
+    live_budget(2, 'post naverofficial')
+    code, payload = cli('post', 'naverofficial/224400531915')
+    assert code in (0, 8), payload
+    sections = {section['name']: section for section in payload['sections']}
+    post = sections['post']['data'][0]
+    assert post['blog_id'] == 'naverofficial'
+    assert post['tags'] and post['tags'] != 'unknown'
+    coverage = post['body']['coverage']
+    # Every component is accounted for as understood, reduced, or lost.
+    assert coverage['full'] + coverage['partial'] + coverage['empty'] == coverage['components']
+    assert len(post['body']['text']) > 0
+
+
+def test_a_rich_editor_post_is_read_by_the_family_rules_rather_than_the_fallback(live_budget):
+    live_budget(2, 'post eijin1130')
+    code, payload = cli('post', 'eijin1130/224403503427')
+    assert code in (0, 8), payload
+    post = {section['name']: section for section in payload['sections']}['post']['data'][0]
+    coverage = post['body']['coverage']
+    assert coverage['components'] > 0
+    # A body read entirely by family rules is what "text[full]" in the output means.
+    assert coverage['unhandled'] == [], coverage
+
+
+def test_a_legacy_post_still_yields_a_body(live_budget):
+    live_budget(2, 'legacy post')
+    code, payload = cli('post', 'peopleteria/220108382928')
+    assert code in (0, 8), payload
+    post = {section['name']: section for section in payload['sections']}['post']['data'][0]
+    assert len(post['body']['text']) > 0
+
+
+def test_comments_never_claim_more_than_naver_reported(live_budget):
+    live_budget(2, 'comments naverofficial')
+    code, payload = cli('comments', 'naverofficial/223222167118', '--limit', '5')
+    assert code in (0, 7, 8), payload
+    if payload.get('shown_of'):
+        assert len(payload['results']) <= payload['shown_of']
+    for record in payload['results']:
+        assert record['comment_no']
+        if record['reply_level'] > 1:
+            assert record['parent_comment_no']

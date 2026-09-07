@@ -106,9 +106,8 @@ def read_posts(args, transport):
     if category is not None:
         category = category_number(transport, blog_id, category)
     values = {'blogId': blog_id, 'categoryNo': category or 0}
-    context = {'command': f'posts {blog_id}', 'blog': blog_id}
-    if category:
-        context['category'] = category
+    context = {'command': 'posts', 'blog': blog_id, 'category': category,
+               'since': args.since, 'until': args.until}
     resume = f'posts {blog_id}' + (f' --category {category}' if category else '')
     for flag in ('since', 'until'):
         if getattr(args, flag):

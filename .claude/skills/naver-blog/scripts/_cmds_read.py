@@ -1,10 +1,11 @@
 """search, post, comments, find — the commands that start from text or from one post."""
+import shlex
 from pathlib import Path
 
 from ._api import operation
 from ._errors import NaverBlogError
 from ._listing import collect
-from ._models import build_comment, build_post, link_replies
+from ._models import UNKNOWN, build_comment, build_post, link_replies
 from ._output import CursorStore, OutFile, document
 from ._transport import Transport
 from ._walk import read_page
@@ -14,8 +15,9 @@ BASE_REQUESTS, COLLECT_REQUESTS = 10, 40
 
 
 def request_budget(args):
+    """Collecting is asking for it: a named --limit, a date window, or a file to fill."""
     explicit = (getattr(args, 'out', None) is not None or getattr(args, 'since', None) is not None
-                or getattr(args, 'limit', None) not in (None, 10, 20))
+                or getattr(args, 'until', None) is not None or getattr(args, 'explicit_limit', False))
     return COLLECT_REQUESTS if explicit else BASE_REQUESTS
 
 
@@ -30,7 +32,16 @@ def listing(args, transport, *, op, context, build, page_values, since=None, unt
     state = store.load(args.after, context) if getattr(args, 'after', None) else None
 
     def fetch(page):
-        payload = transport.get(op, page=page, **page_values)
+        try:
+            payload = transport.get(op, page=page, **page_values)
+        except NaverBlogError as error:
+            # A restricted answer still carries whatever arrived; reporting the restriction
+            # while dropping those results would look exactly like an empty result.
+            if error.error == 'query_restricted' and error.payload is not None:
+                salvaged = read_page(spec, error.payload, page=page)
+                error.records = [record.to_dict() for record in
+                                 (build(item) for item in salvaged.items) if record is not None]
+            raise
         raw = read_page(spec, payload, page=page)
         raw.items = [record.to_dict() for record in
                      (build(item) for item in raw.items) if record is not None]
@@ -38,7 +49,9 @@ def listing(args, transport, *, op, context, build, page_values, since=None, unt
 
     out = OutFile(args.out, context) if getattr(args, 'out', None) else None
     try:
-        if out and out.complete and state is None:
+        # A file that already knows where it stopped is the resume point, finished or not;
+        # starting over would re-display the same head and add nothing to the file.
+        if out and state is None and out.state:
             state = out.state
         result = collect(spec, fetch, limit=args.limit, state=state, since=since, until=until,
                          monotonic=monotonic, commit=out.commit if out else None)
@@ -50,11 +63,17 @@ def listing(args, transport, *, op, context, build, page_values, since=None, unt
         if out:
             out.close()
     next_command = None
-    if result['stop_reason'] == 'limit_reached':
+    # A handle is offered whenever anything is left: more pages to ask for, or records
+    # already read that the display limit did not reach.
+    if result['stop_reason'] == 'limit_reached' or result.get('pending'):
         handle = store.save(context, result['state'])
         # The handle is bound to this exact query, so the printed command must rebuild it.
-        next_command = f'{ENTRY} {resume or context["command"]} --after {handle}'
-    result['context'] = {key: value for key, value in context.items() if key not in ('command', 'account')}
+        following = resume or context['command']
+        if getattr(args, 'out', None):
+            following += f' --out {shlex.quote(str(args.out))}'
+        next_command = f'{ENTRY} {following} --after {handle}'
+    result['context'] = {key: value for key, value in context.items()
+                         if key != 'command' and value not in (None, False)}
     result['label_prefix'] = label_prefix
     result['hops'] = hops or []
     result['budget'] = transport.budget.snapshot()
@@ -89,21 +108,21 @@ def search(args, transport):
             values['endDate'] = args.until
     from ._entities import build_blog
     build = build_blog if args.type == 'blogs' else build_post
-    context = {'command': f'search {args.text!r}', 'type': args.type,
-               'sort': args.sort if args.type != 'tags' else None}
-    resume = f'search {args.text!r} --type {args.type}'
-    if args.type != 'tags':
+    context = {'command': 'search', 'text': args.text, 'type': args.type,
+               'sort': args.sort if args.type == 'posts' else None,
+               'own_money': bool(args.own_money), 'since': args.since, 'until': args.until}
+    resume = f'search {shlex.quote(args.text)} --type {args.type}'
+    if args.type == 'posts':
         resume += f' --sort {args.sort}'
-    if args.own_money:
-        resume += ' --own-money'
+        if args.own_money:
+            resume += ' --own-money'
     for flag in ('since', 'until'):
         if getattr(args, flag):
             resume += f' --{flag} {getattr(args, flag)}'
     hops = ['open: `post <url>`', 'blog: `blog <id>`', 'similar: `search --type tags <tag>`']
     if args.type == 'blogs':
         hops = ['activity: `posts <id>`', 'context: `blog <id>`']
-    return listing(args, transport, op=op, context={k: v for k, v in context.items() if v is not None},
-                   build=build, page_values=values,
+    return listing(args, transport, op=op, context=context, build=build, page_values=values,
                    # The server already applied the window on post search; filtering again is free.
                    since=args.since if args.type == 'posts' else None,
                    until=args.until if args.type == 'posts' else None,
@@ -116,11 +135,10 @@ def find(args, transport):
     values = {'blogId': blog_id, 'query': args.text}
     if not args.tag:
         values['sortType'] = args.sort
-    context = {'command': f'find {blog_id} {args.text!r}', 'blog': blog_id,
-               'kind': 'tag' if args.tag else 'text'}
-    if not args.tag:
-        context['sort'] = args.sort
-    resume = f'find {blog_id} {args.text!r}' + (' --tag' if args.tag else f' --sort {args.sort}')
+    context = {'command': 'find', 'blog': blog_id, 'text': args.text,
+               'kind': 'tag' if args.tag else 'text',
+               'sort': None if args.tag else args.sort, 'since': args.since, 'until': args.until}
+    resume = f'find {blog_id} {shlex.quote(args.text)}' + (' --tag' if args.tag else f' --sort {args.sort}')
     for flag in ('since', 'until'):
         if getattr(args, flag):
             resume += f' --{flag} {getattr(args, flag)}'
@@ -133,17 +151,23 @@ def find(args, transport):
 
 def comments(args, transport):
     blog_id, log_no = args.target.blog_id, args.target.log_no
-    # comments-info is the cheapest source of the numeric blog id the comment box is keyed by.
-    blog_no, info = blog_no_of(transport, blog_id, log_no)
-    context = {'command': f'comments {blog_id}/{log_no}', 'post': f'{blog_id}/{log_no}'}
+    context = {'command': 'comments', 'post': f'{blog_id}/{log_no}'}
+    # The handle is checked before any request: a mismatched one must not cost a lookup.
     store = CursorStore()
     state = store.load(args.after, context) if args.after else None
+    # comments-info is the cheapest source of the numeric blog id the comment box is keyed by,
+    # and a resumed walk already carries that number, so it is asked for only once.
+    blog_no, info = (state.get('blog_no'), {'totalCount': state.get('total')}) if state and state.get('blog_no') \
+        else blog_no_of(transport, blog_id, log_no)
     out = OutFile(args.out, context) if args.out else None
     try:
-        if out and out.complete and state is None:
+        if out and state is None and out.state:
             state = out.state
         result = comments_of(transport, blog_id, log_no, blog_no, args.limit,
                              state=state, commit=out.commit if out else None)
+        # Carry the numeric id and the total forward so continuing costs one request less.
+        result['state']['blog_no'] = blog_no
+        result['state']['total'] = info.get('totalCount')
         if out:
             result['out'] = str(out.path)
             result['saved'] = out.count
@@ -160,17 +184,84 @@ def comments(args, transport):
     result['hops'] = [f'post: `post {blog_id}/{log_no}`', f'blog: `blog {blog_id}`',
                       'commenter: `blog <the blog: id on a comment>`']
     result['next'] = None
-    if result['stop_reason'] == 'limit_reached':
+    if result['stop_reason'] == 'limit_reached' or result.get('pending'):
         handle = store.save(context, result['state'])
-        result['next'] = f'{ENTRY} comments {blog_id}/{log_no} --after {handle}'
+        following = f'comments {blog_id}/{log_no}'
+        if args.out:
+            following += f' --out {shlex.quote(str(args.out))}'
+        result['next'] = f'{ENTRY} {following} --after {handle}'
     result['budget'] = transport.budget.snapshot()
     result['fetched_bytes'] = transport.fetched_bytes
     return result
 
 
 def post(args, transport):
-    from ._cmds_post import read_post
-    return read_post(args, transport)
+    """One HTML read gives metadata, tags and body; one recommendation read gives the rest."""
+    from ._body import parse
+    from . import _session
+    from ._sections import Sections
+
+    blog_id, log_no = args.target.blog_id, args.target.log_no
+    sections = Sections()
+
+    def read():
+        return transport.get('post_html', blogId=blog_id, logNo=log_no)
+
+    from ._cmds_blog import resolve
+    html, resolved = resolve(transport, blog_id, lambda name: transport.get('post_html',
+                                                                            blogId=name, logNo=log_no))
+    blog_id = resolved
+    doc = parse(html)
+    if doc.blog_id and doc.blog_id != blog_id:
+        raise NaverBlogError(6, f'That page belongs to {doc.blog_id}, not {blog_id}.',
+                             'Open the URL in Aside and pass the id it lands on.', error='envelope_drift')
+    # The post page already names the viewer, so the session refreshes without a request.
+    _session.note_viewer(html)
+    record = {'id': f'post:{blog_id}/{log_no}', 'blog_id': blog_id, 'log_no': log_no,
+              'url': f'https://blog.naver.com/{blog_id}/{log_no}', 'title': doc.title,
+              'created_at': doc.created_at, 'category_no': doc.category_no,
+              'category_name': doc.category_name, 'tags': doc.tags,
+              'comment_count': doc.comment_count, 'like_count': UNKNOWN,
+              'body': doc.body.to_dict()}
+    sections.entries.append({'name': 'post', 'ok': True, 'primary': True, 'prefix': 'p',
+                             'data': [record]})
+
+    related = []
+    if doc.category_no is not None:
+        def recommendations():
+            payload = transport.get('related_category', blogId=blog_id, categoryNo=doc.category_no,
+                                    logNo=log_no)
+            rows = (payload.get('result') or {}).get('recommendationPostList') or []
+            built = [item for item in (build_post(row, blog_id=blog_id) for row in rows) if item]
+            # The first recommendation has been the post itself, and that copy carries the
+            # sympathy count the page does not. When it is not, the count stays unknown.
+            if built and built[0].log_no == log_no:
+                record['like_count'] = built[0].like_count
+                del built[0]
+            return [item.to_dict() for item in built[:4]]
+
+        related = sections.add('same category', recommendations, prefix='s') or []
+
+    if args.comments:
+        def first_comments():
+            blog_no = doc.blog_no
+            if not blog_no:
+                blog_no, _ = blog_no_of(transport, blog_id, log_no)
+            outcome = comments_of(transport, blog_id, log_no, blog_no, 10)
+            return outcome['results']
+
+        sections.add('comments', first_comments, prefix='c')
+
+    tags = doc.tags if isinstance(doc.tags, list) else []
+    hops = [f'comments: `comments {blog_id}/{log_no}`', f'blog: `blog {blog_id}`']
+    if tags:
+        hops.append(f'tag: `search --type tags {tags[0]}`')
+    return {'ok': sections.exit_code() == 0, 'code': sections.exit_code(),
+            'sections': sections.as_list(), 'results': [], 'stop_reason': 'not_paginable',
+            'context': {'post': f'{blog_id}/{log_no}', 'body': doc.body.coverage.label()},
+            'budget': transport.budget.snapshot(), 'fetched_bytes': transport.fetched_bytes,
+            'next': None, 'hops': hops, 'coverage': doc.body.coverage.__dict__,
+            'related_count': len(related)}
 
 
 def comments_of(transport, blog_id, log_no, blog_no, limit, *, state=None, commit=None):

@@ -48,8 +48,23 @@ def test_the_worst_of_several_failures_decides_the_exit_code():
     sections.add('b', failing(8, 'partial'))
     sections.add('c', failing(9, 'owner_only'))
     sections.add('d', failing(6))
-    # Gone-or-private outranks a shape change, which outranks a partial.
-    assert sections.exit_code() == 8
+    # Gone-or-private is something the caller must act on, so it is not flattened to "partial".
+    assert sections.exit_code() == 9
+
+
+def test_a_shape_change_or_a_budget_stop_really_is_partial():
+    for code in (6, 8):
+        sections = Sections()
+        sections.add('a', lambda: [1])
+        sections.add('b', failing(code))
+        assert sections.exit_code() == 8
+
+
+def test_a_login_wall_outranks_a_gone_target():
+    sections = Sections()
+    sections.add('a', failing(9, 'not_exist_blog'))
+    sections.add('b', failing(4, 'login'))
+    assert sections.exit_code() == 4
 
 
 def test_a_blocked_or_logged_out_account_is_reported_as_itself_not_as_partial():

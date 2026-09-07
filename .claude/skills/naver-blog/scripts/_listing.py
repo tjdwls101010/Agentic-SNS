@@ -94,7 +94,7 @@ def collect(spec, fetch, *, limit, state=None, since=None, until=None, monotonic
             if page.reported_total is not None:
                 progress.reported_total = page.reported_total
                 progress.reported_is_unreliable = page.reported_is_unreliable
-            fingerprint = tuple(record.get('id') for record in page.items)
+            fingerprint = frozenset(record.get('id') for record in page.items)
             if fingerprint and fingerprint in identifiers:
                 # The server ignoring the page parameter and real exhaustion cannot be told apart.
                 progress.done, progress.terminal = True, 'pagination_stalled'
@@ -119,12 +119,15 @@ def collect(spec, fetch, *, limit, state=None, since=None, until=None, monotonic
                     window_reached = bool(monotonic and lower is not None
                                           and max(present) < lower and not progress.unordered)
             progress.pending = records
-            progress.page += 1
+            # A marked surface names its own next page; assuming page+1 would skip or repeat.
+            progress.page = page.next_page if page.next_page is not None else progress.page + 1
             progress.done, progress.terminal = _terminal(spec, page, progress, window_reached)
             if commit and not records:
                 commit([], progress.as_dict(), progress.terminal if progress.done else 'page')
         except NaverBlogError as exception:
             error = exception
+            if exception.error == 'query_restricted' and getattr(exception, 'records', None):
+                progress.pending = exception.records
             stop = ('blocked' if exception.code in (4, 5) else 'budget' if exception.error == 'budget'
                     else 'query_restricted' if exception.error == 'query_restricted' else 'query_failure')
             break
@@ -140,6 +143,10 @@ def collect(spec, fetch, *, limit, state=None, since=None, until=None, monotonic
         code = 8
     return {'ok': error is None, 'results': results, 'stop_reason': stop, 'state': progress.as_dict(),
             'code': code, 'reported_total': progress.reported_total,
+            # A walk that stopped for any reason can still be holding records the display
+            # limit never reached; losing them would make "server_capped" mean "and the rest
+            # is gone", which it does not.
+            'pending': len(progress.pending),
             'reported_is_unreliable': progress.reported_is_unreliable,
             **({'error': error.error, 'message': error.message, 'fix': error.fix} if error else {})}
 

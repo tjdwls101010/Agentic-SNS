@@ -42,18 +42,38 @@ def tagged(label, first):
     return f'[{label}] {first}' if label and first else (f'[{label}]' if label else first)
 
 
+def head_line(parts):
+    """A header is one line: any value that carries a newline is folded like body text."""
+    return ' · '.join(text(part, 0) for part in parts if part)
+
+
 def post_lines(post, label, chars):
     head = [tagged(label, str(post.get('id') or '').removeprefix('post:')),
             post.get('nickname') or post.get('blog_name'), stamp(post.get('created_at')),
             post.get('category_name')]
+    tags = post.get('tags')
+    if tags:
+        head.append('tags: ' + (', '.join(tags) if isinstance(tags, list) else str(tags)))
     head += counts(post, [('like_count', 'likes'), ('comment_count', 'comments'), ('view_count', 'views')])
     head += post.get('labels') or []
-    lines = [' · '.join(part for part in head if part)]
+    lines = [head_line(head)]
     if post.get('title'):
         lines.append('     ' + quote(post['title']))
-    summary = text(post.get('summary'), chars)
-    if summary:
-        lines.append('     ' + quote(summary))
+    body = post.get('body')
+    if body:
+        # The coverage label rides on the body line, where a summary is actually being written.
+        coverage = body.get('coverage') or {}
+        reduced = (coverage.get('partial', 0) + coverage.get('empty', 0))
+        marker = ('text[legacy]' if not coverage.get('components') else
+                  'text[full]' if not reduced else
+                  f'text[partial: {reduced} of {coverage["components"]} components reduced]')
+        lines.append('     ' + marker + ': ' + quote(body.get('text')))
+        if coverage.get('unhandled'):
+            lines.append('     unhandled: ' + ', '.join(coverage['unhandled']))
+    else:
+        summary = text(post.get('summary'), chars)
+        if summary:
+            lines.append('     ' + quote(summary))
     if post.get('url'):
         lines.append('     url: ' + quote(post['url']))
     return lines
@@ -72,7 +92,7 @@ def blog_lines(blog, label=None):
     head += blog.get('labels') or []
     if blog.get('directory'):
         head.append(blog['directory'])
-    lines = [' · '.join(part for part in head if part)]
+    lines = [head_line(head)]
     if blog.get('description'):
         lines.append('     ' + quote(blog['description']))
     if blog.get('url'):
@@ -80,21 +100,23 @@ def blog_lines(blog, label=None):
     return lines
 
 
-def comment_lines(comment, label, chars):
+def comment_lines(comment, label, chars, shown=None):
     indent = '  ' if comment.get('reply_level', 1) > 1 else ''
     parent = comment.get('parent_comment_no')
+    # Its own number always stays: a reply is something a reader may want to point at too.
     tag = f'{label} #{comment.get("comment_no")}'
     if parent:
-        # Naming the parent's own number lets a reader ask for it; saying it is absent
-        # keeps an indent from implying a quote that is not on this page.
-        tag = f'{label} reply-to=#{parent}' + ('' if comment.get('parent_shown') else ' (parent not shown)')
+        # Naming the parent's number lets a reader ask for it, and saying it is absent keeps
+        # an indent from implying a quote that is not in front of the reader.
+        here = parent in shown if shown is not None else comment.get('parent_shown', True)
+        tag += f' reply-to=#{parent}' + ('' if here else ' (parent not shown)')
     head = [tagged(tag, comment.get('author'))]
     if comment.get('author_blog_id'):
         head.append('blog: ' + comment['author_blog_id'])
     head.append(stamp(comment.get('created_at')))
     head += counts(comment, [('like_count', 'likes'), ('reply_count', 'replies')])
     head += comment.get('labels') or []
-    lines = [indent + ' · '.join(part for part in head if part)]
+    lines = [indent + head_line(head)]
     body = text(comment.get('text'), chars)
     if body:
         lines.append(indent + '     ' + quote(body))
@@ -109,7 +131,7 @@ def buddy_lines(buddy, label):
         head.append('official')
     if buddy.get('updated_at'):
         head.append('updated ' + buddy['updated_at'])
-    return [' · '.join(part for part in head if part)]
+    return [head_line(head)]
 
 
 def category_lines(category):
@@ -119,10 +141,10 @@ def category_lines(category):
         head.append(f'{category["post_count"]} posts')
     if not category.get('open', True):
         head.append('closed')
-    return [' · '.join(part for part in head if part)]
+    return [head_line(head)]
 
 
-def record_lines(record, label, chars):
+def record_lines(record, label, chars, shown=None):
     """Dispatch on the namespaced id, so one renderer serves every listing."""
     kind = str(record.get('id') or '').split(':', 1)[0]
     if kind == 'post':
@@ -130,14 +152,13 @@ def record_lines(record, label, chars):
     if kind == 'blog':
         return blog_lines(record, label)
     if kind == 'comment':
-        return comment_lines(record, label, chars)
+        return comment_lines(record, label, chars, shown)
     if kind == 'buddy':
         return buddy_lines(record, label)
     if kind == 'category':
         return category_lines(record)
     if kind == 'topic':
-        return [' · '.join(part for part in [tagged(record.get('seq'), record.get('name')),
-                                             record.get('group')] if part)]
+        return [head_line([tagged(record.get('seq'), record.get('name')), record.get('group')])]
     return [f'[{label}] ' + quote(record.get('name') or record.get('title') or record.get('id'))]
 
 
@@ -160,10 +181,15 @@ def header(result, args):
         # Naver's totals drift page to page and go to zero past the ceiling; say so where it is read.
         parts.append(f'reported≈{thousands(reported)}'
                      + (' (server figure, drifts)' if result.get('reported_is_unreliable', True) else ''))
+    coverage = result.get('coverage')
+    if coverage:
+        parts.append(f'{coverage["components"]} components ({coverage["full"]} full)')
+        parts.append(f'{len(result.get("images") or [])} images' if result.get('images') else None)
+        parts = [part for part in parts if part]
     parts.append(f'fetched {result.get("fetched_bytes", 0) / 1000:.0f}KB')
     parts.append(f'local budget {budget.get("used", 0)} of {budget.get("limit", 0)}'
                  f' (window {budget.get("window_used", 0)}/{budget.get("window_limit", 120)})')
-    return ' · '.join(parts)
+    return head_line(parts)
 
 
 def render(result, args):
@@ -172,8 +198,12 @@ def render(result, args):
         lines.append(text(note, 0))
     for section in result.get('sections') or []:
         lines.extend(section_lines(section, args))
-    for index, record in enumerate(result.get('results') or [], 1):
-        lines.extend(record_lines(record, result.get('label_prefix', 'p') + str(index), args.chars))
+    records = result.get('results') or []
+    # "Parent not shown" is about this page of output, not about what the server returned.
+    shown = {record.get('comment_no') for record in records if record.get('comment_no')}
+    for index, record in enumerate(records, 1):
+        lines.extend(record_lines(record, result.get('label_prefix', 'p') + str(index),
+                                  args.chars, shown))
     if result.get('out'):
         lines.append(f'{result.get("saved", 0)} saved · ' + quote(result['out'])
                      + (' · already complete' if result.get('already_complete') else ''))

@@ -170,3 +170,17 @@ def test_a_malformed_date_says_what_shape_is_expected():
     with pytest.raises(NaverBlogError) as caught:
         collect(POSTS, pages(30), limit=10, since='last tuesday')
     assert caught.value.code == 2 and 'YYYY-MM-DD' in caught.value.message
+
+
+def test_a_surface_that_names_its_next_page_is_followed_there():
+    """Assuming page+1 on a marked surface would skip a page or ask for one twice."""
+    asked = []
+    comments = operation('comments')
+
+    def fetch(page):
+        asked.append(page)
+        return Page(items=[post(9990000000 + page)], raw_count=1, total_pages=3,
+                    next_page={1: 3, 3: None}.get(page))
+    result = collect(comments, fetch, limit=100)
+    assert asked == [1, 3]
+    assert result['stop_reason'] == 'exhausted'

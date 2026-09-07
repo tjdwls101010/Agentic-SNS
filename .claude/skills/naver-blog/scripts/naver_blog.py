@@ -74,9 +74,9 @@ def parser():
             p.add_argument('--chars', type=int, default=180,
                            help='Preview length per item; 0 means no clipping. A post body is never clipped')
         if command in LISTING:
-            p.add_argument('--limit', type=positive, default=DEFAULT_LIMIT[command],
+            p.add_argument('--limit', type=positive, default=None,
                            help=f'Maximum records to display (default {DEFAULT_LIMIT[command]}); '
-                                'requests are capped separately')
+                                'asking for more than the default also raises the request cap')
         if command in CONTINUABLE:
             p.add_argument('--after', type=positive, default=None,
                            help='Continuation handle from the more: line. Naver resumes by page number, '
@@ -91,8 +91,9 @@ def parser():
             p.add_argument('text', help='Search text')
             p.add_argument('--type', choices=['posts', 'blogs', 'tags'], default='posts',
                            help='What to search (default posts). Tag results carry no blog name')
-            p.add_argument('--sort', choices=['sim', 'date'], default='sim',
-                           help='Relevance or newest (default sim); posts and blogs only, not tags')
+            p.add_argument('--sort', choices=['sim', 'date'], default=None,
+                           help='Relevance or newest (default sim); post search only, '
+                                'because blog and tag search have no ordering parameter')
             p.add_argument('--own-money', action='store_true',
                            help='Only posts Naver marks as bought with the writer\'s own money; posts only')
         if command in ('blog', 'posts', 'find', 'buddies'):
@@ -112,7 +113,7 @@ def parser():
         if command == 'find':
             p.add_argument('text', help='Text to search for inside this blog')
             p.add_argument('--tag', action='store_true', help='Search this blog\'s tags instead of its post text')
-            p.add_argument('--sort', choices=['sim', 'date'], default='sim',
+            p.add_argument('--sort', choices=['sim', 'date'], default=None,
                            help='Relevance or newest (default sim); ignored by tag search, so --tag refuses it')
         if command == 'topic':
             p.add_argument('target', nargs='?', default=None,
@@ -128,13 +129,27 @@ def parser():
     return root
 
 
+def defaults(args):
+    """Fill the defaults after parsing, so `explicit` stays visible to the request budget."""
+    args.explicit_limit = getattr(args, 'limit', None) is not None
+    args.explicit_sort = getattr(args, 'sort', None) is not None
+    if args.command in DEFAULT_LIMIT and args.limit is None:
+        args.limit = DEFAULT_LIMIT[args.command]
+    if hasattr(args, 'sort') and args.sort is None:
+        args.sort = 'sim'
+    return args
+
+
 def check(args):
     """Refuse an impossible combination before it costs a request."""
     if getattr(args, 'chars', 0) < 0:
         raise NaverBlogError(2, '--chars cannot be negative.')
     if args.command == 'search':
-        if args.type == 'tags' and args.sort != 'sim':
-            raise NaverBlogError(2, 'Tag search has no ordering.', 'Drop --sort, or search --type posts.')
+        if args.type != 'posts' and args.explicit_sort:
+            # Naver's blog and tag search take no ordering parameter at all, so accepting
+            # --sort there would silently return relevance order under another name.
+            raise NaverBlogError(2, f'{args.type.capitalize()} search has no ordering.',
+                                 'Drop --sort, or search --type posts.')
         if args.type != 'posts' and args.own_money:
             raise NaverBlogError(2, '--own-money marks posts only.', 'Drop it, or search --type posts.')
         if args.type != 'posts' and (args.since or args.until):
@@ -148,10 +163,11 @@ def check(args):
         if args.target and args.target.category_no and args.category:
             raise NaverBlogError(2, 'That URL already names a category.',
                                  'Drop --category, or pass the blog id without the URL query.')
-        if (args.popular or args.notices) and (args.since or args.until or args.after):
-            raise NaverBlogError(2, 'Popular and notice lists are single pages with no date window.',
-                                 'Drop --since/--until/--after.')
-    if args.command == 'find' and args.tag and args.sort != 'sim':
+        if (args.popular or args.notices) and (args.since or args.until or args.after or args.out):
+            raise NaverBlogError(2, 'Popular and notice lists are single pages: '
+                                    'no date window, no continuation, no file collection.',
+                                 'Drop --since/--until/--after/--out.')
+    if args.command == 'find' and args.tag and args.explicit_sort:
         raise NaverBlogError(2, 'Tag search inside a blog ignores ordering.', 'Drop --sort, or drop --tag.')
     if args.command == 'topic' and args.top and (args.after or args.since or args.until):
         raise NaverBlogError(2, 'Featured posts are one page with no dates.', 'Drop --top, or drop the window.')
@@ -164,7 +180,7 @@ def check(args):
 
 def main(argv=None):
     try:
-        args = check(parse_targets(parser().parse_args(argv)))
+        args = check(defaults(parse_targets(parser().parse_args(argv))))
         if args.command in ('doctor', 'schema'):
             from ._cmds_meta import run
         elif args.command in ('search', 'post', 'comments', 'find'):

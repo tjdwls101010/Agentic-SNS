@@ -205,7 +205,12 @@ def build(name, page=None, **values):
     if missing:
         raise NaverBlogError(6, f'Operation {name} is missing {", ".join(missing)}.',
                              'Reinstall the Naver Blog skill.')
-    path_values = {key: values.pop(key) for key in list(values) if '{' + key + '}' in spec.path}
+    # A value can belong to both: category-related-posts names the blog in its path and
+    # sends it again as a parameter, so filling the path must not remove it from the query.
+    path_values = {key: value for key, value in values.items() if '{' + key + '}' in spec.path}
+    for key in path_values:
+        if key not in spec.required:
+            values.pop(key)
     try:
         path = spec.path.format(**path_values) if '{' in spec.path else spec.path
     except KeyError as error:

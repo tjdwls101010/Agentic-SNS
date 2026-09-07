@@ -55,15 +55,19 @@ class OutFile:
                     if key not in ('kind', 'started_at', 'limit_unit')} != self.context):
             raise NaverBlogError(2, 'That output file belongs to a different query.',
                                  'Use a new file, or rerun the command it was started with.')
-        boundary, page = self.stream.tell(), []
+        boundary, page, damaged = self.stream.tell(), [], False
         while line := self.stream.readline():
             if not line.endswith(b'\n'):
+                # A half-written last line is an interruption; anything after it is not.
+                damaged = bool(self.stream.read(1))
                 break
             try:
                 record = json.loads(line)
             except ValueError:
+                damaged = True
                 break
             if not isinstance(record, dict):
+                damaged = True
                 break
             if record.get('kind') == 'page':
                 identifiers = [item.get('id') for item in page]
@@ -78,6 +82,10 @@ class OutFile:
                 boundary, page = self.stream.tell(), []
             else:
                 page.append(record)
+        if damaged:
+            # Truncating here would delete complete pages that follow the damage.
+            raise NaverBlogError(2, 'This output file is damaged partway through.',
+                                 'Keep this file and collect into a new path.')
         self.stream.seek(boundary)
         self.stream.truncate()
 
