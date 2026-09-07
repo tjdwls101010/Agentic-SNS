@@ -17,3 +17,8 @@ __pycache__/
 !tests/threads/fixtures/*.ndjson
 !.claude/plans/twitter 스킬 구현 계획.md
 !tests/twitter/fixtures/*.ndjson
+!.claude/plans/naver-blog 스킬 구현 계획.md
+# The naver-blog suite keeps whole fixture sets in subdirectories, so this has to
+# reach into them: a top-level-only exception left them untracked and CI failed
+# on eight tests that pass locally.
+!tests/naver_blog/fixtures/**/*.ndjson
