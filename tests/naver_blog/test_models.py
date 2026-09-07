@@ -160,3 +160,19 @@ def test_a_blog_card_prefers_the_plain_name_over_the_highlighted_copy():
 def test_a_neighbour_without_an_update_time_still_builds():
     assert build_buddy({'blogId': 'buddyone', 'blogName': '이웃', 'updateTime': None}).updated_at is None
     assert build_buddy({'nickName': 'no id'}) is None
+
+
+def test_only_a_real_boolean_marks_a_comment_deleted():
+    # Naver sends real booleans; a string "false" is truthy in Python and would blank the text.
+    built = build_comment(dict(COMMENTS[0], deleted='false'))
+    assert built.labels == [] and built.text == '댓글'
+
+
+def test_an_unrecognized_status_value_is_shown_even_when_it_is_not_a_number():
+    built = build_comment(dict(COMMENTS[0], status='NEW'))
+    assert built.labels == ['status=NEW'] and built.text == '댓글'
+
+
+def test_a_zero_status_in_either_spelling_labels_nothing():
+    assert build_comment(dict(COMMENTS[0], status=0)).labels == []
+    assert build_comment(dict(COMMENTS[0], status='0')).labels == []

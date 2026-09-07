@@ -91,8 +91,8 @@ FAMILIES = {
     'material': (component('material', '<a data-linkdata=\'{"type":"book","title":"책 이름",'
                                       '"link":"https://book.naver.com/1"}\'>x</a>'),
                  '[book: 책 이름 (https://book.naver.com/1)]'),
-    'placesMap': (component('placesMap', '<script class="se-module-data" '
-                                         "data-module='{&quot;name&quot;:&quot;장소 이름&quot;}'></script>"),
+    'placesMap': (component('placesMap', '<script class="se-module-data" data-module=\''
+                                         '{"type":"v2_map","data":{"name":"장소 이름"}}\'></script>'),
                   '[map: 장소 이름]'),
 }
 
@@ -106,7 +106,8 @@ def test_each_known_component_family_is_read_by_its_own_rule(family):
 
 
 def test_a_video_without_a_playable_url_keeps_it_null_rather_than_using_the_thumbnail():
-    data = json.dumps({'title': '영상 제목', 'thumbnail': 'https://a.pstatic.net/thumb.jpg'})
+    data = json.dumps({'type': 'v2_video',
+                       'data': {'title': '영상 제목', 'thumbnail': 'https://a.pstatic.net/thumb.jpg'}})
     markup = component('video', f'<script class="se-module-data" data-module=\'{data}\'></script>')
     doc = parse(page([markup]))
     assert '[video: 영상 제목]' in doc.body.text
@@ -117,8 +118,9 @@ def test_a_video_without_a_playable_url_keeps_it_null_rather_than_using_the_thum
 
 
 def test_an_oembed_is_not_assumed_to_be_a_video():
-    data = json.dumps({'inputUrl': 'https://x.com/someone/status/1', 'description': '소셜 글',
-                       'thumbnailUrl': 'https://a.pstatic.net/t.jpg'})
+    data = json.dumps({'type': 'v2_oembed',
+                       'data': {'inputUrl': 'https://x.com/someone/status/1', 'description': '소셜 글',
+                                'thumbnailUrl': 'https://a.pstatic.net/t.jpg'}})
     markup = component('oembed', f'<script class="se-module-data" data-module=\'{data}\'></script>')
     doc = parse(page([markup]))
     assert '[embed: 소셜 글 (https://x.com/someone/status/1)]' in doc.body.text
@@ -153,7 +155,16 @@ def test_broken_module_json_reduces_the_component_instead_of_failing_the_read():
                                 '<div>영상 자리</div>')
     doc = parse(page([TEXT, markup]))
     assert doc.body.coverage.components == 2
-    assert '영상 자리' in doc.body.text or '[video' in doc.body.text
+    # Losing the module fields is a reduction, and the tally has to say so.
+    assert doc.body.coverage.partial == 1 and doc.body.coverage.full == 1
+    assert 'video' in doc.body.coverage.unhandled
+
+
+def test_a_module_wrapper_without_its_data_object_is_also_a_reduction():
+    markup = component('oembed', '<script class="se-module-data" '
+                                 'data-module=\'{"type":"v2_oembed"}\'></script>')
+    doc = parse(page([TEXT, markup]))
+    assert doc.body.coverage.partial == 1
 
 
 def test_a_legacy_post_is_read_from_its_own_container():
@@ -215,3 +226,107 @@ def test_an_empty_page_is_refused_rather_than_read_as_an_empty_post():
     for value in ('', '   ', None):
         with pytest.raises(NaverBlogError):
             parse(value)
+
+
+def test_inline_markup_keeps_the_words_in_the_order_they_were_written():
+    """Reading a node's own text before its children turns 앞<b>중간</b>뒤 into 앞뒤중간."""
+    markup = component('text', '<p>앞<strong>중간</strong>뒤<br>다음</p>')
+    doc = parse(page([markup]))
+    assert doc.body.text == '앞중간뒤\n다음'
+
+
+def test_a_stray_closing_tag_does_not_hide_the_components_after_it():
+    """It closes the container in a browser too; what matters is not calling the rest text[full]."""
+    inner = TEXT + '</div>' + component('text', '<p>뒤에 오는 문단</p>')
+    doc = parse(page([inner]))
+    assert '뒤에 오는 문단' in doc.body.text
+    assert doc.body.coverage.components == 2
+    assert doc.body.coverage.label().startswith('text[partial')
+    assert 'outside-container' in doc.body.coverage.unhandled
+
+
+def test_a_component_missing_its_closing_tag_loses_no_text():
+    """Malformed nesting makes the component count approximate; it must not eat the words."""
+    broken = '<div class="se-component se-text"><p>첫째</p>' + TEXT
+    doc = parse(page([broken]))
+    assert '첫째' in doc.body.text and '첫 문단입니다.' in doc.body.text
+
+
+def test_a_thousand_unclosed_paragraphs_do_not_exhaust_the_stack():
+    # Legacy Naver posts leave <p> open; treating that as nesting builds a stack thousands deep.
+    legacy = ('<div id="viewTypeSelector" class="post_ct">'
+              + ''.join(f'<p>문단 {index}' for index in range(1200)) + '</div>')
+    doc = parse(page([], container='nothing-here', extra=legacy))
+    assert '문단 0' in doc.body.text and '문단 1199' in doc.body.text
+
+
+def test_the_module_shape_naver_actually_sends_is_the_one_that_is_read():
+    video = json.dumps({'type': 'v2_video', 'data': {
+        'thumbnail': 'https://phinf.pstatic.net/video.jpg', 'mediaMeta': {'title': '진짜 제목'}}})
+    embed = json.dumps({'type': 'v2_oembed', 'data': {
+        'description': '진짜 설명', 'inputUrl': 'https://example.com/watch',
+        'thumbnailUrl': 'https://example.com/thumb.jpg'}})
+    doc = parse(page([component('video', f'<script data-module=\'{video}\'></script>'),
+                      component('oembed', f'<script data-module=\'{embed}\'></script>')]))
+    assert '[video: 진짜 제목]' in doc.body.text
+    assert '[embed: 진짜 설명 (https://example.com/watch)]' in doc.body.text
+    kinds = {attachment['kind']: attachment for attachment in doc.body.attachments}
+    assert kinds['video']['thumbnail_url'] == 'https://phinf.pstatic.net/video.jpg'
+    assert kinds['embed']['url'] == 'https://example.com/watch'
+    assert doc.body.coverage.full == 2
+
+
+def test_module_json_that_is_valid_but_not_an_object_reduces_rather_than_crashes():
+    for payload in ('[1]', '"a string"', 'null', '3'):
+        markup = component('oembed', f'<script data-module=\'{payload}\'></script>')
+        doc = parse(page([TEXT, markup]))
+        assert doc.body.coverage.partial == 1, payload
+        assert '첫 문단입니다.' in doc.body.text, payload
+
+
+def test_link_data_that_is_not_an_object_does_not_crash_the_read():
+    markup = component('oglink', '<a data-linkdata=\'["not","an","object"]\'>보이는 글자</a>')
+    doc = parse(page([TEXT, markup]))
+    assert '첫 문단입니다.' in doc.body.text
+
+
+def test_a_picture_inside_a_text_component_is_not_silently_dropped():
+    """Ownership stops double counting; it must not also hide what the owner did not read."""
+    markup = component('text', '<p>글과 함께</p>' + IMAGE)
+    doc = parse(page([markup]))
+    assert doc.body.images and doc.body.images[0]['url'] == 'https://blogfiles.pstatic.net/real.jpg'
+    assert doc.body.coverage.components == 1
+    # Reading only the text of a component that also held a picture is a reduction.
+    assert doc.body.coverage.partial == 1
+
+
+def test_each_picture_in_a_group_keeps_its_own_caption():
+    group = component('imageGroup',
+                      '<div><img data-lazy-src="https://a.pstatic.net/1.jpg">'
+                      '<div class="se-caption">첫 사진</div></div>'
+                      '<div><img data-lazy-src="https://a.pstatic.net/2.jpg">'
+                      '<div class="se-caption">둘째 사진</div></div>')
+    doc = parse(page([group]))
+    assert [image['caption'] for image in doc.body.images] == ['첫 사진', '둘째 사진']
+
+
+def test_a_component_that_yields_only_a_link_counts_as_reduced_not_lost():
+    markup = component('brandNewThing', '<a href="https://example.com">링크만</a>')
+    doc = parse(page([TEXT, markup]))
+    assert doc.body.coverage.empty == 0 and doc.body.coverage.partial == 1
+    assert doc.body.links[-1]['url'] == 'https://example.com'
+
+
+def test_a_body_that_survives_parsing_can_always_be_written_out():
+    """A lone surrogate cannot be encoded as UTF-8; keeping one would fail the write, not the read."""
+    markup = component('text', '<p>앞\ud800뒤​가운데</p>')
+    doc = parse(page([markup]))
+    assert doc.body.text == '앞뒤가운데'
+    json.dumps(doc.to_dict(), ensure_ascii=False).encode('utf-8')
+
+
+def test_entities_are_resolved_once_and_not_twice():
+    # &amp;lt; means the literal text "&lt;", not a less-than sign.
+    markup = component('text', '<p>&amp;lt;태그&amp;gt;</p>')
+    doc = parse(page([markup]))
+    assert doc.body.text == '&lt;태그&gt;'

@@ -228,7 +228,8 @@ def section_lines(section, args):
     if not records:
         return [f'{title}: none']
     lines = [f'{title}:']
+    shown = {record.get('comment_no') for record in records if record.get('comment_no')}
     for index, record in enumerate(records, 1):
         lines.extend('  ' + line for line in
-                     record_lines(record, section.get('prefix', 's') + str(index), args.chars))
+                     record_lines(record, section.get('prefix', 's') + str(index), args.chars, shown))
     return lines

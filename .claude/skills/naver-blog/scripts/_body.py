@@ -25,6 +25,9 @@ SKIP = {'script', 'style'}
 BLOCK = {'p', 'div', 'br', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'tr', 'blockquote', 'section'}
 # Every SmartEditor component carries exactly one family class alongside se-component.
 FAMILY = re.compile(r'(?:^|\s)se-(?!component\b|section\b|module\b)([a-zA-Z]+)(?:\s|$)')
+# The families with a rule written for them; everything else goes through the general fallback.
+KNOWN = {'text', 'sectionTitle', 'documentTitle', 'quotation', 'image', 'imageStrip', 'imageGroup',
+         'sticker', 'horizontalLine', 'oglink', 'material', 'table', 'placesMap', 'video', 'oembed'}
 
 
 @dataclass
@@ -87,28 +90,54 @@ class PostDoc:
         return payload
 
 
+def node(tag, attrs=None):
+    # `parts` interleaves strings and child nodes in document order; `children` is the same
+    # child list, kept separately only so searching does not have to filter strings.
+    return {'tag': tag, 'attrs': dict(attrs or {}), 'children': [], 'parts': []}
+
+
 class Nodes(HTMLParser):
-    """A minimal DOM: enough to find a container and own its top-level components."""
+    """A minimal DOM: enough to find a container, own its components, and keep word order.
+
+    Two rules of real HTML matter here and neither is optional. Text and elements are kept
+    interleaved, because "앞<strong>중간</strong>뒤" read as text-then-elements comes out as
+    "앞뒤중간". And a <p> is closed by the next block-level tag, because Naver's older posts
+    leave them open and treating that as nesting builds a stack thousands of levels deep.
+    """
+
+    # A start tag that implicitly closes an open <p>, per the HTML parsing rules.
+    CLOSES_P = {'p', 'div', 'section', 'article', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th',
+                'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'pre', 'form', 'header',
+                'footer', 'main', 'nav', 'aside', 'figure', 'figcaption'}
 
     def __init__(self, source):
         super().__init__(convert_charrefs=False)
-        self.root = {'tag': 'root', 'attrs': {}, 'children': [], 'text': []}
+        self.root = node('root')
         self.stack = [self.root]
         self.skipping = 0
         self.feed(source)
+        self.close()
+
+    def _append(self, child):
+        parent = self.stack[-1]
+        parent['children'].append(child)
+        parent['parts'].append(child)
 
     def handle_starttag(self, tag, attrs):
-        node = {'tag': tag, 'attrs': dict(attrs), 'children': [], 'text': []}
+        if tag in self.CLOSES_P:
+            while len(self.stack) > 1 and self.stack[-1]['tag'] == 'p':
+                self.stack.pop()
+        child = node(tag, attrs)
         if not self.skipping:
-            self.stack[-1]['children'].append(node)
+            self._append(child)
         if tag in SKIP:
             self.skipping += 1
         if tag not in VOID:
-            self.stack.append(node)
+            self.stack.append(child)
 
     def handle_startendtag(self, tag, attrs):
         if not self.skipping:
-            self.stack[-1]['children'].append({'tag': tag, 'attrs': dict(attrs), 'children': [], 'text': []})
+            self._append(node(tag, attrs))
 
     def handle_endtag(self, tag):
         if tag in SKIP:
@@ -119,11 +148,13 @@ class Nodes(HTMLParser):
             if self.stack[index]['tag'] == tag:
                 del self.stack[index:]
                 return
+        # A stray closing tag with nothing open to match is discarded, not obeyed: obeying it
+        # would close the body container and hide every component after it.
 
     def handle_data(self, data):
         # A script's own source is never body text, but the node stays for its attributes.
         if not self.skipping:
-            self.stack[-1]['text'].append(data)
+            self.stack[-1]['parts'].append(data)
 
     def handle_entityref(self, name):
         self.handle_data(html_module.unescape('&' + name + ';'))
@@ -132,113 +163,138 @@ class Nodes(HTMLParser):
         self.handle_data(html_module.unescape('&#' + name + ';'))
 
 
-def classes(node):
-    return set(str(node['attrs'].get('class') or '').split())
+def classes(item):
+    return set(str(item['attrs'].get('class') or '').split())
 
 
-def find(node, predicate, *, into_components=True):
+def find(root, predicate, *, into_components=True):
     """Depth-first search; stops descending into a component when ownership matters."""
-    for child in node['children']:
+    for child in root['children']:
         if predicate(child):
             yield child
         elif into_components or 'se-component' not in classes(child):
             yield from find(child, predicate, into_components=into_components)
 
 
-def visible_text(node):
-    if node['tag'] in SKIP:
-        return ''
-    parts = list(node['text'])
-    for child in node['children']:
-        if child['tag'] in SKIP:
+def visible_text(root):
+    """Text in document order, with block boundaries as newlines. Iterative: markup nests deeply."""
+    output = []
+    stack = [root]
+    while stack:
+        item = stack.pop()
+        if isinstance(item, str):
+            output.append(item)
             continue
-        if child['tag'] == 'br':
-            parts.append('\n')
-        parts.append(visible_text(child))
-        if child['tag'] in BLOCK:
-            parts.append('\n')
-    return ''.join(parts)
+        if item['tag'] in SKIP:
+            continue
+        if item['tag'] == 'br':
+            output.append('\n')
+            continue
+        after = '\n' if item['tag'] in BLOCK else ''
+        if after:
+            stack.append(after)
+        for part in reversed(item['parts']):
+            stack.append(part)
+    return ''.join(output)
 
 
 def tidy(value):
-    value = re.sub(r'[^\S\n]+', ' ', html_module.unescape(value or ''))
+    """Normalize once. Entities are already resolved by the parser, so they are not undone again."""
+    value = re.sub(r'[^\S\n]+', ' ', value or '')
+    # Zero-width marks and the half-character Naver leaves when it truncates mid-emoji: a lone
+    # surrogate cannot be encoded as UTF-8 and would fail the write rather than the read.
+    value = re.sub(r'[\u200b-\u200d\ufeff]', '', value)
+    value = re.sub('[\ud800-\udfff]', '', value)
     value = '\n'.join(line.strip() for line in value.split('\n'))
     return re.sub(r'\n{3,}', '\n\n', value).strip()
 
 
-def image_url(node, enclosing=None):
+def image_url(item, enclosing=None):
     """data-lazy-src is the real image; src is a deliberately blurred placeholder.
 
     The link data that names the real file sits on the enclosing anchor, not on the img,
     so it is passed in rather than looked for on the wrong node.
     """
-    attrs = node['attrs']
+    attrs = item['attrs']
     for key in ('data-lazy-src', 'data-src'):
         if attrs.get(key):
             return attrs[key]
     for source in (attrs.get('data-linkdata'), enclosing):
         if source:
             try:
-                value = json.loads(html_module.unescape(source)).get('src')
-                if value:
-                    return value
-            except (ValueError, AttributeError):
-                pass
+                payload = json.loads(html_module.unescape(source))
+            except ValueError:
+                continue
+            if isinstance(payload, dict) and payload.get('src'):
+                return payload['src']
     return attrs.get('src') or None
 
 
-def module_data(node):
-    for script in find(node, lambda child: bool(child['attrs'].get('data-module'))):
+def module_data(root):
+    """A module wraps its fields as {"type": ..., "data": {...}}; the fields are inside data."""
+    for script in find(root, lambda child: bool(child['attrs'].get('data-module'))):
         try:
-            return json.loads(html_module.unescape(script['attrs']['data-module']))
+            payload = json.loads(html_module.unescape(script['attrs']['data-module']))
         except ValueError:
             # Broken module JSON reduces this one component; it does not fail the whole read.
             return None
+        if not isinstance(payload, dict):
+            return None
+        # No flat module has ever been observed, so a payload without data is unreadable
+        # rather than a module whose fields happen to sit one level up.
+        data = payload.get('data')
+        return data if isinstance(data, dict) else None
     return None
 
 
-def link_data(node):
-    for child in find(node, lambda item: item['attrs'].get('data-linkdata')):
+def link_data(root):
+    for child in find(root, lambda item: item['attrs'].get('data-linkdata')):
         try:
-            return json.loads(html_module.unescape(child['attrs']['data-linkdata']))
+            payload = json.loads(html_module.unescape(child['attrs']['data-linkdata']))
         except ValueError:
             return None
+        return payload if isinstance(payload, dict) else None
     return None
 
 
-def images_of(node, body, *, caption=None, enclosing=None):
+def is_image(item):
+    return item['tag'] == 'img'
+
+
+def images_of(root, body, *, caption=None, enclosing=None, skip=None):
     found = []
-    enclosing = node['attrs'].get('data-linkdata') or enclosing
-    for child in node['children']:
+    enclosing = root['attrs'].get('data-linkdata') or enclosing
+    # The root may itself be the picture: a group's members are often bare <img> children.
+    for child in ([root] if root['tag'] == 'img' else []) + root['children']:
         if child['tag'] == 'img':
             url = image_url(child, enclosing)
-            if url:
+            if url and not (skip and url in skip):
                 body.images.append({'url': url, 'caption': caption})
                 found.append(url)
-        else:
-            found += images_of(child, body, caption=caption, enclosing=enclosing)
+        elif child is not root:
+            found += images_of(child, body, caption=caption, enclosing=enclosing, skip=skip)
     return found
 
 
-def caption_of(node):
-    for child in find(node, lambda item: 'se-caption' in classes(item)):
+def caption_of(root):
+    for child in find(root, lambda item: 'se-caption' in classes(item)):
         text = tidy(visible_text(child))
         if text:
             return text
     return None
 
 
-def links_of(node, body):
-    for anchor in find(node, lambda child: child['tag'] == 'a'):
+def links_of(root, body):
+    for anchor in find(root, lambda child: child['tag'] == 'a'):
         href = anchor['attrs'].get('href') or ''
         if href.startswith(('http://', 'https://')):
             body.links.append({'url': href, 'text': tidy(visible_text(anchor)) or None})
 
 
-def render_component(family, node, body):
+def render_component(family, item, body):
     """Return (lines, quality). quality is 'full' when a family rule handled it."""
     if family in ('text', 'sectionTitle', 'documentTitle', 'quotation'):
-        content = tidy(visible_text(node))
+        content = tidy(visible_text(item))
         if not content:
             return [], 'empty'
         if family == 'sectionTitle':
@@ -247,45 +303,61 @@ def render_component(family, node, body):
             return ['> ' + content.replace('\n', ' ')], 'full'
         return [content], 'full'
     if family in ('image', 'imageStrip', 'imageGroup', 'sticker'):
-        caption = caption_of(node)
-        found = images_of(node, body, caption=caption)
         if family == 'sticker':
+            images_of(item, body)
             return ['[sticker]'], 'full'
-        if not found:
-            return [], 'empty'
-        return [f'[image: {caption}]' if caption else '[image]' for _ in found], 'full'
+        lines, before = [], len(body.images)
+        # A group holds several pictures with a caption each; one caption for all of them
+        # would attach the first picture's words to every other picture.
+        groups = [child for child in item['children'] if any(find(child, is_image))
+                  or child['tag'] == 'img']
+        # A group with its own caption keeps it; one without falls back to the component's,
+        # which is where a single picture's caption lives.
+        shared = caption_of(item) if len(groups) <= 1 else None
+        for group in (groups or [item]):
+            caption = caption_of(group) or shared
+            for _ in images_of(group, body, caption=caption):
+                lines.append(f'[image: {caption}]' if caption else '[image]')
+        return (lines, 'full') if len(body.images) > before else ([], 'empty')
     if family == 'horizontalLine':
         return ['---'], 'full'
     if family == 'oglink':
-        data = link_data(node)
-        title = (data or {}).get('title') or tidy(visible_text(node))
+        data = link_data(item)
+        title = (data or {}).get('title') or tidy(visible_text(item))
         url = (data or {}).get('link') or (data or {}).get('url')
-        links_of(node, body)
+        images_of(item, body, caption=title)
+        links_of(item, body)
         return [f'link: {title} ({url})' if url else f'link: {title}'], 'full'
     if family == 'material':
-        data = link_data(node) or {}
+        data = link_data(item) or {}
         kind = data.get('type') or 'material'
-        title = data.get('title') or tidy(visible_text(node))
+        title = data.get('title') or tidy(visible_text(item))
         url = data.get('link') or data.get('url')
+        # A book or film card carries its cover; it belongs to this component, not to nothing.
+        images_of(item, body, caption=title)
         body.attachments.append({'kind': kind, 'title': title, 'url': url, 'thumbnail_url': None})
         return [f'[{kind}: {title} ({url})]' if url else f'[{kind}: {title}]'], 'full'
     if family == 'table':
         rows = []
-        for row in find(node, lambda child: child['tag'] == 'tr'):
+        for row in find(item, lambda child: child['tag'] == 'tr'):
             cells = [tidy(visible_text(cell)).replace('\n', ' ')
                      for cell in find(row, lambda child: child['tag'] in ('td', 'th'))]
             if any(cells):
                 rows.append(' | '.join(cells))
         return (rows, 'full') if rows else ([], 'empty')
     if family == 'placesMap':
-        data = module_data(node) or {}
-        name = data.get('name') or tidy(visible_text(node)).split('\n')[0]
-        return ([f'[map: {name}]'], 'full') if name else ([], 'empty')
+        data = module_data(item) or {}
+        name = data.get('name') or tidy(visible_text(item)).split('\n')[0]
+        return ([f'[map: {name}]'], 'full') if name else ([], 'partial')
     if family == 'video':
         # A video component may carry only a thumbnail. Using that as the video URL would
         # hand back an image while calling it the video, so the url stays null instead.
-        data = module_data(node) or {}
-        title = data.get('title') or caption_of(node) or tidy(visible_text(node)).split('\n')[0] or 'video'
+        data = module_data(item)
+        if data is None:
+            return ([f'[video: {caption_of(item) or "video"}]'], 'partial')
+        meta = data.get('mediaMeta') if isinstance(data.get('mediaMeta'), dict) else {}
+        title = (meta.get('title') or data.get('title') or caption_of(item)
+                 or tidy(visible_text(item)).split('\n')[0] or 'video')
         url = data.get('videoUrl') or data.get('playUrl') or data.get('inputUrl')
         thumbnail = data.get('thumbnail') or data.get('thumbnailUrl')
         body.attachments.append({'kind': 'video', 'title': title, 'url': url,
@@ -293,27 +365,58 @@ def render_component(family, node, body):
         return [f'[video: {title}]'], 'full'
     if family == 'oembed':
         # An oembed is a video, a social post or a map; naming it a video would be a guess.
-        data = module_data(node) or {}
+        data = module_data(item)
+        if data is None:
+            return (['[embed]'], 'partial')
         url = data.get('inputUrl') or data.get('url')
-        description = data.get('description') or data.get('title') or caption_of(node) or 'embed'
+        description = data.get('description') or data.get('title') or caption_of(item) or 'embed'
         body.attachments.append({'kind': 'embed', 'title': description, 'url': url,
                                  'thumbnail_url': data.get('thumbnailUrl')})
         return [f'[embed: {description} ({url})]' if url else f'[embed: {description}]'], 'full'
     # An unfamiliar family keeps whatever a general reading can save: text, images, links.
-    content = tidy(visible_text(node))
-    found = images_of(node, body)
-    links_of(node, body)
+    content = tidy(visible_text(item))
+    before = len(body.links)
+    found = images_of(item, body)
+    links_of(item, body)
     lines = ([content] if content else []) + ['[image]' for _ in found]
-    return (lines, 'partial' if lines else 'empty')
+    saved = bool(lines) or len(body.links) > before
+    return (lines, 'partial' if saved else 'empty')
+
+
+def siblings_after(root, target):
+    """The nodes that follow `target` under its own parent, and nothing from elsewhere."""
+    stack = [root]
+    while stack:
+        item = stack.pop()
+        for index, child in enumerate(item['children']):
+            if child is target:
+                return item['children'][index + 1:]
+            stack.append(child)
+    return []
 
 
 def read_components(container, body):
-    for node in find(container, lambda child: 'se-component' in classes(child), into_components=False):
-        names = FAMILY.findall(str(node['attrs'].get('class') or ''))
+    for component in find(container, lambda child: 'se-component' in classes(child),
+                          into_components=False):
+        names = FAMILY.findall(str(component['attrs'].get('class') or ''))
         family = next((name for name in names if name != 'component'), None) or 'unknown'
         body.coverage.components += 1
         body.coverage.families[family] = body.coverage.families.get(family, 0) + 1
-        lines, quality = render_component(family, node, body)
+        # Owning a nested component means reading it too. A rule that saw a component's text
+        # but not the pictures inside it has reduced that component, however sure the rule was.
+        present = sum(1 for _ in find(component, is_image))
+        before = len(body.images)
+        lines, quality = render_component(family, component, body)
+        taken = len(body.images) - before
+        if quality == 'full' and taken < present:
+            for _ in images_of(component, body, skip={image['url'] for image in body.images[before:]}):
+                lines.append('[image]')
+            quality = 'partial'
+        if (quality == 'empty' and family in KNOWN and not tidy(visible_text(component))
+                and not present):
+            # A known family with nothing in it is a spacer, not something this reader missed.
+            # An unfamiliar family gets no such benefit: nobody knows what it was holding.
+            quality = 'full'
         setattr(body.coverage, quality, getattr(body.coverage, quality) + 1)
         if quality != 'full' and family not in body.coverage.unhandled:
             body.coverage.unhandled.append(family)
@@ -349,7 +452,7 @@ def parse(source):
                   viewer_id=variable(source, 'userId'), open_type=variable(source, 'openType'),
                   category_name=clean(variable(source, 'gsCategoryName')),
                   title=clean(variable(source, 'postTitle')) or '')
-    property_node = next(find(tree.root, lambda node: node['attrs'].get('id') == '_post_property'), None)
+    property_node = next(find(tree.root, lambda item: item['attrs'].get('id') == '_post_property'), None)
     if property_node:
         attrs = property_node['attrs']
         doc.log_no = attrs.get('logno') or attrs.get('logNo') or doc.log_no
@@ -370,14 +473,29 @@ def parse(source):
         doc.tags = [tag.strip() for tag in raw_tags.split(',') if tag.strip()]
 
     body = Body()
-    container = next(find(tree.root, lambda node: 'se-main-container' in classes(node)), None)
-    if container is not None and any(find(container, lambda node: 'se-component' in classes(node))):
+    container = next(find(tree.root, lambda item: 'se-main-container' in classes(item)), None)
+    if container is not None and any(find(container, lambda item: 'se-component' in classes(item))):
         read_components(container, body)
+        # A stray </div> closes the container early in a browser too, leaving the rest of the
+        # body as siblings of the container. Those are read anyway and counted as reduced,
+        # because a body that quietly lost its second half must not read as text[full].
+        # Components elsewhere on the page belong to Naver's own widgets and are not this body.
+        for item in siblings_after(tree.root, container):
+            if 'se-component' not in classes(item):
+                continue
+            body.coverage.components += 1
+            body.coverage.partial += 1
+            if 'outside-container' not in body.coverage.unhandled:
+                body.coverage.unhandled.append('outside-container')
+            content = tidy(visible_text(item))
+            if content:
+                body.blocks.append(content)
+            images_of(item, body)
     else:
         # editorversion has been wrong and both containers can coexist, so the fallback is
         # chosen by finding it, not by believing an attribute.
-        legacy = next(find(tree.root, lambda node: node['attrs'].get('id') == 'viewTypeSelector'
-                           or 'post_ct' in classes(node)), None)
+        legacy = next(find(tree.root, lambda item: item['attrs'].get('id') == 'viewTypeSelector'
+                           or 'post_ct' in classes(item)), None)
         if legacy is None:
             raise NaverBlogError(6, 'The post page carried neither body container.',
                                  'Open the post in Aside once; the page layout may have changed.',

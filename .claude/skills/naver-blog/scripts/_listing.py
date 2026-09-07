@@ -148,7 +148,8 @@ def collect(spec, fetch, *, limit, state=None, since=None, until=None, monotonic
             # is gone", which it does not.
             'pending': len(progress.pending),
             'reported_is_unreliable': progress.reported_is_unreliable,
-            **({'error': error.error, 'message': error.message, 'fix': error.fix} if error else {})}
+            **({'error': error.error, 'message': error.message, 'fix': error.fix,
+                'error_code': error.code} if error else {})}
 
 
 def _terminal(spec, page, progress, window_reached):

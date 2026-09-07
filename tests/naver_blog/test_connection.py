@@ -18,6 +18,9 @@ def run(arguments, env):
     return result.returncode, json.loads(result.stdout or '{}')
 
 
+FIXTURES = Path(__file__).parent / 'fixtures'
+
+
 def using(cli_env, folder):
     return dict(cli_env, NAVER_BLOG_FIXTURES=str(FIXTURES / folder))
 
@@ -122,3 +125,40 @@ def test_two_processes_racing_for_the_last_slot_do_not_both_get_it(tmp_path):
     assert sorted(outputs) == ['refused 5', 'sent'], outputs
     remaining = json.loads((home / 'budget.json').read_text())['requests']
     assert len(remaining) == _budget.WINDOW_LIMIT
+
+
+def using_fixtures(cli_env, folder):
+    return dict(cli_env, NAVER_BLOG_FIXTURES=str(FIXTURES / folder))
+
+
+def test_a_page_about_a_different_post_is_refused_before_anything_is_built(cli_env):
+    """Another post's body next to this post's counts is worse than no answer at all."""
+    code, payload = run(['post', 'testblog/99900000101'], using_fixtures(cli_env, 'wrongpost'))
+    assert code == 6 and payload['error'] == 'envelope_drift'
+    assert '99900000999' in payload['message']
+    # It never went on to ask for recommendations.
+    requests = [json.loads(line)['path'] for line in
+                Path(cli_env['NAVER_BLOG_FAKE_LOG']).read_text().splitlines()]
+    assert not any('related' in path for path in requests)
+
+
+def test_a_blocked_comment_read_does_not_become_a_post_with_no_comments(cli_env):
+    code, payload = run(['post', 'testblog/99900000101', '--comments', '--json'],
+                        using_fixtures(cli_env, 'blockedcomments'))
+    sections = {section['name']: section for section in payload['sections']}
+    assert sections['post']['ok'] is True
+    assert sections['comments']['ok'] is False
+    assert sections['comments']['error']['code'] == 5
+    # A block is not "partial": the next command will fail the same way.
+    assert code == 5
+
+
+def test_a_post_written_to_a_file_actually_reaches_it(cli_env, tmp_path):
+    out = tmp_path / 'one-post.ndjson'
+    code, payload = run(['post', 'testblog/99900000101', '--out', str(out), '--json'], cli_env)
+    assert code == 0, payload
+    lines = [json.loads(line) for line in out.read_text().splitlines()]
+    assert lines[0]['kind'] == 'header'
+    saved = [line for line in lines if line.get('id', '').startswith('post:')]
+    assert any(record['id'] == 'post:testblog/99900000101' for record in saved)
+    assert saved[0]['body']['text']

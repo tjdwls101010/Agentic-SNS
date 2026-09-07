@@ -164,17 +164,22 @@ def build_comment(raw):
     if comment_no is None:
         return None
     comment_no = str(comment_no)
+    # Only a real boolean counts: the string "false" is truthy in Python and would blank a
+    # comment that Naver never deleted.
+    def flag(*names):
+        return any(raw.get(name) is True for name in names)
+
     labels = []
-    if raw.get('deleted'):
+    if flag('deleted'):
         labels.append('deleted')
-    if raw.get('blind') or raw.get('hiddenByCleanbot'):
+    if flag('blind', 'hiddenByCleanbot'):
         labels.append('blinded')
-    if raw.get('secret'):
+    if flag('secret'):
         labels.append('secret')
-    status = number(raw.get('status'))
-    # A nonzero status with none of the known booleans set means something this reader
-    # does not recognize; hiding the text would be a guess, so the raw value is shown instead.
-    if status not in (None, 0) and not labels:
+    status = raw.get('status')
+    # A status this reader does not recognize is shown rather than acted on; hiding a comment
+    # on a guess costs more than showing an unfamiliar word next to it.
+    if status not in (None, 0, '0', '') and not labels:
         labels.append(f'status={status}')
     parent = first(raw, 'parentCommentNo')
     author_blog = first(raw, 'profileUserId')

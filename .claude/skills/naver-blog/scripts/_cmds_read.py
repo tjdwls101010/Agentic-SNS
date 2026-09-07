@@ -215,6 +215,12 @@ def post(args, transport):
     if doc.blog_id and doc.blog_id != blog_id:
         raise NaverBlogError(6, f'That page belongs to {doc.blog_id}, not {blog_id}.',
                              'Open the URL in Aside and pass the id it lands on.', error='envelope_drift')
+    if doc.log_no and str(doc.log_no) != str(log_no):
+        # Mixing another post's body with this post's recommendations and counts is worse
+        # than refusing, and nothing downstream could tell the two apart.
+        raise NaverBlogError(6, f'That page is post {doc.log_no}, not {log_no}.',
+                             'Open the URL in Aside and pass the post number it lands on.',
+                             error='envelope_drift')
     # The post page already names the viewer, so the session refreshes without a request.
     _session.note_viewer(html)
     record = {'id': f'post:{blog_id}/{log_no}', 'blog_id': blog_id, 'log_no': log_no,
@@ -238,7 +244,9 @@ def post(args, transport):
             if built and built[0].log_no == log_no:
                 record['like_count'] = built[0].like_count
                 del built[0]
-            return [item.to_dict() for item in built[:4]]
+                # One of the five slots held this post; the other four are the recommendations.
+                built = built[:4]
+            return [item.to_dict() for item in built]
 
         related = sections.add('same category', recommendations, prefix='s') or []
 
@@ -248,9 +256,25 @@ def post(args, transport):
             if not blog_no:
                 blog_no, _ = blog_no_of(transport, blog_id, log_no)
             outcome = comments_of(transport, blog_id, log_no, blog_no, 10)
+            if not outcome['ok']:
+                # collect reports a failure in its return value; swallowing that here would
+                # turn a block or a login wall into a post that simply has no comments.
+                raise NaverBlogError(outcome.get('error_code', 6),
+                                     outcome.get('message') or 'The comment box could not be read.',
+                                     outcome.get('fix'), error=outcome.get('error') or 'transient')
             return outcome['results']
 
         sections.add('comments', first_comments, prefix='c')
+
+    if args.out:
+        # One post is one page of records; the file is written whole rather than page by page.
+        out = OutFile(args.out, {'command': 'post', 'post': f'{blog_id}/{log_no}'})
+        try:
+            rows = [row for entry in sections.as_list() if entry.get('ok')
+                    for row in (entry.get('data') or [])]
+            out.commit(rows, {'page': 1, 'pending': [], 'seen': []}, 'not_paginable')
+        finally:
+            out.close()
 
     tags = doc.tags if isinstance(doc.tags, list) else []
     hops = [f'comments: `comments {blog_id}/{log_no}`', f'blog: `blog {blog_id}`']
@@ -261,7 +285,8 @@ def post(args, transport):
             'context': {'post': f'{blog_id}/{log_no}', 'body': doc.body.coverage.label()},
             'budget': transport.budget.snapshot(), 'fetched_bytes': transport.fetched_bytes,
             'next': None, 'hops': hops, 'coverage': doc.body.coverage.__dict__,
-            'related_count': len(related)}
+            'related_count': len(related),
+            **({'out': str(Path(args.out).expanduser())} if args.out else {})}
 
 
 def comments_of(transport, blog_id, log_no, blog_no, limit, *, state=None, commit=None):
