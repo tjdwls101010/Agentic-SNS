@@ -1,0 +1,34 @@
+{
+  "note": "One allow/deny table, read by both test_api.py and js/test_fetch.js, so the Python guard and the browser snippet cannot drift apart.",
+  "allow": [
+    ["m.blog.naver.com", "/api/search/v1/post"],
+    ["m.blog.naver.com", "/api/blogs/naverofficial/post-list"],
+    ["m.blog.naver.com", "/api/blogs/a/posts/123/comments-info"],
+    ["m.blog.naver.com", "/PostView.naver"],
+    ["m.blog.naver.com", "/FeedList.naver"],
+    ["section.blog.naver.com", "/ajax/SearchList.naver"],
+    ["section.blog.naver.com", "/ajax/BuddyPostList.naver"],
+    ["apis.naver.com", "/commentBox/cbox/web_naver_list_json.json"],
+    ["blog.naver.com", "/NBlogTop.naver"],
+    ["blog.naver.com", "/naver_diary"]
+  ],
+  "deny": [
+    ["m.blog.naver.com", "/PostView.naver.evil"],
+    ["m.blog.naver.com", "/PostWrite.naver"],
+    ["m.blog.naver.com", "/api/../PostWrite.naver"],
+    ["m.blog.naver.com", "/api/..%2fPostWrite.naver"],
+    ["m.blog.naver.com", "/api\\PostWrite.naver"],
+    ["m.blog.naver.com", "api/blogs/x"],
+    ["m.blog.naver.com", "//evil.example.com/api/x"],
+    ["section.blog.naver.com", "/ajax/../PostWrite.naver"],
+    ["section.blog.naver.com", "/BuddyPostList.naver"],
+    ["apis.naver.com", "/commentBox/cbox/web_naver_create_json.json"],
+    ["apis.naver.com", "/commentBox/cbox/web_naver_list_json.json.evil"],
+    ["blog.naver.com", "/PostWrite.naver"],
+    ["blog.naver.com", "/naverofficial/224400531915"],
+    ["blog.naver.com", "/a/../b"],
+    ["cafe.naver.com", "/api/x"],
+    ["nid.naver.com", "/nidlogin.login"],
+    ["news.naver.com", "/api/x"]
+  ]
+}

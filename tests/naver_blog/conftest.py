@@ -26,6 +26,12 @@ def snapshot():
     return json.loads(block)
 
 
+@pytest.fixture(scope='session')
+def path_table():
+    """One allow/deny table shared with the JavaScript snippet test."""
+    return json.loads((Path(__file__).parent / 'fixtures/paths.json').read_text(encoding='utf-8'))
+
+
 @pytest.fixture(autouse=True)
 def isolated_state(monkeypatch, tmp_path, request):
     if request.node.get_closest_marker('live') is None:

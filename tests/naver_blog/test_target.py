@@ -83,3 +83,29 @@ def test_routes_outside_the_reading_surface_are_refused():
 def test_a_post_number_that_is_not_digits_is_refused():
     with pytest.raises(NaverBlogError):
         parse_target('https://m.blog.naver.com/PostView.naver?blogId=x&logNo=abc', 'post')
+
+
+def test_a_valid_blog_id_in_the_query_does_not_license_a_forbidden_route():
+    # The query is not permission to visit a route this reader cannot read.
+    for value in ('https://blog.naver.com/PostWrite.naver?blogId=x&logNo=123',
+                  'https://m.blog.naver.com/BuddyList.naver?blogId=x',
+                  'https://blog.naver.com/a/123/edit?blogId=b&logNo=456'):
+        with pytest.raises(NaverBlogError) as caught:
+            parse_target(value, 'blog')
+        assert caught.value.code == 2, value
+
+
+def test_a_url_naming_two_different_blogs_is_refused_rather_than_guessed():
+    with pytest.raises(NaverBlogError) as caught:
+        parse_target('https://blog.naver.com/someone?blogId=someoneelse', 'blog')
+    assert caught.value.code == 2 and 'two different' in caught.value.message
+
+
+def test_a_category_that_is_not_a_number_is_refused():
+    with pytest.raises(NaverBlogError) as caught:
+        parse_target('https://blog.naver.com/PostList.naver?blogId=x&categoryNo=all', 'blog')
+    assert caught.value.code == 2 and 'digits' in caught.value.message
+
+
+def test_a_very_long_post_number_is_accepted_because_naver_never_fixed_the_width():
+    assert parse_target('someone/' + '9' * 30, 'post').log_no == '9' * 30

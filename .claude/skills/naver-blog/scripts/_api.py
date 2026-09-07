@@ -5,6 +5,7 @@ new endpoint is a row here rather than a branch in transport, walk or a command.
 also owns the query: callers pass identifiers, never assembled parameters, because a
 composed value like the comment box's objectId is wrong in a way nothing downstream sees.
 """
+import re
 from dataclasses import dataclass, field, replace
 from urllib.parse import urlencode
 
@@ -18,13 +19,22 @@ REFERER = {
     'blog.naver.com': 'https://blog.naver.com/',
 }
 
-# browser/fetch.js enforces the same list; both sides must agree or a typo widens the surface.
+# browser/fetch.js enforces the same patterns; both sides must agree or a typo widens the
+# surface. These are full matches, not prefixes: "/PostView.naver" as a prefix would also
+# admit "/PostView.naver.evil", and a bare "/" would admit every path on its host.
 ALLOWED = {
-    'm.blog.naver.com': ('/api/', '/PostView.naver', '/FeedList.naver'),
-    'section.blog.naver.com': ('/ajax/',),
-    'apis.naver.com': ('/commentBox/cbox/web_naver_list_json.json',),
-    'blog.naver.com': ('/NBlogTop.naver', '/'),
+    'm.blog.naver.com': (r'/api/[A-Za-z0-9._/{}-]*', r'/PostView\.naver', r'/FeedList\.naver'),
+    'section.blog.naver.com': (r'/ajax/[A-Za-z0-9._{}-]+\.naver',),
+    'apis.naver.com': (r'/commentBox/cbox/web_naver_list_json\.json',),
+    'blog.naver.com': (r'/NBlogTop\.naver', r'/\{blogId\}', r'/[A-Za-z0-9_-]{1,64}'),
 }
+
+
+def allowed_path(host, path):
+    """A path must match one pattern whole, and may never contain a traversal segment."""
+    if host not in ALLOWED or '..' in path or '\\' in path or not path.startswith('/'):
+        return False
+    return any(re.fullmatch(pattern, path) for pattern in ALLOWED[host])
 
 # Search stops at 1,000 accumulated items, and past that the server reports totalCount 0.
 SEARCH_CEILING = 1000

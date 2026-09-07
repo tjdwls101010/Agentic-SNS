@@ -66,23 +66,28 @@ test('each host carries its own fixed referer, which is the whole header contrac
   }
 });
 
-test('a host outside the four is refused before any request', async () => {
-  for (const host of ['example.com', 'cafe.naver.com', 'news.naver.com', 'nid.naver.com', '']) {
-    await assert.rejects(runSnippet({host, path: '/api/blogs/x'}), /Unsupported host/, host);
+// The same table the Python guard is tested against; a rule added on one side alone fails here.
+const TABLE = JSON.parse(fs.readFileSync(path.join(__dirname, '../fixtures/paths.json'), 'utf8'));
+
+test('every route the ledger uses is reachable through the snippet', async () => {
+  for (const [host, p] of TABLE.allow) {
+    const {calls} = await runSnippet({host, path: p});
+    assert.strictEqual(calls.length, 1, `${host}${p}`);
   }
 });
 
-test('a path outside each host allowlist is refused before any request', async () => {
-  const refused = [
-    ['m.blog.naver.com', '/PostWrite.naver'],
-    ['m.blog.naver.com', '/api'],
-    ['section.blog.naver.com', '/BuddyPostList.naver'],
-    ['apis.naver.com', '/commentBox/cbox/web_naver_create_json.json'],
-    ['blog.naver.com', '/naverofficial/224400531915']
-  ];
-  for (const [host, p] of refused) {
-    await assert.rejects(runSnippet({host, path: p}), /Unsupported reading route/, `${host}${p}`);
+test('every route outside the reading surface is refused before any request', async () => {
+  for (const [host, p] of TABLE.deny) {
+    await assert.rejects(runSnippet({host, path: p}),
+      /Unsupported (host|reading route)/, `${host}${p}`);
   }
+});
+
+test('an attempt to name a method is ignored; the snippet only knows how to GET', async () => {
+  const {calls} = await runSnippet(
+    {host: 'm.blog.naver.com', path: '/api/blogs/x', method: 'POST', body: 'anything'});
+  assert.strictEqual(calls[0].init.method, 'GET');
+  assert.ok(!('body' in calls[0].init));
 });
 
 test('a query may not smuggle a fragment or a backslash past the path check', async () => {

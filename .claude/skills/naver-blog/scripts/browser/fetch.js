@@ -1,11 +1,12 @@
 // naver-blog-snippet: fetch
 // GET only, four hosts, a fixed referer per host. Naver needs no token, so nothing else is sent.
 await (async () => {
+  // Full matches, not prefixes: "/PostView.naver" as a prefix also admits "/PostView.naver.evil".
   const ALLOWED = {
-    'm.blog.naver.com': [/^\/api\//, /^\/PostView\.naver$/, /^\/FeedList\.naver$/],
-    'section.blog.naver.com': [/^\/ajax\//],
+    'm.blog.naver.com': [/^\/api\/[A-Za-z0-9._/-]*$/, /^\/PostView\.naver$/, /^\/FeedList\.naver$/],
+    'section.blog.naver.com': [/^\/ajax\/[A-Za-z0-9._-]+\.naver$/],
     'apis.naver.com': [/^\/commentBox\/cbox\/web_naver_list_json\.json$/],
-    'blog.naver.com': [/^\/NBlogTop\.naver$/, /^\/[A-Za-z0-9_-]+$/]
+    'blog.naver.com': [/^\/NBlogTop\.naver$/, /^\/[A-Za-z0-9_-]{1,64}$/]
   };
   const REFERER = {
     'm.blog.naver.com': 'https://m.blog.naver.com/',
@@ -16,7 +17,10 @@ await (async () => {
   const host = ARGS.host;
   const path = ARGS.path;
   if (typeof host !== 'string' || !Object.prototype.hasOwnProperty.call(ALLOWED, host)) throw new Error('Unsupported host');
-  if (typeof path !== 'string' || !ALLOWED[host].some(pattern => pattern.test(path))) throw new Error('Unsupported reading route');
+  // Reject traversal before matching: fetch() normalizes "/api/../PostWrite.naver" on its way out.
+  if (typeof path !== 'string' || !path.startsWith('/') || path.startsWith('//') ||
+      /\.\.|\\|%2e|%2f|%5c/i.test(path) ||
+      !ALLOWED[host].some(pattern => pattern.test(path))) throw new Error('Unsupported reading route');
   if (ARGS.query !== undefined && (typeof ARGS.query !== 'string' || /[#\\]/.test(ARGS.query))) throw new Error('Unsupported query');
   const accept = ARGS.accept === 'html'
     ? 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'

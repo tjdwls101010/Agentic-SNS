@@ -8,11 +8,15 @@ from ._errors import NaverBlogError
 HOSTS = {'blog.naver.com', 'm.blog.naver.com', 'www.blog.naver.com'}
 # Numeric-only blog ids exist, so this cannot exclude digits; log numbers vary in length.
 BLOG_ID = r'[A-Za-z0-9_-]{1,64}'
-LOG_NO = r'[0-9]{1,20}'
+# Naver has never published a log-number width and it has varied, so length is not a format
+# claim here; 40 digits is only a bound on what a single identifier may be.
+LOG_NO = r'[0-9]{1,40}'
 # Routes that look like a blog id but are Naver's own pages.
 RESERVED = {'postview.naver', 'postlist.naver', 'nblogtop.naver', 'feedlist.naver', 'buddylist.naver',
             'mobilerrorview.naver', 'mobileerrorview.naver', 'prologue.naver', 'guestbook.naver',
             'sectionlist.naver', 'postwrite.naver', 'notice', 'admin', 'section', 'api', 'ajax'}
+# The reserved routes that carry a readable target in their query; the rest are refused outright.
+READABLE_ROUTES = {'postview.naver', 'postlist.naver', 'nblogtop.naver', 'prologue.naver'}
 
 
 @dataclass
@@ -64,11 +68,15 @@ def parse_target(value, kind):
     blog_id = query.get('blogId', '')
     log_no = query.get('logNo', '')
     category = query.get('categoryNo')
+    parts = [part for part in text.split('/') if part]
+    # The path is checked even when the query already names the target: a query is not a
+    # licence to visit /PostWrite.naver, and a route this reader cannot read is refused whole.
+    if parts and parts[0].lower() in RESERVED:
+        if parts[0].lower() not in READABLE_ROUTES or len(parts) > 1:
+            raise NaverBlogError(2, 'This Naver Blog route is outside the reading surface.',
+                                 'Pass a blog id, id/logNo, or a blog.naver.com post URL.')
+        parts = []
     if not blog_id:
-        parts = [part for part in text.split('/') if part]
-        if parts and parts[0].lower() in RESERVED:
-            # PostView.naver and friends carry their identity in the query, which is already read.
-            parts = []
         if len(parts) == 1 and re.fullmatch(BLOG_ID, parts[0]):
             blog_id = parts[0]
         elif len(parts) == 2 and re.fullmatch(BLOG_ID, parts[0]) and re.fullmatch(LOG_NO, parts[1]):
@@ -76,6 +84,16 @@ def parse_target(value, kind):
         elif parts:
             raise NaverBlogError(2, 'This Naver Blog route is outside the reading surface.',
                                  'Pass a blog id, id/logNo, or a blog.naver.com post URL.')
+    elif len(parts) > 1 or (parts and not re.fullmatch(BLOG_ID, parts[0])):
+        raise NaverBlogError(2, 'This Naver Blog route is outside the reading surface.',
+                             'Pass a blog id, id/logNo, or a blog.naver.com post URL.')
+    elif parts and parts[0] != blog_id:
+        # The address names one blog and its query another; guessing which was meant is worse.
+        raise NaverBlogError(2, 'This URL names two different blogs.',
+                             f'Pass just one: {parts[0]} or {blog_id}.')
+    if category is not None and not re.fullmatch(r'[0-9]{1,10}', category):
+        raise NaverBlogError(2, 'A category number is digits only.',
+                             'Pass --category with the number shown by the blog command.')
     if not blog_id or not re.fullmatch(BLOG_ID, blog_id):
         raise NaverBlogError(2, f'Expected a Naver Blog {kind} id or URL.')
     if log_no and not re.fullmatch(LOG_NO, log_no):

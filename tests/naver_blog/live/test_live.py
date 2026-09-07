@@ -36,7 +36,8 @@ def test_the_neighbour_feed_ignores_its_page_size_exactly_as_recorded(live_budge
     transport = Transport(4)
     small = transport.get('buddy_feed', countPerPage=3)['result']['buddyPostList']
     large = transport.get('buddy_feed', countPerPage=30)['result']['buddyPostList']
-    assert [item['logNo'] for item in small] == [item['logNo'] for item in large]
+    # The set, not the order: a neighbour posting between the two reads would reorder them.
+    assert {item['logNo'] for item in small} == {item['logNo'] for item in large}
 
 
 def test_the_feed_page_still_carries_the_viewer_link_login_detection_relies_on(live_budget):

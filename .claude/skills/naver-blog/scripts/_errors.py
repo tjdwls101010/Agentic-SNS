@@ -23,16 +23,22 @@ _FORM_SECRET = re.compile(r'\b(' + _KEYS + r')\s*[:=]\s*[^\s;&"\']+', re.I)
 
 
 class NaverBlogError(Exception):
-    def __init__(self, code, message, fix=None, error=None):
+    def __init__(self, code, message, fix=None, error=None, reason=None):
         super().__init__(message)
         self.code = code
+        # Naver's own word for what happened, kept raw so an unfamiliar one can be reported.
+        self.reason = reason
+        # Results that arrived alongside a partial failure; a restriction is not an empty shelf.
+        self.payload = None
         self.error = error or {2: 'arguments', 3: 'aside', 4: 'login', 5: 'blocked', 6: 'transient',
                                7: 'empty', 8: 'partial', 9: 'unavailable'}.get(code, 'failure')
         self.message = message
         self.fix = fix or _FIXES.get(code, 'Check the command with --help.')
 
     def as_dict(self):
-        return {'ok': False, 'error': self.error, 'code': self.code, 'message': self.message, 'fix': self.fix}
+        payload = {'ok': False, 'error': self.error, 'code': self.code,
+                   'message': self.message, 'fix': self.fix}
+        return payload | ({'reason': self.reason} if self.reason else {})
 
 
 def scrub(value):

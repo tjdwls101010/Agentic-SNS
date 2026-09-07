@@ -3,7 +3,8 @@ import re
 
 import pytest
 
-from naver_blog_skill._api import ALLOWED, OPERATIONS, PATH_KEYS, REFERER, SEARCH_CEILING, build, operation
+from naver_blog_skill._api import (ALLOWED, OPERATIONS, PATH_KEYS, REFERER, SEARCH_CEILING,
+                                   allowed_path, build, operation)
 from naver_blog_skill._errors import NaverBlogError
 
 
@@ -95,7 +96,15 @@ def test_every_host_has_a_referer_and_a_path_allowlist():
     hosts = {spec.host for spec in OPERATIONS.values()}
     assert hosts <= set(REFERER) and hosts <= set(ALLOWED)
     for spec in OPERATIONS.values():
-        assert any(spec.path.startswith(prefix) for prefix in ALLOWED[spec.host]), spec.op
+        assert allowed_path(spec.host, spec.path), spec.op
+
+
+def test_the_python_guard_and_the_browser_snippet_share_one_allow_table(path_table):
+    # js/test_fetch.js reads the same file; a rule added on one side alone fails on the other.
+    for host, path in path_table['allow']:
+        assert allowed_path(host, path), f'{host}{path}'
+    for host, path in path_table['deny']:
+        assert not allowed_path(host, path), f'{host}{path}'
 
 
 def test_building_a_request_fills_the_path_and_the_query():

@@ -8,11 +8,11 @@ restriction outranks an empty list, because reporting the weaker one hides the s
 """
 import json
 import re
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import parse_qsl, urljoin, urlsplit
 
 from ._aside import run_snippet
-from ._api import ALLOWED, build
-from ._budget import Budget, cache_dir, set_blocked
+from ._api import allowed_path, build
+from ._budget import Budget, set_blocked
 from ._errors import NaverBlogError
 
 XSSI = ")]}',"
@@ -28,8 +28,14 @@ def drift(message, fix=None):
 
 
 def at(value, path):
-    """Read a declared leaf path; a missing one is drift, never an empty result."""
+    """Read a declared leaf path. A `field[]` segment fans out over a list of objects."""
     for key in path.split('.'):
+        if key.endswith('[]'):
+            branch = at(value, key[:-2])
+            if not isinstance(branch, list):
+                return None
+            rest = path.split(key + '.', 1)
+            return [at(item, rest[1]) for item in branch] if len(rest) > 1 else branch
         if not isinstance(value, dict) or key not in value:
             return None
         value = value[key]
@@ -80,8 +86,13 @@ def classify(spec, response, *, expect=None):
     """Return the parsed payload, or raise. `expect` names identifiers the answer must match."""
     status, body = response['status'], response.get('body', '')
     location = response.get('location') or ''
-    final = urlsplit(response.get('url') or '')
-    landing = (location + ' ' + (final.netloc + final.path)).lower()
+    # An exact host check, so a lookalike domain ending in nid.naver.com.example is not a login.
+    hosts, paths = set(), set()
+    for candidate in (location, response.get('url') or ''):
+        if candidate:
+            parsed = urlsplit(urljoin('https://' + spec.host, candidate))
+            hosts.add((parsed.hostname or '').lower())
+            paths.add(parsed.path.lower())
 
     # 1. Transport failure: nothing below can read a body that never arrived intact.
     if status >= 500:
@@ -93,7 +104,7 @@ def classify(spec, response, *, expect=None):
                              'Stop requests for 30 minutes; this block expires on its own.', error='rate_limit')
 
     # 3. Login. An explicit hop to the login host counts for every command.
-    if 'nid.naver.com' in landing or '/nidlogin' in landing:
+    if 'nid.naver.com' in hosts or any(path.startswith('/nidlogin') for path in paths):
         raise NaverBlogError(4, 'Naver login is required.')
 
     payload, parse_failed = None, False
@@ -114,16 +125,19 @@ def classify(spec, response, *, expect=None):
             if missing[1] == 'noPost':
                 raise NaverBlogError(9, 'That post is gone, private, or buddy-only.',
                                      'Check the post number; deleted and closed posts answer alike.',
-                                     error='not_exist_post')
+                                     error='not_exist_post', reason='noPost')
             # Any other errorType has never been seen; naming it beats guessing what it means.
             raise NaverBlogError(6, f'Naver returned an unrecognized error page ({missing[1]}).',
-                                 'Open the post in Aside once and report the errorType.', error='transient')
+                                 'Open the post in Aside once and report the errorType.',
+                                 error='transient', reason=missing[1])
     if status == 403 and code == 'not_blog_owner':
         raise NaverBlogError(9, 'This surface belongs to its blog owner only.',
-                             'Read public-buddies instead, or pass your own blog id.', error='owner_only')
+                             'Read public-buddies instead, or pass your own blog id.',
+                             error='owner_only', reason='owner_only')
     if code in MISSING:
         raise NaverBlogError(9, 'That blog or post does not exist, or is not readable.',
-                             'Check the blog id; a domain address resolves to a different id.', error=code)
+                             'Check the blog id; a domain address resolves to a different id.',
+                             error=code, reason=code)
 
     # 5. Arguments the CLI should have refused before spending a request.
     if code in BAD_ARGUMENT:
@@ -137,8 +151,9 @@ def classify(spec, response, *, expect=None):
         raise NaverBlogError(6, f'Naver returned HTTP {status}.', error='transient')
     if spec.accept == 'html':
         return body
-    if parse_failed:
-        raise NaverBlogError(6, 'Naver returned incomplete or non-JSON data.', error='transient')
+    if parse_failed or not isinstance(payload, dict):
+        # A list or a bare null is valid JSON and still not an envelope this reader can read.
+        raise NaverBlogError(6, 'Naver returned incomplete or unrecognized data.', error='transient')
     if code:
         # Includes every CBOX code: 3300 also comes from a wrong pool, so it is a contract error.
         raise drift(f'Naver reported {code or "an unnamed failure"}: {message[:120]}')
@@ -151,25 +166,30 @@ def classify(spec, response, *, expect=None):
         raise drift('Expected an object at ' + spec.leaf)
     for path, wanted in (expect or {}).items():
         got = at(payload, path)
-        if got is not None and str(got) != str(wanted):
-            raise drift(f'Naver answered about {got}, not the requested {wanted}.')
+        # A list path (result.commentList[].objectId) must have every item agree.
+        values = got if isinstance(got, list) else [got]
+        for value in values:
+            if value is not None and str(wanted) not in str(value).split('_'):
+                if str(value) != str(wanted):
+                    raise drift(f'Naver answered about {value}, not the requested {wanted}.')
 
     # 7. Policy restriction. Results that did arrive are kept; the restriction is reported.
     restricted = _restricted(payload)
     if restricted:
-        raise NaverBlogError(8, 'Naver restricted this query (' + ', '.join(sorted(set(restricted))) + ').',
-                             'Rephrase the keyword; adult, forbidden and shielded queries answer this way.',
-                             error='query_restricted')
+        error = NaverBlogError(8, 'Naver restricted this query (' + ', '.join(sorted(set(restricted))) + ').',
+                               'Rephrase the keyword; adult, forbidden and shielded queries answer this way.',
+                               error='query_restricted')
+        # Whatever did arrive is carried on the error: a restriction is not an empty shelf.
+        error.payload = payload
+        raise error
     return payload
 
 
 def safe_location(host, path, location):
     """A redirect may only move within the hosts and paths this reader already allows."""
     url = urlsplit(urljoin(f'https://{host}{path}', location))
-    if url.scheme != 'https' or url.hostname not in ALLOWED:
-        raise drift('A redirect left the Naver Blog hosts this reader allows.')
-    if not any(url.path.startswith(prefix) for prefix in ALLOWED[url.hostname]):
-        raise drift('A redirect left the reading surface.')
+    if url.scheme != 'https' or not allowed_path(url.hostname or '', url.path):
+        raise drift('A redirect left the reading surface this reader allows.')
     return url
 
 
@@ -181,24 +201,39 @@ class Transport:
     def get(self, name, *, page=None, expect=None, unblock=False, **values):
         spec, path, query = build(name, page=page, **values)
         response = self.fetch(spec, path, query, unblock=unblock)
+        # classify first: a redirect to the login host is a login error, not an unexpected hop.
+        payload = classify(spec, response, expect=self._identity_of(spec, values, expect))
         if 300 <= response['status'] < 400:
             raise drift('Naver redirected a request that should not redirect.')
-        return classify(spec, response, expect=expect)
+        return payload
+
+    @staticmethod
+    def _identity_of(spec, values, expect):
+        """The ledger names the field an answer must agree with; nobody has to remember to pass it."""
+        checks = dict(expect or {})
+        if spec.identity and spec.identity.startswith('result.'):
+            wanted = values.get('logNo') if 'commentList' in spec.identity else values.get('blogId')
+            if wanted is not None:
+                checks.setdefault(spec.identity, wanted)
+        return checks
 
     def redirect_of(self, name, **values):
         """Resolve one hop and return the canonical blog id a domain address points at."""
         spec, path, query = build(name, **values)
         response = self.fetch(spec, path, query)
+        # classify runs on every status: a block, a login wall or a server fault here is
+        # that, not "no such blog", and a login hop is a 3xx like any other.
+        classify(spec, response)
         location = response.get('location') or ''
-        if not (300 <= response['status'] < 400) or not location:
+        if not location:
             raise NaverBlogError(9, 'That blog id does not exist and is not a domain address.',
                                  'Open the blog once in Aside and pass the id in its address bar.',
                                  error='not_exist_blog')
         url = safe_location(spec.host, path, location)
-        match = re.search(r'blogId=([A-Za-z0-9_-]{1,64})', url.query)
-        if not match:
+        canonical = dict(parse_qsl(url.query)).get('blogId', '')
+        if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', canonical):
             raise drift('A domain address redirected without naming a blog id.')
-        return match[1]
+        return canonical
 
     def fetch(self, spec, path, query, *, unblock=False):
         with self.budget.request(unblock=unblock):
@@ -210,6 +245,4 @@ class Transport:
             self.fetched_bytes += len(response.get('body', '').encode())
             if response['status'] == 429:
                 set_blocked()
-            if unblock and response['status'] == 200:
-                (cache_dir() / 'blocked.json').unlink(missing_ok=True)
             return response

@@ -16,7 +16,8 @@ from pathlib import Path
 from ._errors import NaverBlogError
 
 # 성진: 0.5s and 120/10min are local estimates from 360 anonymous and ~100 logged-in requests
-# without incident, not an allowance Naver granted; lower them if a 429 or an auth page appears.
+# without incident, not an allowance Naver granted. No 429 or auth page has ever been observed
+# here, so these are a precaution rather than a measured limit; lower them if either appears.
 WINDOW, WINDOW_LIMIT, MIN_GAP, JITTER = 600, 120, 0.5, 0.3
 
 
@@ -91,9 +92,22 @@ def set_blocked(reason='rate_limit'):
     write_state('blocked.json', {'reason': reason, 'blocked_at': now, 'expires_at': now + 1800})
 
 
-def clear_blocked():
+def blocked_since():
+    """When the current block was recorded, so a newer one is not cleared by an older probe."""
     try:
-        (cache_dir() / 'blocked.json').unlink(missing_ok=True)
+        return json.loads((cache_dir() / 'blocked.json').read_text()).get('blocked_at')
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+def clear_blocked(*, only_if_recorded_at=None):
+    """Clear the block this probe was verifying, never one another process wrote meanwhile."""
+    path = cache_dir() / 'blocked.json'
+    try:
+        if only_if_recorded_at is not None and blocked_since() != only_if_recorded_at:
+            return False
+        path.unlink(missing_ok=True)
+        return True
     except OSError:
         raise NaverBlogError(5, 'Account block could not be cleared.',
                              'Restore access to NAVER_BLOG_HOME.') from None
