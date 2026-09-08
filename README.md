@@ -100,7 +100,7 @@ Login credentials stay in Aside, but this is **not a promise that all session da
 
 Requests count against your real SNS account. Platform rate limits, login challenges, and changes to website endpoints can interrupt reads. Check the reported budget and stop reason, and resolve a challenge in Aside before trying again.
 
-Maintenance is **best effort**, without response or fix deadlines. The first X profile → posts → replies path was checked on macOS 26.5 (Apple Silicon), Python 3.12.8, and Aside CLI 1.26.810.1915 on September 8, 2026. This is a tested environment, not a guarantee for every platform or dependency version. The [CI workflow](.github/workflows/test.yml) checks offline behavior; live account checks are separate.
+Maintenance is **best effort**, without response or fix deadlines. The first X profile → posts → replies path was checked on macOS 26.5 (Apple Silicon), Python 3.12.8, and Aside CLI 1.26.810.1915 on September 8, 2026. This is a tested environment, not a guarantee for every platform or dependency version. The [verification workflow](.github/workflows/test.yml) defines the offline checks; live account checks are separate.
 
 New SNS skills, features, bug fixes, and documentation improvements are welcome. See [Contributing](CONTRIBUTING.md) for the development setup and verification commands. Report sensitive issues through [GitHub private vulnerability reporting](https://github.com/tjdwls101010/Agentic-SNS/security/advisories/new).
 
