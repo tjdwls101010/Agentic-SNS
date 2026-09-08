@@ -1,23 +1,109 @@
 # Agentic SNS
 
-로그인된 브라우저로 소셜 네트워크를 읽고 탐색하는 독립 스킬 모음입니다.
+**Skills that let Claude Code and Codex explore social networks freely.**
 
-| 스킬 | 하는 일 |
+Give your agent a question. It can search, open posts and replies, inspect profiles, and follow the next useful link across X, Reddit, Facebook, Threads, and Naver Blog. The skills use your logged-in [Aside](https://aside.com/) browser through CLI commands and text results, so exploration does not require interpreting screenshots and clicking through each page.
+
+Try asking: **“Explore NASA's recent X posts. Open a post that interests you, read its replies, and summarize what you found with links.”** The agent chooses its next command from the results. For example, a profile lookup returns this real output row:
+
+```text
+$ python3 .claude/skills/twitter/scripts/twitter.py about @NASA
+@NASA (NASA ✓gov) · followers 92.4M · following 117 · posts 74.3K · joined 2007-12 · bio: "Making the seemingly impossible, possible. ✨" · url: "https://x.com/NASA"
+```
+
+Captured September 8, 2026; request-budget header omitted. Live content and counts change. [See the profile → posts → replies commands](docs/usage.md#follow-a-result).
+
+**Before you install:** macOS 15+, Python 3.11+, Aside with an account and the relevant SNS login, and a locally running Claude Code or Codex. These are **read-only** skills; they do not publish, reply, like, or follow. Your agent's usual subscription/API costs still apply. Maintenance is best effort; no numerical speed or token-savings claims are made.
+
+**[Start with Aside installation](#get-started)** → clone this repo → make your first request.
+
+## Get started
+
+### 1. Prepare Aside and your accounts
+
+1. [Download Aside](https://aside.com/download), open it, and sign in or create an Aside account. Aside's [setup guide](https://docs.aside.com/help/get-started) requires macOS 15 or later.
+2. Open the SNS you want to explore in Aside and log in. Start with [X](https://x.com/) to follow the example below; you do not need accounts on all five platforms.
+3. Install the Aside CLI from **Aside Settings → Developer**. The official [CLI instructions](https://docs.aside.com/help/developers) also provide a terminal installer.
+4. Check the CLI and Python in the terminal that will run your agent:
+
+```bash
+aside --version
+aside account status u0
+python3 --version
+```
+
+Expected: a CLI version, a signed-in Aside account at `u0`, and Python 3.11 or later. The bundled skills explicitly use **Aside account `u0`**; changing the CLI's default account does not change this. Log into your SNS accounts in that Aside account's browser.
+
+Aside lists a [Free plan and paid plans](https://aside.com/pricing). Its public pricing page does not specify REPL access by tier; check your account's developer access before relying on the Free plan. The skills do not require an SNS developer API key. Claude Code or Codex must already be installed and authenticated on the same Mac.
+
+### 2. Get the skills
+
+```bash
+git clone https://github.com/tjdwls101010/Agentic-SNS.git
+cd Agentic-SNS
+```
+
+There is no Python package to install: each skill bundles its own scripts and uses the Python standard library at runtime. Git is needed for the clone command.
+
+Start `claude` or `codex` from this directory. Claude Code discovers `.claude/skills`; Codex discovers `.agents/skills`. This repository's `.agents` and `.codex` symlinks both point to `.claude`, so the two hosts share one source without copying skills. See the official [Claude Code](https://code.claude.com/docs/en/skills#where-skills-live) and [Codex](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) skill documentation. To use the skills from other working directories, see [individual skill installation](docs/usage.md#use-the-skills-in-other-projects).
+
+### 3. Make your first request
+
+In Claude Code or Codex, ask:
+
+```text
+Read @NASA's X profile using the twitter skill and give me its bio and profile link.
+```
+
+Expected: the agent invokes the Twitter CLI and answers with NASA's bio and `https://x.com/NASA`. If automatic skill selection does not occur, use `/twitter` in Claude Code or `$twitter` in Codex with the same request.
+
+You can check the browser connection independently of the agent:
+
+```bash
+python3 .claude/skills/twitter/scripts/twitter.py about @NASA
+```
+
+A successful read prints the profile row shown above, preceded by request and budget information. Then try the longer exploration request at the top of this README. If a command fails, follow its `fix`; [connection and login troubleshooting](docs/usage.md#troubleshooting) covers the common cases.
+
+## What your agent can explore
+
+| Skill | Available reading and navigation |
 |---|---|
-| [twitter](.claude/skills/twitter/SKILL.md) | Aside에 로그인된 X 계정으로 홈·글과 답글·프로필·검색·관계망·북마크·트렌드·리스트·커뮤니티를 읽고, 이어읽기와 쿼리 복구를 제공합니다. |
-| [reddit](.claude/skills/reddit/SKILL.md) | Aside에 로그인된 Reddit 계정으로 홈·커뮤니티·글·댓글·사용자·검색·구독·저장·추천을 읽고, 댓글 캐시와 재개 가능한 파일 수집을 제공합니다. |
-| [facebook](.claude/skills/facebook/SKILL.md) | Aside에 로그인된 Facebook 계정으로 피드·글·댓글·프로필·그룹을 읽고, 페이지 단위 수집과 쿼리 복구를 수행합니다. |
-| [threads](.claude/skills/threads/SKILL.md) | Aside에 로그인된 Threads 계정으로 피드·글·답글·프로필·관계·검색·좋아요·저장을 읽고, 직접 답글의 미수집 추정치와 로컬 예산을 구분합니다. |
-| [naver-blog](.claude/skills/naver-blog/SKILL.md) | Aside에 로그인된 네이버 계정으로 검색·블로그·글 본문·댓글·이웃·주제 디렉터리를 읽고, 믿을 수 없는 서버 총수와 실제로 읽은 수를 구분하며 본문 파싱 커버리지를 출력에 드러냅니다. |
+| [twitter](.claude/skills/twitter/SKILL.md) | X feeds, posts and replies, profiles, search, followers/following, bookmarks/likes, trends, lists, and communities; continuation handles and query recovery. |
+| [reddit](.claude/skills/reddit/SKILL.md) | Feeds, subreddits, posts, comment threads, users, search, subscriptions, saved/upvoted posts; cached comment continuation and resumable exports. |
+| [facebook](.claude/skills/facebook/SKILL.md) | Feeds, posts, comments, profiles and About fields, search, and groups; paginated collection and query recovery. |
+| [threads](.claude/skills/threads/SKILL.md) | Feeds, posts with parent chains and replies, profiles, search, relationships, liked/saved posts; reports reply coverage and local request budgets. |
+| [naver-blog](.claude/skills/naver-blog/SKILL.md) | Search, blog profiles and categories, full posts, comments, neighbor feeds/lists, topic directories, and blogs of the month; reports extraction coverage and distinguishes observed counts from server totals. |
 
-각 스킬은 자신의 `scripts/`만으로 실행됩니다. `.codex`는 `.claude`를 가리키므로 두 환경에서 같은 원본을 사용합니다. 하네스 결정과 검증 기록은 [.claude/harness-spec.md](.claude/harness-spec.md)에 있습니다.
+Each skill includes instructions for interpreting that platform's output. URLs and handles let the agent open the next relevant target; continuation commands let it read further when the question calls for it. `--json` supplies structured output, and `--out` supports larger local collections where available. [CLI reference and platform notes](docs/usage.md) cover the details.
 
-Facebook CLI는 `python3 .claude/skills/facebook/scripts/facebook.py --help`로 시작합니다. 런타임은 Python 3.11+ 표준 라이브러리와 Aside만 사용합니다. 테스트는 `python3 -m pytest tests/`, 실제 브라우저를 읽는 검증은 `python3 -m pytest -m live tests/facebook/live/`로 구분합니다. 수집 파일과 브라우저 캡처는 커밋하지 않습니다.
+“Explore freely” means choosing a path through the implemented read operations. It does not mean every page or every reply is accessible. For example, X does not expand “More replies” branches or article bodies; Threads post reads do not paginate further sibling replies; Naver's neighbor feed has no further page. Commands report their stopping conditions so the agent can describe what it actually read.
 
-Reddit CLI는 `python3 .claude/skills/reddit/scripts/reddit.py --help`로 시작합니다. 테스트는 `python3 -m pytest tests/reddit/`, 실계정 검증은 누적 30요청 가드를 둔 `python3 -m pytest -m live tests/reddit/live/`입니다. 구현 결정과 단계별 검증은 [.claude/plans/reddit 스킬 구현 계획.md](.claude/plans/reddit%20스킬%20구현%20계획.md)에 기록합니다.
+## Why CLI and text?
 
-Threads CLI는 `python3 .claude/skills/threads/scripts/threads.py --help`로 시작합니다. 테스트는 `python3 -m pytest tests/threads/`, 명시적으로 선택하는 실계정 검증은 `python3 -m pytest -m live tests/threads/live/`입니다. 스냅샷·완료 기준·구현 기록은 [.claude/plans/threads 스킬 구현 계획.md](.claude/plans/threads%20스킬%20구현%20계획.md)에 통합했습니다.
+The agent works with named operations and reusable URLs instead of repeatedly interpreting visual controls. The CLI handles fetching, parsing, pagination, and output formatting; the agent decides what to investigate next. This is the basis for the intended efficiency benefit. There is no published benchmark comparing latency or token use with computer-use.
 
-Twitter CLI는 `python3 .claude/skills/twitter/scripts/twitter.py --help`로 시작합니다. 구현 범위와 검증 결과는 [.claude/plans/twitter 스킬 구현 계획.md](.claude/plans/twitter%20스킬%20구현%20계획.md)에 기록합니다.
+| Approach | How you use it | Tradeoff |
+|---|---|---|
+| Agentic SNS | Claude Code/Codex skills with CLI and text access to five platforms through Aside. | Requires Aside on a Mac and a supported read operation; no posting actions. |
+| Screenshot/click computer-use | An agent navigates visible pages and controls. | Can reach UI workflows outside these CLIs; must interpret the page and operate its controls. |
+| [twitter-cli](https://github.com/public-clis/twitter-cli) | X CLI with an agent skill; browser-cookie or environment-variable authentication. | Focuses on X and also supports write actions; supports browsers other than Aside. |
+| [agent-twitter-client](https://github.com/JacobFV/agent-twitter-client) | JavaScript library for integrating X reads and writes into an application. | Requires application code and credential/cookie setup. |
 
-naver-blog CLI는 `python3 .claude/skills/naver-blog/scripts/naver_blog.py --help`로 시작합니다. 네이버에는 회전하는 토큰이 없어 헤더 계약이 호스트별 referer 하나뿐이지만, 대신 서버가 자기 총수를 모르는 표면이 많아 종료 판정을 CLI가 책임집니다. 테스트는 `python3 -m pytest tests/naver_blog/`, 실계정 검증은 누적 30요청 가드를 둔 `python3 -m pytest -m live tests/naver_blog/live/`입니다. 엔드포인트 스냅샷과 단계별 기록은 [.claude/plans/naver-blog 스킬 구현 계획.md](.claude/plans/naver-blog%20스킬%20구현%20계획.md)에 있고, `tests/naver_blog/test_api.py`가 그 스냅샷과 코드의 장부를 직접 대조합니다.
+The two X projects also work without an official Twitter API key. That is not a unique advantage of Agentic SNS. Comparisons reflect their READMEs checked September 8, 2026.
+
+## Accounts, data, and maintenance
+
+These scripts run with your coding agent's local execution permissions. They make network requests through Aside using the logged-in SNS session, then return content to your agent. What the agent reads can enter its model context and conversation history under your agent provider's settings.
+
+Login credentials stay in Aside, but this is **not a promise that all session data stays in the browser**: the X skill caches a CSRF token and viewer identity locally. Other caches and exports can hold posts, profiles, private saved items, and continuation state. Keep them out of Git and delete task data when it is no longer needed. [Security and data handling](SECURITY.md) explains the boundary.
+
+Requests count against your real SNS account. Platform rate limits, login challenges, and changes to website endpoints can interrupt reads. Check the reported budget and stop reason, and resolve a challenge in Aside before trying again.
+
+Maintenance is **best effort**, without response or fix deadlines. The first X profile → posts → replies path was checked on macOS 26.5 (Apple Silicon), Python 3.12.8, and Aside CLI 1.26.810.1915 on September 8, 2026. This is a tested environment, not a guarantee for every platform or dependency version. The [verification workflow](.github/workflows/test.yml) defines the offline checks; live account checks are separate.
+
+New SNS skills, features, bug fixes, and documentation improvements are welcome. See [Contributing](CONTRIBUTING.md) for the development setup and verification commands. Report sensitive issues through [GitHub private vulnerability reporting](https://github.com/tjdwls101010/Agentic-SNS/security/advisories/new).
+
+## License
+
+[MIT](LICENSE). The license covers this project's code and documentation; it does not grant rights to third-party SNS content retrieved by the tools.
