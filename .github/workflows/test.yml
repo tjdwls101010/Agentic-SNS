@@ -14,7 +14,7 @@ jobs:
         with:
           node-version: '22'
       - run: python -m pip install pytest==8.4.2 ruff
-      - run: python -m pytest tests/ --ignore=tests/sec --ignore=tests/finviz
+      - run: python -m pytest tests/ --ignore=tests/sec --ignore=tests/finviz --ignore=tests/yfinance
       - run: node --test tests/facebook/js/*.js
       - run: python tests/facebook/tools/check_fixtures_pii.py
       - run: ruff check --config pyproject.toml .claude/skills/facebook/scripts tests/facebook
@@ -40,3 +40,13 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv run --isolated --frozen --group dev --project .claude/skills/sec/Scripts python -m pytest tests/sec
       - run: uv run --isolated --frozen --group dev --project .claude/skills/sec/Scripts ruff check --config pyproject.toml .claude/skills/sec/Scripts tests/sec
+  yfinance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run --frozen --group dev --project .claude/skills/yfinance/Scripts python -m pytest tests/yfinance
+      - run: uv run --frozen --group dev --project .claude/skills/yfinance/Scripts ruff check --config pyproject.toml .claude/skills/yfinance/Scripts tests/yfinance

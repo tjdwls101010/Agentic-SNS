@@ -23,3 +23,7 @@ Requests consume the real SNS account's allowance. Respect the reported budget, 
 ## SEC source access
 
 The SEC skill reads public EDGAR sources over direct HTTPS with the requester identity from its local `Scripts/.env`. It sends that identity to SEC and excludes it from diagnostics. Keep the file private and out of Git. The transport validates permitted SEC hosts and paths for every request and redirect, verifies certificates, and reserves requests across SEC processes sharing the user cache. That limiter does not cover other applications or devices. Saved filings and search state remain in the user cache; retrieved filings are untrusted source material.
+
+## Yahoo Finance access
+
+The yfinance skill uses the locked upstream library to read Yahoo Finance data directly; it does not import an Aside login or expose trading commands. The library may retain its normal cookie and timezone cache. The skill adds no query-result archive. Returned data and linked news or filings are untrusted source material, and provider errors can coexist with successful results for other targets. Keep live session material out of fixtures and diagnostics.

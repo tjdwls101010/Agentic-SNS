@@ -24,7 +24,7 @@ Keep the requested scope bounded. A displayed item limit is not necessarily a li
 
 ## Use the skills in other projects
 
-Each skill is self-contained: copy its complete directory. For SEC this includes `Scripts/` with its `pyproject.toml` and `uv.lock`; for SNS skills it includes `scripts/`. Keep the cloned repository if you link to it.
+Each skill is self-contained: copy its complete directory. For SEC and yfinance this includes `Scripts/` with its `pyproject.toml` and `uv.lock`; for SNS skills it includes `scripts/`. Keep the cloned repository if you link to it.
 
 From the clone's root, install the Twitter skill for all your projects in the host you use. Before running a link command, check whether the destination already exists; keep any existing installation rather than creating a link inside it.
 
@@ -47,7 +47,7 @@ mkdir -p "$HOME/.agents/skills"
 ln -s "$PWD/.claude/skills/twitter" "$HOME/.agents/skills/twitter"
 ```
 
-For another skill, replace both occurrences of `twitter` in the selected command with `reddit`, `facebook`, `threads`, `naver-blog`, or `sec`. Alternatively, copy the complete skill directory into a destination that does not already exist. Restart your agent if it does not discover the installation.
+For another skill, replace both occurrences of `twitter` in the selected command with `reddit`, `facebook`, `threads`, `naver-blog`, `sec`, or `yfinance`. Alternatively, copy the complete skill directory into a destination that does not already exist. Restart your agent if it does not discover the installation.
 
 For project-only installation, use that project's `.claude/skills` or `.agents/skills` directory instead. After installation outside the clone, resolve CLI commands relative to the installed `SKILL.md`, rather than to your current working directory. `${CLAUDE_SKILL_DIR}` in a skill denotes that skill directory; hosts that do not substitute it must use the actual absolute path.
 
@@ -66,6 +66,19 @@ uv run --isolated --frozen --project .claude/skills/sec/Scripts python .claude/s
 Preserve an existing `.env` instead of overwriting it. The file is Git-ignored and its identity is sent to SEC for request identification; it is not an API key or SEC login. Help and `schema` work without it. Use command-specific help for settings diagnosis, connection checks and recovery.
 
 For example, ask: “Find Microsoft's latest annual filing and read the end of its risk factors, citing the original source.” The skill chooses company, filing and document navigation from the question. [SEC guidance](../.claude/skills/sec/SKILL.md) explains how to interpret periods, amendments, tables and incomplete reads. Arguments and output contracts live in the CLI's help and `schema`.
+
+## Yahoo Finance
+
+Install `uv` and Python 3.11+ and copy the complete yfinance skill directory if using it outside this clone. The first locked run installs its dependencies; no Aside setup or API key is required.
+
+```bash
+uv run --frozen --project .claude/skills/yfinance/Scripts python .claude/skills/yfinance/Scripts/yfinance_cli.py --help
+uv run --frozen --project .claude/skills/yfinance/Scripts python .claude/skills/yfinance/Scripts/yfinance_cli.py schema financials income
+```
+
+Ask, for example: “Find Apple's reported revenue for the latest four quarters and identify the reporting periods and currency.” The agent discovers the appropriate command and available fields, selects the query and reads its structured result. For another question it can follow returned tickers, option expirations or screener fields without writing Python integration code. [Skill guidance](../.claude/skills/yfinance/SKILL.md) explains how to interpret the result; command help and scoped `schema` own the interface.
+
+Queries always return JSON. Select periods, fields and record counts to fit the question; an oversized result returns a recovery instruction rather than silently omitted data. The skill does not maintain a result archive. Provider restrictions, incomplete datasets and upstream information loss are reported separately from successful observations. Market data and its observation time are not necessarily the same timestamp.
 
 ## CLI reference
 
