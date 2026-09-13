@@ -21,6 +21,8 @@ In zsh, expanding one variable containing a whole command does not split it into
 
 A company-name search returns candidates. Use the exchange, instrument type and identifying fields to choose the intended security; an equity, its depositary receipt and a similarly named fund are different targets. Ask when the remaining ambiguity would change the answer. Screening returns matches to particular conditions, not an independently verified census of a market.
 
+Keep returned symbols unchanged when reporting as well as querying: adding or removing punctuation can identify a different instrument.
+
 Choose datasets from the question: a statement supplies reported results, analyst estimates describe expectations, and a calendar describes events. Combine the calls the question needs rather than fetching every available dataset. Returned news and filing entries locate sources; use the appropriate reader when the answer requires the article or original filing itself.
 
 ## Interpret periods, units and adjustments

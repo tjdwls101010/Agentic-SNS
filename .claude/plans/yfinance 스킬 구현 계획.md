@@ -172,87 +172,96 @@ tests/yfinance/
 
 ## 실행 진행표
 
-TaskCreate/TaskUpdate와 도구 검색 인터페이스를 가용 도구 목록에서 확인했으나 제공되지 않아 이 표를 영속 진행 기록으로 사용한다.
+TaskCreate/TaskUpdate와 검색 인터페이스를 가용 도구 목록에서 확인했으나 제공되지 않아 이 표를 영속 진행 기록으로 사용한다.
 
 | 단계 | 상태 | 완료 판정 |
 |---|---|---|
-| 인터페이스·환경 | 완료 | 도움말·스키마 무네트워크 실행, 잠금 환경과 다른 위치 실행 확인 |
-| 기능별 TDD | 완료 | 공개 CLI에서 기능별 정상·빈 반환·대표 실패 검증 |
-| 스킬·활용 검증 | 진행 중 | 실제 조회와 Claude·Codex의 발견·조회·복구 기록 |
-| 통합 검토·전달 | 진행 중 | 리뷰 수정, 필수 검사·CI 통과, PR 머지와 그래프 갱신 |
+| 인터페이스·환경 | 완료 | 도움말·스키마의 무네트워크 실행, 잠금 환경과 다른 위치 실행 확인 |
+| 기능별 TDD | 완료 | 공개 CLI에서 정상·빈 반환·대표 실패 검증, 102개 통과 |
+| 스킬·활용 검증 | 진행 중 | 실제 조회와 두 모델의 발견·조회·복구 기록, 식별자 보고 후속 확인 |
+| 통합 검토·전달 | 진행 중 | 리뷰 수정·로컬 검사 완료, Linux CI·PR·머지·그래프 갱신 |
 
-### 구현·검토 기준
+### 구현·리뷰 기준
 
-- Principle over rail: 정해진 조회 순서 대신 선택·해석의 이유를 제공한다.
-- Interface over document: 인자·선택지·기본값·출력·오류 복구는 실행 인터페이스가 소유하며 설명을 중복하지 않는다.
+- Principle over rail: 정해진 조회 순서 대신 선택과 해석의 이유를 제공한다.
+- Interface over document: 인자·선택지·기본값·출력·복구는 실행 인터페이스가 소유한다.
 - For user, not developer: 모델이 라이브러리 구조를 공부하지 않고 데이터 목적과 반환 식별자로 다음 호출을 구성한다.
-- Dense information: 판단 근거는 보존하고 중복·개발 과정·불필요한 문서는 런타임에서 제거한다.
-- 리팩터링: 공개 CLI 회귀 검증을 유지하며 중복된 계약, 잘못된 책임 분리, 수정이 여러 파일로 번지는 결합을 검토하고 수정한다. 필요하면 신규 스킬 내부를 재작성하되 추상화 수를 품질로 판단하지 않는다.
+- Dense information: 판단 근거를 남기고 중복·개발 과정·불필요한 문서는 런타임에서 제거한다.
+- 리팩터링: 공개 CLI 검증을 유지하며 중복 계약과 잘못된 책임 분리를 수정한다. 파일 수나 추상화 수를 품질로 판단하지 않는다.
 
-### 작업 전 상태
+### 작업 범위와 기록 위치
 
-기준 커밋 23916d6, 작업 브랜치 feat/yfinance-skill. 기존 사용자 변경(.gitignore, .claude/harness-spec.md 삭제, 미추적 기획·조사 파일)은 스테이징하거나 되돌리지 않는다.
+기준 커밋은 23916d6, 작업 브랜치는 feat/yfinance-skill이다. 기존 .gitignore 변경, harness-spec 삭제, SEC 계획 이름 변경과 다른 기획·조사 파일은 이 변경에 포함하지 않는다. 구현 중 yfinance 계획 파일도 날짜 접두사 없는 현재 이름으로 정리되어 현재 경로를 유지한다.
 
-### 검증 기록 — 구현 초기
+런타임 구현 run은 20260913-205147-yfinance-runtime-8ea1이다. 구현자가 95개 테스트·Ruff·독립 위치 실행 기록을 남긴 뒤 부모가 소유권을 인계받아 리뷰 수정과 최종 검증을 수행했다. 요약 정리 대기를 줄이기 위해 실행을 중단했으므로 interrupted 상태 자체를 기능 완료의 증거로 쓰지 않는다. 최종 기준은 아래 실제 명령과 결과다.
 
-- `python3 -m pytest tests/ --ignore=tests/sec --ignore=tests/yfinance -q`: 1023 passed, 40 deselected, 241.18s. 기존 SNS 테스트 기준선이 통과했다.
-- `git diff --check`: 통과. 사용자 변경(.gitignore와 harness-spec 삭제)은 별도 보존 중이다.
-- GitHub workflow `Social skill checks`는 시작 시 disabled_manually(350663910)였다. CI 검증 단계에서 실행 상태와 결과를 별도로 기록한다.
-- 기존 graphify 실행 링크는 사라진 uv tool 환경을 가리켰다. 이전 SEC 전달 기록의 `uvx --from graphifyy` 실행 방식으로 CLI 로딩이 되는 것을 확인했다. 전역 설치나 링크를 변경하지 않았다.
-- 런타임 구현 run: 20260913-205147-yfinance-runtime-8ea1. 첫 명령 미구현 red와 scoped schema green을 보고받았으며, 최종 결과에서 실행 기록을 대조한다.
+### 변경 결정 — 실행 환경 재사용
 
-### 중간 검증
+승인 계획의 `uv --isolated`는 `uv run --frozen --project ...`로 대체한다. 같은 시점의 동일 `--help`를 실측했을 때 프로젝트 환경은 0.65초, 매번 새 격리 환경을 만드는 방식은 42.8초였다. 이 시작 지연은 일부 테스트의 30초 시간 초과와 Claude 스크리너의 420초 시간 초과로도 관측됐다.
 
-- 하네스 검사 `validate_harness.py --path . --json`: errors=0, warnings=0.
-- 문서 리뷰 20260913-210043-yfinance-skill-review-7a11: 확정 문제 없음. 런타임의 문법·JSON·실패 관측성은 별도 실행으로 확인한다.
-- 실제 가격 비교: AAPL 2026-08-17 이상/2026-08-22 미만, adjust none, Close/Volume 5행이 같은 잠금 yfinance1.7.0 직접 호출의 값·날짜와 일치했다.
-- 별도 임시 프로젝트의 가격 E2E: Claude는 Skill(yfinance)을 호출했고 Codex는 해당 SKILL.md를 로드했다. 양쪽 모두 CLI help/schema로 end-exclusive/adjust-none 조건을 찾아 AAPL·MSFT의 5거래일을 조회했다. 소스·외부 문서·임시 Python 없이 완료했다. Claude 실제 모델은 claude-opus-5[1m], Codex는 gpt-6-astra high다. 실행본 .tmp/yfinance-acceptance/claude-prices 및 run 20260913-210610-yfinance-e2e-prices-8445.
-- 카탈로그 필드·값, US 시장 상태, most_actives 3개, 시장 실적 일정 3개, AAPL offset25/limit1, technology 섹터 개요의 CLI live 조회 7개가 모두 exit0/status ok를 반환했다. 일정 next_offset은26으로 반환돼 읽은25행만큼 건너뛰지 않았다.
-- 사용자 피드백에 따라 문서 리뷰를 반복하지 않고 구현·필수 검증·집약 코드 리뷰를 병행한다.
-- 구현 중 계획 파일명이 날짜 접두사 없는 현재 이름으로 변경됐다. 진행표가 포함된 동일 문서를 확인했고 현재 경로를 유지한다. SEC/finviz 등 다른 작업의 변경은 포함하지 않는다.
+프로젝트별 가상환경과 uv.lock으로 시스템 패키지와 분리하며, `.python-version`은 검증한 Python 3.12를 선택한다. `[tool.uv] default-groups=[]`로 조회에는 개발 의존성을 요구하지 않고 테스트만 `--group dev`를 사용한다. `.venv`는 자체 ignore로 Git에서 제외된다. 이 변경은 조회 결과 저장 기능을 도입하는 것이 아니다.
 
-### 리뷰 수정과 유지보수 정리
+### 독립 리뷰와 수정
 
-코드 리뷰 20260913-211724-yfinance-code-review-9a84의 유효한 발견5개를 대조했다. 빈 필드 반환의 오류분류는 구현자가 마지막에 이미 수정했고, 나머지는 공개CLI 재현을 먼저 확인해 수정했다.
+문서 리뷰 20260913-210043-yfinance-skill-review-7a11에서는 네 프레임을 위반하는 확정 문제가 없었다. 실행 계약과의 대조는 별도 검증으로 남겼다. 코드 리뷰 20260913-211724-yfinance-code-review-9a84에서는 다음 5개를 확인했다.
 
-| 발견 | 수정과 근거 |
+| 발견 | 수정·검증 |
 |---|---|
-| 실적 날짜 누락 후 EPS/날짜 정렬 손상 | NaT 인덱스를 감지하면 데이터를 정상 반환하지 않고 upstream 오류. 짧은 페이지로 종료를 확정하지 않고 remaining=null/후보offset을 표시. review-earnings-red/green에서 2개재현 후 관련3개통과 |
-| schema/실행 기본값 이중 정의 | 고정 limit은파서에, 조건부기본값은resolve_defaults 한곳에두고schema가동일정책을계산. review-defaults-red/green 재현·통과 |
-| 빈 응답 필드 선택이invalid로변환 | 필드목록까지없는빈반환은빈상태와검증미확인을보존. 기존필드가있을때오타검증유지 |
-| 모든선택값null인데ok | 공통is_empty에서값부재를검사하고empty/7,축정보보존. 원래0은유효값. review-null-red 및 review-date-null-green(관련9개통과) |
-| 명시적빈날짜가가까운만기로대체 | None만생략으로인정,빈문자열은요청전에invalid/2. 가격·일정에도같은검증적용 |
+| 날짜 누락 후 실적 날짜와 EPS 정렬 손상 | NaT 인덱스를 감지하면 데이터를 정상 반환하지 않고 upstream 오류를 낸다. 짧은 페이지로 종료를 확정하지 않고 remaining=null과 후보 offset을 표시한다. 재현 2개 실패 → 관련 3개 통과. |
+| schema와 실행 기본값의 이중 정의 | 고정 limit은 파서에, 조건부 기본값은 resolve_defaults 한곳에 두고 schema도 같은 정책을 계산한다. 재현 실패 → 관련 2개 통과. |
+| 빈 응답에 필드 선택 시 invalid 오판 | 필드 목록까지 없는 빈 반환은 빈 상태와 필드 검증 미확인을 보존한다. 목록이 있는 경우의 오타 검증은 유지한다. |
+| 선택 값이 모두 null이어도 ok | 공통 is_empty에서 값 부재를 검사해 empty/exit 7로 표시하고 축 정보는 보존한다. 실제 0은 유효값으로 유지한다. 재현 3개 실패 → 날짜·결측 관련 9개 통과. |
+| 명시적 빈 날짜를 생략으로 처리 | None만 생략으로 인정하고 빈 문자열은 요청 전에 invalid/exit 2로 거부한다. 가격·옵션·일정에 같은 검증을 적용한다. |
 
-추가로 screen presets의 --type이무시되는사례를재현해공개Query클래스기준으로필터했다(preset-red/green, 관련2개통과). E2E에서반복된zsh명령문자열변수실패는스킬진입점에이유와직접호출/함수방법을짧게설명했다. 새저장소·참고문서·내부SDK패치는추가하지않았다.
+추가로 `screen presets --type etf`가 다른 자산의 프리셋까지 반환하는 사례를 재현하고 공개 Query 클래스 기준으로 필터했다(재현 실패 → 관련 2개 통과). E2E에서 반복된 zsh 명령 문자열 변수 실행 실패는 스킬 진입점에 이유와 직접 호출·함수 사용 방법을 짧게 설명했다. 별도 저장소·참고 문서·SDK 내부 패치는 추가하지 않았다.
 
-### 실행 환경 결정 변경 — --isolated 대체
+### 로컬 검사
 
-승인계획의 매번새환경을만드는 uv --isolated는프로젝트환경재사용으로대체한다. 같은시점의동일 --help를실측했을때프로젝트환경0.65초,isolated환경42.8초였고,새격리환경의import지연이테스트30초timeout과Claude스크리너420초timeout을일으켰다. uv --help도 --isolated는격리환경생성, --active만현재활성환경을우선한다고설명한다.
-
-실행은 `uv run --frozen --project ...`로프로젝트별가상환경을재사용한다. uv.lock은계속의존성을고정하며 `.python-version`은검증한3.12를선택한다. 프로젝트외부시스템yfinance에의존하지않고, `.venv`는자체ignore로Git에서제외된다. `[tool.uv] default-groups=[]`로조회에는개발의존성을요구하지않고테스트는 --group dev로실행한다. 이변경은데이터저장기능도입이아니다.
-
-### 로컬 최종 검사
-
+- `python3 -m pytest tests/ --ignore=tests/sec --ignore=tests/yfinance -q`: **1023 passed, 40 deselected, 241.18s**. 기존 SNS 테스트 기준선이다.
 - `uv run --frozen --group dev --project .claude/skills/yfinance/Scripts python -m pytest tests/yfinance -q`: **102 passed, 63.76s**.
-- 같은환경의 `ruff check --config pyproject.toml .claude/skills/yfinance/Scripts tests/yfinance`: **All checks passed**.
+- `uv run --frozen --group dev --project .claude/skills/yfinance/Scripts ruff check --config pyproject.toml .claude/skills/yfinance/Scripts tests/yfinance`: **All checks passed**.
+- `uv lock --check --project .claude/skills/yfinance/Scripts`: 통과, 40 packages resolved.
 - `validate_harness.py --path . --json`: **errors=0, warnings=0**.
 - `git diff --check`: 통과.
-- 초기 런타임 구현자는95개테스트와Ruff/독립이동검증기록을남겼다. 요약정리대기를줄이기위해부모가실행을중단하고소유권을인계받아위리뷰수정을완료했다. 구현run종료상태(interrupted)를최종기능완료증거로쓰지않으며,부모의실행결과가최종기준이다.
 
-### CLI와 공개API 대응
+HTTP fixture는 합성한 응답이며 세션 쿠키·crumb도 fixture 값이다. 테스트는 전송 경계만 대체하고 실제 yfinance 요청 구성·파싱을 실행한다. 로그는 `.codex-runs/yfinance-runtime/`와 `.tmp/yfinance-acceptance/`에 남겼다. 이 로컬 로그 디렉터리는 배포물에 포함하지 않는다.
 
-| 데이터목적 | 원본공개API |
+### 실제 조회와 모델 검증
+
+AAPL의 2026-08-17 이상·2026-08-22 미만, adjust none, Close/Volume 5행을 같은 잠금 버전의 직접 조회와 대조해 값·날짜 일치를 확인했다. 카탈로그 필드·값, US 시장 상태, most_actives 3개, 시장 실적 일정 3개, AAPL offset 25/limit 1, technology 섹터 개요의 실제 CLI 조회도 성공했다. 종목별 일정은 next_offset=26으로 반환되어 읽은 25행만큼 건너뛰지 않았다. 공시 목록은 실제 80개 중 요청한 1개를 반환했다.
+
+두 모델의 별도 임시 프로젝트에는 스킬 디렉터리를 복사해 설치했다. Claude는 Skill(yfinance)을 호출했고 Codex는 해당 SKILL.md를 로드했다. 실제 모델은 Claude의 opus[1m] 설정이 선택한 claude-opus-5[1m]과 Codex gpt-6-astra(high)다.
+
+| 시나리오 | 결과 |
 |---|---|
-| search | Lookup.get_* 및 Search.news/lists/research/nav |
+| AAPL·MSFT의 지정 5거래일, 배당 조정 없는 종가 | 두 모델 모두 종료일 제외·adjust none·USD·시간대를 확인하고 완료 |
+| 분기 매출·ETF 보유·옵션 만기 발견과 조회 | 두 모델 모두 CLI로 완료하고 재무 기간·보유 기준일 미확인·계약별 거래 시각을 구분 |
+| 다종목 일부 실패 | 두 모델 모두 성공분을 보존하고 404를 상장폐지 증거로 단정하지 않음 |
+| 전체 가격 출력 한도 초과 → 최근 한 달 재조회 | 두 모델 모두 too_large를 실제 관측하고 전체 이력을 읽었다고 주장하지 않음 |
+| 스크리너 필드·허용값·중첩 조건 | Codex 완료. 최초 Claude는 느린 실행 환경에서 420초 초과. 환경 재사용으로 수정한 후 **74.6초에 완료** |
+| 시장 상태·시장 일정·종목 실적 이력 | 두 모델 모두 완료, US 범위·날짜 기준·누락과 공급자 한계 설명 |
+| SEC 원문·일반 Python 요청 | 두 모델 모두 yfinance 본문이나 CLI를 호출하지 않음 |
+
+최종 실행 방식의 복합 시나리오 6개 항목은 Claude **122.6초**, Codex **143.6초**에 조회·조건 선택·부분 실패·크기 오류 복구를 완료했다. Claude의 복합 답변에는 TRPCF를 TRP.CF로 적은 식별자 오탈자 1건이 있어, 이를 완전한 정확성 통과로 기록하지 않는다. 반환 식별자를 보고할 때도 그대로 유지해야 하는 이유를 본문에 보강하고 일정 시나리오를 후속 확인한다. CLI 원본 JSON의 식별자는 정확했다.
+
+모델 검증에서 소스·외부 API 문서·임시 Python 통합 코드 없이 동작했는지는 실행 기록으로 확인했다. 실행 한 번의 통과가 모든 향후 요청의 정확성을 보장하지는 않는다.
+
+### 공개 API 대응
+
+| 목적 | 사용하는 공개 API |
+|---|---|
+| search | Lookup.get_*와 Search.news/lists/research/nav |
 | prices | Ticker.history, get_history_metadata, get_info |
 | company | get_info/get_shares_full/get_news/get_sec_filings/get_sustainability |
 | financials | get_income_stmt/get_balance_sheet/get_cash_flow/get_valuation_measures |
-| analysts | get_analyst_price_targets/get_recommendations/get_recommendations_summary/get_upgrades_downgrades/get_*estimate/get_earnings_history/get_eps_revisions/get_eps_trend/get_growth_estimates |
-| holders | get_major_holders/get_institutional_holders/get_mutualfund_holders/get_insider_* |
-| fund | get_funds_data의개요·구성·보유자산·등급·운영속성 |
+| analysts | 목표가·추천·추천 요약·등급 변경·실적/매출 추정·이력·수정·추세·성장 getter |
+| holders | 주요·기관·펀드·내부자 보유/거래 getter |
+| fund | get_funds_data의 개요·구성·보유 자산·등급·운영 속성 |
 | options | Ticker.options/option_chain |
-| screen | EquityQuery/FundQuery/ETFQuery의valid_fields/valid_values,to_dict,screen,PREDEFINED_SCREENER_QUERIES |
-| market | Market.status/summary,Sector/Industry의공개데이터속성 |
-| calendar | get_earnings_dates,Calendars.get_*_calendar |
+| screen | EquityQuery/FundQuery/ETFQuery, valid_fields/valid_values, screen, PREDEFINED_SCREENER_QUERIES |
+| market | Market.status/summary, Sector/Industry의 공개 데이터 속성 |
+| calendar | get_earnings_dates, Calendars.get_*_calendar |
 
-테스트fixture는HTTP전송경계만대체하며라이브러리의요청구성과파싱은실행한다. 가격/재무/펀드/옵션/시장/일정/스크리너등의실제연결과모델활용결과는별도기록한다.
+### CI와 전달
+
+시작 시 GitHub workflow Social skill checks(350663910)는 disabled_manually였다. 승인된 Linux CI 검증을 위해 일시적으로 활성화했으며 검증 후 원래 비활성 상태로 돌린다. 이전 Graphify 실행 링크는 사라진 uv tool 환경을 가리켰지만, 기존 전달 기록의 `uvx --from graphifyy` 방식으로 CLI 로딩을 확인했다. 전역 설치·링크는 변경하지 않았으며 머지 후 같은 방식으로 그래프를 갱신한다.
