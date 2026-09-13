@@ -22,3 +22,6 @@ __pycache__/
 # reach into them: a top-level-only exception left them untracked and CI failed
 # on eight tests that pass locally.
 !tests/naver_blog/fixtures/**/*.ndjson
+
+# SEC requester identity stays local.
+.claude/skills/sec/Scripts/.env

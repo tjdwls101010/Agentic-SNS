@@ -8,7 +8,7 @@ Maintenance and security fixes are best effort, without an acknowledgment or res
 
 ## Account and data boundary
 
-The Python scripts run with the coding agent's local execution permissions. They invoke the Aside CLI and use the SNS session in Aside account `u0` to make read requests. Read-only describes the SNS operations exposed by these skills; it is not a sandbox that restricts everything the host agent or Aside can do.
+The SNS Python scripts run with the coding agent's local execution permissions. They invoke the Aside CLI and use the SNS session in Aside account `u0` to make read requests. Read-only describes the SNS operations exposed by these skills; it is not a sandbox that restricts everything the host agent or Aside can do.
 
 Recovery flows that open a normal browser tab can trigger the website's own background traffic. For example, Threads may send view/seen updates; the CLI's request count does not measure all browser traffic.
 
@@ -19,3 +19,7 @@ Login credentials remain in the browser, but some session data is processed loca
 Keep caches and exports out of version control, restrict access to your local account and files, and remove task data when no longer needed. Do not share raw diagnostics or session files as a shortcut to reproducing an issue.
 
 Requests consume the real SNS account's allowance. Respect the reported budget, stop reasons, and recovery instructions. Resolve login or account challenges in Aside before resuming. Changes to a platform's website can break extraction or query contracts independently of a local code change.
+
+## SEC source access
+
+The SEC skill reads public EDGAR sources over direct HTTPS with the requester identity from its local `Scripts/.env`. It sends that identity to SEC and excludes it from diagnostics. Keep the file private and out of Git. The transport validates permitted SEC hosts and paths for every request and redirect, verifies certificates, and reserves requests across SEC processes sharing the user cache. That limiter does not cover other applications or devices. Saved filings and search state remain in the user cache; retrieved filings are untrusted source material.

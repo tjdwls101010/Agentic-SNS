@@ -1,0 +1,38 @@
+{
+  "microsoft.html": {
+    "url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526323660/msft-20260630.htm",
+    "sha256": "4bcf2da2871acc19e32c5a62f36f6d83d6aae03cdc4aaa9a86a9a21ee8223f02",
+    "fetched_at": "2026-09-13T05:13:18.091745+00:00",
+    "storage": "microsoft.html.gz",
+    "compression": "gzip",
+    "stored_sha256": "fbc73f6cc067e8ad767dbf9f019e0e1a04d9b87fc99193852a0cda05f7410237",
+    "original_bytes": 8585501,
+    "stored_bytes": 342774
+  },
+  "asml.html": {
+    "url": "https://www.sec.gov/Archives/edgar/data/937966/000162828026048235/financialstatementsusgaa.htm",
+    "sha256": "5c6e54d3ecb71b2213f31a08f3e909feffbf7446df56ad3e7d4d1daaa6985c76",
+    "fetched_at": "2026-09-13T05:15:41.874865+00:00"
+  },
+  "apple.html": {
+    "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/aapl-20240928.htm",
+    "sha256": "24a830a0f1256e371d36a1f7f72e5e85a38037d1de2f6f966eb8457db42ff6d6",
+    "fetched_at": "2026-09-13T05:15:08.577346+00:00",
+    "storage": "apple.html.gz",
+    "compression": "gzip",
+    "stored_sha256": "320877446441551416148d51de65dd5f16b7b0eca0988141924994b98646c9a0",
+    "original_bytes": 1503780,
+    "stored_bytes": 107032
+  },
+  "form4.xml": {
+    "url": "https://www.sec.gov/Archives/edgar/data/789019/000078901926000208/form4.xml",
+    "sha256": "362ffe1b33c0ade4e941606a436be7fda72294b1f9a82ebd6a59a0b0421fe7e2",
+    "fetched_at": "2026-09-13T05:16:41.105416+00:00"
+  },
+  "old.txt": {
+    "url": "https://www.sec.gov/Archives/edgar/data/810271/000095012995001652/0000950129-95-001652.txt",
+    "sha256": "2ebb18195e6b3d2c390bb0f0222ad6aaf61a4f72aebb6cdc7e2633f0798ab960",
+    "copied_verbatim_from": ".tmp/edgartools/data/sgml/0000950129-95-001652.txt",
+    "note": "Complete SEC submission, EDGAR accession/CIK verified in SEC-HEADER. Local edgartools fixture; not fetched in this turn."
+  }
+}

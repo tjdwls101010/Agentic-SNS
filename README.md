@@ -13,9 +13,11 @@ $ python3 .claude/skills/twitter/scripts/twitter.py about @NASA
 
 Captured September 8, 2026; request-budget header omitted. Live content and counts change. [See the profile → posts → replies commands](docs/usage.md#follow-a-result).
 
-**Before you install:** macOS 15+, Python 3.11+, Aside with an account and the relevant SNS login, and a locally running Claude Code or Codex. These are **read-only** skills; they do not publish, reply, like, or follow. Your agent's usual subscription/API costs still apply. Maintenance is best effort; no numerical speed or token-savings claims are made.
+**For the SNS skills:** macOS 15+, Python 3.11+, Aside with an account and the relevant SNS login, and a locally running Claude Code or Codex. These are **read-only** skills; they do not publish, reply, like, or follow. Your agent's usual subscription/API costs still apply. Maintenance is best effort; no numerical speed or token-savings claims are made.
 
 **[Start with Aside installation](#get-started)** → clone this repo → make your first request.
+
+The [SEC skill](.claude/skills/sec/SKILL.md) also reads original EDGAR company filings and exhibits through direct HTTPS. It requires Python 3.11+, `uv`, and your SEC requester identity; Aside and an SNS account are unnecessary. [Set up SEC access](docs/usage.md#sec-edgar).
 
 ## Get started
 
@@ -43,7 +45,7 @@ git clone https://github.com/tjdwls101010/Agentic-SNS.git
 cd Agentic-SNS
 ```
 
-There is no Python package to install: each skill bundles its own scripts and uses the Python standard library at runtime. Git is needed for the clone command.
+The SNS skills bundle their own scripts and use the Python standard library at runtime. The SEC skill has a separate locked Python environment managed by `uv`; see [SEC setup](docs/usage.md#sec-edgar). Git is needed for the clone command.
 
 Start `claude` or `codex` from this directory. Claude Code discovers `.claude/skills`; Codex discovers `.agents/skills`. This repository's `.agents` and `.codex` symlinks both point to `.claude`, so the two hosts share one source without copying skills. See the official [Claude Code](https://code.claude.com/docs/en/skills#where-skills-live) and [Codex](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) skill documentation. To use the skills from other working directories, see [individual skill installation](docs/usage.md#use-the-skills-in-other-projects).
 
@@ -69,6 +71,7 @@ A successful read prints the profile row shown above, preceded by request and bu
 
 | Skill | Available reading and navigation |
 |---|---|
+| [sec](.claude/skills/sec/SKILL.md) | Company and filing lookup, filing/exhibit search, saved source documents, text and table navigation, and original image links; distinguishes filing dates, report periods, amendments and incomplete reads. |
 | [twitter](.claude/skills/twitter/SKILL.md) | X feeds, posts and replies, profiles, search, followers/following, bookmarks/likes, trends, lists, and communities; continuation handles and query recovery. |
 | [reddit](.claude/skills/reddit/SKILL.md) | Feeds, subreddits, posts, comment threads, users, search, subscriptions, saved/upvoted posts; cached comment continuation and resumable exports. |
 | [facebook](.claude/skills/facebook/SKILL.md) | Feeds, posts, comments, profiles and About fields, search, and groups; paginated collection and query recovery. |
@@ -106,4 +109,4 @@ New SNS skills, features, bug fixes, and documentation improvements are welcome.
 
 ## License
 
-[MIT](LICENSE). The license covers this project's code and documentation; it does not grant rights to third-party SNS content retrieved by the tools.
+[MIT](LICENSE). The license covers this project's code and documentation; it does not grant rights to third-party content retrieved by the tools.

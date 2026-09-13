@@ -14,7 +14,7 @@ jobs:
         with:
           node-version: '22'
       - run: python -m pip install pytest==8.4.2 ruff
-      - run: python -m pytest tests/
+      - run: python -m pytest tests/ --ignore=tests/sec
       - run: node --test tests/facebook/js/*.js
       - run: python tests/facebook/tools/check_fixtures_pii.py
       - run: ruff check --config pyproject.toml .claude/skills/facebook/scripts tests/facebook
@@ -30,3 +30,13 @@ jobs:
       - run: node --test tests/naver_blog/js/*.js
       - run: python tests/naver_blog/tools/check_fixtures_pii.py
       - run: ruff check --config pyproject.toml .claude/skills/naver-blog/scripts tests/naver_blog
+  sec:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+      - run: uv run --isolated --frozen --group dev --project .claude/skills/sec python -m pytest tests/sec
+      - run: uv run --isolated --frozen --group dev --project .claude/skills/sec ruff check --config pyproject.toml .claude/skills/sec/Scripts tests/sec
