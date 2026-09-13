@@ -19,6 +19,8 @@ Captured September 8, 2026; request-budget header omitted. Live content and coun
 
 The [SEC skill](.claude/skills/sec/SKILL.md) also reads original EDGAR company filings and exhibits through direct HTTPS. It requires Python 3.11+, `uv`, and your SEC requester identity; Aside and an SNS account are unnecessary. [Set up SEC access](docs/usage.md#sec-edgar).
 
+The [yfinance skill](.claude/skills/yfinance/SKILL.md) reads Yahoo Finance prices, financial statements, estimates, holdings, options, screens and calendars through a CLI organized by the data you need. It uses its own locked `uv` environment and does not require Aside. [Set up market-data queries](docs/usage.md#yahoo-finance).
+
 ## Get started
 
 ### 1. Prepare Aside and your accounts
@@ -45,7 +47,7 @@ git clone https://github.com/tjdwls101010/Agentic-SNS.git
 cd Agentic-SNS
 ```
 
-The SNS skills bundle their own scripts and use the Python standard library at runtime. The SEC skill has a separate locked Python environment managed by `uv`; see [SEC setup](docs/usage.md#sec-edgar). Git is needed for the clone command.
+The SNS skills bundle their own scripts and use the Python standard library at runtime. SEC and yfinance have separate locked Python environments managed by `uv`; see [SEC setup](docs/usage.md#sec-edgar) or [Yahoo Finance setup](docs/usage.md#yahoo-finance). Git is needed for the clone command.
 
 Start `claude` or `codex` from this directory. Claude Code discovers `.claude/skills`; Codex discovers `.agents/skills`. This repository's `.agents` and `.codex` symlinks both point to `.claude`, so the two hosts share one source without copying skills. See the official [Claude Code](https://code.claude.com/docs/en/skills#where-skills-live) and [Codex](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) skill documentation. To use the skills from other working directories, see [individual skill installation](docs/usage.md#use-the-skills-in-other-projects).
 
@@ -72,13 +74,14 @@ A successful read prints the profile row shown above, preceded by request and bu
 | Skill | Available reading and navigation |
 |---|---|
 | [sec](.claude/skills/sec/SKILL.md) | Company and filing lookup, filing/exhibit search, saved source documents, text and table navigation, and original image links; distinguishes filing dates, report periods, amendments and incomplete reads. |
+| [yfinance](.claude/skills/yfinance/SKILL.md) | Market and company data, field and condition discovery, options and calendars; structured results distinguish applied query conditions, missing data and partial failures. |
 | [twitter](.claude/skills/twitter/SKILL.md) | X feeds, posts and replies, profiles, search, followers/following, bookmarks/likes, trends, lists, and communities; continuation handles and query recovery. |
 | [reddit](.claude/skills/reddit/SKILL.md) | Feeds, subreddits, posts, comment threads, users, search, subscriptions, saved/upvoted posts; cached comment continuation and resumable exports. |
 | [facebook](.claude/skills/facebook/SKILL.md) | Feeds, posts, comments, profiles and About fields, search, and groups; paginated collection and query recovery. |
 | [threads](.claude/skills/threads/SKILL.md) | Feeds, posts with parent chains and replies, profiles, search, relationships, liked/saved posts; reports reply coverage and local request budgets. |
 | [naver-blog](.claude/skills/naver-blog/SKILL.md) | Search, blog profiles and categories, full posts, comments, neighbor feeds/lists, topic directories, and blogs of the month; reports extraction coverage and distinguishes observed counts from server totals. |
 
-Each skill includes instructions for interpreting that platform's output. URLs and handles let the agent open the next relevant target; continuation commands let it read further when the question calls for it. `--json` supplies structured output, and `--out` supports larger local collections where available. [CLI reference and platform notes](docs/usage.md) cover the details.
+Each skill includes instructions for interpreting that platform's output. URLs and handles let the agent open the next relevant target; continuation commands let it read further when the question calls for it. `--json` supplies structured output, and `--out` supports larger local collections where available. yfinance always returns JSON and uses query selection rather than saved result collections. [CLI reference and platform notes](docs/usage.md) cover the details.
 
 “Explore freely” means choosing a path through the implemented read operations. It does not mean every page or every reply is accessible. For example, X does not expand “More replies” branches or article bodies; Threads post reads do not paginate further sibling replies; Naver's neighbor feed has no further page. Commands report their stopping conditions so the agent can describe what it actually read.
 
