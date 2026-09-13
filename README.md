@@ -19,6 +19,8 @@ Captured September 8, 2026; request-budget header omitted. Live content and coun
 
 The [SEC skill](.claude/skills/sec/SKILL.md) also reads original EDGAR company filings and exhibits through direct HTTPS. It requires Python 3.11+, `uv`, and your SEC requester identity; Aside and an SNS account are unnecessary. [Set up SEC access](docs/usage.md#sec-edgar).
 
+The [Finviz skill](.claude/skills/finviz/SKILL.md) reads public screening, company and market data through Python, `uv` and system curl. It needs no Aside account and runs when you name Finviz or provide a Finviz URL. [Finviz setup](docs/usage.md#finviz).
+
 ## Get started
 
 ### 1. Prepare Aside and your accounts
@@ -71,6 +73,7 @@ A successful read prints the profile row shown above, preceded by request and bu
 
 | Skill | Available reading and navigation |
 |---|---|
+| [finviz](.claude/skills/finviz/SKILL.md) | Public stock screening, company and ETF data, prices, statements, options, markets, numeric maps, calendars, news and insider trades; saved observations retain definitions, conditions and coverage. |
 | [sec](.claude/skills/sec/SKILL.md) | Company and filing lookup, filing/exhibit search, saved source documents, text and table navigation, and original image links; distinguishes filing dates, report periods, amendments and incomplete reads. |
 | [twitter](.claude/skills/twitter/SKILL.md) | X feeds, posts and replies, profiles, search, followers/following, bookmarks/likes, trends, lists, and communities; continuation handles and query recovery. |
 | [reddit](.claude/skills/reddit/SKILL.md) | Feeds, subreddits, posts, comment threads, users, search, subscriptions, saved/upvoted posts; cached comment continuation and resumable exports. |

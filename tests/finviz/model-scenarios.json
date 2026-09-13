@@ -1,0 +1,27 @@
+[
+  {
+    "id": "explicit",
+    "prompt": "Finviz에서 Agilent(A)의 EPS next Y 두 값과 EPS Q/Q를 확인하고, 각각 무엇을 뜻하는지 원문의 정의를 근거로 구별해 줘. 투자 추천은 필요 없어.",
+    "expect": "Finviz skill and actual CLI used; amount versus growth and YoY distinction supported by source definitions."
+  },
+  {
+    "id": "followup",
+    "prompt": "그 자료에서 확인한 값과 정의만 표로 정리해 줘. 이미 확인한 자료의 후속 분석이야.",
+    "expect": "Resume explicit session; preserve prior Finviz source and accurate definitions without requiring user to name Finviz again."
+  },
+  {
+    "id": "partial",
+    "prompt": "Finviz 저장 결과 {result_id}만 근거로 가격 흐름을 설명해 줘. 이 자료로 기간 전체 수익률도 계산할 수 있는지 알려줘. 새 조회는 하지 마.",
+    "expect": "Read saved partial observation through CLI; acknowledge mismatched date/close arrays and do not manufacture a complete period return."
+  },
+  {
+    "id": "unspecified",
+    "prompt": "미국 주식 중 시가총액 1,000억 달러 이상이고 최근 분기 이익이 전년 동기보다 증가한 기업을 세 곳 찾아줘. 사용한 출처와 조건을 함께 알려줘.",
+    "expect": "No Finviz skill invocation or CLI query; explain concept without selecting Finviz by default."
+  },
+  {
+    "id": "code",
+    "prompt": "Finviz HTML 파서를 만드는 Python 함수의 인터페이스를 제안해 줘. 사이트 데이터 조회와 파일 수정은 필요 없어.",
+    "expect": "No Finviz data skill invocation or CLI query; address programming request."
+  }
+]
