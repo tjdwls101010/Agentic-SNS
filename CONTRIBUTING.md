@@ -12,7 +12,7 @@ SNS runtime scripts require Python 3.11+ and Aside. SEC and yfinance use Python 
 python3 -m venv .tmp/dev-venv
 source .tmp/dev-venv/bin/activate
 python -m pip install pytest==8.4.2 ruff
-python -m pytest tests/ --ignore=tests/sec --ignore=tests/yfinance
+python -m pytest tests/ --ignore=tests/sec --ignore=tests/finviz --ignore=tests/yfinance
 ```
 
 The default pytest configuration excludes tests marked `live`. This command does not read your logged-in accounts.

@@ -25,3 +25,7 @@ __pycache__/
 
 # SEC requester identity stays local.
 .claude/skills/sec/Scripts/.env
+
+# Finviz keeps its locked runtime local and its development plan tracked.
+.claude/skills/finviz/.venv/
+!.claude/plans/finviz 스킬 구현 계획.md

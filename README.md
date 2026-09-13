@@ -21,6 +21,8 @@ The [SEC skill](.claude/skills/sec/SKILL.md) also reads original EDGAR company f
 
 The [yfinance skill](.claude/skills/yfinance/SKILL.md) reads Yahoo Finance prices, financial statements, estimates, holdings, options, screens and calendars through a CLI organized by the data you need. It uses its own locked `uv` environment and does not require Aside. [Set up market-data queries](docs/usage.md#yahoo-finance).
 
+The [Finviz skill](.claude/skills/finviz/SKILL.md) reads public screening, company and market data through Python, `uv` and system curl. It needs no Aside account and runs when you name Finviz or provide a Finviz URL. [Finviz setup](docs/usage.md#finviz).
+
 ## Get started
 
 ### 1. Prepare Aside and your accounts
@@ -73,6 +75,7 @@ A successful read prints the profile row shown above, preceded by request and bu
 
 | Skill | Available reading and navigation |
 |---|---|
+| [finviz](.claude/skills/finviz/SKILL.md) | Public stock screening, company and ETF data, prices, statements, options, markets, numeric maps, calendars, news and insider trades; saved observations retain definitions, conditions and coverage. |
 | [sec](.claude/skills/sec/SKILL.md) | Company and filing lookup, filing/exhibit search, saved source documents, text and table navigation, and original image links; distinguishes filing dates, report periods, amendments and incomplete reads. |
 | [yfinance](.claude/skills/yfinance/SKILL.md) | Market and company data, field and condition discovery, options and calendars; structured results distinguish applied query conditions, missing data and partial failures. |
 | [twitter](.claude/skills/twitter/SKILL.md) | X feeds, posts and replies, profiles, search, followers/following, bookmarks/likes, trends, lists, and communities; continuation handles and query recovery. |
