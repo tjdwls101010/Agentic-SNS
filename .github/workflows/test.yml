@@ -38,5 +38,5 @@ jobs:
         with:
           python-version: '3.12'
       - uses: astral-sh/setup-uv@v6
-      - run: uv run --isolated --frozen --group dev --project .claude/skills/sec python -m pytest tests/sec
-      - run: uv run --isolated --frozen --group dev --project .claude/skills/sec ruff check --config pyproject.toml .claude/skills/sec/Scripts tests/sec
+      - run: uv run --isolated --frozen --group dev --project .claude/skills/sec/Scripts python -m pytest tests/sec
+      - run: uv run --isolated --frozen --group dev --project .claude/skills/sec/Scripts ruff check --config pyproject.toml .claude/skills/sec/Scripts tests/sec

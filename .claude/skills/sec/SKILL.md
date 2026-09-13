@@ -12,7 +12,7 @@ Find the right EDGAR source and read as much of it as the question needs. The CL
 Resolve this skill's installed directory and use its locked environment, including when the working directory is another project:
 
 ```bash
-uv run --isolated --frozen --project "${CLAUDE_SKILL_DIR}" python "${CLAUDE_SKILL_DIR}/Scripts/sec.py" --help
+uv run --isolated --frozen --project "${CLAUDE_SKILL_DIR}/Scripts" python "${CLAUDE_SKILL_DIR}/Scripts/sec.py" --help
 ```
 
 If the host does not substitute `${CLAUDE_SKILL_DIR}`, replace it with the absolute directory containing this SKILL.md. Command help and `schema` own the arguments, output fields and recovery instructions. Their settings diagnosis is the place to resolve access problems; another account's identity is not a substitute for the configured requester.
