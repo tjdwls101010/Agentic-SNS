@@ -60,3 +60,23 @@ Claude Code와 Codex에서 Finviz 명시 요청·후속 탐색·불완전 자료
 - 실서비스 32개 조회가 모두 통과했다. 기본 날짜 없는 일정 API의 HTTP 400은 사이트 기본 날짜를 제공하는 페이지로 연결해 수정했고, Custom 열과 필터 컨트롤이 다른 응답에 있는 경우 두 관측을 출처와 함께 결합했다. 일반적인 JSON 파싱 실패·중복 키·재귀 한계에서도 수신 원문이 보존된다.
 - 독립 설치 테스트는 한글·공백 경로와 다른 작업 디렉터리에서 잠금 환경으로 통과했다. harness validator는 오류 0·경고 0이며 SKILL.md는 약 2.7KB, references 폴더는 없다.
 - Graphify의 기존 실행 링크는 대상 패키지가 없었으므로 uv tool로 graphifyy 0.9.61을 설치해 복구했다. Finviz 런타임 의존성에는 포함하지 않는다.
+
+
+## 최종 검증 기록
+
+- 오프라인 CLI·설치: `.claude/skills/finviz/.venv/bin/python -m pytest tests/finviz -q` → **23 passed, 32 deselected**. 외부 curl만 대체하며 실제 CLI subprocess와 SQLite를 사용한다. 정상 빈 결과, 조건 미적용·미확인, 리디렉션 조건 보존, 중복 지표·JSON 키, 배열 불일치, 추출 예외 원문 보존, 수집 재개·내보내기 보호, 맵 자산 선택, 부분 읽기 경고, 독립 설치를 포함한다.
+- 실서비스: `.claude/skills/finviz/.venv/bin/python -m pytest tests/finviz/test_live.py -m live -q` → **32 passed**. 원문은 로컬 관측 저장소에 보존하며 원본 기사·시장 데이터 캡처는 저장소에 커밋하지 않는다.
+- 정적 검사: `ruff check --config pyproject.toml .claude/skills/finviz/scripts tests/finviz` 통과. `validate_harness.py --path /tmp/agentic-sns-finviz --json` → 오류 0·경고 0. 코드 포매팅은 저장소의 ruff 설정을 적용했으며 도움말 문장은 자동 하드랩 없이 출력한다.
+- GitHub Finviz CI: https://github.com/tjdwls101010/Agentic-SNS/actions/runs/34758009293 및 PR 실행 https://github.com/tjdwls101010/Agentic-SNS/actions/runs/34758068922 통과.
+- 독립 코드 리뷰: `20260913-213321-finviz-code-review-700c`. 수정 지적 3건은 각각 CLI 회귀 테스트로 재현 후 수정했다.
+- 독립 최종 판정: `20260913-214643-finviz-final-verification-5248` → 아래 모델 시나리오 **10/10 PASS**, 지정한 코드 결함 3건 수정 확인. 리뷰어는 읽기 전용 샌드박스의 임시 파일 쓰기 제한으로 pytest를 재실행하지 못했으며 코드 검사와 주 세션 실행 기록을 구별해 평가했다.
+
+| 시나리오 | Claude Code (실제 모델 claude-opus-5) | Codex (gpt-6-astra, medium, priority) |
+|---|---|---|
+| Finviz 명시 요청의 지표 의미 구별 | PASS: Skill 호출 후 CLI read의 금액·성장률·YoY 정의로 답변 | PASS: 스킬 읽기·stock 조회·저장 결과 읽기의 원문 정의로 답변 |
+| 후속 대화 | PASS: 같은 세션의 실제 resume, 기존 값과 정의 유지 | PASS: 같은 thread의 실제 exec resume, 기존 값과 정의 유지 |
+| 불완전 자료 | PASS: 저장 자료만 읽고 배열 불일치 때문에 수익률 계산 불가로 설명 | PASS: 새 조회 없이 배열 불일치·조건 미확인을 설명하고 수익률을 만들지 않음 |
+| 출처 미지정 실제 스크리닝 | PASS: ultra-search로 다른 출처 탐색, Finviz 스킬·CLI 호출 없음 | PASS: ultra-search로 다른 출처 탐색, Finviz 스킬·CLI 호출 없음 |
+| Finviz 코드 작업 | PASS: 도구 호출 없이 함수 인터페이스 제안 | PASS: 도구 호출 없이 함수 인터페이스 제안 |
+
+판정 근거는 `/tmp/finviz-model-checks/grade-evidence.json`과 각 원본 transcript 및 Codex 실행 기록에 있다. explicit은 실서비스 관측, partial은 외부 curl 경계의 통제 응답으로 실제 CLI가 생성한 저장 관측이다. 최초 개념 설명 near-miss보다 강한 실제 데이터 조회 요청으로 출처 미지정 시나리오를 재검증했다. Claude partial은 잘못된 명령 시도 뒤 도움말과 실제 read로 복구했다. Codex explicit은 짧은 원문 정의에 없는 성장률 분모를 “올해 대비”로 확장해 설명했으므로, 테스트 통과를 모든 금융 해석의 보장으로 일반화하지 않는다.
