@@ -178,8 +178,8 @@ TaskCreate/TaskUpdate와 검색 인터페이스를 가용 도구 목록에서 �
 |---|---|---|
 | 인터페이스·환경 | 완료 | 도움말·스키마의 무네트워크 실행, 잠금 환경과 다른 위치 실행 확인 |
 | 기능별 TDD | 완료 | 공개 CLI에서 정상·빈 반환·대표 실패 검증, 102개 통과 |
-| 스킬·활용 검증 | 진행 중 | 실제 조회와 두 모델의 발견·조회·복구 기록, 식별자 보고 후속 확인 |
-| 통합 검토·전달 | 진행 중 | 리뷰 수정·로컬 검사 완료, Linux CI·PR·머지·그래프 갱신 |
+| 스킬·활용 검증 | 완료 | 실제 조회와 두 모델의 발견·조회·복구, 식별자 후속 확인 완료 |
+| 통합 검토·전달 | 완료 | 리뷰 수정, Linux CI, PR 머지와 그래프 갱신 완료 |
 
 ### 구현·리뷰 기준
 
@@ -265,3 +265,14 @@ AAPL의 2026-08-17 이상·2026-08-22 미만, adjust none, Close/Volume 5행을 
 ### CI와 전달
 
 시작 시 GitHub workflow Social skill checks(350663910)는 disabled_manually였다. 승인된 Linux CI 검증을 위해 일시적으로 활성화했으며 검증 후 원래 비활성 상태로 돌린다. 이전 Graphify 실행 링크는 사라진 uv tool 환경을 가리켰지만, 기존 전달 기록의 `uvx --from graphifyy` 방식으로 CLI 로딩을 확인했다. 전역 설치·링크는 변경하지 않았으며 머지 후 같은 방식으로 그래프를 갱신한다.
+
+### 최종 전달 완료
+
+- PR #11: https://github.com/tjdwls101010/Agentic-SNS/pull/11 — bbbc28b65c3b98116d65ccd38aa4291bef3bcc70으로 squash merge했다.
+- 진행 중 main에 Finviz PR #10이 먼저 병합되어 README 소개와 기본 테스트 제외 목록이 충돌했다. 별도 worktree에서 두 변경을 보존하고 `--ignore=tests/finviz --ignore=tests/yfinance`를 함께 적용했다. yfinance 런타임은 이 통합에서 변경하지 않았다.
+- 최종 통합 commit 85f9cdb66be8a8286c916332d84278b59ccc9a08의 Linux CI: Social skill checks run 34758770485에서 yfinance·SEC·offline 모두 success, Finviz skill checks run 34758770489도 success. 앞선 문서 변경 commit의 run 34758347241 역시 모두 success였다. 중복 push 실행은 취소했으며 취소를 테스트 실패로 해석하지 않는다.
+- 일시 활성화했던 Social skill checks는 원래 disabled_manually 상태로 복구했다. 기존 Finviz workflow의 active 상태는 유지했다.
+- Claude 식별자 후속 시나리오는 72.035초에 완료했고 HELNF·DLMAF·TRPCF를 원본 그대로 보고했다. 이전 복합 답변의 오탈자는 기록에 남겨 한 번의 모델 실행을 무조건적인 정확성 보장으로 해석하지 않는다.
+- `uvx --from graphifyy python /Users/seongjin/.codex/skills/Graphify/scripts/build.py .`: exit 0. **2655 nodes / 5997 edges / 180 named communities**, 39 files re-extracted, 289 cached. `graphify query yfinance_cli`로 새 CLI가 그래프에 포함된 것도 확인했다. 그래프는 Git 추적 대상이 아니다.
+- main을 원격 머지 결과로 갱신했고 작업 브랜치와 통합 worktree를 정리했다. 체크아웃 중 .gitignore만 일시 보관한 뒤 복원해 사용자의 10줄 삭제와 기존 하네스·SEC 계획 변경을 유지했다. 이 파일들은 커밋하지 않았다.
+- 전체 모델·HTTP 실측의 상세 로그는 로컬 `.tmp/yfinance-acceptance/`와 `.codex-runs/`에 보존한다. 독립 설치에 사용한 임시 프로젝트 복사본은 검증 후 제거한다.
