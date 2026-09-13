@@ -1,0 +1,8 @@
+{
+  "method": "Expectations inspected directly from original SEC HTML/XML/SGML, before exercising document.py or reader.py. These literal values are not parser-generated snapshots. Synthetic edge cases are named synthetic in test_documents.py.",
+  "microsoft": {"risk_tail": "The unionization of significant employee populations could result in higher costs and other operational changes necessary to respond to changing conditions and to establish new relationships with worker representatives."},
+  "apple": {"table_index": 22, "title": "CONSOLIDATED STATEMENTS OF OPERATIONS", "units": "In millions, except number of shares", "years": ["September 28, 2024", "September 30, 2023", "September 24, 2022"], "total_net_sales": ["391,035", "383,285", "394,328"], "span_text": "Years ended", "span_columns": 15},
+  "asml": {"image_count": 12, "first_image": "financialstatementsusgaa001.jpg", "last_image": "financialstatementsusgaa012.jpg", "text": "ASML Financial statements US GAAP Q2 2026"},
+  "form4": {"issuer": "MICROSOFT CORP", "shares_owned": "9913.797", "shares_path": "/ownershipDocument[1]/nonDerivativeTable[1]/nonDerivativeHolding[1]/postTransactionAmounts[1]/sharesOwnedFollowingTransaction[1]/value[1]"},
+  "old": {"accession": "0000950129-95-001652", "cik": "0000810271", "types": ["24F-2NT", "EX-99.11"]}
+}

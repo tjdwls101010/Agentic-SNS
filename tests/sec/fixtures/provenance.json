@@ -1,0 +1,39 @@
+{
+  "apple-submissions.json": {
+    "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+    "sha256": "d510d73a69969f32f39f33cf42366a3425ee2dae2f17d62b61823062439b52f2",
+    "provenance": "Unmodified SEC response body from dgunning/edgartools test_get_entity_by_ticker.yaml",
+    "recorded_at": null
+  },
+  "filing-index.html": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1009672/0001564590-18-004771-index.html",
+    "sha256": "5133834d46f493b7b83139769e072d6aa677d51a99a7b9bcaff00ed542a0f549",
+    "provenance": "Unmodified SEC response body from dgunning/edgartools test_filing_homepage_documents_and_datafiles.yaml",
+    "recorded_at": null
+  },
+  "tickers-live.json": {
+    "url": "https://www.sec.gov/files/company_tickers_exchange.json",
+    "sha256": "8a413648b53aecc35db5d47798be6d59ca7130891850b57ea90b2070e930a8de",
+    "fetched_at": "2026-09-13T05:12:24.131833+00:00"
+  },
+  "apple-live.json": {
+    "url": "https://data.sec.gov/submissions/CIK0000320193.json",
+    "sha256": "cb90ffafc5b6f997b60aa109e07008223ad35abe896ec7918fd43652b4057329",
+    "fetched_at": "2026-09-13T05:12:24.580951+00:00"
+  },
+  "efts-live.json": {
+    "url": "https://efts.sec.gov/LATEST/search-index?q=competition&ciks=0000320193&dateRange=custom&startdt=2024-01-01&enddt=2024-12-31&from=0&size=100&sort=desc",
+    "sha256": "5ed8d9b620743677217790dd000d161c60869823ecf8d960723043cf88ad95bd",
+    "fetched_at": "2026-09-13T05:12:25.238769+00:00"
+  },
+  "apple-index-live.html": {
+    "url": "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.html",
+    "sha256": "03fe4c8fe40b35e6f01c2a3c002f427f25cd9b2b2d56ca7799c6ba3479365be7",
+    "fetched_at": "2026-09-13T05:14:17.874223+00:00"
+  },
+  "company-name-live.json": {
+    "url": "https://efts.sec.gov/LATEST/search-index?entityName=Apple&from=0&size=100",
+    "sha256": "f2d2d0a6ca7c2799e601ef3ebc32af2dd34aa63566658410c988307712626c99",
+    "fetched_at": "2026-09-13T05:16:22.600470+00:00"
+  }
+}

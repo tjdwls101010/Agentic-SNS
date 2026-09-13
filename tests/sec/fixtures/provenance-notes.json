@@ -1,0 +1,10 @@
+{
+  "scope": "Independent SEC originals for discovery; request headers and requester identity were not copied.",
+  "expected_values": {
+    "apple-index-live.html": "SEC index: accession 0000320193-24-000123, Apple CIK 320193, first document aapl-20240928.htm; exhibits EX-4.1, EX-10.19, EX-10.20 observed directly in original rows.",
+    "efts-live.json": "Original four 2024 competition hits have document IDs ending 000123:aapl-20240928.htm, 000081:aapl-20240629.htm, 000069:aapl-20240330.htm, 000006:aapl-20231230.htm. Total is 4 eq. SEC report period and filing date are distinct fields.",
+    "filing-index.html": "Unmodified upstream SEC recording: crr-10k_20171231.htm then EX-10.16 crr-ex1016_258.htm with size 33917.",
+    "company-name-live.json": "Original entityName Apple results contain cofilers such as Newstead Jennifer. Such cofilers are not Apple name matches."
+  },
+  "synthetic_cases": "CLI tests explicitly construct malformed URLs, legacy TXT/viewer path variants, wrong-filing replay, timeout/shard/lower-bound/window limits, concurrency, cache corruption, long text and charset/table integration. These are regression inputs, not claims of live SEC content. Document fixtures are independently owned in fixtures/documents."
+}

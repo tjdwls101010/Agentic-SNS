@@ -24,7 +24,7 @@ Keep the requested scope bounded. A displayed item limit is not necessarily a li
 
 ## Use the skills in other projects
 
-Each skill is self-contained: its `SKILL.md` and entire `scripts/` directory travel together. Keep the cloned repository if you link to it.
+Each skill is self-contained: copy its complete directory. For SEC this includes `Scripts/`, `pyproject.toml` and `uv.lock`; for SNS skills it includes `scripts/`. Keep the cloned repository if you link to it.
 
 From the clone's root, install the Twitter skill for all your projects in the host you use. Before running a link command, check whether the destination already exists; keep any existing installation rather than creating a link inside it.
 
@@ -47,11 +47,25 @@ mkdir -p "$HOME/.agents/skills"
 ln -s "$PWD/.claude/skills/twitter" "$HOME/.agents/skills/twitter"
 ```
 
-For another skill, replace both occurrences of `twitter` in the selected command with `reddit`, `facebook`, `threads`, or `naver-blog`. Alternatively, copy the complete skill directory into a destination that does not already exist. Restart your agent if it does not discover the installation.
+For another skill, replace both occurrences of `twitter` in the selected command with `reddit`, `facebook`, `threads`, `naver-blog`, or `sec`. Alternatively, copy the complete skill directory into a destination that does not already exist. Restart your agent if it does not discover the installation.
 
 For project-only installation, use that project's `.claude/skills` or `.agents/skills` directory instead. After installation outside the clone, resolve CLI commands relative to the installed `SKILL.md`, rather than to your current working directory. `${CLAUDE_SKILL_DIR}` in a skill denotes that skill directory; hosts that do not substitute it must use the actual absolute path.
 
 To update a linked installation, run `git pull --ff-only` in the clone after reviewing incoming changes. A copied installation must be updated separately. Deleting a symlink removes that installation without deleting the source skill.
+
+## SEC EDGAR
+
+Install `uv` and Python 3.11+ and copy the complete SEC skill directory if using it outside this clone. Create the local configuration from the example, then replace its placeholder with your own requester identity:
+
+```bash
+cp .claude/skills/sec/Scripts/.env.example .claude/skills/sec/Scripts/.env
+uv run --isolated --frozen --project .claude/skills/sec python .claude/skills/sec/Scripts/sec.py --help
+uv run --isolated --frozen --project .claude/skills/sec python .claude/skills/sec/Scripts/sec.py doctor
+```
+
+Preserve an existing `.env` instead of overwriting it. The file is Git-ignored and its identity is sent to SEC for request identification; it is not an API key or SEC login. Help and `schema` work without it. Use command-specific help for settings diagnosis, connection checks and recovery.
+
+For example, ask: “Find Microsoft's latest annual filing and read the end of its risk factors, citing the original source.” The skill chooses company, filing and document navigation from the question. [SEC guidance](../.claude/skills/sec/SKILL.md) explains how to interpret periods, amendments, tables and incomplete reads. Arguments and output contracts live in the CLI's help and `schema`.
 
 ## CLI reference
 
