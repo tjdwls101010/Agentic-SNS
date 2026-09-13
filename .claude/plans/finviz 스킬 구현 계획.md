@@ -46,7 +46,7 @@ Claude Code와 Codex에서 Finviz 명시 요청·후속 탐색·불완전 자료
 | 스크리너·수집 | 현재 카탈로그·조건·열·페이지·중단·재개·범위 보고 | 완료 |
 | 나머지 원천 | 합의한 각 기능의 원천과 정상·실패 검증 | 완료 |
 | 스킬·인터페이스·설치 | 레퍼런스 없이 발견·사용, 독립 설치 | 완료 |
-| 전체 검증·전달 | 회귀·실서비스·모델 검증·코드 리뷰와 결과 기록 | 모델 판정·CI·머지 대기 |
+| 전체 검증·전달 | 회귀·실서비스·모델 검증·코드 리뷰와 결과 기록 | 완료 · PR #10 머지 |
 
 `feat/finviz-skill` 브랜치에서 관련 변경만 한국어 커밋·PR·squash merge한다. 병행 작업은 보존한다. 머지 후 Graphify를 갱신하고 깨진 실행 링크는 사전 점검한다. 완료는 합의 역량의 검증 근거가 있으며 식별·의미·범위·보존을 깨는 미해결 문제가 없는 상태다.
 
@@ -80,3 +80,7 @@ Claude Code와 Codex에서 Finviz 명시 요청·후속 탐색·불완전 자료
 | Finviz 코드 작업 | PASS: 도구 호출 없이 함수 인터페이스 제안 | PASS: 도구 호출 없이 함수 인터페이스 제안 |
 
 판정 근거는 `/tmp/finviz-model-checks/grade-evidence.json`과 각 원본 transcript 및 Codex 실행 기록에 있다. explicit은 실서비스 관측, partial은 외부 curl 경계의 통제 응답으로 실제 CLI가 생성한 저장 관측이다. 최초 개념 설명 near-miss보다 강한 실제 데이터 조회 요청으로 출처 미지정 시나리오를 재검증했다. Claude partial은 잘못된 명령 시도 뒤 도움말과 실제 read로 복구했다. Codex explicit은 짧은 원문 정의에 없는 성장률 분모를 “올해 대비”로 확장해 설명했으므로, 테스트 통과를 모든 금융 해석의 보장으로 일반화하지 않는다.
+
+- 인계 완료: [PR #10](https://github.com/tjdwls101010/Agentic-SNS/pull/10)은 2026-09-13에 `91dee475ebe601dba1e84ab4cc3368347b7e5d36`으로 squash merge됐다. Finviz 전용 CI와 저장소 공통 CI가 모두 통과했다. 로컬 검증은 Finviz 범위로 실행했으며, 기존 GitHub 공통 워크플로는 설정대로 자체 SEC job도 실행했다. SEC·yfinance 코드와 테스트 파일의 diff는 없다.
+- 머지 직후 `python3 /Users/seongjin/.codex/skills/Graphify/scripts/build.py /tmp/agentic-sns-finviz` 성공: 2,648 nodes, 5,958 edges, 170 communities named. 그래프는 worktree의 `graphify-out/`에 있으며 Git 추적 대상이 아니다. 루트 pyproject.toml은 AST 노드가 없어 제외됐다는 도구 경고를 남겼다.
+- 현재 주 작업 폴더는 진행 중인 feat/yfinance-skill 브랜치이므로 전환하지 않았다. 구현과 검증은 `/tmp/agentic-sns-finviz` worktree에서 완료했고, 제품 코드는 origin/main에 있다.
