@@ -33,11 +33,11 @@ The [CI workflow](.github/workflows/test.yml) contains the corresponding command
 For the SEC skill, run its locked development environment:
 
 ```bash
-uv run --isolated --frozen --group dev --project .claude/skills/sec python -m pytest tests/sec
-uv run --isolated --frozen --group dev --project .claude/skills/sec ruff check --config pyproject.toml .claude/skills/sec/Scripts tests/sec
+uv run --isolated --frozen --group dev --project .claude/skills/sec/Scripts python -m pytest tests/sec
+uv run --isolated --frozen --group dev --project .claude/skills/sec/Scripts ruff check --config pyproject.toml .claude/skills/sec/Scripts tests/sec
 ```
 
-Its fixture provenance distinguishes recorded public SEC responses from constructed edge cases. Live checks require the local requester identity; never record that identity in a fixture or diagnostic. The SEC skill's whole directory, including `Scripts/`, `pyproject.toml` and `uv.lock`, must work independently of this repository.
+Its fixture provenance distinguishes recorded public SEC responses from constructed edge cases. Live checks require the local requester identity; never record that identity in a fixture or diagnostic. The SEC skill's whole directory, including `Scripts/` with its `pyproject.toml` and `uv.lock`, must work independently of this repository.
 
 For bugs, add a failing reproduction at the public behavior boundary before changing the implementation. Keep assertions focused on observable results, failures, privacy, and continuation behavior rather than private helper structure. For documentation-only changes, execute the changed commands, check links and output claims, and avoid tests that merely repeat the prose.
 

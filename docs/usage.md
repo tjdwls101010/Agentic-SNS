@@ -24,7 +24,7 @@ Keep the requested scope bounded. A displayed item limit is not necessarily a li
 
 ## Use the skills in other projects
 
-Each skill is self-contained: copy its complete directory. For SEC this includes `Scripts/`, `pyproject.toml` and `uv.lock`; for SNS skills it includes `scripts/`. Keep the cloned repository if you link to it.
+Each skill is self-contained: copy its complete directory. For SEC this includes `Scripts/` with its `pyproject.toml` and `uv.lock`; for SNS skills it includes `scripts/`. Keep the cloned repository if you link to it.
 
 From the clone's root, install the Twitter skill for all your projects in the host you use. Before running a link command, check whether the destination already exists; keep any existing installation rather than creating a link inside it.
 
@@ -59,8 +59,8 @@ Install `uv` and Python 3.11+ and copy the complete SEC skill directory if using
 
 ```bash
 cp .claude/skills/sec/Scripts/.env.example .claude/skills/sec/Scripts/.env
-uv run --isolated --frozen --project .claude/skills/sec python .claude/skills/sec/Scripts/sec.py --help
-uv run --isolated --frozen --project .claude/skills/sec python .claude/skills/sec/Scripts/sec.py doctor
+uv run --isolated --frozen --project .claude/skills/sec/Scripts python .claude/skills/sec/Scripts/sec.py --help
+uv run --isolated --frozen --project .claude/skills/sec/Scripts python .claude/skills/sec/Scripts/sec.py doctor
 ```
 
 Preserve an existing `.env` instead of overwriting it. The file is Git-ignored and its identity is sent to SEC for request identification; it is not an API key or SEC login. Help and `schema` work without it. Use command-specific help for settings diagnosis, connection checks and recovery.
