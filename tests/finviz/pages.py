@@ -62,3 +62,56 @@ def stock_section(payload, ticker="A", metrics=METRICS):
     header = '<div class="quote-header-wrapper"><h1 class="quote-header_ticker-wrapper_ticker" data-ticker="%s">%s</h1></div>' % (ticker, ticker)
     snapshot = '<table class="snapshot-table2">%s</table>' % "".join('<tr><td data-boxover-html="%s">%s</td><td><b>%s</b></td></tr>' % (d, label, v) for label, v, d in metrics)
     return '<html><body>%s%s<script id="route-init-data" type="application/json">%s</script></body></html>' % (header, snapshot, json.dumps(payload))
+
+
+def groups_page(rows=(("Basic Materials", "sec_basicmaterials", ["291", "2882.47B", "1.93%"]), ("Technology", "sec_technology", ["800", "30000.00B", "0.70%"])), headers=("No.", "Name", "Stocks", "Market Cap", "Dividend"), selected_group="groups?g=sector&v=110&o=name&st=d1", sort=("name", "ascending")):
+    head = "".join('<th class="table-header%s" onclick="window.location=\'groups?g=sector&v=110&o=%s&st=d1\'">%s</th>' % (" is-selected is-" + sort[1] if h.lower() == sort[0] else "", ("-" if sort[1] == "ascending" else "") + h.lower().replace(" ", ""), h) for h in headers)
+    body = "".join('<tr class="styled-row"><td>%d</td><td><a class="tab-link" href="screener?f=%s&v=111">%s</a></td>%s</tr>' % (i + 1, f, name, "".join("<td>%s</td>" % c for c in cells)) for i, (name, f, cells) in enumerate(rows))
+    table = '<table class="styled-table-new groups_table"><thead><tr>%s</tr></thead>%s</table>' % (head, body)
+    chosen = selected_group if isinstance(selected_group, tuple) else (selected_group,)
+    groups = '<select id="groupSelect">' + "".join('<option%s value="%s">%s</option>' % (' selected="selected"' if v in chosen else "", v, t) for v, t in (("groups?g=sector&v=110&o=name&st=d1", "Sector"), ("groups?g=industry&v=110&o=name&st=d1", "Industry"), ("groups?g=industry&sg=basicmaterials&v=110&o=name&st=d1", "Industry (Basic Materials)"), ("groups?g=country&v=110&o=name&st=d1", "Country"), ("groups?g=capitalization&v=110&o=name&st=d1", "Capitalization"))) + "</select>"
+    orders = '<select id="orderSelect"><option selected="selected" value="groups?g=sector&v=110&o=name&st=d1">Name</option><option value="groups?g=sector&v=110&o=marketcap&st=d1">Market Capitalization</option></select>'
+    views = '<a href="groups?g=sector&v=110&o=name&st=d1">Overview</a><a href="groups?g=sector&v=120&o=name&st=d1">Valuation</a>'
+    return "<html><body>" + groups + orders + views + table + "</body></html>"
+
+
+def insiders_page(rows=(("ENLT", "Paz Amit", "2108367", "CHIEF INNOVATION OFFICER", "Sep 12 '26", "Sale", "42.10", "10,000", "421,000", "50,000", "Sep 14 09:55 PM", "http://www.sec.gov/Archives/edgar/data/1/x.xml"),), transaction="insidertrading?tc=7"):
+    head = "".join("<th class=\"table-header\">%s</th>" % h for h in ("Ticker", "Owner", "Relationship", "Date", "Transaction", "Cost", "#Shares", "Value ($)", "#Shares Total", "SEC Form 4"))
+    body = "".join('<tr class="fv-insider-row"><td data-boxover-ticker="%s"><span class="flex"><span class="company-ticker"><img src="x.svg"/><span>%s</span></span><a class="tab-link" href="stock?t=%s&b=2">%s</a></span></td><td><a class="tab-link" href="insidertrading?oc=%s&tc=7&b=2">%s</a></td><td>%s</td><td>%s</td><td><span>%s</span></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><a class="tab-link" href="%s">%s</a></td></tr>' % (r[0], r[0][0], r[0], r[0], r[2], r[1], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[11], r[10]) for r in rows)
+    control = '<select id="transactionFilter">' + "".join('<option%s value="%s">%s</option>' % (' selected="selected"' if v == transaction else "", v, t) for v, t in (("insidertrading?tc=7", "All Transactions"), ("insidertrading?tc=1", "Buy Transactions"), ("insidertrading?tc=2", "Sale Transactions"))) + "</select>"
+    return '<html><body>%s<table id="insider-table" class="styled-table-new"><thead><tr>%s</tr></thead>%s</table></body></html>' % (control, head, body)
+
+
+def news_page(items=(("06:56AM", "Stocks Fall as Oil Rally", "https://www.bloomberg.com/a", "Bloomberg", ()), ("06:30AM", "Paramount Dividend Analysis", "https://finance.yahoo.com/b", "GuruFocus.com", ("PSKY",))), sections=("News", "Blogs"), by_source=False):
+    def row(t, title, url, source, tickers):
+        badges = "".join('<a class="fv-label stock-news-label" data-boxover-ticker="%s" href="/stock?t=%s"><span>%s</span></a>' % (k, k, k) for k in tickers)
+        return '<tr class="styled-row news_table-row"><td class="news_first-time-cell"><svg><use href="/assets/icons_news.svg#%s-light"></use></svg></td><td class="news_date-cell">%s</td><td class="news_link-cell"><a class="nn-tab-link" href="%s" onclick="trackAndOpenNews(event, \'%s\', \'%s\')">%s</a>%s</td></tr>' % (source.lower().split(".")[0], t, url, source, url, title, badges)
+    if by_source:
+        tables = "".join('<table class="styled-table-new break-inside-avoid-column"><tr class="news_table-row"><td class="news_heading-cell"><div><a href="https://%s.example/">%s</a></div></td></tr>%s</table>' % (source.lower(), source, row(t, title, url, source, tickers)) for t, title, url, source, tickers in items)
+        return "<html><body>" + tables + "</body></html>"
+    headings = "".join('<span class="news-calendar_heading">%s</span>' % h for h in sections)
+    half = (len(items) + 1) // 2
+    tables = "".join('<table class="styled-table-new">%s</table>' % "".join(row(*i) for i in chunk) for chunk in (items[:half], items[half:]) if chunk)
+    return "<html><body>" + headings + tables + "</body></html>"
+
+
+def pulse_page(items=((285611, "7 min", "VEON signs memorandum", ("VEON",)), (285537, "2 hours", "US equity futures point lower", ("$MARKET",)))):
+    rows = "".join('<tr class="news_table-row" data-wiim-trigger="%d"><td class="news_icon-cell"></td><td class="news_date-cell">%s</td><td class="news_link-cell"><div><span class="market-pulse-headline">%s</span><div class="market-pulse-badges">%s<span class="market-pulse-more-link">More +</span></div></div></td></tr>' % (i, age, head, "".join('<a class="fv-label stock-news-label" data-boxover-ticker="%s" href="/stock?t=%s"><span>%s</span></a>' % (k, k, k) for k in tickers)) for i, age, head, tickers in items)
+    return '<html><body><table class="styled-table-new">%s</table></body></html>' % rows
+
+
+def article_page(title="Fed Decision Preview", paragraphs=("First paragraph.", "Second paragraph."), links=(("SEC filing", "https://www.sec.gov/x"),)):
+    return '<html><body><h1>%s</h1><article>%s%s<img src="/img/chart.png"/></article></body></html>' % (title, "".join("<p>%s</p>" % p for p in paragraphs), "".join('<a href="%s">%s</a>' % (u, t) for t, u in links))
+
+
+def calendar_page(payload):
+    return '<html><body><script id="route-init-data" type="application/json">%s</script></body></html>' % json.dumps(payload)
+
+
+def map_page(scripts=("/assets/dist-legacy/4740.v1.b05b832c.js", "/assets/dist-legacy/runtime.v1.22f44280.js", "/assets/dist-legacy/1378.v1.61170fe2.js", "/assets/dist-legacy/map.v1.aaaa1111.js")):
+    return "<html><body>" + "".join('<script defer src="%s"></script>' % s for s in scripts) + "</body></html>"
+
+
+MAP_LOADER = 'var IZ={World:1,SectorFull:2};switch(t){case IZ.World:return n.e(62).then(x);case IZ.SectorFull:return n.e(63).then(y);default:return n.e(61).then(z)}'
+MAP_RUNTIME = 'r.u=function(e){return e+".v1."+{61:"aaa111",62:"bbb222",63:"ccc333"}[e]+".js"}'
+MAP_CHUNK = 'module.exports={name:"Root",children:[{name:"World",children:[{name:"Canada",children:[{name:"RY",description:"Royal Bank Of Canada",value:294647}]}]}]};'

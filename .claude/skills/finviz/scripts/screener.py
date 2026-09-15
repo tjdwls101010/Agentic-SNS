@@ -207,19 +207,7 @@ def evidence(obs, page, args, requested_columns, start):
         except (Failure, KeyError):
             conditions["columns"] = condition(args.columns)
     if args.sort:
-        key = args.sort.lstrip("-")
-        wanted = "descending" if args.sort.startswith("-") else "ascending"
-        header = page.select_one("th.table-header.is-selected")
-        chosen = [o for o in controls.get("orderSelect", []) if o["selected"] and markup.query_param(o["value"], "o")]
-        if header is not None and "o=" in header.get("onclick", ""):
-            toggled = markup.query_param("https://finviz.com/" + header["onclick"].split("'")[1], "o") or ""
-            observed = {"column": markup.text(header), "key": toggled.lstrip("-"), "direction": "descending" if "is-descending" in header.get("class", []) else "ascending"}
-        elif chosen:
-            value = markup.query_param(chosen[0]["value"], "o")
-            observed = {"column": chosen[0]["label"], "key": value.lstrip("-"), "direction": "descending" if value.startswith("-") else "ascending"}
-        else:
-            observed = None
-        conditions["sort"] = condition(args.sort, ("confirmed" if observed["key"] == key and observed["direction"] == wanted else "not_applied") if observed else "unverified", observed)
+        conditions["sort"] = markup.sort_condition(args.sort, page, controls)
     pages = [o["value"] for o in controls.get("pageSelect", []) if o["selected"]]
     if pages:
         conditions["start"] = condition(start, "confirmed" if pages[0] == str(start) else "not_applied", int(pages[0]) if pages[0].isdigit() else pages[0])

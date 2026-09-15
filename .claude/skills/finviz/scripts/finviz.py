@@ -247,14 +247,14 @@ def find_leaf(args):
 
 
 def request_of(args, item):
-    names = [(flags[0].lstrip("-").replace("-", "_")) for flags, _ in item.args]
+    names = [options.get("dest") or flags[0].lstrip("-").replace("-", "_") for flags, options in item.args]
     return {name: getattr(args, name, None) for name in names if name != item.targets}
 
 
 def load_modules():
     """Command modules register their leaves on import; the parser is built after all of them are loaded."""
     sys.modules.setdefault("finviz", sys.modules[__name__])
-    for name in ("screener", "stock"):
+    for name in ("screener", "stock", "markets", "feeds"):
         __import__(name)
 
 

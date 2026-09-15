@@ -34,7 +34,7 @@ def script_json(page, obs, script_id):
 
 
 def cell_text(cell):
-    for icon in cell.select("a.company-ticker, img, svg"):
+    for icon in cell.select(".company-ticker, img, svg"):
         icon.decompose()
     return text(cell)
 
@@ -109,7 +109,7 @@ def article(page, base):
     body = page.select_one("article, .text-justify")
     if body is None:
         return None
-    return {"title": text(page.h1), "paragraphs": [text(p) for p in body.select("p")], "links": [{"text": text(a), "url": urljoin(base, a["href"])} for a in body.select("a[href]")], "images": [urljoin(base, img["src"]) for img in body.select("img[src]")]}
+    return {"title": text(page.h1), "paragraphs": [text(p) for p in body.select("p")], "text": text(body), "links": [{"text": text(a), "url": urljoin(base, a["href"])} for a in body.select("a[href]")], "images": [urljoin(base, img["src"]) for img in body.select("img[src]")]}
 
 
 def total_count(page):
@@ -124,3 +124,23 @@ def table_with_header(page, header):
         if any(markup_text == header for markup_text in (text(th) for th in table.select("th") if th.find_parent("table") is table)):
             return table
     return None
+
+
+def sort_condition(requested, page, controls):
+    """Confirm a sort key from the selected header (its toggle link names the key; a leading - means it is currently ascending) or the order control."""
+    key = requested.lstrip("-")
+    wanted = "descending" if requested.startswith("-") else "ascending"
+    header = page.select_one("th.table-header.is-selected")
+    chosen = [o for o in controls.get("orderSelect", []) if o["selected"] and query_param(o["value"], "o")]
+    if header is not None and "o=" in header.get("onclick", ""):
+        toggled = query_param("https://finviz.com/" + header["onclick"].split("'")[1], "o") or ""
+        classes = header.get("class", [])
+        direction = "descending" if "is-descending" in classes else "ascending" if "is-ascending" in classes else ("ascending" if toggled.startswith("-") else "descending")
+        observed = {"column": text(header), "key": toggled.lstrip("-"), "direction": direction}
+    elif chosen:
+        value = query_param(chosen[0]["value"], "o")
+        observed = {"column": chosen[0]["label"], "key": value.lstrip("-"), "direction": "descending" if value.startswith("-") else "ascending"}
+    else:
+        observed = None
+    status = ("confirmed" if observed["key"] == key and observed["direction"] == wanted else "not_applied") if observed else "unverified"
+    return {"requested": requested, "status": status, "evidence": observed}

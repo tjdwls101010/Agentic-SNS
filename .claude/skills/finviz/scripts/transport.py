@@ -36,7 +36,7 @@ def unique_object(pairs):
 
 
 PAGES = {
-    "/", "/screener", "/screener.ashx", "/stock", "/quote.ashx", "/groups", "/groups.ashx", "/map", "/map.ashx",
+    "/", "/screener", "/screener.ashx", "/stock", "/quote", "/quote.ashx", "/groups", "/groups.ashx", "/map", "/map.ashx",
     "/bubbles", "/bubbles.ashx", "/news", "/news.ashx", "/insidertrading", "/insidertrading.ashx", "/futures",
     "/futures.ashx", "/forex", "/forex.ashx", "/crypto", "/crypto.ashx",
 }
