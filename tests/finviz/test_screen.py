@@ -87,7 +87,7 @@ def test_run_follows_pages_into_a_jsonl_file_and_refuses_to_overwrite_it(client,
     out = tmp_path / "rows.jsonl"
     result = client.one("screen", "run", "--filters", "sec_technology", "--pages", "3", "--out", str(out))
     assert result["data"] == {"path": str(out), "rows_written": 5, "pages": 3}
-    assert result["coverage"] == {"received": 5, "source_total": 5, "exhaustive": False, "pages": 3}
+    assert result["coverage"] == {"received": 5, "shown": 5, "source_total": 5, "exhaustive": False, "pages": 3}
     assert "continuation" not in result
     lines = [json.loads(line) for line in out.read_text().splitlines()]
     assert [r["ticker"] for r in lines] == ["AAPL", "MSFT", "GOOG", "AMZN", "META"]
@@ -107,3 +107,49 @@ def test_run_starts_at_a_continuation_and_confirms_the_page_offset(client):
     assert result["conditions"]["start"] == {"requested": 21, "status": "confirmed", "evidence": 21}
     assert result["data"][0]["No."] == "21"
     assert result["continuation"] == {"start": 41}
+
+
+def test_each_page_observation_keeps_its_own_rows_and_conditions(client):
+    client.add("https://finviz.com/screener?v=111&ft=4&f=cap_largeover&r=1", screener_table(ROWS, total=4, current=1, page_values=(1, 21), selected_filters=("cap_largeover",)))
+    client.add("https://finviz.com/screener?v=111&ft=4&f=cap_largeover&r=21", screener_table([("GOOG", ["Alphabet", "2T"])], total=4, current=21, page_values=(1, 21)))
+    result = client.one("screen", "run", "--filters", "cap_largeover", "--pages", "2")
+    first, second = result["source"]["pages"]
+    assert [r["ticker"] for r in client.one("read", second, "--pointer", "/data")["data"]] == ["GOOG"]
+    assert client.one("read", second)["data"]["conditions"]["filters"]["status"] == "not_applied"
+    assert result["conditions"]["filters"]["status"] == "not_applied"
+    assert result["conditions"]["filters"]["evidence"] == {first: ["cap_largeover"], second: None}
+
+
+def test_a_failing_later_page_keeps_earlier_rows_and_names_the_resume_offset(client, tmp_path):
+    client.add("https://finviz.com/screener?v=111&ft=4&f=sec_technology&r=1", screener_table(ROWS, total=40, current=1, page_values=(1, 21)))
+    client.add("https://finviz.com/screener?v=111&ft=4&f=sec_technology&r=21", "", status=429, headers={"Retry-After": "30"})
+    out = tmp_path / "rows.jsonl"
+    result = client.one("screen", "run", "--filters", "sec_technology", "--pages", "2", "--out", str(out), code=8)
+    assert result["status"] == "partial" and result["data"]["rows_written"] == 2
+    assert result["continuation"] == {"start": 21}
+    assert result["error"]["code"] == "access_restricted" and "21" in result["warnings"][0]
+    assert len(out.read_text().splitlines()) == 2
+    plain = client.one("screen", "run", "--filters", "sec_technology", "--pages", "2", code=8)
+    assert [r["ticker"] for r in plain["data"]] == ["AAPL", "MSFT"] and plain["continuation"] == {"start": 21}
+
+
+def test_export_applies_selection_and_reports_empty_when_nothing_matched(client, tmp_path):
+    client.add("https://finviz.com/screener?v=111&ft=4&r=1", screener_table(ROWS, total=2, page_values=(1,)))
+    out = tmp_path / "rows.jsonl"
+    result = client.one("screen", "run", "--fields", "ticker", "--limit", "1", "--out", str(out))
+    assert [json.loads(line) for line in out.read_text().splitlines()] == [{"ticker": "AAPL", "observation_id": result["source"]["pages"][0]}]
+    assert result["coverage"] == {"received": 2, "shown": 1, "source_total": 2, "exhaustive": False, "pages": 1}
+    empty = client.one("screen", "run", "--filter", "nomatch", "--out", str(tmp_path / "none.jsonl"), code=7)
+    assert empty["status"] == "empty" and empty["data"]["rows_written"] == 0
+
+
+def test_missing_column_catalog_is_a_structure_change_not_an_empty_list(client):
+    client.add("https://finviz.com/screener?v=152", '<html><body><script id="route-init-data" type="application/json">{}</script></body></html>')
+    assert client.one("screen", "columns", code=6)["error"]["code"] == "structure_changed"
+
+
+def test_sort_falls_back_to_the_order_control_when_no_header_is_marked(client):
+    page = screener_table(ROWS).replace('is-selected is-ascending', '') + '<select id="orderSelect"><option selected="selected" value="screener?v=111&ft=4&o=-marketcap">Market Capitalization</option></select>'
+    client.add("https://finviz.com/screener?v=111&ft=4&o=-marketcap&r=1", page)
+    result = client.one("screen", "run", "--sort=-marketcap")
+    assert result["conditions"]["sort"] == {"requested": "-marketcap", "status": "confirmed", "evidence": {"key": "marketcap", "direction": "descending", "column": "Market Capitalization"}}

@@ -35,3 +35,30 @@ def screener_table(rows, headers=("No.", "Ticker", "Company", "Market Cap"), tot
 
 COLUMNS_MAP = {"row": {"id": "row", "title": "No.", "index": 0, "categoryIndex": 0}, "ticker": {"id": "ticker", "title": "Ticker", "index": 1, "categoryIndex": 0}, "company": {"id": "company", "title": "Company", "index": 2, "categoryIndex": 0}, "marketCap": {"id": "marketCap", "title": "Market Cap", "index": 6, "categoryIndex": 1}, "PE": {"id": "PE", "title": "P/E", "index": 7, "categoryIndex": 1}}
 CATEGORIES = [{"id": "identification-classification", "title": "Identification & Classification"}, {"id": "valuation", "title": "Valuation"}]
+
+
+METRICS = [("Market Cap", "41.39B", "Market capitalization"), ("EPS next Y", "6.74", "EPS estimate for next year"), ("EPS this Y", "10.95%", "EPS growth this year"), ("EPS next Y", "8.75%", "EPS growth next year"), ("EPS Q/Q", "8.50%", "Quarterly earnings growth (YoY)")]
+
+
+def stock_overview(ticker="A", name="Agilent Technologies Inc", last_close="147.00", date="Sep 15 • 6:05 AM ET", change="+0.20 (0.14%)", metrics=METRICS, ratings=(("Sep-09-26", "Resumed", "UBS", "Neutral", "$165"),), news=(("Sep-14-26 04:30PM", "Keysight stock underperforms", "https://www.marketwatch.com/x", "MarketWatch"),), insiders=(("Dolsten Mikael", "Director", "Sep 04 '26", "Sale", "151.38", "634", "95,972", "4,924", "Sep 09 04:01 PM", "http://www.sec.gov/Archives/edgar/data/1/form4.xml"),), profile="Agilent Technologies, Inc. engages in life sciences.", peers=("WAT", "MTD"), ownership=None, insider_monthly=None, fundflows=None, ratings_table=True):
+    header = '<div class="quote-header-wrapper"><h1 class="quote-header_ticker-wrapper_ticker" data-ticker="%s">%s</h1><h2 class="quote-header_ticker-wrapper_company"><a href="http://example.com">%s</a></h2><div class="quote-price"><strong class="quote-price_price">%s</strong><span class="quote-price_date">%s</span><span class="quote-price_change">%s</span></div></div>' % (ticker, ticker, name, last_close, date, change)
+    cells = "".join('<tr><td data-boxover-html="%s">%s</td><td><b>%s</b></td></tr>' % (d, label, v) for label, v, d in metrics)
+    snapshot = '<table class="snapshot-table2">%s</table>' % cells
+    rating_rows = "".join("<tr>%s</tr>" % "".join("<td>%s</td>" % c for c in row) for row in ratings)
+    ratings_html = '<table class="js-table-ratings"><thead><tr><th>Date</th><th>Action</th><th>Analyst</th><th>Rating Change</th><th>Price Target Change</th></tr></thead>%s</table>' % rating_rows if ratings_table else ""
+    news_rows = "".join('<tr><td>%s</td><td><div class="news-link-left"><a class="tab-link-news" href="%s">%s</a></div><div class="news-link-right"><span>(%s)</span></div></td></tr>' % (t, u, h, s) for t, h, u, s in news)
+    news_html = '<table id="news-table" class="fullview-news-outer news-table">%s</table>' % news_rows
+    insider_rows = "".join('<tr class="fv-insider-row"><td><a class="tab-link" href="insidertrading?oc=1437590&tc=7">%s</a></td><td>%s</td><td>%s</td><td><span>%s</span></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><a class="tab-link" href="%s">%s</a></td></tr>' % (r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[9], r[8]) for r in insiders)
+    insider_html = '<table class="body-table styled-table-new"><thead><tr><th>Insider Trading</th><th>Relationship</th><th>Date</th><th>Transaction</th><th>Cost</th><th>#Shares</th><th>Value ($)</th><th>#Shares Total</th><th>SEC Form 4</th></tr></thead>%s</table>' % insider_rows
+    profile_html = '<td class="fullview-profile quote_profile">%s</td><div class="fullview-links"><a href="screener?t=A,WAT,MTD">Peers</a>%s</div>' % (profile, "".join('<a href="stock?t=%s&ty=c&ta=1&p=d">%s</a>' % (p, p) for p in peers))
+    scripts = ""
+    for script_id, payload in (("institutional-ownership-init-data-0", ownership), ("insider-init-data-0", insider_monthly), ("route-init-data-fundflows-0", fundflows)):
+        if payload is not None:
+            scripts += '<script id="%s" type="application/json">%s</script>' % (script_id, json.dumps(payload))
+    return "<html><body>" + header + snapshot + profile_html + ratings_html + news_html + insider_html + scripts + "</body></html>"
+
+
+def stock_section(payload, ticker="A", metrics=METRICS):
+    header = '<div class="quote-header-wrapper"><h1 class="quote-header_ticker-wrapper_ticker" data-ticker="%s">%s</h1></div>' % (ticker, ticker)
+    snapshot = '<table class="snapshot-table2">%s</table>' % "".join('<tr><td data-boxover-html="%s">%s</td><td><b>%s</b></td></tr>' % (d, label, v) for label, v, d in metrics)
+    return '<html><body>%s%s<script id="route-init-data" type="application/json">%s</script></body></html>' % (header, snapshot, json.dumps(payload))

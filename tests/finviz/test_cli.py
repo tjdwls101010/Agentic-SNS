@@ -81,3 +81,40 @@ def test_doctor_runs_offline(client):
     result = client.one("doctor")
     assert result["data"]["problems"] == []
     assert result["data"]["store"] == str(client.store)
+
+
+def test_verification_page_on_a_json_endpoint_is_access_restricted(client):
+    client.add("https://finviz.com/api/suggestions?input=A", '<html><head><title>Just a moment...</title></head><body><form id="challenge-form"></form></body></html>')
+    result = client.one("search", "A", code=5)
+    assert result["error"]["code"] == "access_restricted"
+
+
+def test_rejected_redirect_still_saves_the_received_response(client):
+    client.add("https://finviz.com/api/suggestions?input=Out", "moved", status=302, headers={"Location": "https://evil.example/x"})
+    result = client.one("search", "Out", code=2)
+    assert result["error"]["code"] == "unsupported_url" and result["id"]
+    assert client.one("read", result["id"], "--raw")["data"] == "moved"
+
+
+def test_read_hides_headers_unless_pointed_at_and_accepts_the_root_pointer(client):
+    client.add("https://finviz.com/api/suggestions?input=A", [{"ticker": "A"}], headers={"Set-Cookie": "secret=1", "Retry-After": "5"})
+    saved = client.one("search", "A")["id"]
+    whole = client.one("read", saved)
+    assert "headers" not in whole["data"]["source"] and whole["data"]["data"] == [{"ticker": "A"}]
+    root = client.one("read", saved, "--pointer", "/")
+    assert root["data"]["data"] == [{"ticker": "A"}]
+    headers = client.one("read", saved, "--pointer", "/source/headers")["data"]
+    assert headers["retry-after"] == "5"
+    pointers = [e["pointer"] for e in client.one("inspect", saved)["data"]]
+    assert pointers[0] == "/" and "/source/headers" in pointers
+
+
+def test_local_storage_failures_stay_inside_the_json_contract(client, tmp_path):
+    (tmp_path / "adir").mkdir()
+    doc = client.run("--store", str(tmp_path / "adir"), "doctor", code=6)
+    assert doc["results"][0]["error"]["code"] == "local_io"
+    client.add("https://finviz.com/screener?v=111&ft=4&r=1", "<html></html>")
+    blocked = tmp_path / "file.txt"
+    blocked.write_text("x")
+    result = client.one("screen", "run", "--out", str(blocked / "rows.jsonl"), code=6)
+    assert result["error"]["code"] == "local_io"

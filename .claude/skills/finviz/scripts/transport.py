@@ -101,6 +101,9 @@ class Observation:
         return self.raw.decode("utf-8-sig", errors="replace")
 
     def json(self):
+        head = self.text[:4000].lower()
+        if head.lstrip().startswith("<") and ("challenge-form" in head or "just a moment" in head):
+            raise self.fail("access_restricted", "Finviz returned a verification page instead of data.", "Wait before retrying and do not bypass the verification; the raw page is saved.")
         try:
             return json.loads(self.text, object_pairs_hook=unique_object)
         except ValueError as exc:
@@ -147,7 +150,10 @@ def fetch(url, options):
             raise obs.fail("transport", "curl exited " + str(proc.returncode) + ": " + proc.stderr.decode(errors="replace").strip()[:300], "Retry after checking connectivity, --timeout and --max-bytes; a partial body, if any, is saved.")
         if status in (301, 302, 303, 307, 308):
             location = urljoin(url, headers.get("location", ""))
-            validate_url(location)
+            try:
+                validate_url(location)
+            except Failure as exc:
+                raise Failure(exc.code, "Redirect to " + location + " refused: " + exc.message, exc.fix, obs)
             redirects.append({"url": url, "http_status": status})
             url = location
             continue
@@ -156,4 +162,4 @@ def fetch(url, options):
         if status < 200 or status >= 300:
             raise obs.fail("http_error", "HTTP " + str(status), "Check the ticker or identifier; a 404 usually means the security or page does not exist. The raw response is saved.")
         return obs
-    raise Failure("redirect_limit", "More than five redirects.", "Inspect the URL; the chain is not followed further.")
+    raise Failure("redirect_limit", "More than five redirects.", "Inspect the URL; the chain is not followed further.", obs)

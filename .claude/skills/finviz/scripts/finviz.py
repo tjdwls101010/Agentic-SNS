@@ -4,6 +4,7 @@ import argparse
 import os
 from pathlib import Path
 import re
+import sqlite3
 import subprocess
 import sys
 from urllib.parse import urlencode
@@ -40,20 +41,20 @@ COMMON = [
 
 
 class Leaf:
-    def __init__(self, group, name, help, output, fn, args, narrow, records, targets):
+    def __init__(self, group, name, help, output, fn, args, narrow, records, targets, default_limit):
         self.group, self.name, self.help, self.output, self.fn = group, name, help, output, fn
-        self.args, self.narrow, self.records, self.targets = args, narrow, records, targets
+        self.args, self.narrow, self.records, self.targets, self.default_limit = args, narrow, records, targets, default_limit
 
     @property
     def path(self):
         return self.group + (" " + self.name if self.name else "")
 
 
-def leaf(group, name=None, *, help, output, args=(), narrow=(), records=None, targets=None):
+def leaf(group, name=None, *, help, output, args=(), narrow=(), records=None, targets=None, default_limit=None):
     """Register a command. `records` names the list inside data that --filter/--fields/--limit act on (None = data itself); `targets` names a positional list that yields one result per value."""
 
     def register(fn):
-        LEAVES.append(Leaf(group, name, help, output, fn, list(args), list(narrow), records, targets))
+        LEAVES.append(Leaf(group, name, help, output, fn, list(args), list(narrow), records, targets, default_limit))
         return fn
 
     return register
@@ -115,11 +116,14 @@ def doctor(ctx, args, target):
     return result
 
 
-@leaf("read", help="Read a saved observation, or a JSON Pointer inside it, without a new request.", args=[(("id",), dict(help="Observation ID from an earlier result.")), (("--pointer",), dict(default="", help="JSON Pointer into the saved envelope, e.g. /data or /data/rows/0.")), (("--start",), dict(type=int, default=0, help="Zero-based start when the selected value is a list.")), (("--raw",), dict(action="store_true", help="Return the received response text instead of the extracted envelope."))], output={"*": "the selected value; source, conditions, coverage and status of the original observation are repeated so a slice keeps its context", "selection": "pointer, start, received (list length) and shown"})
+@leaf("read", help="Read a saved observation, or a JSON Pointer inside it, without a new request.", args=[(("id",), dict(help="Observation ID from an earlier result.")), (("--pointer",), dict(default="", help="JSON Pointer into the saved envelope, e.g. /data or /data/rows/0; / or empty is the whole envelope, /source/headers the response headers.")), (("--start",), dict(type=int, default=0, help="Zero-based start when the selected value is a list.")), (("--raw",), dict(action="store_true", help="Return the received response text instead of the extracted envelope."))], output={"*": "the selected value; source, conditions, coverage and status of the original observation are repeated so a slice keeps its context", "selection": "pointer, start, received (list length) and shown"})
 def read(ctx, args, target):
     if args.pointer and not args.pointer.startswith("/"):
         raise Failure("invalid_pointer", "A JSON Pointer starts with '/'.", "Use a pointer from inspect, e.g. /data.")
+    pointer = "" if args.pointer == "/" else args.pointer
     saved = ctx.store.get(args.id)
+    if not pointer.startswith("/source/headers") and isinstance(saved.get("source"), dict):
+        saved["source"] = {k: v for k, v in saved["source"].items() if k != "headers"}
     result = {k: saved[k] for k in ("target", "id", "source", "conditions", "coverage", "continuation", "warnings") if saved.get(k) is not None}
     result["observed_at"], result["status"] = saved.get("observed_at"), "ok"
     if saved.get("status") == "error":
@@ -128,13 +132,13 @@ def read(ctx, args, target):
         result["data"] = ctx.store.get(args.id, raw=True).decode("utf-8", errors="replace")
         return result
     value = saved
-    for token in args.pointer.split("/")[1:]:
+    for token in pointer.split("/")[1:]:
         token = token.replace("~1", "/").replace("~0", "~")
         try:
             value = value[int(token)] if isinstance(value, list) else value[token]
         except (KeyError, IndexError, ValueError, TypeError):
             raise Failure("invalid_pointer", "Nothing at " + args.pointer + ".", "Run inspect " + args.id + " to list available pointers.")
-    selection = {"pointer": args.pointer or "/", "start": args.start}
+    selection = {"pointer": pointer or "/", "start": args.start}
     if isinstance(value, list):
         selection["received"] = len(value)
         value = value[args.start :]
@@ -179,7 +183,7 @@ def schema(ctx, args, target):
     item = matches[0]
     sub = leaf_parser(parser, item)
     actions = [a for a in sub._actions if a.help is not argparse.SUPPRESS] + [a for a in parser._actions if a.option_strings and a.help is not argparse.SUPPRESS]
-    data = {"command": item.path, "description": item.help, "arguments": describe_actions(actions), "output": item.output, "narrowing": item.narrow, "records": item.records, "statuses": output.STATUSES, "exit_codes": output.EXIT_CODES}
+    data = {"command": item.path, "description": item.help, "arguments": describe_actions(actions), "output": item.output, "narrowing": item.narrow, "records": item.records, "default_limit": item.default_limit, "statuses": output.STATUSES, "exit_codes": output.EXIT_CODES}
     return output.plain(item.path, data)
 
 
@@ -210,7 +214,7 @@ def leaf_parser(parser, item):
 
 
 def epilog(item):
-    return "Output keys: " + ", ".join(item.output) + ". Full contract: schema " + item.path + ". Shared options (--fields, --limit, --filter, --max-chars, --store, timeouts) are accepted here too; finviz.py --help explains them."
+    return "Output keys: " + ", ".join(item.output) + ("; --limit defaults to " + str(item.default_limit) + " records here" if item.default_limit else "") + ". Full contract: schema " + item.path + ". Shared options (--fields, --limit, --filter, --max-chars, --store, timeouts) are accepted here too; finviz.py --help explains them."
 
 
 def build_parser():
@@ -250,7 +254,7 @@ def request_of(args, item):
 def load_modules():
     """Command modules register their leaves on import; the parser is built after all of them are loaded."""
     sys.modules.setdefault("finviz", sys.modules[__name__])
-    for name in ("screener",):
+    for name in ("screener", "stock"):
         __import__(name)
 
 
@@ -263,9 +267,10 @@ def main(argv=None):
         parser.error("limits must be positive")
     try:
         store = Store(args.store)
-    except OSError as exc:
-        output.diagnostic("cannot open store: " + str(exc))
-        return output.EXIT_CODES["invalid"]
+    except (OSError, sqlite3.Error) as exc:
+        result = output.plain(item.path)
+        result["status"], result["error"] = "error", output.error_info("local_io", "Cannot open the observation store " + args.store + ": " + str(exc), "Pass a writable file path with --store or FINVIZ_STORE.")
+        return output.emit([output.finalize(result, args, item, {})], args, item)
     ctx = Context(args, store)
     targets = getattr(args, item.targets) if item.targets else [None]
     results = []
@@ -276,12 +281,18 @@ def main(argv=None):
         except Failure as exc:
             result = exc.observation.result if exc.observation is not None else output.plain(target)
             result["target"], result["status"], result["error"] = target if target is not None else result.get("target", item.path), "error", exc.info()
+        except (OSError, sqlite3.Error) as exc:
+            result = output.plain(target)
+            result["target"], result["status"], result["error"] = target if target is not None else item.path, "error", output.error_info("local_io", type(exc).__name__ + ": " + str(exc)[:200], "Check the --out path, the --store path and local disk permissions.")
         except (ValueError, KeyError, IndexError, TypeError) as exc:
             obs = ctx.pending[-1] if ctx.pending else None
             result = obs.result if obs is not None else output.plain(target)
             result["target"], result["status"], result["error"] = target if target is not None else result.get("target", item.path), "error", output.error_info("parse_error", type(exc).__name__ + ": " + str(exc)[:200], "The provider structure may have changed; read the saved raw response with read ID --raw.")
         finally:
-            ctx.flush()
+            try:
+                ctx.flush()
+            except (OSError, sqlite3.Error) as exc:
+                result = dict(result, status="error", error=output.error_info("local_io", "Saving the observation failed: " + str(exc)[:200], "Check the --store path and disk space."))
         results.append(output.finalize(result, args, item, request_of(args, item)))
     return output.emit(results, args, item)
 

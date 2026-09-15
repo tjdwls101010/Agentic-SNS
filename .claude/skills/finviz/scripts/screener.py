@@ -1,13 +1,12 @@
 """Finviz screener: discovery of filters, signals, columns and views, and screening runs with condition evidence and paging."""
 
-import hashlib
 import json
 from pathlib import Path
 from urllib.parse import urlencode
 
 import markup
 import output
-from finviz import condition, leaf
+from finviz import LEAVES, condition, leaf
 from transport import Failure
 
 BASE = "https://finviz.com/screener"
@@ -69,7 +68,9 @@ def columns(ctx, args, target):
 
 
 def column_catalog(page, obs):
-    settings = markup.script_json(page, obs, "route-init-data").get("tableSettings", {})
+    settings = markup.script_json(page, obs, "route-init-data").get("tableSettings") or {}
+    if not isinstance(settings.get("columnsMap"), dict) or not settings["columnsMap"]:
+        raise obs.fail("structure_changed", "The screener page has no column map in route-init-data.", "Read the saved raw page with read ID --raw; Finviz may have changed the custom view.")
     categories = [c.get("title") for c in settings.get("categories", [])]
     return [{"id": c["id"], "title": c["title"], "index": c["index"], "category": categories[c["categoryIndex"]] if c.get("categoryIndex") is not None and c["categoryIndex"] < len(categories) else None} for c in settings.get("columnsMap", {}).values()]
 
@@ -92,7 +93,7 @@ RUN_ARGS = [
 ]
 
 
-@leaf("screen", "run", help="Run the screener with filters, a signal, a view or custom columns, sorting and paging; rows keep source strings.", args=RUN_ARGS, output={"[]": "one record per row keyed by the column headers, plus ticker and url; with --out the data is {path, rows_written, pages} instead", "conditions": "filters, signal, columns, sort and start as confirmed by the page's own controls", "coverage": "received rows, source_total from the page count, exhaustive false", "continuation": "{start} for the next page"}, narrow=["--fields", "--limit", "--out", "--pages 1"])
+@leaf("screen", "run", help="Run the screener with filters, a signal, a view or custom columns, sorting and paging; rows keep source strings.", args=RUN_ARGS, output={"[]": "one record per row keyed by the column headers, plus ticker and url (and observation_id when more than one page or --out); with --out the data is {path, rows_written, pages} instead", "conditions": "filters, signal, columns, sort and start as confirmed by each page's own controls; pages that disagree show evidence per observation id", "coverage": "received rows across pages, shown after selection, source_total from the page count, pages fetched, exhaustive false", "continuation": "{start} for the next page, or for the page that failed"}, narrow=["--fields", "--limit", "--out", "--pages 1"])
 def run(ctx, args, target):
     if args.pages < 1:
         raise Failure("invalid_pages", "--pages must be at least 1.", "Use --pages 1 for a single page.")
@@ -100,33 +101,65 @@ def run(ctx, args, target):
     view = "152" if requested_columns else VIEWS[args.view][0]
     query = {"v": view, "ft": "4", "f": args.filters, "s": args.signal, "c": ",".join(map(str, requested_columns)) if requested_columns else None, "o": args.sort, "r": args.start}
     writer = Exporter(args) if args.out else None
-    rows, page_ids, first, start = [], [], None, args.start
-    for _ in range(args.pages):
+    pages, failure, start = [], None, args.start
+    for index in range(args.pages):
         query["r"] = start
-        obs, page = screener_page(ctx, query)
-        headers, records = page_records(page, obs)
-        first = first or obs
-        page_ids.append(obs.id)
-        if writer:
-            writer.write(records, obs.id)
-        else:
-            rows.extend(records)
+        try:
+            obs, page = screener_page(ctx, query)
+            headers, records = page_records(page, obs)
+        except Failure as exc:
+            if index == 0:
+                raise
+            failure = exc
+            break
         evidence(obs, page, args, requested_columns, start)
+        obs.result["data"] = records
+        obs.result["coverage"] = {"received": len(records), "source_total": markup.total_count(page), "exhaustive": False}
+        pages.append(obs)
         nxt = next_start(page, start)
         if nxt is None:
             start = None
             break
         start = nxt
-    result = first.result
-    result["target"] = "screen"
-    result["coverage"] = {"received": len(rows) if not writer else writer.count, "source_total": markup.total_count(page), "exhaustive": False, "pages": len(page_ids)}
+    result = dict(pages[0].result)
+    tagged = [dict(row, observation_id=obs.id) if len(pages) > 1 or writer else row for obs in pages for row in obs.result["data"]]
+    selected, total = output.select_records(tagged, args, next(item for item in LEAVES if item.path == "screen run"))
+    result["target"], result["selection_applied"] = "screen", True
+    result["source"] = dict(result["source"], pages=[obs.id for obs in pages])
+    result["conditions"] = merge_conditions(pages)
+    result["coverage"] = {"received": total, "shown": len(selected), "source_total": pages[-1].result["coverage"]["source_total"], "exhaustive": False, "pages": len(pages)}
+    result["warnings"] = list(dict.fromkeys(w for obs in pages for w in obs.result.get("warnings", [])))
     if start is not None:
         result["continuation"] = {"start": start}
-    result["source"]["pages"] = page_ids
-    result["data"] = {"path": str(writer.path), "rows_written": writer.count, "pages": len(page_ids)} if writer else rows
+    if failure is not None:
+        failed = failure.observation.id if failure.observation is not None else None
+        result["status"], result["error"] = "partial", failure.info()
+        result["warnings"].append("The page at --start " + str(start) + " failed" + (" (observation " + failed + ")" if failed else "") + "; rows from " + str(len(pages)) + " completed pages are included. Resume with --start " + str(start) + (" and --append" if writer else "") + ".")
     if writer:
+        writer.write(selected)
         writer.close()
+        result["data"] = {"path": str(writer.path), "rows_written": writer.count, "pages": len(pages)}
+        if writer.count == 0 and result["status"] != "partial":
+            result["status"] = "empty"
+            result["warnings"].append("No rows were written; the source returned no matching rows or the selection removed them all.")
+    else:
+        result["data"] = selected
     return result
+
+
+def merge_conditions(pages):
+    """One condition per parameter across pages; when pages disagree the worst status wins and evidence is listed per observation."""
+    order = {"confirmed": 0, "unverified": 1, "not_applied": 2}
+    merged = {}
+    for key in dict.fromkeys(k for obs in pages for k in obs.result.get("conditions", {})):
+        found = [(obs.id, obs.result["conditions"].get(key)) for obs in pages if key in obs.result.get("conditions", {})]
+        statuses = {c["status"] for _, c in found}
+        if len(statuses) == 1 or key == "start":
+            merged[key] = found[0][1]
+        else:
+            worst = max(statuses, key=order.get)
+            merged[key] = condition(found[0][1]["requested"], worst, {obs_id: c["evidence"] for obs_id, c in found})
+    return merged
 
 
 def resolve_columns(ctx, spec):
@@ -174,16 +207,19 @@ def evidence(obs, page, args, requested_columns, start):
         except (Failure, KeyError):
             conditions["columns"] = condition(args.columns)
     if args.sort:
-        header = page.select_one("th.table-header.is-selected")
         key = args.sort.lstrip("-")
+        wanted = "descending" if args.sort.startswith("-") else "ascending"
+        header = page.select_one("th.table-header.is-selected")
+        chosen = [o for o in controls.get("orderSelect", []) if o["selected"] and markup.query_param(o["value"], "o")]
         if header is not None and "o=" in header.get("onclick", ""):
             toggled = markup.query_param("https://finviz.com/" + header["onclick"].split("'")[1], "o") or ""
-            direction = "descending" if "is-descending" in header.get("class", []) else "ascending"
-            observed = {"column": markup.text(header), "key": toggled.lstrip("-"), "direction": direction}
-            wanted = "descending" if args.sort.startswith("-") else "ascending"
-            conditions["sort"] = condition(args.sort, "confirmed" if observed["key"] == key and direction == wanted else "not_applied", observed)
+            observed = {"column": markup.text(header), "key": toggled.lstrip("-"), "direction": "descending" if "is-descending" in header.get("class", []) else "ascending"}
+        elif chosen:
+            value = markup.query_param(chosen[0]["value"], "o")
+            observed = {"column": chosen[0]["label"], "key": value.lstrip("-"), "direction": "descending" if value.startswith("-") else "ascending"}
         else:
-            conditions["sort"] = condition(args.sort)
+            observed = None
+        conditions["sort"] = condition(args.sort, ("confirmed" if observed["key"] == key and observed["direction"] == wanted else "not_applied") if observed else "unverified", observed)
     pages = [o["value"] for o in controls.get("pageSelect", []) if o["selected"]]
     if pages:
         conditions["start"] = condition(start, "confirmed" if pages[0] == str(start) else "not_applied", int(pages[0]) if pages[0].isdigit() else pages[0])
@@ -208,14 +244,11 @@ class Exporter:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.handle = self.path.open("a" if args.append else "x", encoding="utf-8")
 
-    def write(self, records, page_id):
+    def write(self, records):
         for record in records:
-            self.handle.write(json.dumps(dict(record, observation_id=page_id), ensure_ascii=False) + "\n")
+            self.handle.write(json.dumps(record, ensure_ascii=False) + "\n")
             self.count += 1
 
     def close(self):
         self.handle.close()
 
-    @staticmethod
-    def digest(path):
-        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
