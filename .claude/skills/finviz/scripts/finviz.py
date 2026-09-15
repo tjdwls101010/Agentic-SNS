@@ -30,7 +30,7 @@ GROUPS = {
 }
 COMMON = [
     (("--max-chars",), dict(type=int, default=20000, help="Maximum output characters; larger results become a too_large error with narrowing advice, never a truncated document.")),
-    (("--filter",), dict(default=None, help="Case-insensitive substring; keeps only records whose JSON contains it (discovery lists and record lists).")),
+    (("--filter",), dict(default=None, help="Case-insensitive substring; keeps records whose own values or scalar lists contain it (nested objects such as option lists are not searched).")),
     (("--fields",), dict(default=None, help="Comma-separated record fields to keep; unknown names return the available ones.")),
     (("--limit",), dict(type=int, default=None, help="Maximum records to output; the observation keeps everything received.")),
     (("--store",), dict(default=os.environ.get("FINVIZ_STORE", str(Path.home() / ".cache/finviz-skill/observations.sqlite3")), help="SQLite observation store; use the same path to read earlier IDs.")),
@@ -219,10 +219,10 @@ def epilog(item):
 
 def build_parser():
     parser = argparse.ArgumentParser(prog="finviz.py", description="Read public Finviz data. stdout: one JSON document; stderr: diagnostics. `schema [GROUP [LEAF]]` describes every command offline.", formatter_class=Formatter, epilog="Shared options may be written before GROUP or after the command.")
-    hidden = argparse.ArgumentParser(add_help=False)
+    hidden = argparse.ArgumentParser(add_help=False, description="Shared options, accepted after the command as well as before GROUP.")
     for flags, options in COMMON:
-        parser.add_argument(*flags, **options)
-        hidden.add_argument(*flags, **dict(options, default=argparse.SUPPRESS, help=argparse.SUPPRESS))
+        parser.add_argument(*flags, help=options["help"], **without(options, "help"))
+        hidden.add_argument(*flags, help=argparse.SUPPRESS, default=argparse.SUPPRESS, **without(options, "help", "default"))
     groups = parser.add_subparsers(dest="group", metavar="GROUP", required=True)
     by_group = {}
     for item in LEAVES:
@@ -231,15 +231,19 @@ def build_parser():
         if items[0].name is None:
             sub = groups.add_parser(name, help=GROUPS[name], description=items[0].help, parents=[hidden], formatter_class=Formatter, epilog=epilog(items[0]))
             for flags, options in items[0].args:
-                sub.add_argument(*flags, **options)
+                sub.add_argument(*flags, help=options["help"], **without(options, "help"))
             continue
         group = groups.add_parser(name, help=GROUPS[name], description=GROUPS[name] + ".", formatter_class=Formatter)
         leaves = group.add_subparsers(dest="leaf", metavar="LEAF", required=True)
         for item in items:
             sub = leaves.add_parser(item.name, help=item.help, description=item.help, parents=[hidden], formatter_class=Formatter, epilog=epilog(item))
             for flags, options in item.args:
-                sub.add_argument(*flags, **options)
+                sub.add_argument(*flags, help=options["help"], **without(options, "help"))
     return parser
+
+
+def without(options, *keys):
+    return {k: v for k, v in options.items() if k not in keys}
 
 
 def find_leaf(args):

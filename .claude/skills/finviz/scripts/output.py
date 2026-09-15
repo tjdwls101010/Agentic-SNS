@@ -50,13 +50,26 @@ def records_at(data, location):
     return data.get(location) if isinstance(data, dict) else None
 
 
+def searchable(record):
+    """The text --filter matches: a record's own values and scalar lists, not the objects nested inside it."""
+    if isinstance(record, dict):
+        parts = []
+        for value in record.values():
+            if isinstance(value, list):
+                parts += [str(v) for v in value if not isinstance(v, (list, dict))]
+            elif not isinstance(value, dict):
+                parts.append(str(value))
+        return " ".join(parts).lower()
+    return json.dumps(record, ensure_ascii=False).lower()
+
+
 def select_records(records, args, leaf):
     """Apply --filter, --fields and --limit to a record list; returns the kept records and the count before selection."""
     total = len(records)
     fields = [f.strip() for f in args.fields.split(",")] if args.fields else None
     if args.filter:
         term = args.filter.lower()
-        records = [r for r in records if term in json.dumps(r, ensure_ascii=False).lower()]
+        records = [r for r in records if term in searchable(r)]
     if fields and records and all(isinstance(r, dict) for r in records):
         known = list(dict.fromkeys(k for r in records for k in r))
         missing = [f for f in fields if f not in known]
