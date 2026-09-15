@@ -69,7 +69,7 @@ For example, ask: “Find Microsoft's latest annual filing and read the end of i
 
 ## Yahoo Finance
 
-Install `uv` and Python 3.11+ and copy the complete yfinance skill directory if using it outside this clone. The first locked run installs its dependencies; no Aside setup or API key is required.
+Install `uv` and copy the complete yfinance skill directory if using it outside this clone. The first locked run prepares Python 3.12 from the skill's `.python-version` and installs its dependencies; no Aside setup or API key is required.
 
 ```bash
 uv run --frozen --project .claude/skills/yfinance/Scripts python .claude/skills/yfinance/Scripts/yfinance_cli.py --help

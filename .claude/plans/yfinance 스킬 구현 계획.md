@@ -276,3 +276,32 @@ AAPL의 2026-08-17 이상·2026-08-22 미만, adjust none, Close/Volume 5행을 
 - `uvx --from graphifyy python /Users/seongjin/.codex/skills/Graphify/scripts/build.py .`: exit 0. **2655 nodes / 5997 edges / 180 named communities**, 39 files re-extracted, 289 cached. `graphify query yfinance_cli`로 새 CLI가 그래프에 포함된 것도 확인했다. 그래프는 Git 추적 대상이 아니다.
 - main을 원격 머지 결과로 갱신했고 작업 브랜치와 통합 worktree를 정리했다. 체크아웃 중 .gitignore만 일시 보관한 뒤 복원해 사용자의 10줄 삭제와 기존 하네스·SEC 계획 변경을 유지했다. 이 파일들은 커밋하지 않았다.
 - 전체 모델·HTTP 실측의 상세 로그는 로컬 `.tmp/yfinance-acceptance/`와 `.codex-runs/`에 보존한다. 독립 설치에 사용한 임시 프로젝트 복사본은 검증 후 제거한다.
+
+### 변경 결정 — 결과 봉투 구조와 인터페이스 자기설명 (2026-09-15)
+
+머지 후 Claude(Fable 5.1)가 네 프레임 기준으로 CLI 출력·도움말·schema를 실측 점검했다. 코덱스 문서 리뷰 7a11은 SKILL.md 산문만 봐서 위반 없음이었지만, 프레임이 실제로 사는 곳은 인터페이스였고 결함은 거기서 나왔다. 점검 전문은 `.claude/plans/yfinance 스킬 4프레임 점검.md`에 있다.
+
+| 발견 | 결정·수정 | 근거 |
+|---|---|---|
+| 다종목 결과에서 동일한 `request`가 대상마다 반복되어 30종목 Close 1행(데이터 3,997자)이 21,972자로 기본 한도 20,000자를 넘김. 그때의 `too_large` `fix`는 `--fields`·`--limit` 축소를 먼저 안내해 오답 | `request`를 문서 최상위 `{"status","request","results"}`로 한 번만 둔다. 승인 계획 §2의 "각 결과에 적용 조건"은 대상별로 달라지는 조건이 `context`에 남으므로 의도는 유지된다. `too_large`는 대상이 둘 이상이고 데이터가 전체의 절반 미만이면 `--max-chars N` 또는 대상 분할을 먼저 안내하고, 그 외에는 기존 축소 안내를 유지한다 | 수정 후 같은 조회 15,011자·exit 0, `request` 228자 1회. 재현 테스트 2개 실패 → 통과(`test_thirty_targets_one_value_each_fit_the_default_budget`, `test_envelope_dominated_oversize_recovery_names_budget_before_narrowing`) |
+| 인자 13개에 `help=` 없음(`schema`가 `"help": null`) | 모두 한 줄 설명 추가. `--adjust`는 none/auto/back 각각의 결과를 말하도록 재작성 | 전체 리프 순회에서 null help 0건 |
+| 리프 설명 5곳이 라이브러리 내부 이름(`get_earnings_dates`, `valid_fields`, deprecated shares 등)을 노출 | 사용자 의미만 남김. API 대응은 위의 "공개 API 대응" 표가 유일한 위치 | COMMANDS에 `get_`·`valid_`·`deprecated`·`aliases` 0건 |
+| `options chain`이 매 호출 전체 underlying quote(약 2.6 KB)를 context에 실음 | symbol·regularMarketPrice·regularMarketTime·currency·exchangeTimezoneName만 남기고 전체는 `prices quote`로 안내 | 같은 조회 약 3.6 KB → 940자 |
+| SKILL.md 36행이 사례 없이 추상적, schema `output.empty`가 런타임 경고와 중복 | 36행에 문서 수준 request와 context의 선택 전후 행 수를 잇는 절 추가, schema 플래그 제거 | SKILL.md 38줄 유지 |
+| 문서가 "Python 3.11+"라 하나 `.python-version`은 3.12 고정 | usage.md·CONTRIBUTING을 uv가 3.12를 준비한다고 정정. SEC는 pin이 없어 3.11+ 표기 유지 | — |
+
+검증: `tests/yfinance` 104 passed(재현 2개 추가), Ruff All checks passed, `validate_harness.py` yfinance 0건(보고된 오류 4건은 finviz 스크립트의 것으로 이 변경 밖). 결과 구조 변경은 README·usage.md가 세부 구조를 적지 않아 문서 변경이 없다.
+
+독립 리뷰 20260915-200024-yfinance-fix-review-ee6b(gpt-6-astra high, 읽기 전용)는 블로킹 없음, should-fix 4·nit 3을 확인했고 7건 모두 일반 사용에서 도달 가능하다고 판정했다. 재현 테스트를 먼저 추가해(5개 실패 → 108개 통과) 다음과 같이 고쳤다.
+
+| 발견 | 수정 |
+|---|---|
+| 데이터 비중 50% 기준이 `--limit 1`로 한도에 들어오는 경우까지 "축소 불가"로 오판 | 기준을 "대상별 봉투만으로 한도를 넘는가"로 바꿈. 봉투가 한도 이하면 축소 안내, 초과면 `--max-chars`·대상 분할 안내 |
+| 안내한 `--max-chars N`을 그대로 쓰면 에코된 값의 자릿수가 늘어 한 글자 초과로 재실패 | 자릿수 변화를 반영한 고정점으로 N을 계산. 안내값 그대로 재실행이 성공하는 테스트 추가 |
+| schema·`--list-fields` 초과 시 해당 명령이 받지 않는 `--fields`·`--limit`을 권함 | 요청 종류별로 안내 분리: schema는 범위 축소·`--filter`, 필드 발견은 `--filter`·대상 축소 |
+| schema가 `--ascending`을 `--no-ascending`으로만 노출 | 첫 철자를 키로 쓰고 도움말에 두 철자를 명시 |
+| schema의 출력 계약이 문서 수준 `request`와 대상별 적용 조건(`context`)을 설명하지 않음 | `output.document` 추가, SKILL.md 36행을 "요청한 것 vs 실제 적용된 것"으로 정정 |
+| `company shares` context가 `get_shares_full`을 언급 | 기본 창(끝은 현재, 시작은 548일 전)과 일 단위 반올림으로 대체 |
+| 모든 리프의 schema가 가격 기간·프리셋 기본값 설명을 반복하고 `output.selection`이 인자 도움말을 중복 | 기본값 설명을 해당 리프에만 조건부로 넣고 `selection` 제거 |
+
+미확인 우려로 남긴 "raw"·"announced" 표현은 "unadjusted as supplied"·"past and upcoming"으로 바꿨다. 리뷰어는 샌드박스가 uv 캐시를 막아 기존 Python 3.12 환경에서 fixture를 메모리로 주입해 104개를 통과시켰고, 표준 pytest 실행은 아니었다.

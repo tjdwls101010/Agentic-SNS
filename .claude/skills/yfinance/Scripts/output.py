@@ -50,28 +50,43 @@ def is_empty(data):
     return data is None or data is pd.NA or data is pd.NaT or isinstance(data, (float, np.floating)) and not math.isfinite(data)
 
 
-def result(target, request, data=None, context=None, warnings=None, error=None, status=None):
+def result(target, data=None, context=None, warnings=None, error=None, status=None):
     if status is None:
         empty = is_empty(data)
         status = "error" if error else "empty" if empty else "ok"
     notices = list(warnings or [])
     if status == "empty":
         notices.append("An empty upstream return does not prove that the data does not exist.")
-    return {"target": target, "request": request, "observed_at": dt.datetime.now(dt.timezone.utc).isoformat(), "status": status, "data": encode(data), "context": encode(context or {}), "warnings": notices, "error": error}
+    return {"target": target, "observed_at": dt.datetime.now(dt.timezone.utc).isoformat(), "status": status, "data": encode(data), "context": encode(context or {}), "warnings": notices, "error": error}
 
 
 def error_info(code, message, fix):
     return {"code": code, "message": str(message), "fix": fix}
 
 
-def emit(results, max_chars=20000):
+def dump(value):
+    return json.dumps(value, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+
+
+def emit(results, max_chars=20000, request=None):
+    """One request applies to every result, so it is stated once at the document level."""
     states = {r["status"] for r in results}
     status = "error" if states <= {"error", "not_attempted"} else next(iter(states)) if len(states) == 1 else "partial"
-    doc = {"status": status, "results": results}
-    text = json.dumps(doc, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+    text = dump({"status": status, "request": request, "results": results})
     if len(text) > max_chars:
-        doc = {"status": "error", "results": [result("output", {}, error=error_info("too_large", f"Result requires {len(text)} characters; limit is {max_chars}.", f"Narrow --fields (discover with --list-fields --filter TEXT), --limit, --periods or --start/--end; scope schema to GROUP LEAF or use --filter TEXT; alternatively rerun with --max-chars {len(text)}."))]}
-        print(json.dumps(doc, ensure_ascii=False, allow_nan=False))
+        needed = len(text)
+        for _ in range(3):  # the echoed max_chars value changes the document length when its digit count changes
+            needed = max(len(text), len(text) - len(str(max_chars)) + len(str(needed)))
+        envelope = len(text) - sum(len(dump(r["data"])) for r in results)
+        if request is None or "scope" in request:
+            fix = f"Scope schema to GROUP LEAF or add --filter TEXT; alternatively rerun with --max-chars {needed}."
+        elif request.get("list_fields"):
+            fix = f"Narrow field discovery with --filter TEXT or query fewer targets; alternatively rerun with --max-chars {needed}."
+        elif len(results) > 1 and envelope > max_chars:
+            fix = f"{len(results)} targets need {len(text)} characters and their per-target context alone is {envelope}, above the limit, so narrowing --fields or --limit cannot fit it. Rerun with --max-chars {needed} or split the targets into smaller batches."
+        else:
+            fix = f"Narrow --fields (discover with --list-fields --filter TEXT), --limit, --periods or --start/--end; alternatively rerun with --max-chars {needed}."
+        print(dump({"status": "error", "request": request, "results": [result("output", error=error_info("too_large", f"Result requires {len(text)} characters; limit is {max_chars}.", fix))]}))
         return 9
     print(text)
     if status == "ok":

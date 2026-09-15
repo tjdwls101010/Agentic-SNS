@@ -39,7 +39,9 @@ def fetch(ticker, args, context, warnings):
         if not expirations:
             return None
         chain = ticker.option_chain(date=expiry)
-        context["underlying"] = chain.underlying
+        underlying = chain.underlying or {}
+        context["underlying"] = {key: underlying.get(key) for key in ("symbol", "regularMarketPrice", "regularMarketTime", "currency", "exchangeTimezoneName")}
+        context["underlying_detail"] = "prices quote SYMBOL returns the full underlying quote."
         sides = ["calls", "puts"] if args.side == "both" else [args.side]
         data = {}
         for side in sides:
@@ -52,7 +54,7 @@ def fetch(ticker, args, context, warnings):
     if args.group == "company" and args.leaf == "filings":
         return ticker.get_sec_filings()
     if args.group == "company" and args.leaf == "shares":
-        context.update(unit="shares", date_meaning="Yahoo observation timestamp, localized by yfinance", range="Native get_shares_full date bounds; dates rounded to days by library")
+        context.update(unit="shares", date_meaning="Yahoo observation timestamp, localized by yfinance", range="Omitted --end defaults to now and omitted --start to 548 days (about 18 months) earlier; observation timestamps are rounded to whole days")
         return ticker.get_shares_full(start=args.start, end=args.end)
     if args.group == "company" and args.leaf == "sustainability":
         return ticker.get_sustainability()

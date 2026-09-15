@@ -54,7 +54,7 @@ def test_market_earnings_discloses_us_scope_and_native_zero_loss(cli):
     r = doc["results"][0]
     assert r["data"]["data"] == [[None, None, None]]
     assert r["context"]["scope"] == "US"
-    assert r["request"]["most_active"] is False
+    assert doc["request"]["most_active"] is False
     assert r["context"]["end_boundary"] == "native_inclusive"
     assert any("zero" in w.lower() for w in r["warnings"])
 
@@ -81,7 +81,7 @@ def test_screen_applied_defaults_identify_actual_preset_universe(cli):
     routes = [{"path": "/v1/finance/screener", "body": {"quoteType": "ETF", "sortField": "percentchange", "sortType": "DESC"}, "json": {"finance": {"result": [{"quotes": [{"symbol": "SPY"}], "total": 1}], "error": None}}}]
     proc, doc = cli("screen", "run", "--preset", "top_etfs_us", routes=routes)
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    request = doc["results"][0]["request"]
+    request = doc["request"]
     assert request["type"] == "etf"
     assert request["sort"] == "percentchange"
     assert request["ascending"] is False
