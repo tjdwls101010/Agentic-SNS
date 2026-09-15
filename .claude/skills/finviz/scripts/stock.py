@@ -79,7 +79,7 @@ def news(ctx, args, ticker):
 @stock_leaf("insiders", "Insider transactions listed on the overview page plus Finviz's monthly buy/sell aggregates.", {"trades": "rows keyed by the table headers plus owner_url (Finviz owner page) and filing_url (SEC Form 4)", "monthly": "Finviz's monthly aggregates as published: date (epoch), saleAggregated, buyAggregated and counts"}, records="trades", narrow=["--limit", "--filter", "--fields"])
 def insiders(ctx, args, ticker):
     obs, page = stock_page(ctx, ticker, "c")
-    table = next((t for t in page.select("table") if "Insider Trading" in [markup.text(th) for th in t.select("th")]), None)
+    table = markup.table_with_header(page, "Insider Trading")
     trades = []
     if table is not None:
         for row, tr in zip(markup.table_records(table, obs.url)[1], [tr for tr in table.select("tr") if tr.find_all("td", recursive=False)]):
@@ -181,6 +181,8 @@ def filings(ctx, args, ticker):
     items = entries.get("items") or []
     if args.form:
         items = [i for i in items if i.get("form") == args.form]
+        if not items and entries.get("items"):
+            obs.result["warnings"] = ["No " + args.form + " on page " + str(args.page) + "; the source has no form filter, so page through with --page (continuation) to find older filings."]
     conditions = {"page": condition(args.page, "confirmed" if entries.get("page") == args.page else "not_applied", entries.get("page"))}
     if args.sort:
         conditions["sort"] = condition(args.sort, "confirmed" if init.get("initialSort") == args.sort else "not_applied", init.get("initialSort"))

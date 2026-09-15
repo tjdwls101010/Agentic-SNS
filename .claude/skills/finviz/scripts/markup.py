@@ -116,3 +116,11 @@ def total_count(page):
     node = page.select_one("#screener-total")
     match = re.search(r"/\s*([\d,]+)\s*Total", text(node)) if node else None
     return int(match.group(1).replace(",", "")) if match else None
+
+
+def table_with_header(page, header):
+    """The innermost table whose own header cells include `header`; Finviz nests data tables inside layout tables."""
+    for table in reversed(page.select("table")):
+        if any(markup_text == header for markup_text in (text(th) for th in table.select("th") if th.find_parent("table") is table)):
+            return table
+    return None
