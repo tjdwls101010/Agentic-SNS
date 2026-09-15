@@ -16,8 +16,8 @@ def test_history_preserves_axis_timezone_zero_and_large_integer(cli):
     assert r["data"]["index"] == ["2024-01-02T00:00:00-05:00", "2024-01-03T00:00:00-05:00"]
     assert r["data"]["index_names"] == ["Date"]
     assert r["context"]["currency"] == "USD"
-    assert r["request"]["period"] is None
-    assert r["request"]["repair"] is False
+    assert doc["request"]["period"] is None
+    assert doc["request"]["repair"] is False
     assert r["context"]["end_boundary"] == "exclusive"
 
 
@@ -36,7 +36,7 @@ def test_adjustment_modes_keep_their_distinct_price_meaning(cli, adjust, expecte
     proc, doc = cli("prices", "history", "AAPL", "--start", "2024-01-02", "--end", "2024-01-03", "--adjust", adjust, "--fields", "Open,Close", routes=chart_routes())
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert doc["results"][0]["data"]["data"] == [[expected_open, expected_close]]
-    assert doc["results"][0]["request"]["adjust"] == adjust
+    assert doc["request"]["adjust"] == adjust
 
 
 def test_actions_keep_native_dividend_amount(cli):
@@ -68,3 +68,27 @@ def test_rate_limit_without_success_uses_rate_exit_code(cli):
     assert proc.returncode == 5, proc.stdout + proc.stderr
     assert doc["status"] == "error"
     assert [r["status"] for r in doc["results"]] == ["error", "not_attempted"]
+
+
+def many_symbol_routes(count):
+    return [{"path": f"/v8/finance/chart/S{i:02d}", "json": CHART} for i in range(count)]
+
+
+def test_thirty_targets_one_value_each_fit_the_default_budget(cli):
+    symbols = [f"S{i:02d}" for i in range(30)]
+    proc, doc = cli("prices", "history", *symbols, "--period", "5d", "--fields", "Close", "--limit", "1", routes=many_symbol_routes(30))
+    assert proc.returncode == 0, proc.stdout[:300] + proc.stderr
+    assert doc["status"] == "ok"
+    assert [r["target"] for r in doc["results"]] == symbols
+    assert doc["request"]["fields"] == ["Close"]
+    assert "request" not in doc["results"][0]
+
+
+def test_envelope_dominated_oversize_recovery_names_budget_before_narrowing(cli):
+    symbols = [f"S{i:02d}" for i in range(30)]
+    proc, doc = cli("prices", "history", *symbols, "--period", "5d", "--fields", "Close", "--limit", "1", "--max-chars", "5000", routes=many_symbol_routes(30))
+    assert proc.returncode == 9, proc.stdout[:300] + proc.stderr
+    fix = doc["results"][0]["error"]["fix"]
+    assert "--max-chars" in fix
+    assert "--fields" not in fix.split("--max-chars")[0]
+    assert "target" in fix.lower()

@@ -6,7 +6,7 @@ Keep the project focused on reading and exploring SNS through the user's logged-
 
 ## Development setup
 
-SNS runtime scripts require Python 3.11+ and Aside. SEC and yfinance use Python 3.11+ and separate `uv.lock` environments. Offline checks do not need Aside or SNS accounts. CI uses Python 3.12 and Node.js 22; pytest and Ruff are development dependencies.
+SNS runtime scripts require Python 3.11+ and Aside. SEC uses Python 3.11+ and yfinance the Python 3.12 that `uv` prepares from its `.python-version`; each has a separate `uv.lock` environment. Offline checks do not need Aside or SNS accounts. CI uses Python 3.12 and Node.js 22; pytest and Ruff are development dependencies.
 
 ```bash
 python3 -m venv .tmp/dev-venv

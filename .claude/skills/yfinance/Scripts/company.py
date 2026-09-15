@@ -39,7 +39,9 @@ def fetch(ticker, args, context, warnings):
         if not expirations:
             return None
         chain = ticker.option_chain(date=expiry)
-        context["underlying"] = chain.underlying
+        underlying = chain.underlying or {}
+        context["underlying"] = {key: underlying.get(key) for key in ("symbol", "regularMarketPrice", "regularMarketTime", "currency", "exchangeTimezoneName")}
+        context["underlying_detail"] = "prices quote SYMBOL returns the full underlying quote."
         sides = ["calls", "puts"] if args.side == "both" else [args.side]
         data = {}
         for side in sides:
