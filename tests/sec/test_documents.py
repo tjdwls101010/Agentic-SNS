@@ -59,8 +59,8 @@ def test_synthetic_outline_links_and_find_share_real_anchor_and_position(tmp_pat
     from reader import outline, find, links
     doc, store = snapshot(tmp_path, b'<a href="#risk">Risk factors</a><h2 id="risk">Item 1A. Risk Factors</h2><p>Direct <b>MARKET</b> tail.</p><img src="chart.jpg" alt="Revenue chart"><h2>No anchor heading</h2>')
     entries = outline(doc, store)['items']
-    assert any(x['kind'] == 'toc' and x['url'] == URL + '#risk' for x in entries)
-    assert any(x['kind'] == 'heading' and x['text'] == 'No anchor heading' and x['url'] == URL for x in entries)
+    assert any(x['kind'] == 'toc' and x['anchor'] == 'risk' and 'url' not in x for x in entries)
+    assert any(x['kind'] == 'heading' and x['text'] == 'No anchor heading' and 'url' not in x for x in entries)
     matches = find(doc, store, query='market')['items']
     assert read(doc, store, position=matches[0]['position'])['text'].startswith('MARKET tail.')
     assert not find(doc, store, query='market', case_sensitive=True)['items']
@@ -303,14 +303,15 @@ def test_synthetic_inline_image_and_unresolved_links_do_not_become_fake_toc(tmp_
 def test_synthetic_find_cursor_rejects_query_operation_changes_and_corruption(tmp_path):
     from reader import find
     doc, store = snapshot(tmp_path, ('<p>' + 'needle ' * 30 + '</p>').encode())
-    result = find(doc, store, query='needle', limit=3)
+    result = find(doc, store, query='needle', budget=1100)
+    assert result['has_more']
     with pytest.raises(SecError):
-        find(doc, store, query='other', limit=3, cursor=result['next_cursor'])
+        find(doc, store, query='other', budget=1100, cursor=result['next_cursor'])
     with pytest.raises(SecError):
-        read(doc, store, limit=3, cursor=result['next_cursor'])
+        read(doc, store, budget=1100, cursor=result['next_cursor'])
     (store.root / result['next_cursor']).write_bytes(b'corrupt cursor')
     with pytest.raises(SecError) as error:
-        find(doc, store, query='needle', limit=3, cursor=result['next_cursor'])
+        find(doc, store, query='needle', budget=1100, cursor=result['next_cursor'])
     assert error.value.code == 'cache_corrupt'
 
 
@@ -330,21 +331,22 @@ def test_review_inline_anchors_preserve_text_and_exact_offsets(tmp_path, markup)
     expected = 'micro soft tail' if markup.startswith('  ') else 'microsoft tail'
     assert read(doc, store)['text'] == expected + '\njump'
     assert find(doc, store, query=expected)['items']
-    anchor = next(x for x in outline(doc, store)['items'] if x['kind'] == 'anchor')
-    assert anchor['url'] == URL + '#x'
+    navigation = outline(doc, store, kinds=('anchor', 'internal_link'))['items']
+    anchor = next(x for x in navigation if x['kind'] == 'anchor')
+    assert set(anchor) == {'kind', 'text', 'position'} and anchor['text'] == 'x'
     assert read(doc, store, position=anchor['position'])['text'].startswith('soft tail')
-    target = next(x for x in outline(doc, store)['items'] if x['kind'] == 'internal_link')
+    target = next(x for x in navigation if x['kind'] == 'internal_link')
     assert target['position'] == anchor['position']
 
 
 def test_review_next_position_preserves_unreturned_block_separator(tmp_path):
     store = Store(tmp_path / 'cache')
-    source = SourceDocument(('<p>' + 'A' * 101 + '</p><p>END</p>').encode(), {'url': 'https://www.sec.gov/Archives/edgar/data/1/report.htm'})
+    source = SourceDocument(('<p>' + 'A' * 1500 + '</p><p>END</p>').encode(), {'url': 'https://www.sec.gov/Archives/edgar/data/1/report.htm'})
     doc = parse_document(source, store)
     first = read(doc, store, budget=1024)
     assert first['has_more']
-    assert first['text'] + read(doc, store, position=first['next_position'])['text'] == 'A' * 101 + '\nEND'
-    assert read(doc, store, position=f'{doc.id}:0:101', end=f'{doc.id}:1:0')['text'] == '\n'
+    assert first['text'] + read(doc, store, position=first['next_position'])['text'] == 'A' * 1500 + '\nEND'
+    assert read(doc, store, position=f'{doc.id}:0:1500', end=f'{doc.id}:1:0')['text'] == '\n'
 
 
 @pytest.mark.parametrize('headers', [{'Content-Type': 'application/xml'}, {'Content-Type': 'text/xml'}, {}])
@@ -365,13 +367,14 @@ def test_review_find_and_read_share_canonical_cross_block_ranges(tmp_path, query
     assert read(doc, store, position=hits[0]['position'], end=hits[0]['match_end'])['text'] == expected
     if query.isupper():
         assert not find(doc, store, query=query, case_sensitive=True)['items']
-    first = find(doc, store, query='\n', limit=1)
+    many, _ = snapshot(tmp_path, b'<p>x</p>' * 40)
+    first = find(many, store, query='\n', budget=1024)
     assert first['has_more']
-    second = find(doc, store, query='\n', limit=1, cursor=first['next_cursor'])
+    second = find(many, store, query='\n', budget=1024, cursor=first['next_cursor'])
     for page in [first, second]:
-        hit = page['items'][0]
-        assert read(doc, store, position=hit['position'], end=hit['match_end'])['text'] == '\n'
-    assert not second['has_more']
+        for hit in page['items']:
+            assert read(many, store, position=hit['position'], end=hit['match_end'])['text'] == '\n'
+    assert len(first['items']) + len(second['items']) < 39
 
 
 @pytest.mark.parametrize('prefix', ['ix', 'inline'])
@@ -397,3 +400,42 @@ def test_nonbody_metadata_is_excluded_from_table_cell_text_too(tmp_path):
     assert 'MACHINE_ONLY_FACT' not in read(doc, store)['text']
     cells = [item for item in table(doc, store, table_id='table-0')['items'] if item['kind'] == 'cell']
     assert cells[0]['text'] == '100 units'
+
+
+# Output density: the snapshot argument already names the copy, so positions carry only block:offset.
+def test_positions_are_block_offset_and_snapshot_prefixed_positions_are_still_accepted(tmp_path):
+    from reader import find, outline
+    doc, store = snapshot(tmp_path, b'<h2 id="a">Alpha</h2><p>beta gamma</p>')
+    hit = find(doc, store, query='gamma')['items'][0]
+    assert hit['position'] == '1:5' and hit['match_end'] == '2:0'
+    assert read(doc, store, position='1:5')['text'] == 'gamma'
+    assert read(doc, store, position=f'{doc.id}:1:5', end='1:10')['text'] == 'gamma'
+    assert outline(doc, store)['items'][0]['position'] == '0:0'
+    other = parse_document(SourceDocument(b'<p>other</p>', {'url': URL}), store)
+    with pytest.raises(SecError) as error:
+        read(doc, store, position=f'{other.id}:0:0')
+    assert error.value.code == 'invalid_position'
+
+
+def test_contents_links_to_one_target_merge_into_one_entry_and_table_header_skips_empty_rows(tmp_path):
+    from reader import outline
+    body = (b'<table><tr><td><a href="#i1">Item 1.</a></td><td><a href="#i1">Business</a></td><td><a href="#i1">1</a></td></tr>'
+            b'<tr><td><a href="#i2">Item 2.</a></td><td><a href="#i2">Properties</a></td></tr></table>'
+            b'<h2 id="i1">Item 1. Business</h2><p>Sales:</p><table><tr><td></td><td></td></tr><tr><td>Region</td><td></td><td>2025</td></tr></table><h2 id="i2">Item 2. Properties</h2>')
+    doc, store = snapshot(tmp_path, body)
+    items = outline(doc, store)['items']
+    toc = [x for x in items if x['kind'] == 'toc']
+    assert [x['text'] for x in toc] == ['Item 1. Business 1', 'Item 2. Properties']
+    assert toc[0]['anchor'] == 'i1'
+    table_entry = next(x for x in items if x['kind'] == 'table' and x['table_id'] == 'table-1')
+    assert table_entry['header'] == 'Region | 2025' and table_entry['context'] == 'Sales:'
+
+
+def test_reader_pages_are_bounded_by_budget_alone(tmp_path):
+    from reader import outline
+    body = ''.join(f'<h2>Heading {i}</h2>' for i in range(60)).encode()
+    doc, store = snapshot(tmp_path, body)
+    page = outline(doc, store)
+    assert len(page['items']) == 60 and page['scope_complete']
+    small = outline(doc, store, budget=1024)
+    assert 0 < len(small['items']) < 60 and small['has_more'] and small['next_cursor']

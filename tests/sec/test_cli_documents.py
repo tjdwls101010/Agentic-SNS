@@ -1,4 +1,5 @@
 """CLI integration at the HTTP boundary and immutable document reader seam."""
+import re
 
 URL = "https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/integration.htm"
 HTML = b"""<html><body><h1 id="risk">Risk factors</h1><p>Access denied controls cost \x80 20.</p><p>Competition evidence.</p><table><tr><th>Year</th><th>Revenue</th></tr><tr><td>2024</td><td>42</td></tr></table><a href="#risk">Return to risks</a><img src="chart.png" alt="Sales chart"></body></html>"""
@@ -34,7 +35,6 @@ def test_open_summary_is_bounded_and_outline_discovers_all_table_ids(cli):
     assert code == 0 and opened["table_count"] == 30
     assert opened["returned_chars"] == len(cli.last_output) <= 1024
     assert opened["tables_has_more"] is True
-    assert "outline" in opened["table_discovery"]
     cli.identity.write_text('EDGAR_IDENTITY=""')
     cursor, table_ids = None, []
     while True:
@@ -99,3 +99,54 @@ def test_long_read_cursor_is_exact_bounded_and_reusable_without_network(cli):
     assert len(cli.calls) == 1
     code, error = cli("read", opened["snapshot_id"], "--max-chars", "4096", "--cursor", first_cursor)
     assert code == 2 and error["error"]["code"] == "cursor_mismatch"
+
+
+STRUCTURED = (
+    b'<html><body><a href="#part1">Part I</a><h2 id="part1">Item 1. Business</h2><p>Narrative.</p>'
+    b'<a name="pb1"></a><p>Net sales by category were:</p><table><caption>Sales table</caption>'
+    b"<tr><th>Category</th><th>2025</th></tr><tr><td>iPhone</td><td></td><td>209,586</td></tr></table>"
+    b"<h2>Item 1A. Risk Factors</h2></body></html>"
+)
+
+
+def test_outline_defaults_to_contents_and_tables_and_exposes_table_context(cli):
+    cli.replies.append(("integration.htm", 200, STRUCTURED, {"content-type": "text/html"}))
+    code, opened = cli("open", URL)
+    assert code == 0 and "table_discovery" not in opened
+    snapshot = opened["snapshot_id"]
+    (table,) = opened["tables"]
+    assert table["table_id"] == "table-0" and table["rows"] == 2
+    assert table["context"] == "Sales table" and table["header"] == "Category | 2025"
+    assert re.fullmatch(r"\d+:\d+", table["position"])
+    cli.identity.write_text('EDGAR_IDENTITY=""')
+    code, read = cli("read", snapshot, "--position", table["position"])
+    assert code == 0 and read["text"].startswith("Sales table\nCategory\n2025")
+    code, outline = cli("outline", snapshot)
+    assert code == 0 and outline["scope_complete"] is True
+    assert [item["kind"] for item in outline["items"]] == ["toc", "heading", "table", "heading"]
+    toc, business, table_entry, risk = outline["items"]
+    assert toc["text"] == "Part I" and toc["anchor"] == "part1" and toc["position"] == business["position"]
+    assert set(business) == {"kind", "text", "position", "anchor"} and business["anchor"] == "part1"
+    assert set(risk) == {"kind", "text", "position"} and risk["text"] == "Item 1A. Risk Factors"
+    assert set(table_entry) == {"kind", "position", "table_id", "rows", "context", "header"}
+    assert "context_position" not in toc
+    assert table_entry["context"] == "Sales table" and table_entry["position"] == table["position"]
+    code, anchors = cli("outline", snapshot, "--kind", "anchor")
+    assert code == 0 and [item["text"] for item in anchors["items"]] == ["part1", "pb1"]
+    code, mixed = cli("outline", snapshot, "--kind", "table,anchor")
+    assert code == 0 and [item["kind"] for item in mixed["items"]] == ["anchor", "anchor", "table"]
+    code, error = cli("outline", snapshot, "--kind", "chapter")
+    assert code == 2 and error["error"]["code"] == "invalid_argument" and "anchor" in error["error"]["fix"]
+    assert len(cli.calls) == 1
+
+
+def test_reader_commands_have_no_item_limit_and_reject_it(cli):
+    cli.replies.append(("integration.htm", 200, STRUCTURED, {"content-type": "text/html"}))
+    code, opened = cli("open", URL)
+    assert code == 0
+    code, error = cli("outline", opened["snapshot_id"], "--limit", "5")
+    assert code == 2 and error["error"]["code"] == "invalid_argument"
+    code, result = cli("schema")
+    reader_options = {name: [o["names"][0] for o in c["options"]] for name, c in result["commands"].items()}
+    for name in ("outline", "find", "read", "table", "links"):
+        assert "--limit" not in reader_options[name], name

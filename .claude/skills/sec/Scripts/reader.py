@@ -1,22 +1,24 @@
 """Budgeted navigation over one immutable snapshot; no parsing or network access."""
 import json
 from bisect import bisect_right
+from urllib.parse import unquote
 
 from output import SecError
 from store import digest
 
 
 def position(snapshot, block, offset=0):
-    return f'{snapshot.id}:{block}:{offset}'
+    # The snapshot argument already names the copy; positions carry only block:offset.
+    return f'{block}:{offset}'
 
 
 def _position(snapshot, value, default):
     if value is None:
         return default
     try:
-        sid, block, offset = value.split(':')
+        *sid, block, offset = value.split(':')
         block, offset = int(block), int(offset)
-        if sid != snapshot.id or block < 0 or offset < 0:
+        if sid not in ([], [snapshot.id]) or block < 0 or offset < 0:
             raise ValueError
         blocks = snapshot.data['blocks']
         if block > len(blocks) or (block == len(blocks) and offset) or (block < len(blocks) and offset > len(blocks[block]['text'])):
@@ -26,10 +28,39 @@ def _position(snapshot, value, default):
         raise SecError('invalid_position', 'Position belongs to a different snapshot or is out of range.', 'Use a position returned for this snapshot.') from None
 
 
-def _page(snapshot, store, operation, options, items, cursor, limit, budget):
-    if not isinstance(limit, int) or not 1 <= limit <= 20 or not isinstance(budget, int) or not 1024 <= budget <= 12000:
-        raise SecError('invalid_budget', 'Limit must be 1..20 and budget must be 1024..12000 characters.', 'Use the defaults or values in these ranges.')
-    query = {'version': 2, 'operation': operation, 'snapshot_id': snapshot.id, 'options': options, 'limit': limit, 'budget': budget}
+# Budget bounds: the host tool truncates Bash results around 30,000 characters, so the ceiling stays below that.
+MIN_BUDGET, DEFAULT_BUDGET, MAX_BUDGET = 1024, 12000, 24000
+OUTLINE_KINDS = ('toc', 'heading', 'table', 'anchor', 'internal_link')
+DEFAULT_OUTLINE_KINDS = ('toc', 'heading', 'table')
+# Fields the model acts on; block bookkeeping stays inside the position string.
+INTERNAL = ('block', 'offset', 'text_offset', 'text_complete', 'context_block', 'target_resolved')
+
+
+def _public(operation, item, source_url):
+    if operation == 'table':
+        return item
+    public = {k: v for k, v in item.items() if k not in INTERNAL and v != ''}
+    if operation == 'read':
+        public.pop('text', None)
+    if operation == 'outline':
+        public.pop('context_position', None)
+    if item.get('kind') in ('table', 'anchor'):
+        public.pop('text', None) if item['kind'] == 'table' else None
+        public.pop('url', None)
+    elif operation != 'links' and 'url' in public:
+        # The envelope carries source_url once; an item names only the anchor observed in the original DOM.
+        url = public.pop('url')
+        if url.startswith(source_url + '#'):
+            public['anchor'] = unquote(url[len(source_url) + 1:])
+    if operation == 'links' and 'target_resolved' in item:
+        public['target_resolved'] = item['target_resolved']
+    return public
+
+
+def _page(snapshot, store, operation, options, items, cursor, budget):
+    if not isinstance(budget, int) or not MIN_BUDGET <= budget <= MAX_BUDGET:
+        raise SecError('invalid_budget', f'max-chars must be {MIN_BUDGET}..{MAX_BUDGET} characters.', 'Use the default or a value in this range.')
+    query = {'version': 3, 'operation': operation, 'snapshot_id': snapshot.id, 'options': options, 'budget': budget}
     # Validate saved bytes on every public read, including callers holding a snapshot object.
     encoded = json.dumps(snapshot.data, sort_keys=True, ensure_ascii=False).encode()
     if digest(encoded) != snapshot.id:
@@ -49,7 +80,7 @@ def _page(snapshot, store, operation, options, items, cursor, limit, budget):
     def size():
         return len(json.dumps(result, ensure_ascii=False, indent=2)) + 1
 
-    while index < len(items) and len(result['items']) < limit:
+    while index < len(items):
         original = items[index]
         text = original.get('text', '')
         remaining = text[offset:]
@@ -58,7 +89,7 @@ def _page(snapshot, store, operation, options, items, cursor, limit, budget):
             item['position'] = position(snapshot, original['block'], original.get('offset', 0) + (offset if operation == 'read' else 0))
         if 'context_block' in original:
             item['context_position'] = position(snapshot, original['context_block'], 0)
-        result['items'].append(item)
+        result['items'].append(_public(operation, item, snapshot.data['source']['url']))
         prefix = result.get('text', '')
         if operation == 'read':
             result['text'] = prefix + remaining
@@ -112,7 +143,7 @@ def _canonical(snapshot):
     return text, starts
 
 
-def read(snapshot, store, *, position=None, end=None, cursor=None, limit=20, budget=12000):
+def read(snapshot, store, *, position=None, end=None, cursor=None, budget=DEFAULT_BUDGET):
     start = _position(snapshot, position, (0, 0))
     stop = _position(snapshot, end, (len(snapshot.data['blocks']), 0))
     if stop < start:
@@ -128,14 +159,18 @@ def read(snapshot, store, *, position=None, end=None, cursor=None, limit=20, bud
         if hi <= lo and not (block.get('empty') and start <= (i, 0) < stop):
             continue
         items.append(dict(block, text=text[lo:hi], block=i, offset=lo - starts[i]))
-    return _page(snapshot, store, 'read', {'position': position, 'end': end}, items, cursor, limit, budget)
+    return _page(snapshot, store, 'read', {'position': position, 'end': end}, items, cursor, budget)
 
 
-def outline(snapshot, store, *, cursor=None, limit=20, budget=12000):
-    return _page(snapshot, store, 'outline', {}, snapshot.data['outline'], cursor, limit, budget)
+def outline(snapshot, store, *, kinds=DEFAULT_OUTLINE_KINDS, cursor=None, budget=DEFAULT_BUDGET):
+    kinds = tuple(kinds)
+    if not kinds or any(kind not in OUTLINE_KINDS for kind in kinds):
+        raise SecError('invalid_argument', 'Unknown outline kind.', 'Use kinds from: ' + ', '.join(OUTLINE_KINDS) + '.')
+    items = [item for item in snapshot.data['outline'] if item['kind'] in kinds]
+    return _page(snapshot, store, 'outline', {'kinds': sorted(kinds)}, items, cursor, budget)
 
 
-def find(snapshot, store, *, query, case_sensitive=False, cursor=None, limit=20, budget=12000):
+def find(snapshot, store, *, query, case_sensitive=False, cursor=None, budget=DEFAULT_BUDGET):
     if not query:
         raise SecError('invalid_query', 'Search text cannot be empty.', 'Provide a nonempty literal string.')
     import re
@@ -155,18 +190,18 @@ def find(snapshot, store, *, query, case_sensitive=False, cursor=None, limit=20,
         items.append({'block': block, 'offset': offset, 'match_end': position(snapshot, *locate(match.end())),
                       'text': text[max(0, match.start() - 60):match.end() + 100],
                       'url': snapshot.data['blocks'][block].get('url', snapshot.data['source']['url'])})
-    return _page(snapshot, store, 'find', {'query': query, 'case_sensitive': case_sensitive}, items, cursor, limit, budget)
+    return _page(snapshot, store, 'find', {'query': query, 'case_sensitive': case_sensitive}, items, cursor, budget)
 
 
-def links(snapshot, store, *, kind=None, cursor=None, limit=20, budget=12000):
+def links(snapshot, store, *, kind=None, cursor=None, budget=DEFAULT_BUDGET):
     if kind not in (None, 'image', 'internal', 'external'):
         raise SecError('invalid_kind', 'Unknown link kind.', 'Use image, internal or external.')
     items = [item for item in snapshot.data['links'] if kind is None or item['kind'] == kind]
-    return _page(snapshot, store, 'links', {'kind': kind}, items, cursor, limit, budget)
+    return _page(snapshot, store, 'links', {'kind': kind}, items, cursor, budget)
 
 
-def table(snapshot, store, *, table_id, cursor=None, limit=20, budget=12000):
+def table(snapshot, store, *, table_id, cursor=None, budget=DEFAULT_BUDGET):
     selected = next((t for t in snapshot.data['tables'] if t['table_id'] == table_id), None)
     if selected is None:
         raise SecError('invalid_table', 'Table identifier is not in this snapshot.', 'Use table_id from open output.')
-    return _page(snapshot, store, 'table', {'table_id': table_id}, selected['items'], cursor, limit, budget)
+    return _page(snapshot, store, 'table', {'table_id': table_id}, selected['items'], cursor, budget)

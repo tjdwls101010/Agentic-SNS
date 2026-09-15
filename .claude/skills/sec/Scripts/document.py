@@ -22,9 +22,13 @@ class DocumentSnapshot:
     id: str
     data: dict
 
+    def table_entry(self, table):
+        return {'table_id': table['table_id'], 'rows': table['rows'], 'position': f"{table['block']}:0",
+                'context': table['context'], 'header': table['header']}
+
     def summary(self):
         return {'snapshot_id': self.id, 'source': self.data['source'], 'status': self.data['status'],
-                'format': self.data['format'], 'blocks': len(self.data['blocks']), 'tables': [{k: v for k, v in t.items() if k != 'items'} for t in self.data['tables'][:20]],
+                'format': self.data['format'], 'blocks': len(self.data['blocks']), 'tables': [self.table_entry(t) for t in self.data['tables'][:20]],
                 'table_count': len(self.data['tables']), 'tables_has_more': len(self.data['tables']) > 20,
                 'encoding': self.data['encoding'], 'warnings': self.data['warnings'],
                 'extraction_complete': self.data['extraction_complete']}
@@ -140,6 +144,7 @@ def _html_blocks(text, url):
 
     walk(root)
     flush()
+    contents = {}
     for node, item in link_nodes.items():
         item['context_block'] = min(item['block'], max(0, len(blocks) - 1))
         if item['kind'] == 'internal' and item['target_resolved']:
@@ -148,7 +153,14 @@ def _html_blocks(text, url):
             if target_position is not None:
                 target_block = target_position['block']
                 kind = 'toc' if target_block < len(blocks) and blocks[target_block]['kind'] == 'heading' else 'internal_link'
-                outlines.append(dict(item, kind=kind, block=target_block, offset=target_position['offset']))
+                entry = dict(item, kind=kind, block=target_block, offset=target_position['offset'])
+                # A contents row often links its item number, title and page separately; one target is one entry.
+                if kind == 'toc' and (target_block, entry['offset']) in contents:
+                    contents[(target_block, entry['offset'])]['text'] += ' ' + entry['text']
+                    continue
+                if kind == 'toc':
+                    contents[(target_block, entry['offset'])] = entry
+                outlines.append(entry)
     tables = []
     for node in table_nodes:
         if node not in node_blocks:
@@ -202,9 +214,18 @@ def _html_blocks(text, url):
                     target = target.getparent()
                 records.append({'kind': 'footnote', 'text': _dom_text(target, nonbody_tags),
                                 'url': urljoin(url, anchor.get('href')), 'block': node_blocks.get(target, 0)})
-        outlines.append({'kind': 'table', 'text': table_id, 'table_id': table_id, 'block': block_index, 'offset': 0, 'url': url})
+        # The caption or the nearest preceding prose names the table; the first row shows what it measures.
+        context = next((r['text'] for r in reversed(records) if r['kind'] in ('caption', 'context') and r['text']), '')
+        header_row = next((r['row'] for r in records if r['kind'] == 'cell' and r['text']), None)
+        header = ' | '.join(r['text'] for r in records if r['kind'] == 'cell' and r['row'] == header_row and r['text'])
+        outlines.append({'kind': 'table', 'text': table_id, 'table_id': table_id, 'block': block_index, 'offset': 0,
+                         'url': url, 'rows': len(rows), 'context': context, 'header': header})
         tables.append({'table_id': table_id, 'rows': len(rows), 'block': block_index, 'items': records,
+                       'context': context, 'header': header,
                        'parent_table_id': table_ids.get(next(node.iterancestors('table'), None))})
+    # Reading order: a contents entry precedes the heading it points to, then tables at that position.
+    rank = {'toc': 0, 'heading': 1, 'table': 2, 'anchor': 3, 'internal_link': 4}
+    outlines.sort(key=lambda item: (item['block'], item['offset'], rank[item['kind']]))
     return blocks, outlines, link_items, tables, excluded_metadata
 
 

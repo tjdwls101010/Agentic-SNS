@@ -97,8 +97,8 @@ def query_options(args):
 
 
 def validate_options(args):
-    if hasattr(args, "budget") and not 1024 <= args.budget <= 12000:
-        raise SecError("invalid_budget", "max-chars must be 1024..12000.", "Use a budget within this range.")
+    if hasattr(args, "budget") and not 1024 <= args.budget <= 24000:
+        raise SecError("invalid_budget", "max-chars must be 1024..24000.", "Use a budget within this range.")
     if hasattr(args, "limit") and not 1 <= args.limit <= 100:
         raise SecError("invalid_argument", "limit must be between 1 and 100.", "Choose a limit from 1 to 100.")
     if hasattr(args, "query") and not args.query.strip():
@@ -395,9 +395,6 @@ def open_filing(args, store, transport):
         summary = snapshot.summary()
         summary["source"] = source
         summary["tables"] = summary["tables"][: args.limit]
-        summary["table_discovery"] = (
-            "Run outline with this snapshot_id and follow next_cursor; kind=table entries contain every table_id."
-        )
         summary["returned_chars"] = args.budget
         while len(json.dumps(summary, ensure_ascii=False, indent=2)) + 1 > args.budget and summary["tables"]:
             summary["tables"].pop()
@@ -487,8 +484,10 @@ def execute(args, store):
         from document import load_snapshot
 
         snapshot = load_snapshot(store, args.snapshot)
-        options = {"cursor": args.cursor, "limit": args.limit, "budget": args.budget}
-        if args.command == "find":
+        options = {"cursor": args.cursor, "budget": args.budget}
+        if args.command == "outline":
+            options["kinds"] = [kind.strip() for kind in args.kind.split(",")]
+        elif args.command == "find":
             options.update(query=args.query, case_sensitive=args.case_sensitive)
         elif args.command == "read":
             options.update(position=args.position, end=args.end)

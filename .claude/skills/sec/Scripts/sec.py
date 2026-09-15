@@ -25,7 +25,7 @@ def parser():
         "filings": "List company filings newest first, keeping submission dates, report dates and amendments distinct.",
         "search": "Search filing and exhibit text since 2001 by default; each document remains a separate hit.",
         "open": "Open a filing index to list exhibits, or save an original document as an immutable reading snapshot.",
-        "outline": "List source anchors, detected headings and every table ID in a saved snapshot; follow next_cursor to finish.",
+        "outline": "List a saved snapshot's contents links, detected headings and tables with their context; --kind selects anchors or link targets instead.",
         "find": "Find a literal string in one saved snapshot; matching ignores case unless --case-sensitive is set.",
         "read": "Read a saved snapshot range using opaque positions; no identity or network access is required.",
         "table": "Read one table with cell structure and context; get table IDs from open or the complete outline.",
@@ -86,19 +86,19 @@ def parser():
             sub.add_argument(
                 "--cursor", help="Opaque continuation for this operation; repeat the same snapshot and all options."
             )
-            sub.add_argument(
-                "--limit",
-                type=int,
-                default=20,
-                help="Maximum returned items, 1–20 (default 20); long items continue through next_cursor.",
-            )
         if name in ["open", "outline", "find", "read", "table", "links"]:
             sub.add_argument(
                 "--max-chars",
                 dest="budget",
                 type=int,
                 default=12000,
-                help="Document response budget including its envelope, 1024–12000 characters (default 12000); filing-index lists use --limit.",
+                help="Response budget including its envelope, 1024–24000 characters (default 12000); the only page boundary for reader commands, kept below the host's ~30,000-character tool-output truncation.",
+            )
+        if name == "outline":
+            sub.add_argument(
+                "--kind",
+                default="toc,heading,table",
+                help="Comma-separated kinds from toc, heading, table, anchor, internal_link (default toc,heading,table); anchors are citation targets, not navigation.",
             )
         if name == "find":
             sub.add_argument("query", help="Nonempty literal text to find in snapshot text and table cells.")
@@ -149,6 +149,8 @@ def schema():
         "defaults": {
             "limit": 20,
             "max_chars": 12000,
+            "max_chars_ceiling": 24000,
+            "max_chars_reason": "the host truncates tool output around 30,000 characters; 12000 keeps several reads in one context window",
             "requests_per_second": 2,
             "search_from": "2001-01-01",
             "sort": "date",
@@ -193,8 +195,7 @@ def schema():
             "format": "html, xml, sgml, text, pdf or image; PDF/image open succeeds with unsupported status and original access path",
             "encoding": "selected encoding, original declarations, inferred/conflict/loss flags",
             "blocks": "number of saved reading blocks",
-            "tables": "bounded first table summaries; table_count is the total, tables_has_more marks omitted summaries",
-            "table_discovery": "run outline on snapshot_id and follow next_cursor; kind=table entries expose every table_id",
+            "tables": "first table entries {table_id, rows, position, context, header}; context is the caption or nearest preceding prose and header the first row; table_count is the total, tables_has_more marks omitted entries and outline lists them all",
             "warnings": "extraction limitations such as encoding_loss, unsupported_format or image_content_not_extracted",
             "extraction_complete": "document extraction completeness; distinct from finishing the selected output range",
             "returned_chars": "actual emitted character count including the trailing newline; document summary obeys --max-chars",
@@ -202,7 +203,7 @@ def schema():
         "reading": {
             "snapshot_id": "same immutable snapshot for outline/find/read/table/links; no identity, fetch or reparsing is required",
             "position": "opaque snapshot-bound internal position; use returned values unchanged and do not turn them into SEC URL fragments",
-            "items": "outline: source anchors/toc/internal links, detected headings and tables; find: literal-match context and match_end; read: selected blocks; table: context/caption/cells with row/column/spans/header plus links; links: kind/url/context",
+            "items": "outline: {kind, text, position} plus url only for a verified anchor and table_id/rows/context/header for tables; find: match text with position and match_end; read: {kind, position} per returned block while text carries the prose once; table: context/caption/cells with row/column/spans/header plus links; links: kind/url/text/position/context_position",
             "context_position": "when present, a saved internal location for surrounding evidence",
             "url": "an original source URL; an anchor is exposed only when observed in the original DOM",
             "next_position": "read continuation position, or null at selected range end; --end remains exclusive",
@@ -211,7 +212,7 @@ def schema():
             "scope_complete": "selected range/output returned completely; does not imply extraction_complete",
             "remaining_items": "unreturned operation items, including an item whose text is only partially returned",
             "text_complete": "false on a long item continued by next_cursor; text_offset is its returned slice offset",
-            "returned_chars": "actual emitted characters including envelope and trailing newline; --max-chars 1024..12000, --limit 1..20",
+            "returned_chars": "actual emitted characters including envelope and trailing newline; --max-chars 1024..24000 is the only page boundary",
             "extraction_complete": "whether extraction is complete independently of output pagination",
         },
         "recovery": {
@@ -222,7 +223,7 @@ def schema():
             "filing_mismatch": "verify the exact accession and a declared filer CIK; never substitute the latest filing",
             "access_denied/rate_limited": "check identity and pause before retrying; 403/429 are never automatically retried",
             "parse_failed": "inspect the original source; parsing failures are errors rather than empty documents",
-            "budget_too_small": "increase --max-chars within 1024..12000 or follow the original URL",
+            "budget_too_small": "increase --max-chars within 1024..24000 or follow the original URL",
             "invalid_table": "follow outline continuations for every table_id in this snapshot",
             "invalid_position": "use a position returned for this same snapshot",
         },
