@@ -74,11 +74,18 @@ def emit(results, max_chars=20000, request=None):
     status = "error" if states <= {"error", "not_attempted"} else next(iter(states)) if len(states) == 1 else "partial"
     text = dump({"status": status, "request": request, "results": results})
     if len(text) > max_chars:
-        data_chars = sum(len(dump(r["data"])) for r in results)
-        if len(results) > 1 and data_chars * 2 < len(text):
-            fix = f"{len(results)} targets need {len(text)} characters but their data is only {data_chars}; per-target context dominates. Rerun with --max-chars {len(text)} or split the targets into smaller batches; narrowing --fields or --limit cannot recover this much."
+        needed = len(text)
+        for _ in range(3):  # the echoed max_chars value changes the document length when its digit count changes
+            needed = max(len(text), len(text) - len(str(max_chars)) + len(str(needed)))
+        envelope = len(text) - sum(len(dump(r["data"])) for r in results)
+        if request is None or "scope" in request:
+            fix = f"Scope schema to GROUP LEAF or add --filter TEXT; alternatively rerun with --max-chars {needed}."
+        elif request.get("list_fields"):
+            fix = f"Narrow field discovery with --filter TEXT or query fewer targets; alternatively rerun with --max-chars {needed}."
+        elif len(results) > 1 and envelope > max_chars:
+            fix = f"{len(results)} targets need {len(text)} characters and their per-target context alone is {envelope}, above the limit, so narrowing --fields or --limit cannot fit it. Rerun with --max-chars {needed} or split the targets into smaller batches."
         else:
-            fix = f"Narrow --fields (discover with --list-fields --filter TEXT), --limit, --periods or --start/--end; scope schema to GROUP LEAF or use --filter TEXT; alternatively rerun with --max-chars {len(text)}."
+            fix = f"Narrow --fields (discover with --list-fields --filter TEXT), --limit, --periods or --start/--end; alternatively rerun with --max-chars {needed}."
         print(dump({"status": "error", "request": request, "results": [result("output", error=error_info("too_large", f"Result requires {len(text)} characters; limit is {max_chars}.", fix))]}))
         return 9
     print(text)

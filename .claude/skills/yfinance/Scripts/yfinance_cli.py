@@ -26,7 +26,7 @@ COMMANDS = {
     "options": {"expirations": "Available option expiration dates.", "chain": "Option contracts for an expiration and side; discover dates with options expirations."},
     "screen": {"presets": "Available named screeners.", "fields": "Filterable query field catalog for the selected --type.", "values": "Enumerated allowed values for query fields of the selected --type.", "run": "Run a preset or JSON query; equity, fund and ETF query types are supported."},
     "market": {"status": "Trading status; Yahoo may not provide regional status outside US.", "summary": "Market benchmark summary.", "sectors": "Sector keys accepted by market sector.", "sector": "Sector overview, industries, companies, funds or research.", "industry": "Industry overview, companies or research; discover keys through market sector --dataset industries."},
-    "calendar": {"earnings": "With SYMBOL: that company's past and announced earnings dates, paged by --limit/--offset, no date filter. Without SYMBOL: market earnings, native US scope, most-active filtering OFF by default; startdatetime >= start and <= end.", "economic": "Economic events: native startdatetime >= start and <= end; country appears per row.", "ipo": "IPO events: native gtelt range matches ANY of listing startdatetime, filingdate or amendeddate; endpoint boundary semantics are not independently verified.", "splits": "Split calendar: payable startdatetime >= start and <= end."},
+    "calendar": {"earnings": "With SYMBOL: that company's past and upcoming earnings dates, paged by --limit/--offset, no date filter. Without SYMBOL: market earnings, native US scope, most-active filtering OFF by default; startdatetime >= start and <= end.", "economic": "Economic events: native startdatetime >= start and <= end; country appears per row.", "ipo": "IPO events: native gtelt range matches ANY of listing startdatetime, filingdate or amendeddate; endpoint boundary semantics are not independently verified.", "splits": "Split calendar: payable startdatetime >= start and <= end."},
 }
 QUERY_HELP = '''JSON query: {"operator":OP,"operands":[...]}; field names come from screen fields, enumerated values from screen values.
 EQ [field, string|finite number] (2 operands); IS-IN [field, value, ...] (2+ operands).
@@ -90,7 +90,7 @@ def build_parser():
                 dates(p)
                 p.add_argument("--period", help="Relative range such as 5d, 1mo, 1y, ytd or max; default 1mo only when start/end are absent.")
                 p.add_argument("--interval", choices=["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"], default="1d", help="Bar size; intraday intervals cover only recent history.")
-                p.add_argument("--adjust", choices=["none", "auto", "back"], default="auto", help="none: raw OHLC plus Adj Close; auto: Open/High/Low/Close scaled for splits and dividends, Adj Close removed; back: Close kept raw while Open/High/Low are scaled by the adjustment ratio, Adj Close removed.")
+                p.add_argument("--adjust", choices=["none", "auto", "back"], default="auto", help="none: unadjusted OHLC as supplied plus Adj Close; auto: Open/High/Low/Close scaled for splits and dividends, Adj Close removed; back: Close kept raw while Open/High/Low are scaled by the adjustment ratio, Adj Close removed.")
                 p.add_argument("--repair", action="store_true", help="Opt into yfinance price repair; OFF by default.")
                 p.add_argument("--prepost", action="store_true", help="Include pre/post-market data where available.")
             if group == "company" and leaf == "shares":
@@ -118,7 +118,7 @@ def build_parser():
                     q.add_argument("--preset", help="Preset name from screen presets.")
                     p.add_argument("--offset", type=int, default=0, help="Remote row offset for the next page; context next_offset supplies it.")
                     p.add_argument("--sort", help="Sort field from screen fields; custom query default ticker, preset uses its defined sort.")
-                    p.add_argument("--ascending", action=argparse.BooleanOptionalAction, default=None, help="Sort direction; omitted means the preset's own direction, or descending for a custom query.")
+                    p.add_argument("--ascending", action=argparse.BooleanOptionalAction, default=None, help="Sort direction: --ascending or --no-ascending; omitted means the preset's own direction, or descending for a custom query.")
             if group == "market":
                 if leaf in {"status", "summary"}:
                     p.add_argument("--region", choices=[r.value for r in yf.MarketRegion], default="US", help="Yahoo market region.")
@@ -161,7 +161,14 @@ def resolve_defaults(args):
 def describe(parser, group, leaf):
     defaults = argparse.Namespace(group=group, leaf=leaf, **{a.dest: a.default for a in parser._actions if a.dest != "help"})
     resolve_defaults(defaults)
-    return {"description": parser.description, "arguments": {a.option_strings[-1] if a.option_strings else a.dest: {"help": a.help, "default": GLOBAL_DEFAULTS.get(a.dest) if a.default == argparse.SUPPRESS else getattr(defaults, a.dest, a.default), "choices": a.choices, "required": a.required} for a in parser._actions if a.dest != "help"}, "notes": parser.epilog, "default_context": "Defaults resolve for omitted options on this host at schema time; supplied dates disable the default price period, and presets select their own universe and sort.", "output": {"table": ["index", "columns", "data", "index_names", "column_names"], "statuses": ["ok", "empty", "partial", "error", "not_attempted"], "exit_codes": {"ok": 0, "invalid": 2, "rate_limited": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}, "selection": "--fields selects output fields; --list-fields discovers target-specific fields; --limit clips rows locally even if upstream returns more."}}
+    notes = ["Defaults shown are resolved on this host at schema time"]
+    if hasattr(defaults, "period"):
+        notes.append("supplied --start or --end disable the default --period")
+    if (group, leaf) == ("screen", "run"):
+        notes.append("a preset selects its own universe, sort field and direction unless overridden")
+    if group == "calendar":
+        notes.append("market-wide calendars default --start to today and --end to seven days later")
+    return {"description": parser.description, "arguments": {a.option_strings[0] if a.option_strings else a.dest: {"help": a.help, "default": GLOBAL_DEFAULTS.get(a.dest) if a.default == argparse.SUPPRESS else getattr(defaults, a.dest, a.default), "choices": a.choices, "required": a.required} for a in parser._actions if a.dest != "help"}, "notes": parser.epilog, "default_context": "; ".join(notes) + ".", "output": {"document": "One request for the whole document, null when the request itself was invalid; each result's context reports the conditions actually applied to that target, such as the selected options expiration, and rows before and after --limit.", "table": ["index", "columns", "data", "index_names", "column_names"], "statuses": ["ok", "empty", "partial", "error", "not_attempted"], "exit_codes": {"ok": 0, "invalid": 2, "rate_limited": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}}}
 
 
 def schema_data(args, leaves):

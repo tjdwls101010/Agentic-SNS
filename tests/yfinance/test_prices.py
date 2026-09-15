@@ -89,6 +89,36 @@ def test_envelope_dominated_oversize_recovery_names_budget_before_narrowing(cli)
     proc, doc = cli("prices", "history", *symbols, "--period", "5d", "--fields", "Close", "--limit", "1", "--max-chars", "5000", routes=many_symbol_routes(30))
     assert proc.returncode == 9, proc.stdout[:300] + proc.stderr
     fix = doc["results"][0]["error"]["fix"]
+    assert "split the targets" in fix
     assert "--max-chars" in fix
-    assert "--fields" not in fix.split("--max-chars")[0]
-    assert "target" in fix.lower()
+
+
+def test_advised_budget_is_sufficient_when_reused_verbatim(cli):
+    import re
+    symbols = [f"S{i:02d}" for i in range(30)]
+    args = ("prices", "history", *symbols, "--period", "5d", "--fields", "Close", "--limit", "1")
+    proc, doc = cli(*args, "--max-chars", "5000", routes=many_symbol_routes(30))
+    assert proc.returncode == 9, proc.stdout[:300] + proc.stderr
+    advised = re.search(r"--max-chars (\d+)", doc["results"][0]["error"]["fix"]).group(1)
+    proc, doc = cli(*args, "--max-chars", advised, routes=many_symbol_routes(30))
+    assert proc.returncode == 0, proc.stdout[:300] + proc.stderr
+
+
+def test_oversize_that_narrowing_can_fit_advises_narrowing(cli):
+    symbols = [f"S{i:02d}" for i in range(30)]
+    proc, doc = cli("prices", "history", *symbols, "--period", "5d", "--fields", "Close", "--max-chars", "14700", routes=many_symbol_routes(30))
+    assert proc.returncode == 9, proc.stdout[:300] + proc.stderr
+    fix = doc["results"][0]["error"]["fix"]
+    assert fix.startswith("Narrow")
+    assert "cannot" not in fix
+    proc, doc = cli("prices", "history", *symbols, "--period", "5d", "--fields", "Close", "--limit", "1", "--max-chars", "14700", routes=many_symbol_routes(30))
+    assert proc.returncode == 0, proc.stdout[:300] + proc.stderr
+
+
+def test_field_discovery_oversize_recovery_names_filter_not_selection(cli):
+    symbols = [f"S{i:02d}" for i in range(30)]
+    proc, doc = cli("prices", "history", *symbols, "--period", "5d", "--list-fields", "--max-chars", "1000", routes=many_symbol_routes(30))
+    assert proc.returncode == 9, proc.stdout[:300] + proc.stderr
+    fix = doc["results"][0]["error"]["fix"]
+    assert "--filter" in fix
+    assert "--fields" not in fix and "--limit" not in fix

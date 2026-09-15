@@ -24,6 +24,7 @@ def test_global_output_budget_is_honored_and_schema_recovery_is_scoped(cli):
     assert proc.returncode == 9, proc.stdout + proc.stderr
     assert doc["results"][0]["error"]["code"] == "too_large"
     assert "schema" in doc["results"][0]["error"]["fix"]
+    assert "--fields" not in doc["results"][0]["error"]["fix"]
     proc, doc = cli("schema", "--filter", "options", "--max-chars", "1000")
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert list(doc["results"][0]["data"]["commands"]) == ["options"]
@@ -137,3 +138,14 @@ def test_schema_and_requests_share_omitted_option_defaults(cli):
         assert doc['results'][0]['data']['arguments']['--limit']['default'] == limit
     proc, doc = cli('schema', 'prices', 'history')
     assert doc['results'][0]['data']['arguments']['--period']['default'] == '1mo'
+
+
+def test_scoped_schema_states_its_own_defaults_and_the_document_contract(cli):
+    proc, doc = cli("schema", "holders", "major")
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    data = doc["results"][0]["data"]
+    assert "period" not in data["default_context"] and "preset" not in data["default_context"]
+    assert "request" in data["output"]["document"] and "context" in data["output"]["document"]
+    proc, doc = cli("schema", "screen", "run", "--filter", "ascending")
+    assert "--ascending" in doc["results"][0]["data"]["arguments"]
+    assert "preset" in doc["results"][0]["data"]["default_context"]
