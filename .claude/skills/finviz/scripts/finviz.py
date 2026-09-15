@@ -1,563 +1,281 @@
-"""Read-only Finviz CLI."""
+"""Read-only Finviz CLI: one JSON document on stdout, diagnostics on stderr. `schema` describes every command from the parser itself."""
 
 import argparse
-import json
 import os
 from pathlib import Path
-import sys
 import re
 import subprocess
-import sqlite3
-from uuid import uuid4
+import sys
 from urllib.parse import urlencode
 
-from runtime import Failure, Store, fetch
-from extract import parse
-from collect import collect
-from maps import enrich
+import output
+from transport import Failure, Store, fetch
 
-
-def parser():
-    common = argparse.ArgumentParser(add_help=False, description="Shared output, storage and transport arguments.")
-    common.add_argument(
-        "--full",
-        action="store_true",
-        help="Explicitly emit full selected data, including large arrays; otherwise large outputs are previews.",
-    )
-    common.add_argument("--json", action="store_true", help="Emit structured JSON instead of compact text.")
-    common.add_argument(
-        "--store",
-        default=os.environ.get("FINVIZ_STORE", str(Path.home() / ".cache/finviz-skill/observations.sqlite3")),
-        help="SQLite observation store; reuse this location when reading saved IDs.",
-    )
-    common.add_argument("--connect-timeout", type=float, default=10, help="Connection timeout in seconds.")
-    common.add_argument("--timeout", type=float, default=60, help="Per-request timeout in seconds.")
-    common.add_argument(
-        "--max-bytes",
-        type=int,
-        default=16 * 1024 * 1024,
-        help="Maximum bytes per response; incomplete responses are marked.",
-    )
-    p = argparse.ArgumentParser(
-        description="Explore public Finviz data. Commands describe inputs; schema explains results.",
-        formatter_class=argparse.RawTextHelpFormatter,
-    )
-    sub = p.add_subparsers(dest="command", required=True)
-    lookup = sub.add_parser(
-        "lookup",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Find security candidates by name or ticker.",
-    )
-    lookup.add_argument("query", help="Company name or ticker.")
-    read = sub.add_parser(
-        "read",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Read a saved observation without fetching the network.",
-    )
-    read.add_argument("id", help="Saved observation ID.")
-    read.add_argument("--pointer", default="", help="JSON Pointer inside the saved observation, e.g. /data/results/0.")
-    read.add_argument(
-        "--raw", action="store_true", help="Read the original response text, including failed extraction."
-    )
-    screen = sub.add_parser(
-        "screen",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Screen stocks using current Finviz conditions; catalog lists filter values.",
-    )
-    screen.add_argument(
-        "--filter",
-        default=None,
-        help="Comma-separated native filters, e.g. sec_technology,cap_largeover; discover with catalog.",
-    )
-    screen.add_argument("--view", default="111", help="Finviz view identifier; use catalog for current choices.")
-    screen.add_argument("--columns", help="Comma-separated native column indices for the custom view.")
-    screen.add_argument("--sort", help="Native sort key, prefix - for descending; use --sort=-marketcap.")
-    screen.add_argument(
-        "--start", type=int, default=1, help="One-based row offset; follow returned continuation instead of guessing."
-    )
-    stock = sub.add_parser(
-        "stock",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Read a company or ETF, preserving source metrics and initial data.",
-    )
-    stock.add_argument("ticker", help="Resolved ticker from lookup.")
-    stock.add_argument(
-        "--section",
-        choices=[
-            "overview",
-            "earnings",
-            "dividends",
-            "revenue",
-            "forecast",
-            "short-interest",
-            "options",
-            "filings",
-            "income",
-            "balance",
-            "cashflow",
-        ],
-        default="overview",
-        help="Dataset to read; overview also includes available ETF and ownership data.",
-    )
-    stock.add_argument("--expiry", help="Options expiration YYYY-MM-DD from returned expiries.")
-    stock.add_argument("--page", type=int, help="Filings page, one-based.")
-    stock.add_argument("--sort", help="Filings sort key from returned controls.")
-    stock.add_argument(
-        "--period",
-        choices=["annual", "quarterly"],
-        default="annual",
-        help="Financial statement period; returned source periods remain authoritative.",
-    )
-    prices = sub.add_parser(
-        "prices",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Read source price bars; date and price array lengths are validated.",
-    )
-    prices.add_argument("ticker", help="Ticker or market instrument identifier.")
-    prices.add_argument(
-        "--instrument", default="stock", choices=["stock", "futures", "forex", "crypto"], help="Instrument family."
-    )
-    prices.add_argument("--timeframe", default="d", help="Source timeframe identifier, e.g. d, w, m.")
-    prices.add_argument("--bars", type=int, default=30, help="Requested number of bars; response coverage may differ.")
-    calendar = sub.add_parser(
-        "calendar",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Read earnings, dividend and economic events with source dates intact.",
-    )
-    calendar.add_argument(
-        "kind", choices=["earnings", "dividends", "economic", "season-preview"], help="Calendar dataset."
-    )
-    calendar.add_argument(
-        "--date", help="Starting date YYYY-MM-DD; application is confirmed only with response evidence."
-    )
-    calendar.add_argument("--page", type=int, default=1, help="One-based page.")
-    calendar.add_argument("--sort", default=None, help="Source ordering key.")
-    opened = sub.add_parser(
-        "open",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Read a supported Finviz URL; external article and filing URLs stay links.",
-    )
-    opened.add_argument("url", help="HTTPS Finviz read URL.")
-    groups = sub.add_parser(
-        "groups",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Read sector, industry, country or capitalization groups.",
-    )
-    groups.add_argument(
-        "--group", default="sector", help="Native grouping identifier; catalog groups lists page controls."
-    )
-    groups.add_argument("--view", default="210", help="210 uses performance API; other views read group tables.")
-    groups.add_argument("--sort", default="name", help="Native sort identifier.")
-    groups.add_argument("--period", default="d1", help="Performance period identifier.")
-    market = sub.add_parser(
-        "market",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Read market instrument data without reclassifying source instruments.",
-    )
-    market.add_argument("kind", choices=["futures", "forex", "crypto"], help="Source market surface.")
-    market.add_argument("--timeframe", default="d", help="Source price timeframe.")
-    market.add_argument(
-        "--performance", action="store_true", help="Read period performance instead of price summaries."
-    )
-    maps = sub.add_parser(
-        "map",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Read map performance and classification data; no visual rendering.",
-    )
-    maps.add_argument(
-        "--type", default="sec", help="Source map universe, e.g. sec, geo, sec_all, etf; catalog map lists navigation."
-    )
-    maps.add_argument("--period", default="d1", help="Performance period, e.g. d1, w1.")
-    maps.add_argument(
-        "--performance-only", action="store_true", help="Read performance values without classification assets."
-    )
-    maps.add_argument(
-        "--bubbles", action="store_true", help="Read bubble observations instead of hierarchical map data."
-    )
-    maps.add_argument("--x", default="sector", help="Bubble x field.")
-    maps.add_argument("--y", default="lastChange", help="Bubble y field.")
-    maps.add_argument("--size", default="marketCap", help="Bubble size field.")
-    maps.add_argument("--color", default="sector", help="Bubble color field.")
-    maps.add_argument("--index", default="sp500", help="Bubble stock universe.")
-    news = sub.add_parser(
-        "news",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Read Finviz news lists, own articles or source-generated Market Pulse explanations.",
-    )
-    news.add_argument("--view", default="2", help="Source view: 2 source, 3 stocks, 4 ETFs, 5 crypto, 6 Market Pulse.")
-    news.add_argument("--pulse", type=int, help="Market Pulse ID returned by a news row.")
-    news.add_argument("--url", help="Finviz-hosted article URL; use external readers for other hosts.")
-    insiders = sub.add_parser(
-        "insiders",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Read insider trade lists and original filing links.",
-    )
-    insiders.add_argument(
-        "--transaction", choices=["all", "buy", "sale"], default="all", help="Native transaction filter."
-    )
-    insiders.add_argument("--owner", help="Native owner identifier returned by source links.")
-    insiders.add_argument("--sort", help="Native ordering identifier.")
-    insiders.add_argument("--value", help="Native transaction-value threshold.")
-    catalog = sub.add_parser(
-        "catalog",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Discover current source controls, column definitions and navigation.",
-    )
-    catalog.add_argument(
-        "surface",
-        choices=["screen", "stock", "map", "groups", "calendar", "news", "insiders", "market"],
-        default="screen",
-        nargs="?",
-        help="Surface whose current interface to inspect.",
-    )
-    catalog.add_argument(
-        "--ticker",
-        default="A",
-        help="Example security for stock-specific choices; lookup resolves the intended security.",
-    )
-    sub.add_parser(
-        "doctor",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Check local Python, curl and observation storage; does not contact Finviz.",
-    )
-    sub.add_parser(
-        "schema",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Describe output semantics and recovery without fetching the network.",
-    )
-    inspect = sub.add_parser(
-        "inspect",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="List saved JSON Pointer locations and counts, without dumping records.",
-    )
-    inspect.add_argument("id", help="Saved observation ID.")
-    read.add_argument("--start", type=int, default=0, help="Zero-based array slice start at the selected pointer.")
-    read.add_argument(
-        "--limit", type=int, default=20, help="Number of selected array entries to display; saved content is unchanged."
-    )
-    collecting = sub.add_parser(
-        "collect",
-        parents=[common],
-        formatter_class=argparse.RawTextHelpFormatter,
-        help="Continue a saved query; resume with its c_ collection ID after failure or page limit.",
-    )
-    collecting.add_argument("id", help="Starting observation ID or existing c_ collection ID.")
-    collecting.add_argument(
-        "--max-pages",
-        type=int,
-        default=20,
-        help="Maximum additional pages in this invocation; the checkpoint retains the next URL.",
-    )
-    collecting.add_argument(
-        "--out",
-        help="JSONL export path: one full observation per line, preserving headers, metadata and errors; edited files are refused.",
-    )
-    return p
-
-
-def run(args):
-    store = Store(args.store)
-    if args.command == "collect":
-        if args.max_pages < 0:
-            raise Failure(
-                "invalid_argument",
-                "max-pages cannot be negative.",
-                "Use zero to inspect a checkpoint or a positive page budget.",
-            )
-        return collect(args, store)
-    if args.command == "doctor":
-        proc = subprocess.run(["curl", "--version"], capture_output=True, text=True)
-        version = re.search(r"curl (\d+)\.(\d+)\.(\d+)", proc.stdout)
-        valid = version is not None and tuple(map(int, version.groups())) >= (8, 4, 0) and sys.version_info >= (3, 11)
-        return dict(
-            status="ok" if valid else "error",
-            data=dict(
-                python=sys.version.split()[0],
-                curl=proc.stdout.splitlines()[0] if proc.stdout else proc.stderr,
-                store=str(store.path),
-            ),
-            errors=[] if valid else [dict(code="runtime_version", fix="Install Python 3.11+ and curl 8.4+.")],
-        )
-    if args.command == "schema":
-        return dict(status="ok", data=SCHEMA)
-    if args.command == "inspect":
-        return dict(
-            id=args.id,
-            status="ok",
-            data=inventory(store.collection(args.id) if args.id.startswith("c_") else store.get(args.id)),
-        )
-    if args.command == "read":
-        if (
-            args.start < 0
-            or args.limit < 0
-            or (args.pointer and not args.pointer.startswith("/"))
-            or re.search(r"~(?![01])", args.pointer)
-        ):
-            raise Failure(
-                "invalid_selection",
-                "Invalid JSON Pointer or negative read window.",
-                "Use pointers from inspect and non-negative start/limit values.",
-            )
-        if args.raw and (args.pointer or args.id.startswith("c_")):
-            raise Failure(
-                "invalid_selection",
-                "Raw reads require an observation ID without a pointer.",
-                "Use read OBSERVATION_ID --raw.",
-            )
-        data = store.collection(args.id) if args.id.startswith("c_") else store.get(args.id, raw=args.raw)
-        if args.raw:
-            data = data.decode("utf-8", errors="replace")
-        else:
-            for token in args.pointer.split("/")[1:]:
-                token = token.replace("~1", "/").replace("~0", "~")
-                if isinstance(data, list):
-                    if not re.fullmatch(r"0|[1-9][0-9]*", token):
-                        raise Failure(
-                            "invalid_pointer",
-                            "Array pointer requires a non-negative integer.",
-                            "Use a returned array position from inspect.",
-                        )
-                    data = data[int(token)]
-                else:
-                    data = data[token]
-        count = len(data) if isinstance(data, list) else None
-        if isinstance(data, list):
-            data = data[args.start : args.start + args.limit]
-        context = {} if args.id.startswith("c_") else store.get(args.id)
-        return dict(
-            id=args.id,
-            status="ok",
-            observation_status=context.get("status"),
-            source=context.get("source"),
-            conditions=context.get("conditions"),
-            coverage=context.get("coverage"),
-            errors=context.get("errors", []),
-            data=data,
-            selection=dict(
-                pointer=args.pointer,
-                received=count,
-                shown=len(data) if isinstance(data, list) else None,
-                start=args.start,
-            ),
-        )
-    if args.command == "catalog":
-        url = (
-            "https://finviz.com"
-            + {
-                "screen": "/screener?ft=4&v=151",
-                "stock": "/stock?t=" + args.ticker,
-                "map": "/map",
-                "groups": "/groups",
-                "calendar": "/calendar/earnings",
-                "news": "/news",
-                "insiders": "/insidertrading",
-                "market": "/futures",
-            }[args.surface]
-        )
-    elif args.command == "open":
-        url = args.url
-    elif args.command == "groups":
-        path = "/api/groups_perf" if args.view == "210" else "/groups"
-        url = (
-            "https://finviz.com"
-            + path
-            + "?"
-            + urlencode({"g": args.group, "v": args.view, "o": args.sort, "st": args.period})
-        )
-    elif args.command == "market":
-        url = (
-            "https://finviz.com/api/"
-            + args.kind
-            + ("_perf" if args.performance else "_all?" + urlencode({"timeframe": args.timeframe}))
-        )
-    elif args.command == "insiders":
-        query = {
-            "tc": {"all": "7", "buy": "1", "sale": "2"}[args.transaction],
-            "oc": args.owner,
-            "o": args.sort,
-            "tv": args.value,
-        }
-        url = "https://finviz.com/insidertrading?" + urlencode({k: v for k, v in query.items() if v is not None})
-    elif args.command == "news":
-        url = args.url or (
-            "https://finviz.com/api/stocks-why-moving/by-id/" + str(args.pulse)
-            if args.pulse
-            else "https://finviz.com/news?" + urlencode({"v": args.view})
-        )
-    elif args.command == "map":
-        if args.bubbles:
-            url = "https://finviz.com/api/bubbles?" + urlencode(
-                {"x": args.x, "y": args.y, "size": args.size, "color": args.color, "idx": args.index}
-            )
-        else:
-            url = "https://finviz.com/api/map_perf?" + urlencode({"t": args.type, "st": args.period})
-    elif args.command == "calendar":
-        path = (
-            "/calendar/earnings/season-preview"
-            if args.kind == "season-preview"
-            else ("/api/calendar/earnings" if args.kind == "earnings" and args.date else "/calendar/" + args.kind)
-        )
-        query = {
-            "dateFrom": args.date,
-            "page": args.page,
-            "sort": args.sort or ("earningsDate" if args.kind == "earnings" else None),
-        }
-        url = "https://finviz.com" + path + "?" + urlencode({k: v for k, v in query.items() if v is not None})
-    elif args.command == "screen":
-        query = {"ft": "4", "v": args.view, "f": args.filter, "c": args.columns, "o": args.sort, "r": args.start}
-        url = "https://finviz.com/screener?" + urlencode({k: v for k, v in query.items() if v is not None})
-    elif args.command == "prices":
-        url = "https://finviz.com/api/quote?" + urlencode(
-            {"instrument": args.instrument, "ticker": args.ticker, "timeframe": args.timeframe, "barsCount": args.bars}
-        )
-    elif args.command == "stock" and args.section in ("income", "balance", "cashflow"):
-        kind = {"income": "I", "balance": "B", "cashflow": "C"}[args.section] + (
-            "A" if args.period == "annual" else "Q"
-        )
-        url = "https://finviz.com/api/statement?" + urlencode({"t": args.ticker, "so": "F", "s": kind})
-    elif args.command == "stock":
-        section = {
-            "overview": "c",
-            "earnings": "ea",
-            "dividends": "dv",
-            "revenue": "rv",
-            "forecast": "fc",
-            "short-interest": "si",
-            "options": "oc",
-            "filings": "lf",
-        }[args.section]
-        query = {"t": args.ticker, "ty": section, "e": args.expiry, "page": args.page, "sort": args.sort}
-        url = "https://finviz.com/stock?" + urlencode({k: v for k, v in query.items() if v is not None})
-    else:
-        url = "https://finviz.com/api/suggestions?" + urlencode({"input": args.query})
-    result = fetch(url, args, store, parse)
-    if (
-        args.command == "catalog"
-        and args.surface == "screen"
-        and result["status"] != "error"
-        and not any((c["id"] or "").startswith("fs_") for c in result["data"]["controls"])
-    ):
-        filters = fetch("https://finviz.com/screener?ft=4", args, store, parse)
-        combined = dict(
-            result,
-            id=uuid4().hex,
-            data=dict(result["data"]),
-            dependencies=[result["id"], filters["id"]],
-            errors=list(result["errors"]),
-        )
-        if filters["status"] == "ok":
-            combined["data"]["controls"] = filters["data"]["controls"]
-            combined["data"]["controls_source"] = filters["source"]
-        else:
-            combined["status"] = "partial"
-            combined["errors"].extend(filters["errors"])
-        store.save(combined, store.get(result["id"], raw=True))
-        result = combined
-    return (
-        enrich(result, args, store)
-        if args.command == "map" and not args.performance_only and not args.bubbles
-        else result
-    )
-
-
-SCHEMA = {
-    "status": "ok: usable extraction; partial: usable data with gaps; error: no usable requested result. Exit 1 for error, 2 for invalid CLI syntax.",
-    "source": "url, requested_url, observed_at (UTC collection time), HTTP status, headers, received_complete and redirect observation IDs. Collection time is not market time.",
-    "conditions": "Each query parameter carries requested, status (confirmed / not_applied / unverified) and source evidence. HTTP success alone never confirms a condition.",
-    "data": "Source JSON remains intact. HTML supplies initial named JSON, ordered metric records with definitions, tables with ordered cells and links, controls and article paragraphs. Same-name metrics remain separate.",
-    "coverage": "received is extracted items on this response, shown is displayed items, source_total is the provider claim or null. Exhaustive is false for a changing remote population; pagination_end only describes navigation.",
-    "continuation": "URL for the next page of the same query or null when none can be established. Null alone does not prove completeness.",
-    "errors": "code, message and fix; a saved raw response remains available even after extraction failure. Access restrictions may carry Retry-After in source.headers.",
-    "export": "collect --out writes one complete observation per JSONL line, preserving table headers, enclosing source metadata, status and errors. unique_items counts distinct extracted items; export retains page observations including repeated items.",
-    "reading": "read.status reports retrieval success; observation_status, source, conditions, coverage and errors retain the original observation context even for a slice. selection describes only the displayed slice.",
-    "storage": "Observations are immutable. read --raw retrieves received text; inspect lists pointers; read ID --pointer /data/... --start 0 --limit 20 reads a slice without network access.",
-    "dates": "Source timestamp, reporting period, estimated event date and observed_at retain different roles. Source units, currencies, nulls, placeholder times and extra fields are not guessed or replaced.",
+LEAVES = []
+GROUPS = {
+    "schema": "Describe commands, arguments, defaults and output shapes offline",
+    "doctor": "Check Python, curl and the observation store offline",
+    "search": "Find securities by name or ticker",
+    "screen": "Finviz stock screener: filters, signals, columns, views and screening runs",
+    "stock": "One company or ETF: snapshot, profile, ratings, news, insiders, ownership, flows, earnings, forecast, dividends, revenue, short interest, options, filings, statements, prices",
+    "groups": "Sector, industry, country and capitalization groups",
+    "market": "Futures, forex and crypto quotes, market maps and bubbles",
+    "calendar": "Earnings, dividend, economic and earnings-season calendars",
+    "news": "News headlines, Market Pulse explanations and Finviz-hosted articles",
+    "insiders": "Insider trades across the market",
+    "open": "Read any supported finviz.com URL with the generic extractor",
+    "read": "Read a saved observation in slices without a new request",
+    "inspect": "List the JSON pointers inside a saved observation",
 }
+COMMON = [
+    (("--max-chars",), dict(type=int, default=20000, help="Maximum output characters; larger results become a too_large error with narrowing advice, never a truncated document.")),
+    (("--filter",), dict(default=None, help="Case-insensitive substring; keeps only records whose JSON contains it (discovery lists and record lists).")),
+    (("--fields",), dict(default=None, help="Comma-separated record fields to keep; unknown names return the available ones.")),
+    (("--limit",), dict(type=int, default=None, help="Maximum records to output; the observation keeps everything received.")),
+    (("--store",), dict(default=os.environ.get("FINVIZ_STORE", str(Path.home() / ".cache/finviz-skill/observations.sqlite3")), help="SQLite observation store; use the same path to read earlier IDs.")),
+    (("--connect-timeout",), dict(type=float, default=10, help="Connection timeout in seconds.")),
+    (("--timeout",), dict(type=float, default=60, help="Per-request timeout in seconds.")),
+    (("--max-bytes",), dict(type=int, default=16 * 1024 * 1024, help="Maximum response size in bytes.")),
+]
 
 
-def inventory(value, pointer="", depth=0):
-    entries = [
-        dict(pointer=pointer, type=type(value).__name__, count=len(value) if isinstance(value, (dict, list)) else None)
-    ]
-    if depth < 5:
-        if isinstance(value, dict):
-            for key, child in value.items():
-                entries.extend(
-                    inventory(child, pointer + "/" + str(key).replace("~", "~0").replace("/", "~1"), depth + 1)
-                )
-        elif isinstance(value, list) and value:
-            entries.extend(inventory(value[0], pointer + "/0", depth + 1))
-    return entries
+class Leaf:
+    def __init__(self, group, name, help, output, fn, args, narrow, records, targets):
+        self.group, self.name, self.help, self.output, self.fn = group, name, help, output, fn
+        self.args, self.narrow, self.records, self.targets = args, narrow, records, targets
+
+    @property
+    def path(self):
+        return self.group + (" " + self.name if self.name else "")
 
 
-def preview(value, depth=0):
-    if depth >= 5 and isinstance(value, (dict, list)):
-        return {"type": type(value).__name__, "count": len(value), "preview_omitted": True}
-    if isinstance(value, dict):
-        return {k: preview(v, depth + 1) for k, v in list(value.items())[:8]}
-    if isinstance(value, list):
-        return [preview(v, depth + 1) for v in value[:5]]
-    return value[:180] + "…" if isinstance(value, str) and len(value) > 180 else value
+def leaf(group, name=None, *, help, output, args=(), narrow=(), records=None, targets=None):
+    """Register a command. `records` names the list inside data that --filter/--fields/--limit act on (None = data itself); `targets` names a positional list that yields one result per value."""
+
+    def register(fn):
+        LEAVES.append(Leaf(group, name, help, output, fn, list(args), list(narrow), records, targets))
+        return fn
+
+    return register
 
 
-def presentation(result, args):
-    if args.full or len(json.dumps(result, ensure_ascii=False)) <= 16000:
-        return result
-    output = dict(result, data=preview(result.get("data")))
-    output["presentation"] = {
-        "truncated": True,
-        "fix": "Use inspect ID, then read ID --pointer /data/... --start 0 --limit 20; --full explicitly emits all selected data.",
-    }
-    if isinstance(output.get("coverage"), dict):
-        output["coverage"] = dict(output["coverage"], shown=None)
-    if len(json.dumps(output, ensure_ascii=False)) > 16000:
-        output["data"] = {"pointer": "/data", "preview_omitted": True}
-    return output
+def condition(requested, status="unverified", evidence=None):
+    return {"requested": requested, "status": status, "evidence": evidence}
 
 
-def main():
-    args = parser().parse_args()
+class Context:
+    """Per-invocation transport and the observations waiting to be saved."""
+
+    def __init__(self, args, store):
+        self.args, self.store, self.pending = args, store, []
+
+    def observe(self, url):
+        try:
+            obs = fetch(url, self.args)
+        except Failure as exc:
+            if exc.observation is not None:
+                self.pending.append(exc.observation)
+            raise
+        self.pending.append(obs)
+        return obs
+
+    def flush(self):
+        for obs in self.pending:
+            self.store.save(obs.result, obs.raw)
+        self.pending = []
+
+
+# ---- built-in leaves -------------------------------------------------------------------------------------------------
+
+
+@leaf("search", help="Find security candidates by company name or ticker fragment.", args=[(("query",), dict(help="Company name or ticker fragment."))], output={"[]": "candidates as returned: ticker, company, exchange and any extra source fields"}, narrow=["--limit", "--filter"])
+def search(ctx, args, target):
+    obs = ctx.observe("https://finviz.com/api/suggestions?" + urlencode({"input": args.query}))
+    obs.result["target"] = args.query
+    obs.result["data"] = obs.json()
+    return obs.result
+
+
+@leaf("doctor", help="Report the local Python, curl and store without contacting Finviz.", output={"python": "interpreter version", "curl": "curl version line", "store": "observation store path", "problems": "what to fix, if anything"})
+def doctor(ctx, args, target):
     try:
-        if args.timeout <= 0 or args.connect_timeout <= 0 or args.max_bytes <= 0:
-            raise Failure("invalid_argument", "Limits must be positive.", "Use positive timeout and byte limits.")
-        result = run(args)
-    except (Failure, ValueError, KeyError, IndexError, OSError, sqlite3.Error) as exc:
-        result = dict(
-            status="error",
-            errors=[
-                exc.detail
-                if isinstance(exc, Failure)
-                else dict(
-                    code="invalid_input", message=str(exc), fix="Check the command help and returned IDs or pointers."
-                )
-            ],
-        )
-    result = presentation(result, args)
-    if args.json:
-        print(json.dumps(result, ensure_ascii=False))
-    else:
-        print("status=" + result["status"] + " id=" + result.get("id", "-"))
-        for key, value in result.items():
-            if key not in ("status", "id"):
-                print(key + ": " + json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+        proc = subprocess.run(["curl", "--version"], capture_output=True, text=True)
+        version = proc.stdout.splitlines()[0] if proc.stdout else proc.stderr.strip()
+    except FileNotFoundError:
+        version = None
+    match = re.search(r"curl (\d+)\.(\d+)", version or "")
+    problems = []
+    if sys.version_info < (3, 11):
+        problems.append("Python 3.11+ is required.")
+    if not match or tuple(map(int, match.groups())) < (8, 4):
+        problems.append("curl 8.4+ is required; found: " + str(version))
+    result = output.plain("doctor", {"python": sys.version.split()[0], "curl": version, "store": str(ctx.store.path), "problems": problems})
+    if problems:
+        result["status"], result["error"] = "error", output.error_info("runtime", "; ".join(problems), "Install the listed requirements and rerun doctor.")
+    return result
 
-    return 1 if result["status"] == "error" else 0
+
+@leaf("read", help="Read a saved observation, or a JSON Pointer inside it, without a new request.", args=[(("id",), dict(help="Observation ID from an earlier result.")), (("--pointer",), dict(default="", help="JSON Pointer into the saved envelope, e.g. /data or /data/rows/0.")), (("--start",), dict(type=int, default=0, help="Zero-based start when the selected value is a list.")), (("--raw",), dict(action="store_true", help="Return the received response text instead of the extracted envelope."))], output={"*": "the selected value; source, conditions, coverage and status of the original observation are repeated so a slice keeps its context", "selection": "pointer, start, received (list length) and shown"})
+def read(ctx, args, target):
+    if args.pointer and not args.pointer.startswith("/"):
+        raise Failure("invalid_pointer", "A JSON Pointer starts with '/'.", "Use a pointer from inspect, e.g. /data.")
+    saved = ctx.store.get(args.id)
+    result = {k: saved[k] for k in ("target", "id", "source", "conditions", "coverage", "continuation", "warnings") if saved.get(k) is not None}
+    result["observed_at"], result["status"] = saved.get("observed_at"), "ok"
+    if saved.get("status") == "error":
+        result["warnings"] = result.get("warnings", []) + ["The original observation failed: " + saved["error"]["message"]]
+    if args.raw:
+        result["data"] = ctx.store.get(args.id, raw=True).decode("utf-8", errors="replace")
+        return result
+    value = saved
+    for token in args.pointer.split("/")[1:]:
+        token = token.replace("~1", "/").replace("~0", "~")
+        try:
+            value = value[int(token)] if isinstance(value, list) else value[token]
+        except (KeyError, IndexError, ValueError, TypeError):
+            raise Failure("invalid_pointer", "Nothing at " + args.pointer + ".", "Run inspect " + args.id + " to list available pointers.")
+    selection = {"pointer": args.pointer or "/", "start": args.start}
+    if isinstance(value, list):
+        selection["received"] = len(value)
+        value = value[args.start :]
+    result["data"], result["selection"] = value, selection
+    return result
+
+
+@leaf("inspect", help="List pointers, types and sizes inside a saved observation without printing its records.", args=[(("id",), dict(help="Observation ID from an earlier result.")), (("--depth",), dict(type=int, default=4, help="How many levels to descend."))], output={"[]": "{pointer, type, count} for each container; lists show their first item's shape"})
+def inspect(ctx, args, target):
+    saved = ctx.store.get(args.id)
+
+    def walk(value, pointer, depth):
+        entries = [{"pointer": pointer or "/", "type": type(value).__name__, "count": len(value) if isinstance(value, (dict, list)) else None}]
+        if depth < args.depth:
+            if isinstance(value, dict):
+                for key, child in value.items():
+                    entries += walk(child, pointer + "/" + str(key).replace("~", "~0").replace("/", "~1"), depth + 1)
+            elif isinstance(value, list) and value:
+                entries += walk(value[0], pointer + "/0", depth + 1)
+        return entries
+
+    result = output.plain(args.id, walk(saved, "", 0))
+    result["id"] = args.id
+    return result
+
+
+@leaf("schema", help="Describe groups, commands, arguments with defaults, output shapes, statuses and exit codes; offline.", args=[(("scope",), dict(nargs="*", help="Optional GROUP or GROUP LEAF to describe in detail."))], output={"groups": "group -> command -> one-line purpose (unscoped)", "arguments": "name -> {help, default, choices, required} for the scoped command, shared options included", "output": "data key -> meaning for the scoped command", "narrowing": "arguments that reduce output size for the scoped command", "envelope": "meaning of each result field", "statuses": "result statuses", "exit_codes": "process exit code per outcome"})
+def schema(ctx, args, target):
+    parser = build_parser()
+    scope = args.scope
+    if not scope:
+        groups = {}
+        for item in LEAVES:
+            groups.setdefault(item.group, {})[item.name or ""] = item.help
+        data = {"groups": groups, "group_purposes": GROUPS, "shared_options": describe_actions(parser._actions), "envelope": output.ENVELOPE, "statuses": output.STATUSES, "exit_codes": output.EXIT_CODES, "usage": "finviz.py [shared options] GROUP [LEAF] [arguments]; shared options are also accepted after the command."}
+        return output.plain("schema", data)
+    matches = [item for item in LEAVES if item.group == scope[0] and (len(scope) == 1 or item.name == scope[1])]
+    if not matches:
+        raise Failure("invalid_scope", "No command " + " ".join(scope) + ".", "Run schema without arguments to list groups and commands.")
+    if len(matches) > 1:
+        return output.plain(" ".join(scope), {"commands": {m.name: m.help for m in matches}, "purpose": GROUPS[scope[0]]})
+    item = matches[0]
+    sub = leaf_parser(parser, item)
+    actions = [a for a in sub._actions if a.help is not argparse.SUPPRESS] + [a for a in parser._actions if a.option_strings and a.help is not argparse.SUPPRESS]
+    data = {"command": item.path, "description": item.help, "arguments": describe_actions(actions), "output": item.output, "narrowing": item.narrow, "records": item.records, "statuses": output.STATUSES, "exit_codes": output.EXIT_CODES}
+    return output.plain(item.path, data)
+
+
+# ---- parser -----------------------------------------------------------------------------------------------------------
+
+
+class Formatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
+    pass
+
+
+def describe_actions(actions):
+    described = {}
+    for action in actions:
+        if not action.option_strings and action.dest == "group":
+            continue
+        if action.option_strings and action.option_strings[0] in ("-h",):
+            continue
+        name = action.option_strings[0] if action.option_strings else action.dest
+        described[name] = {"help": action.help, "default": None if action.default is argparse.SUPPRESS else action.default, "choices": list(action.choices) if action.choices else None, "required": bool(action.required) if action.option_strings else action.nargs not in ("?", "*")}
+    return described
+
+
+def leaf_parser(parser, item):
+    group = parser._subparsers._group_actions[0].choices[item.group]
+    if item.name is None:
+        return group
+    return group._subparsers._group_actions[0].choices[item.name]
+
+
+def epilog(item):
+    return "Output keys: " + ", ".join(item.output) + ". Full contract: schema " + item.path + ". Shared options (--fields, --limit, --filter, --max-chars, --store, timeouts) are accepted here too; finviz.py --help explains them."
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(prog="finviz.py", description="Read public Finviz data. stdout: one JSON document; stderr: diagnostics. `schema [GROUP [LEAF]]` describes every command offline.", formatter_class=Formatter, epilog="Shared options may be written before GROUP or after the command.")
+    hidden = argparse.ArgumentParser(add_help=False)
+    for flags, options in COMMON:
+        parser.add_argument(*flags, **options)
+        hidden.add_argument(*flags, **dict(options, default=argparse.SUPPRESS, help=argparse.SUPPRESS))
+    groups = parser.add_subparsers(dest="group", metavar="GROUP", required=True)
+    by_group = {}
+    for item in LEAVES:
+        by_group.setdefault(item.group, []).append(item)
+    for name, items in by_group.items():
+        if items[0].name is None:
+            sub = groups.add_parser(name, help=GROUPS[name], description=items[0].help, parents=[hidden], formatter_class=Formatter, epilog=epilog(items[0]))
+            for flags, options in items[0].args:
+                sub.add_argument(*flags, **options)
+            continue
+        group = groups.add_parser(name, help=GROUPS[name], description=GROUPS[name] + ".", formatter_class=Formatter)
+        leaves = group.add_subparsers(dest="leaf", metavar="LEAF", required=True)
+        for item in items:
+            sub = leaves.add_parser(item.name, help=item.help, description=item.help, parents=[hidden], formatter_class=Formatter, epilog=epilog(item))
+            for flags, options in item.args:
+                sub.add_argument(*flags, **options)
+    return parser
+
+
+def find_leaf(args):
+    return next(item for item in LEAVES if item.group == args.group and item.name == getattr(args, "leaf", None))
+
+
+def request_of(args, item):
+    names = [(flags[0].lstrip("-").replace("-", "_")) for flags, _ in item.args]
+    return {name: getattr(args, name, None) for name in names if name != item.targets}
+
+
+def main(argv=None):
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    item = find_leaf(args)
+    if args.max_chars <= 0 or args.timeout <= 0 or args.connect_timeout <= 0 or args.max_bytes <= 0 or (args.limit is not None and args.limit < 0):
+        parser.error("limits must be positive")
+    try:
+        store = Store(args.store)
+    except OSError as exc:
+        output.diagnostic("cannot open store: " + str(exc))
+        return output.EXIT_CODES["invalid"]
+    ctx = Context(args, store)
+    targets = getattr(args, item.targets) if item.targets else [None]
+    results = []
+    for target in targets:
+        try:
+            result = item.fn(ctx, args, target)
+            result.setdefault("target", target)
+        except Failure as exc:
+            result = exc.observation.result if exc.observation is not None else output.plain(target)
+            result["target"], result["status"], result["error"] = target if target is not None else result.get("target", item.path), "error", exc.info()
+        except (ValueError, KeyError, IndexError, TypeError) as exc:
+            obs = ctx.pending[-1] if ctx.pending else None
+            result = obs.result if obs is not None else output.plain(target)
+            result["target"], result["status"], result["error"] = target if target is not None else result.get("target", item.path), "error", output.error_info("parse_error", type(exc).__name__ + ": " + str(exc)[:200], "The provider structure may have changed; read the saved raw response with read ID --raw.")
+        finally:
+            ctx.flush()
+        results.append(output.finalize(result, args, item, request_of(args, item)))
+    return output.emit(results, args, item)
 
 
 if __name__ == "__main__":
