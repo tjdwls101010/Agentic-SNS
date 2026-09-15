@@ -247,7 +247,15 @@ def request_of(args, item):
     return {name: getattr(args, name, None) for name in names if name != item.targets}
 
 
+def load_modules():
+    """Command modules register their leaves on import; the parser is built after all of them are loaded."""
+    sys.modules.setdefault("finviz", sys.modules[__name__])
+    for name in ("screener",):
+        __import__(name)
+
+
 def main(argv=None):
+    load_modules()
     parser = build_parser()
     args = parser.parse_args(argv)
     item = find_leaf(args)

@@ -5,6 +5,7 @@ import sys
 
 from transport import Failure, now
 
+INPUT_CODES = {"export_exists", "missing_curl", "redirect_limit"}
 EXIT_CODES = {"ok": 0, "invalid": 2, "access_restricted": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}
 STATUSES = {
     "ok": "usable data was extracted",
@@ -125,7 +126,7 @@ def emit(results, args, leaf):
     codes = {r["error"]["code"] for r in results if r.get("error")}
     if codes & {"access_restricted"}:
         return EXIT_CODES["access_restricted"]
-    if any(c.startswith("invalid") or c in ("unknown_id", "unsupported_url", "unsupported_route") for c in codes):
+    if any(c.startswith(("invalid", "unknown", "unsupported")) or c in INPUT_CODES for c in codes):
         return EXIT_CODES["invalid"]
     return EXIT_CODES["upstream"]
 
