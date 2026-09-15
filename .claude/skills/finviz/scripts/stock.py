@@ -44,12 +44,13 @@ def snapshot(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("profile", "Company description and Finviz peer tickers from the overview page.", {"ticker, name": "header facts", "description": "profile paragraph as displayed", "peers": "tickers Finviz lists as peers"})
+@stock_leaf("profile", "Company description and Finviz peer tickers from the overview page.", {"ticker, name": "header facts", "description": "profile paragraph as displayed", "peers": "tickers Finviz lists as peers", "links": "{website} from the company header"})
 def profile(ctx, args, ticker):
     obs, page = stock_page(ctx, ticker, "c")
     peers = [markup.query_param(urljoin(obs.url, a["href"]), "t") for a in page.select(".fullview-links a[href]") if "/stock" in urljoin(obs.url, a["href"])]
     facts = header(page)
-    obs.result["data"] = {"ticker": facts["ticker"], "name": facts["name"], "description": markup.text(page.select_one(".fullview-profile")), "peers": [p for p in peers if p]}
+    site = page.select_one(".quote-header_ticker-wrapper_company a[href]")
+    obs.result["data"] = {"ticker": facts["ticker"], "name": facts["name"], "description": markup.text(page.select_one(".fullview-profile")), "peers": [p for p in peers if p], "links": {"website": site["href"]} if site is not None else {}}
     return obs.result
 
 
@@ -215,7 +216,7 @@ def statement(ctx, args, ticker):
 ARRAYS = ("date", "open", "high", "low", "close", "volume")
 
 
-@stock_leaf("prices", "Price bars from Finviz's quote API for a stock or a futures, forex or crypto instrument.", {"bars": "[{date (epoch seconds as supplied), open, high, low, close, volume}] oldest first, only when every array has the same length", "last": "the remaining scalar fields as supplied, e.g. lastClose, lastTime"}, args=[(("--instrument",), dict(default="stock", choices=["stock", "futures", "forex", "crypto"], help="Instrument family the ticker belongs to.")), (("--timeframe",), dict(default="d", help="Source timeframe: d daily, w weekly, m monthly, or intraday codes such as i1, i5.")), (("--bars",), dict(type=int, default=30, help="Bars requested; the source may return fewer."))], records="bars", narrow=["--bars", "--limit"])
+@stock_leaf("prices", "Price bars from Finviz's quote API for a stock or a futures, forex or crypto instrument.", {"bars": "[{date_epoch (seconds as supplied), open, high, low, close, volume}] oldest first, only when every array has the same length", "last": "the remaining scalar fields as supplied, e.g. lastClose, lastTime"}, args=[(("--instrument",), dict(default="stock", choices=["stock", "futures", "forex", "crypto"], help="Instrument family the ticker belongs to.")), (("--timeframe",), dict(default="d", help="Source timeframe: d daily, w weekly, m monthly, or intraday codes such as i1, i5.")), (("--bars",), dict(type=int, default=30, help="Bars requested; the source may return fewer."))], records="bars", narrow=["--bars", "--limit"])
 def prices(ctx, args, ticker):
     obs = ctx.observe("https://finviz.com/api/quote?" + urlencode({"instrument": args.instrument, "ticker": ticker, "timeframe": args.timeframe, "barsCount": args.bars}))
     obs.result["target"] = ticker
@@ -226,6 +227,6 @@ def prices(ctx, args, ticker):
         raise obs.fail("structure_changed", "The quote response has no date array.", "Read the saved raw response with read ID --raw.")
     if len(set(lengths.values())) > 1:
         raise obs.fail("array_alignment", "Price arrays differ in length: " + ", ".join(k + "=" + str(v) for k, v in lengths.items()), "Do not zip these arrays into bars; read the saved arrays with read ID --pointer /data/close and treat the shorter ones as incomplete.")
-    bars = [dict(zip(lengths, values)) for values in zip(*(source[k] for k in lengths))]
+    bars = [dict(zip(["date_epoch" if k == "date" else k for k in lengths], values)) for values in zip(*(source[k] for k in lengths))]
     obs.result["data"] = {"bars": bars, "last": {k: v for k, v in source.items() if k not in lengths and not isinstance(v, list)}}
     return obs.result

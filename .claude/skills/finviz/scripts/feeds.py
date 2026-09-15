@@ -13,9 +13,20 @@ CALENDAR_PATHS = {"earnings": "/calendar/earnings", "dividends": "/calendar/divi
 DATE_FIELDS = {"earnings": "earningsDate", "dividends": "exdate", "economic": "date", "season": "date"}
 
 
-@leaf("calendar", None, help="Earnings, dividend, economic or earnings-season calendar with source dates and paging.", args=[(("kind",), dict(choices=list(CALENDAR_PATHS), help="Calendar dataset.")), (("--date",), dict(default=None, help="Start date YYYY-MM-DD; without it the page's own default date is used and reported as date_from.")), (("--page",), dict(type=int, default=1, help="One-based page from a previous continuation; earnings and dividends page through the calendar API.")), (("--sort",), dict(default=None, help="Source sort key for earnings, e.g. earningsDate."))], output={"date_from": "the start date the source used", "items": "source records: earnings carry epsEstimate/epsActual/salesEstimate and isEarningDateEstimate; dividends carry exdate, ordinary, special, yield; economic carry event, actual, previous, forecast; season carries date and estimates", "totals_per_day": "season only: report counts per day"}, records="items", narrow=["--limit", "--fields", "--filter"])
+CALENDAR_ARGS = [(("--date",), dict(default=None, help="Start date YYYY-MM-DD; without it the page's own default date is used and reported as date_from. Not accepted by season.")), (("--page",), dict(type=int, default=1, help="One-based page from a previous continuation; earnings and dividends page through the calendar API. Not accepted by season.")), (("--sort",), dict(default=None, help="Source sort key for earnings, e.g. earningsDate or -earningsDate; sorting goes through the calendar API."))]
+CALENDAR_HELP = {"earnings": "Earnings calendar: report dates with EPS and sales estimates, actuals and surprises.", "dividends": "Dividend calendar: ex-dates with ordinary and special amounts and yields.", "economic": "Economic calendar: events with actual, previous and forecast values.", "season": "Earnings season preview: upcoming report counts per day with estimates."}
+CALENDAR_OUTPUT = {"date_from": "the start date the source used", "items": "source records: earnings carry epsEstimate/epsActual/salesEstimate and isEarningDateEstimate; dividends carry exdate, ordinary, special, yield; economic carry event, actual, previous, forecast; season carries date and estimates", "totals_per_day": "season only: report counts per day"}
+
+
+def calendar_leaf(kind):
+    return leaf("calendar", kind, help=CALENDAR_HELP[kind], args=CALENDAR_ARGS, output=CALENDAR_OUTPUT, records="items", narrow=["--limit", "--fields", "--filter"])
+
+
 def calendar(ctx, args, target):
-    use_api = args.kind != "season" and (args.date or args.page != 1)
+    args.kind = args.leaf
+    if args.kind == "season" and (args.date or args.page != 1 or args.sort):
+        raise Failure("invalid_argument", "The season preview has no date, page or sort selectors.", "Run calendar season without them; select locally with --filter or --limit.")
+    use_api = args.kind != "season" and (args.date or args.page != 1 or args.sort)
     date_from = args.date
     if use_api and not date_from:
         page_obs, page_data = calendar_page_data(ctx, args.kind)
@@ -48,8 +59,7 @@ def calendar(ctx, args, target):
         observed = entries.get("page") if entries else None
         conditions["page"] = condition(args.page, ("confirmed" if observed == args.page else "not_applied") if observed is not None else "unverified", observed)
     if args.sort:
-        observed = data.get("initialSort") if data else None
-        conditions["sort"] = condition(args.sort, ("confirmed" if observed == args.sort else "not_applied") if observed else "unverified", observed)
+        conditions["sort"] = condition(args.sort, "unverified", None)
     obs.result["conditions"] = conditions
     coverage = {"received": len(items), "exhaustive": False}
     if entries:
@@ -62,6 +72,10 @@ def calendar(ctx, args, target):
         coverage["source_total"] = data["totalCount"]
     obs.result["coverage"] = coverage
     return obs.result
+
+
+for _kind in CALENDAR_PATHS:
+    calendar_leaf(_kind)(calendar)
 
 
 def calendar_page_data(ctx, kind):
@@ -176,11 +190,12 @@ def open_url(ctx, args, target):
     page = markup.soup(obs)
     tables = []
     for node in page.select("table"):
-        own = [th for th in node.select("th") if th.find_parent("table") is node]
-        if own and "snapshot-table2" not in node.get("class", []):
-            headers, rows = markup.table_records(node, obs.url)
-            if rows:
-                tables.append({"headers": headers, "rows": rows})
+        nested = node.select("table")
+        if nested or "snapshot-table2" in node.get("class", []):
+            continue
+        headers, rows = markup.table_records(node, obs.url)
+        if rows:
+            tables.append({"headers": headers, "rows": rows})
     initial = {}
     for script in page.select("script[id]"):
         text = script.string or script.get_text()
@@ -189,7 +204,9 @@ def open_url(ctx, args, target):
                 initial[script["id"]] = markup.script_json(page, obs, script["id"])
             except Exception:
                 initial[script["id"]] = None
-    links = [{"text": markup.text(a), "url": urljoin(obs.url, a["href"])} for a in page.select("a[href]") if markup.text(a)]
+    for chrome in page.select("nav, header, footer"):
+        chrome.decompose()
+    links = [{"text": markup.text(a), "url": urljoin(obs.url, a["href"])} for a in page.select("a[href]") if markup.text(a) and not re.search(r"/(login|register|elite|help|contact|privacy|terms)", a["href"])]
     data = {"metrics": markup.metrics(page), "tables": tables, "initial": initial, "controls": markup.selects(page), "article": markup.article(page, obs.url), "links": links}
     if not any((data["metrics"], tables, initial, data["controls"], data["article"])):
         raise obs.fail("structure_changed", "No supported data structure was found on this page.", "Read the saved raw page with read ID --raw; the page may be visual-only or require an account.")

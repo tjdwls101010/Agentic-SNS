@@ -59,7 +59,10 @@ def table(ctx, args, target):
 @leaf("groups", "performance", help="Performance of every group over all standard periods from Finviz's groups API.", args=[GROUP_ARG], output={"[]": "{ticker, label, screenerUrl, perfT, perfW, perfM, perfQ, perfH, perfY, perfYtd} per group; percentages as published"}, narrow=["--filter", "--fields", "--limit"])
 def performance(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/groups_perf?" + urlencode({k: v for k, v in group_query(args.group_key).items() if v is not None}))
-    obs.result["target"], obs.result["data"] = args.group_key, obs.json()
+    records = obs.json()
+    first = records[0].get("screenerUrl") if isinstance(records, list) and records and isinstance(records[0], dict) else None
+    obs.result["conditions"] = {"group": condition(args.group_key, "unverified", {"first_screener_url": first} if first else None)}
+    obs.result["target"], obs.result["data"] = args.group_key, records
     return obs.result
 
 
@@ -70,6 +73,7 @@ KIND = (("kind",), dict(choices=["futures", "forex", "crypto"], help="Market sur
 def quotes(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/" + args.kind + "_all?" + urlencode({"timeframe": args.timeframe}))
     source = obs.json()
+    obs.result["conditions"] = {"timeframe": condition(args.timeframe, "unverified", None)}
     obs.result["target"], obs.result["data"] = args.kind, list(source.values()) if isinstance(source, dict) else source
     return obs.result
 
@@ -89,6 +93,7 @@ def market_map(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/map_perf?" + urlencode({"t": args.type, "st": args.period}))
     perf = obs.json()
     obs.result["target"] = args.type
+    obs.result["conditions"] = {"period": condition(args.period, ("confirmed" if perf.get("subtype") == args.period else "not_applied") if perf.get("subtype") else "unverified", perf.get("subtype"))}
     obs.result["data"] = {"period": perf.get("subtype"), "version": perf.get("version"), "performance": perf.get("nodes"), "classification": None, "classification_source": None}
     if args.performance_only:
         return obs.result

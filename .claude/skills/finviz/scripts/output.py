@@ -119,7 +119,8 @@ def finalize(result, args, leaf, request):
         except Failure as exc:
             result["status"], result["error"] = "error", exc.info()
         else:
-            if is_empty(result.get("data")) and result["status"] != "partial":
+            records = records_at(result.get("data"), leaf.records)
+            if (is_empty(result.get("data")) or (leaf.records and isinstance(records, list) and not records)) and result["status"] != "partial":
                 result["status"] = "empty"
                 result.setdefault("warnings", []).append("The source returned no usable items; this is not proof that the data does not exist.")
     ordered = ["target", "request", "id", "observed_at", "source", "conditions", "coverage", "continuation", "selection", "status", "data", "warnings", "error"]
@@ -129,7 +130,8 @@ def finalize(result, args, leaf, request):
 def too_large_fix(results, leaf, size, max_chars):
     narrow = ", ".join(leaf.narrow) if leaf.narrow else "--fields or --limit"
     ids = [r["id"] for r in results if r.get("id")]
-    saved = " The response is saved: read " + ids[0] + " --pointer /data --start 0 --limit 20 reads it in slices without a new request." if ids else ""
+    pointer = "/data" + ("/" + leaf.records if leaf.records else "")
+    saved = " The response is saved: read " + ids[0] + " --pointer " + pointer + " --start 0 --limit 20 reads it in slices without a new request." if ids else ""
     return "Result needs " + str(size) + " characters; limit is " + str(max_chars) + ". Narrow with " + narrow + "." + saved + " Or rerun with --max-chars " + str(size) + "."
 
 

@@ -30,7 +30,7 @@ def test_profile_ratings_news_insiders_and_ownership_come_from_the_overview_page
     monthly = [{"date": 1756684800, "saleAggregated": 95972, "saleTransactionCount": 1, "buyAggregated": 0, "buyTransactionCount": 0}]
     client.add(OVERVIEW, stock_overview(ownership=ownership, insider_monthly=monthly))
     profile = client.one("stock", "profile", "A")["data"]
-    assert profile == {"ticker": "A", "name": "Agilent Technologies Inc", "description": "Agilent Technologies, Inc. engages in life sciences.", "peers": ["WAT", "MTD"]}
+    assert profile == {"ticker": "A", "name": "Agilent Technologies Inc", "description": "Agilent Technologies, Inc. engages in life sciences.", "peers": ["WAT", "MTD"], "links": {"website": "http://example.com"}}
     ratings = client.one("stock", "ratings", "A")["data"]
     assert ratings == [{"Date": "Sep-09-26", "Action": "Resumed", "Analyst": "UBS", "Rating Change": "Neutral", "Price Target Change": "$165"}]
     news = client.one("stock", "news", "A")["data"]
@@ -126,10 +126,29 @@ def test_statement_aligns_periods_and_prices_refuse_misaligned_arrays(client):
     bars = {"date": [1788872400, 1788958800], "open": [148.02, 145.23], "high": [149.2, 146.5], "low": [145.9, 143.7], "close": [146.85, 144.75], "volume": [1603236, 1853973], "lastClose": 146.8}
     client.add("https://finviz.com/api/quote?instrument=stock&ticker=A&timeframe=d&barsCount=2", bars)
     result = client.one("stock", "prices", "A", "--bars", "2")
-    assert result["data"]["bars"] == [{"date": 1788872400, "open": 148.02, "high": 149.2, "low": 145.9, "close": 146.85, "volume": 1603236}, {"date": 1788958800, "open": 145.23, "high": 146.5, "low": 143.7, "close": 144.75, "volume": 1853973}]
+    assert result["data"]["bars"] == [{"date_epoch": 1788872400, "open": 148.02, "high": 149.2, "low": 145.9, "close": 146.85, "volume": 1603236}, {"date_epoch": 1788958800, "open": 145.23, "high": 146.5, "low": 143.7, "close": 144.75, "volume": 1853973}]
     assert result["data"]["last"] == {"lastClose": 146.8}
     broken = dict(bars, close=[146.85])
     client.add("https://finviz.com/api/quote?instrument=stock&ticker=A&timeframe=d&barsCount=3", broken)
     result = client.one("stock", "prices", "A", "--bars", "3", code=6)
     assert result["error"]["code"] == "array_alignment" and "close" in result["error"]["message"]
     assert client.one("read", result["id"], "--pointer", "/data/close")["data"] == [146.85]
+
+
+def test_empty_record_sets_inside_a_dict_report_empty_and_too_large_points_at_the_records(client):
+    client.add("https://finviz.com/stock?t=A&ty=ea", stock_section(EARNINGS))
+    empty = client.one("stock", "earnings", "A", "--fiscal-period", "2099Q9", code=7)
+    assert empty["status"] == "empty" and empty["data"]["records"] == [] and empty["data"]["next_earnings_date"]
+    big = dict(EARNINGS, earningsData=[{"fiscalPeriod": "2026Q%d" % i, "note": "x" * 400} for i in range(20)])
+    client.add("https://finviz.com/stock?t=A&ty=ea", stock_section(big))
+    error = client.run("--max-chars", "1000", "stock", "earnings", "A", code=9)["results"][0]["error"]
+    assert "--pointer /data/records" in error["fix"]
+
+
+def test_profile_links_and_price_bar_field_names_follow_the_contract(client):
+    client.add(OVERVIEW, stock_overview())
+    profile = client.one("stock", "profile", "A")["data"]
+    assert profile["links"] == {"website": "http://example.com"} and profile["peers"] == ["WAT", "MTD"]
+    bars = {"date": [1788872400], "open": [1.0], "high": [2.0], "low": [0.5], "close": [1.5], "volume": [10]}
+    client.add("https://finviz.com/api/quote?instrument=stock&ticker=A&timeframe=d&barsCount=1", bars)
+    assert client.one("stock", "prices", "A", "--bars", "1")["data"]["bars"] == [{"date_epoch": 1788872400, "open": 1.0, "high": 2.0, "low": 0.5, "close": 1.5, "volume": 10}]

@@ -141,3 +141,34 @@ def test_open_reads_any_supported_finviz_url_generically_and_refuses_others(clie
     client.add("https://finviz.com/api/forex_perf", {"USD": 0.0})
     assert client.one("open", "https://finviz.com/api/forex_perf")["data"] == {"USD": 0.0}
     assert json.dumps(data)  # generic output is plain JSON
+
+
+def test_calendar_kinds_are_real_commands_with_their_own_schema_and_sorting_goes_through_the_api(client):
+    assert client.one("schema", "calendar", "earnings")["data"]["command"] == "calendar earnings"
+    page = {"data": {"initialDateFrom": "2026-09-15", "initialSort": "earningsDate", "initialPage": 1, "entries": {"items": [{"ticker": "A", "earningsDate": "2026-09-15T08:30:00"}], "page": 1, "totalPages": 1}}}
+    client.add("https://finviz.com/calendar/earnings", calendar_page(page))
+    client.add("https://finviz.com/api/calendar/earnings?dateFrom=2026-09-15&page=1&sort=-earningsDate", {"items": [{"ticker": "Z", "earningsDate": "2026-09-30T08:30:00"}], "page": 1, "totalPages": 1})
+    result = client.one("calendar", "earnings", "--sort=-earningsDate")
+    assert result["data"]["items"][0]["ticker"] == "Z" and result["conditions"]["sort"]["status"] == "unverified"
+    assert client.one("calendar", "season", "--page", "2", code=2)["error"]["code"] == "invalid_argument"
+    client.add("https://finviz.com/calendar/earnings", calendar_page({"data": {"initialDateFrom": "2026-09-15", "entries": {"items": [], "page": 1, "totalPages": 1, "totalItemsCount": 0}}}))
+    empty = client.one("calendar", "earnings", code=7)
+    assert empty["status"] == "empty" and empty["data"]["date_from"] == "2026-09-15" and empty["coverage"]["received"] == 0
+
+
+def test_market_and_group_api_parameters_report_conditions(client):
+    client.add("https://finviz.com/api/map_perf?t=sec&st=w1", {"nodes": {"AAPL": 1.0}, "subtype": "d1", "version": 15})
+    result = client.one("market", "map", "--period", "w1", "--performance-only")
+    assert result["conditions"]["period"] == {"requested": "w1", "status": "not_applied", "evidence": "d1"}
+    client.add("https://finviz.com/api/futures_all?timeframe=w", {"ES": {"ticker": "ES", "last": 1}})
+    assert client.one("market", "quotes", "futures", "--timeframe", "w")["conditions"]["timeframe"]["status"] == "unverified"
+    client.add("https://finviz.com/api/groups_perf?g=industry&sg=energy", [{"ticker": "oilgasdrilling", "label": "Oil & Gas Drilling", "screenerUrl": "screener?f=ind_oilgasdrilling&v=211"}])
+    result = client.one("groups", "performance", "--group", "industry/energy")
+    assert result["conditions"]["group"]["status"] == "unverified" and result["conditions"]["group"]["evidence"] == {"first_screener_url": "screener?f=ind_oilgasdrilling&v=211"}
+
+
+def test_open_keeps_headerless_tables_and_drops_site_navigation_links(client):
+    client.add("https://finviz.com/news", news_page().replace("<html><body>", '<html><body><nav><a href="/login">Login</a><a href="/register?poster=trial">Try Elite</a></nav>'))
+    data = client.one("open", "https://finviz.com/news")["data"]
+    assert data["tables"][0]["headers"] == [] and data["tables"][0]["rows"][0]["cells"][1] == "06:56AM"
+    assert all(link["text"] not in ("Login", "Try Elite") for link in data["links"])
