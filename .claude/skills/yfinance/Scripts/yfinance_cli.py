@@ -18,15 +18,15 @@ GLOBAL_DEFAULTS = {"max_chars": 20000, "filter": ""}
 COMMANDS = {
     "search": {"": "Find instrument candidates by name, symbol and asset type; only the first Lookup page is available."},
     "prices": {"quote": "Current quote and company market fields.", "history": "Price start is inclusive; end is exclusive. Naive dates use the exchange timezone.", "actions": "Dividends, splits and capital gains over the selected price range; start inclusive, end exclusive."},
-    "company": {"profile": "Company profile and quote metadata.", "shares": "Historical shares outstanding (full shares query; deprecated shares is not used).", "news": "Related articles; links are not full article contents.", "filings": "SEC filing links and metadata; use the SEC skill for original filing contents.", "sustainability": "Reported sustainability metrics."},
-    "financials": {"income": "Native income statement items by fiscal period; earnings aliases merge here.", "balance": "Native balance sheet items by fiscal period; TTM is unavailable.", "cashflow": "Native cash flow items by fiscal period.", "valuation": "Valuation measures by period; Current is a snapshot, not a fiscal period."},
+    "company": {"profile": "Company profile and quote metadata.", "shares": "Historical shares outstanding as observed by Yahoo over the selected dates.", "news": "Related articles; links are not full article contents.", "filings": "SEC filing links and metadata; use the SEC skill for original filing contents.", "sustainability": "Reported sustainability metrics."},
+    "financials": {"income": "Native income statement items by fiscal period, including earnings lines.", "balance": "Native balance sheet items by fiscal period; TTM is unavailable.", "cashflow": "Native cash flow items by fiscal period.", "valuation": "Valuation measures by period; Current is a snapshot, not a fiscal period."},
     "analysts": {"targets": "Analyst price targets.", "recommendations": "Recommendation counts by period.", "summary": "Recommendation summary.", "upgrades": "Rating upgrade and downgrade history.", "earnings-estimate": "Earnings estimates.", "revenue-estimate": "Revenue estimates.", "history": "Historical earnings estimates and actuals.", "revisions": "EPS revisions.", "trend": "EPS estimate trends.", "growth": "Growth estimates."},
     "holders": {"major": "Major holder breakdown.", "institutional": "Institutional holders.", "fund": "Mutual fund holders.", "insider-purchases": "Insider purchase summary.", "insider-transactions": "Insider transactions.", "insider-roster": "Insider ownership roster."},
     "fund": {"overview": "Fund overview.", "description": "Fund investment description.", "holdings": "Top reported holdings, not a complete portfolio.", "asset-classes": "Asset allocation.", "sector-weights": "Sector allocation.", "equity": "Equity holding metrics.", "bond": "Bond holding metrics.", "rating": "Bond rating allocation.", "operations": "Fund operational metrics."},
     "options": {"expirations": "Available option expiration dates.", "chain": "Option contracts for an expiration and side; discover dates with options expirations."},
-    "screen": {"presets": "Available named screeners.", "fields": "Filterable query field catalog, using public valid_fields.", "values": "Filterable allowed values, using public valid_values.", "run": "Run a preset or JSON query; equity, fund and ETF query types are supported."},
+    "screen": {"presets": "Available named screeners.", "fields": "Filterable query field catalog for the selected --type.", "values": "Enumerated allowed values for query fields of the selected --type.", "run": "Run a preset or JSON query; equity, fund and ETF query types are supported."},
     "market": {"status": "Trading status; Yahoo may not provide regional status outside US.", "summary": "Market benchmark summary.", "sectors": "Sector keys accepted by market sector.", "sector": "Sector overview, industries, companies, funds or research.", "industry": "Industry overview, companies or research; discover keys through market sector --dataset industries."},
-    "calendar": {"earnings": "With SYMBOL: earnings dates via get_earnings_dates, no date filter. Without SYMBOL: market earnings, native US scope, most-active filtering OFF by default; startdatetime >= start and <= end.", "economic": "Economic events: native startdatetime >= start and <= end; country appears per row.", "ipo": "IPO events: native gtelt range matches ANY of listing startdatetime, filingdate or amendeddate; endpoint boundary semantics are not independently verified.", "splits": "Split calendar: payable startdatetime >= start and <= end."},
+    "calendar": {"earnings": "With SYMBOL: that company's past and upcoming earnings dates, paged by --limit/--offset, no date filter. Without SYMBOL: market earnings, native US scope, most-active filtering OFF by default; startdatetime >= start and <= end.", "economic": "Economic events: native startdatetime >= start and <= end; country appears per row.", "ipo": "IPO events: native gtelt range matches ANY of listing startdatetime, filingdate or amendeddate; endpoint boundary semantics are not independently verified.", "splits": "Split calendar: payable startdatetime >= start and <= end."},
 }
 QUERY_HELP = '''JSON query: {"operator":OP,"operands":[...]}; field names come from screen fields, enumerated values from screen values.
 EQ [field, string|finite number] (2 operands); IS-IN [field, value, ...] (2+ operands).
@@ -65,7 +65,7 @@ def build_parser():
     common(parser, False, root=True)
     groups = parser.add_subparsers(dest="group", required=True)
     schema = groups.add_parser("schema", help="Discover inputs and output contracts offline")
-    schema.add_argument("scope", nargs="*")
+    schema.add_argument("scope", nargs="*", help="GROUP or GROUP LEAF to describe; omit to list every group.")
     common(schema, False)
     leaves = {}
     for group, commands in COMMANDS.items():
@@ -89,26 +89,26 @@ def build_parser():
             if group == "prices" and leaf in {"history", "actions"}:
                 dates(p)
                 p.add_argument("--period", help="Relative range such as 5d, 1mo, 1y, ytd or max; default 1mo only when start/end are absent.")
-                p.add_argument("--interval", choices=["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"], default="1d")
-                p.add_argument("--adjust", choices=["none", "auto", "back"], default="auto", help="Price adjustment; none retains Adj Close, auto adjusts OHLC, back adjusts OHL.")
+                p.add_argument("--interval", choices=["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"], default="1d", help="Bar size; intraday intervals cover only recent history.")
+                p.add_argument("--adjust", choices=["none", "auto", "back"], default="auto", help="none: unadjusted OHLC as supplied plus Adj Close; auto: Open/High/Low/Close scaled for splits and dividends, Adj Close removed; back: Close kept raw while Open/High/Low are scaled by the adjustment ratio, Adj Close removed.")
                 p.add_argument("--repair", action="store_true", help="Opt into yfinance price repair; OFF by default.")
                 p.add_argument("--prepost", action="store_true", help="Include pre/post-market data where available.")
             if group == "company" and leaf == "shares":
                 dates(p)
             if group == "company" and leaf == "news":
-                p.add_argument("--tab", choices=["news", "all", "press releases"], default="news")
+                p.add_argument("--tab", choices=["news", "all", "press releases"], default="news", help="Article source: news articles, press releases, or all.")
             if group == "financials":
                 p.add_argument("--frequency", choices=["yearly", "quarterly"] if leaf == "balance" else ["yearly", "quarterly", "monthly", "trailing"] if leaf == "valuation" else ["yearly", "quarterly", "trailing"], default="quarterly" if leaf == "valuation" else "yearly", help="trailing means TTM; statement dates are fiscal period ends.")
                 p.add_argument("--periods", type=int, default=5, help="Maximum periods; valuation sends this upstream (0 = Current only), statements select locally.")
             if group == "options" and leaf == "chain":
                 p.add_argument("--date", help="Expiration YYYY-MM-DD; omitted selects nearest available expiry.")
-                p.add_argument("--side", choices=["calls", "puts", "both"], default="both")
+                p.add_argument("--side", choices=["calls", "puts", "both"], default="both", help="Contract side to return.")
             if group == "search":
-                p.add_argument("query")
-                p.add_argument("--type", choices=["all", "stock", "mutualfund", "etf", "index", "future", "currency", "cryptocurrency"], default="all")
-                p.add_argument("--dataset", choices=["quotes", "news", "lists", "research", "nav"], default="quotes")
+                p.add_argument("query", help="Company name, symbol fragment or keyword.")
+                p.add_argument("--type", choices=["all", "stock", "mutualfund", "etf", "index", "future", "currency", "cryptocurrency"], default="all", help="Instrument type filter; applies to --dataset quotes only.")
+                p.add_argument("--dataset", choices=["quotes", "news", "lists", "research", "nav"], default="quotes", help="quotes: instrument candidates; news: articles; lists: Yahoo curated lists; research: research reports; nav: Yahoo navigation links.")
             if group == "screen":
-                p.add_argument("--type", choices=["equity", "fund", "etf"], default="equity")
+                p.add_argument("--type", choices=["equity", "fund", "etf"], default="equity", help="Query universe; fields, values and presets differ per type.")
                 if leaf in {"fields", "values"}:
                     p.add_argument("--field", help="Exact query field, useful for allowed-value lookup.")
                 if leaf == "run":
@@ -116,17 +116,17 @@ def build_parser():
                     q = p.add_mutually_exclusive_group(required=True)
                     q.add_argument("--query", help="JSON operator/operands object; see examples below.")
                     q.add_argument("--preset", help="Preset name from screen presets.")
-                    p.add_argument("--offset", type=int, default=0)
+                    p.add_argument("--offset", type=int, default=0, help="Remote row offset for the next page; context next_offset supplies it.")
                     p.add_argument("--sort", help="Sort field from screen fields; custom query default ticker, preset uses its defined sort.")
-                    p.add_argument("--ascending", action=argparse.BooleanOptionalAction, default=None)
+                    p.add_argument("--ascending", action=argparse.BooleanOptionalAction, default=None, help="Sort direction: --ascending or --no-ascending; omitted means the preset's own direction, or descending for a custom query.")
             if group == "market":
                 if leaf in {"status", "summary"}:
-                    p.add_argument("--region", choices=[r.value for r in yf.MarketRegion], default="US")
+                    p.add_argument("--region", choices=[r.value for r in yf.MarketRegion], default="US", help="Yahoo market region.")
                 if leaf in {"sector", "industry"}:
-                    p.add_argument("key")
+                    p.add_argument("key", help="Sector key from market sectors, or industry key from market sector KEY --dataset industries.")
                     p.add_argument("--region", default="US", help="Yahoo region code.")
                     choices = ["overview", "top-companies", "research-reports"] + (["industries", "top-etfs", "top-funds"] if leaf == "sector" else ["top-performing", "top-growth"])
-                    p.add_argument("--dataset", choices=choices, default="overview")
+                    p.add_argument("--dataset", choices=choices, default="overview", help="Part of the sector or industry to return.")
             if group == "calendar":
                 dates(p)
                 p.add_argument("--offset", type=int, default=0, help="Remote row offset; next_offset advances by displayed rows, not native batch size.")
@@ -161,7 +161,14 @@ def resolve_defaults(args):
 def describe(parser, group, leaf):
     defaults = argparse.Namespace(group=group, leaf=leaf, **{a.dest: a.default for a in parser._actions if a.dest != "help"})
     resolve_defaults(defaults)
-    return {"description": parser.description, "arguments": {a.option_strings[-1] if a.option_strings else a.dest: {"help": a.help, "default": GLOBAL_DEFAULTS.get(a.dest) if a.default == argparse.SUPPRESS else getattr(defaults, a.dest, a.default), "choices": a.choices, "required": a.required} for a in parser._actions if a.dest != "help"}, "notes": parser.epilog, "default_context": "Defaults resolve for omitted options on this host at schema time; supplied dates disable the default price period, and presets select their own universe and sort.", "output": {"table": ["index", "columns", "data", "index_names", "column_names"], "statuses": ["ok", "empty", "partial", "error", "not_attempted"], "exit_codes": {"ok": 0, "invalid": 2, "rate_limited": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}, "empty": "Not proof of absence", "selection": "--fields selects output fields; --list-fields discovers target-specific fields; --limit clips rows locally even if upstream returns more."}}
+    notes = ["Defaults shown are resolved on this host at schema time"]
+    if hasattr(defaults, "period"):
+        notes.append("supplied --start or --end disable the default --period")
+    if (group, leaf) == ("screen", "run"):
+        notes.append("a preset selects its own universe, sort field and direction unless overridden")
+    if group == "calendar":
+        notes.append("market-wide calendars default --start to today and --end to seven days later")
+    return {"description": parser.description, "arguments": {a.option_strings[0] if a.option_strings else a.dest: {"help": a.help, "default": GLOBAL_DEFAULTS.get(a.dest) if a.default == argparse.SUPPRESS else getattr(defaults, a.dest, a.default), "choices": a.choices, "required": a.required} for a in parser._actions if a.dest != "help"}, "notes": parser.epilog, "default_context": "; ".join(notes) + ".", "output": {"document": "One request for the whole document, null when the request itself was invalid; each result's context reports the conditions actually applied to that target, such as the selected options expiration, and rows before and after --limit.", "table": ["index", "columns", "data", "index_names", "column_names"], "statuses": ["ok", "empty", "partial", "error", "not_attempted"], "exit_codes": {"ok": 0, "invalid": 2, "rate_limited": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}}}
 
 
 def schema_data(args, leaves):
@@ -246,7 +253,7 @@ def main():
         if args.max_chars < 1000:
             raise InputError("--max-chars must be >= 1000 so recovery instructions remain readable")
         if args.group == "schema":
-            return emit([result("schema", {"scope": args.scope}, schema_data(args, leaves))], args.max_chars)
+            return emit([result("schema", schema_data(args, leaves))], args.max_chars, {"scope": args.scope})
         validate(args)
         yf.config.debug.hide_exceptions = False
         request = {k: v for k, v in vars(args).items() if k != "symbols"}
@@ -254,7 +261,7 @@ def main():
         stopped = False
         for symbol in getattr(args, "symbols", [getattr(args, "symbol", None) or getattr(args, "query", None) or getattr(args, "key", None) or args.group]):
             if stopped:
-                results.append(result(symbol, request, status="not_attempted", error=error_info("not_attempted", "Stopped after rate limiting", "Retry later with fewer targets.")))
+                results.append(result(symbol, status="not_attempted", error=error_info("not_attempted", "Stopped after rate limiting", "Retry later with fewer targets.")))
                 continue
             context, warnings = {}, []
             try:
@@ -268,17 +275,17 @@ def main():
                         data = prices.fetch(ticker, args, context, warnings) if args.group == "prices" and args.leaf in {"history", "actions"} else company.fetch(ticker, args, context, warnings)
                     if (args.group, args.leaf) != ("options", "chain"):
                         data = select(data, args, context)
-                results.append(result(symbol, request, data, context, warnings))
+                results.append(result(symbol, data, context, warnings))
                 stopped = context.get("rate_limited", False)
             except (Exception, DeadlineExpired) as exc:
                 code = "invalid" if isinstance(exc, InputError) else "rate_limited" if "429" in str(exc) or "RateLimit" in type(exc).__name__ else "upstream"
                 stopped = code == "rate_limited"
-                results.append(result(symbol, request, context=context, warnings=warnings, error=error_info(code, exc, f"Use schema {args.group} {args.leaf} to correct inputs." if code == "invalid" else "Retry later with fewer targets; remaining targets were not attempted." if code == "rate_limited" else "Retry later or verify the symbol/dataset; use --timeout SECONDS if the target timed out.")))
+                results.append(result(symbol, context=context, warnings=warnings, error=error_info(code, exc, f"Use schema {args.group} {args.leaf} to correct inputs." if code == "invalid" else "Retry later with fewer targets; remaining targets were not attempted." if code == "rate_limited" else "Retry later or verify the symbol/dataset; use --timeout SECONDS if the target timed out.")))
             finally:
                 signal.alarm(0)
-        return emit(results, args.max_chars)
+        return emit(results, args.max_chars, request)
     except InputError as exc:
-        return emit([result("request", {}, error=error_info("invalid", exc, "Use --help or schema GROUP LEAF."))])
+        return emit([result("request", error=error_info("invalid", exc, "Use --help or schema GROUP LEAF."))])
 
 
 if __name__ == "__main__":
