@@ -1,4 +1,7 @@
 import json
+import re
+
+import pytest
 
 from pages import screener_filters, screener_table
 
@@ -153,3 +156,59 @@ def test_sort_falls_back_to_the_order_control_when_no_header_is_marked(client):
     client.add("https://finviz.com/screener?v=111&ft=4&o=-marketcap&r=1", page)
     result = client.one("screen", "run", "--sort=-marketcap")
     assert result["conditions"]["sort"] == {"requested": "-marketcap", "status": "confirmed", "evidence": {"key": "marketcap", "direction": "descending", "column": "Market Capitalization"}}
+
+
+def test_aggregate_reports_a_later_page_returning_the_wrong_start(client):
+    for start in (1, 21):
+        client.add(f"https://finviz.com/screener?v=111&ft=4&r={start}", screener_table(ROWS, current=1, page_values=(1, 21)))
+    result = client.one("screen", "run", "--pages", "2")
+    first, second = result["source"]["pages"]
+    assert result["conditions"]["start"] == {"requested": 1, "status": "not_applied", "evidence": {first: 1, second: 1}}
+    assert client.one("read", second)["data"]["conditions"]["start"] == {"requested": 21, "status": "not_applied", "evidence": 1}
+    assert len(result["data"]) == 4  # Keep the received rows; do not silently deduplicate the source.
+
+
+def test_oversized_aggregate_and_every_page_are_recoverable_without_fetching(client):
+    for start, ticker in ((1, "FIRST"), (21, "SECOND")):
+        client.add(f"https://finviz.com/screener?v=111&ft=4&r={start}", screener_table([(ticker, [ticker * 2200, "2T"])], current=start, page_values=(1, 21)))
+    result = client.one("screen", "run", "--pages", "2", code=9)
+    assert result["error"]["code"] == "too_large"
+    client.responses.clear()
+    pointers = client.one("inspect", result["id"])["data"]
+    assert "/source/pages" in {entry["pointer"] for entry in pointers}
+    ids = client.one("read", result["id"], "--pointer", "/source/pages")["data"]
+    assert len(ids) == 2 and result["id"] not in ids
+    for offset, (page_id, ticker) in enumerate(zip(ids, ("FIRST", "SECOND"))):
+        recovered = client.one("read", result["id"], "--pointer", "/data", "--start", str(offset), "--limit", "1")
+        assert recovered["data"][0]["ticker"] == ticker
+        assert recovered["data"][0]["observation_id"] == page_id
+        page = client.one("read", page_id, "--pointer", "/data")
+        assert page["data"][0]["ticker"] == ticker and page["data"][0]["Market Cap"] == "2T"
+        assert ticker in client.one("read", page_id, "--raw")["data"]
+
+
+@pytest.mark.parametrize("body,status,code", [("wait", 429, "access_restricted"), ("<html>Changed layout</html>", 200, "structure_changed")])
+def test_caught_later_page_failure_is_saved_with_original_error(client, body, status, code):
+    client.add("https://finviz.com/screener?v=111&ft=4&r=1", screener_table(ROWS, page_values=(1, 21)))
+    client.add("https://finviz.com/screener?v=111&ft=4&r=21", body, status=status, headers={"Retry-After": "30"})
+    result = client.one("screen", "run", "--pages", "2", code=8)
+    failed_id = re.search(r"observation ([a-f0-9]+)", " ".join(result["warnings"]))[1]
+    saved = client.one("read", failed_id)
+    assert saved["data"]["status"] == "error" and saved["data"]["error"]["code"] == code
+    assert saved["data"]["error"] == result["error"]
+    raw = client.one("read", failed_id, "--raw")
+    assert raw["data"] == body and any("original observation failed" in warning for warning in raw["warnings"])
+    assert client.one("read", result["id"])["data"]["status"] == "partial"
+
+
+def test_aggregate_keeps_unselected_rows_even_when_export_selection_is_empty(client, tmp_path):
+    for start, rows in ((1, ROWS), (21, [("GOOG", ["Alphabet", "2T"])])):
+        client.add(f"https://finviz.com/screener?v=111&ft=4&r={start}", screener_table(rows, current=start, page_values=(1, 21)))
+    out = tmp_path / "empty.jsonl"
+    result = client.one("screen", "run", "--pages", "2", "--filter", "missing", "--fields", "ticker", "--out", str(out), code=7)
+    assert out.read_text() == "" and result["coverage"]["shown"] == 0
+    saved = client.one("read", result["id"])["data"]
+    assert saved["status"] == "ok" and saved["coverage"]["shown"] == 3
+    assert [row["ticker"] for row in saved["data"]] == ["AAPL", "MSFT", "GOOG"]
+    assert saved["data"][2]["Market Cap"] == "2T"
+    assert json.loads(client.one("read", result["id"], "--raw")["data"]) == saved

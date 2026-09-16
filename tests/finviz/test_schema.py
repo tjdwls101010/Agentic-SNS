@@ -38,3 +38,13 @@ def test_shared_options_work_before_the_group_and_after_the_command(client):
     after = client.one("search", "A", "--limit", "1")["data"]
     assert before == after == [{"ticker": "A"}]
     assert list(itertools.chain(before)) == before
+
+
+def test_help_and_schema_disclose_shared_defaults_and_parser_errors_use_stderr(client):
+    assert "--max-bytes" in client.raw("--help", code=0).stdout
+    leaf_help = client.raw("stock", "earnings", "--help", code=0).stdout
+    assert "finviz.py --help" in leaf_help and "--max-bytes" not in leaf_help
+    schema = client.one("schema", "stock", "earnings")["data"]
+    assert schema["arguments"]["--max-bytes"]["default"] == 16777216
+    invalid = client.raw("stock", "earnings", "A", "--dataset", "bogus", code=2)
+    assert invalid.stdout == "" and "invalid choice" in invalid.stderr

@@ -5,7 +5,7 @@ from urllib.parse import urlencode, urljoin, urlsplit
 
 import markup
 from finviz import condition, leaf
-from transport import Failure, validate_url
+from transport import Failure, PAGES, validate_url
 
 CALENDAR_PATHS = {"earnings": "/calendar/earnings", "dividends": "/calendar/dividends", "economic": "/calendar/economic", "season": "/calendar/earnings/season-preview"}
 
@@ -13,7 +13,7 @@ CALENDAR_PATHS = {"earnings": "/calendar/earnings", "dividends": "/calendar/divi
 DATE_FIELDS = {"earnings": "earningsDate", "dividends": "exdate", "economic": "date", "season": "date"}
 
 
-CALENDAR_ARGS = [(("--date",), dict(default=None, help="Start date YYYY-MM-DD; without it the page's own default date is used and reported as date_from. Not accepted by season.")), (("--page",), dict(type=int, default=1, help="One-based page from a previous continuation; earnings and dividends page through the calendar API. Not accepted by season.")), (("--sort",), dict(default=None, help="Source sort key for earnings, e.g. earningsDate or -earningsDate; sorting goes through the calendar API."))]
+CALENDAR_ARGS = [(("--date",), dict(default=None, help="Start date YYYY-MM-DD; without it the page's own default date is used and reported as date_from. Not accepted by season.")), (("--page",), dict(type=int, default=1, help="One-based page from a previous continuation; earnings and dividends page through the calendar API. Values other than 1 are rejected by economic and season.")), (("--sort",), dict(default=None, help="Source sort key for earnings, e.g. earningsDate or -earningsDate; sorting goes through the calendar API."))]
 CALENDAR_HELP = {"earnings": "Earnings calendar: report dates with EPS and sales estimates, actuals and surprises.", "dividends": "Dividend calendar: ex-dates with ordinary and special amounts and yields.", "economic": "Economic calendar: events with actual, previous and forecast values.", "season": "Earnings season preview: upcoming report counts per day with estimates."}
 CALENDAR_OUTPUT = {"date_from": "the start date the source used", "items": "source records: earnings carry epsEstimate/epsActual/salesEstimate and isEarningDateEstimate; dividends carry exdate, ordinary, special, yield; economic carry event, actual, previous, forecast; season carries date and estimates", "totals_per_day": "season only: report counts per day"}
 
@@ -24,6 +24,8 @@ def calendar_leaf(kind):
 
 def calendar(ctx, args, target):
     args.kind = args.leaf
+    if args.kind == "economic" and args.page != 1:
+        raise Failure("invalid_argument", "The economic calendar has no pagination.", "Omit --page; narrow with --date, --filter or --limit.")
     if args.kind == "season" and (args.date or args.page != 1 or args.sort):
         raise Failure("invalid_argument", "The season preview has no date, page or sort selectors.", "Run calendar season without them; select locally with --filter or --limit.")
     use_api = args.kind != "season" and (args.date or args.page != 1 or args.sort)
@@ -188,13 +190,24 @@ def open_url(ctx, args, target):
         obs.result["data"] = obs.json()
         return obs.result
     page = markup.soup(obs)
+    content = page.select("article, main, .text-justify")
+    for chrome in page.select("nav, header, footer, .navbar"):
+        if chrome.parent is not None and not any(node in content for node in chrome.parents) and not chrome.select_one("article, main, .text-justify"):
+            chrome.decompose()
+    # 성진: 본문 컨테이너 밖의 무쿼리 화면 링크를 메뉴로 본다; 본문 링크 오분류가 확인되면 사이트 메뉴 컨테이너로 범위를 좁힌다.
+    for anchor in page.select("a[href]"):
+        if any(node in content for node in anchor.parents):
+            continue
+        parts = urlsplit(urljoin(obs.url, anchor["href"]))
+        if parts.hostname in ("finviz.com", "www.finviz.com") and ((parts.path in PAGES and not parts.query) or re.fullmatch(r"/(login|register|elite|help|contact|privacy|terms)(?:\.ashx)?/?", parts.path)):
+            anchor.decompose()
     tables = []
     for node in page.select("table"):
         nested = node.select("table")
         if nested or "snapshot-table2" in node.get("class", []):
             continue
         headers, rows = markup.table_records(node, obs.url)
-        if rows:
+        if rows and markup.text(node):
             tables.append({"headers": headers, "rows": rows})
     initial = {}
     for script in page.select("script[id]"):
@@ -204,9 +217,7 @@ def open_url(ctx, args, target):
                 initial[script["id"]] = markup.script_json(page, obs, script["id"])
             except Exception:
                 initial[script["id"]] = None
-    for chrome in page.select("nav, header, footer"):
-        chrome.decompose()
-    links = [{"text": markup.text(a), "url": urljoin(obs.url, a["href"])} for a in page.select("a[href]") if markup.text(a) and not re.search(r"/(login|register|elite|help|contact|privacy|terms)", a["href"])]
+    links = [{"text": markup.text(a), "url": urljoin(obs.url, a["href"])} for a in page.select("a[href]") if markup.text(a)]
     data = {"metrics": markup.metrics(page), "tables": tables, "initial": initial, "controls": markup.selects(page), "article": markup.article(page, obs.url), "links": links}
     if not any((data["metrics"], tables, initial, data["controls"], data["article"])):
         raise obs.fail("structure_changed", "No supported data structure was found on this page.", "Read the saved raw page with read ID --raw; the page may be visual-only or require an account.")

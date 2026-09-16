@@ -147,11 +147,11 @@ def dividends(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("revenue", "Revenue by product, region or segment per fiscal year, with the SEC filing each value came from.", {"[]": "{name, unit, values: [{fiscal_year, report_end_date, source_filing_url, value}]} per breakdown line"}, args=[(("--by",), dict(default="products", choices=["products", "regions", "segment"], help="Breakdown to return."))], narrow=["--filter", "--limit"])
+@stock_leaf("revenue", "Revenue by product, region or segment per fiscal year, with the SEC filing each value came from.", {"unit": "source currency or scale, preserved alongside selected series", "series": "name -> source records [{fiscal_year, report_end_date, source_filing_url, value, ...}]; --fields selects series names, --filter matches names or values, --limit counts series; unit stays alongside them"}, args=[(("--by",), dict(default="products", choices=["products", "regions", "segment"], help="Breakdown to return."))], records="series", narrow=["--filter", "--limit"])
 def revenue(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "rv")
     block = init.get({"products": "products_and_services", "regions": "regions", "segment": "segment"}[args.by]) or {}
-    obs.result["data"] = [{"name": name, "unit": block.get("unit"), "values": values} for name, values in (block.get("revenues") or {}).items()]
+    obs.result["data"] = {"unit": block.get("unit"), "series": block.get("revenues") or {}}
     return obs.result
 
 

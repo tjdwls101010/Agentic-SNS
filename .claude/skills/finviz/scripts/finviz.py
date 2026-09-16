@@ -41,20 +41,21 @@ COMMON = [
 
 
 class Leaf:
-    def __init__(self, group, name, help, output, fn, args, narrow, records, targets, default_limit):
+    def __init__(self, group, name, help, output, fn, args, narrow, records, targets, default_limit, keyed):
         self.group, self.name, self.help, self.output, self.fn = group, name, help, output, fn
         self.args, self.narrow, self.records, self.targets, self.default_limit = args, narrow, records, targets, default_limit
+        self.keyed = keyed
 
     @property
     def path(self):
         return self.group + (" " + self.name if self.name else "")
 
 
-def leaf(group, name=None, *, help, output, args=(), narrow=(), records=None, targets=None, default_limit=None):
-    """Register a command. `records` names the list inside data that --filter/--fields/--limit act on (None = data itself); `targets` names a positional list that yields one result per value."""
+def leaf(group, name=None, *, help, output, args=(), narrow=(), records=None, targets=None, default_limit=None, keyed=False):
+    """Register a command. `records` names the collection inside data (None = data itself); `keyed` enables selection of mapping keys; `targets` names a positional list that yields one result per value."""
 
     def register(fn):
-        LEAVES.append(Leaf(group, name, help, output, fn, list(args), list(narrow), records, targets, default_limit))
+        LEAVES.append(Leaf(group, name, help, output, fn, list(args), list(narrow), records, targets, default_limit, keyed))
         return fn
 
     return register
@@ -116,7 +117,7 @@ def doctor(ctx, args, target):
     return result
 
 
-@leaf("read", help="Read a saved observation, or a JSON Pointer inside it, without a new request.", args=[(("id",), dict(help="Observation ID from an earlier result.")), (("--pointer",), dict(default="", help="JSON Pointer into the saved envelope, e.g. /data or /data/rows/0; / or empty is the whole envelope, /source/headers the response headers.")), (("--start",), dict(type=int, default=0, help="Zero-based start when the selected value is a list.")), (("--raw",), dict(action="store_true", help="Return the received response text instead of the extracted envelope."))], output={"*": "the selected value; source, conditions, coverage and status of the original observation are repeated so a slice keeps its context", "selection": "pointer, start, received (list length) and shown"})
+@leaf("read", help="Read a saved observation, or a JSON Pointer inside it, without a new request.", args=[(("id",), dict(help="Observation ID from an earlier result.")), (("--pointer",), dict(default="", help="JSON Pointer into the saved envelope, e.g. /data or /data/rows/0; / or empty is the whole envelope, /source/headers the response headers.")), (("--start",), dict(type=int, default=0, help="Zero-based start among list entries or object keys at the selected pointer; nested collections are not sliced.")), (("--raw",), dict(action="store_true", help="Return the received response text instead of the extracted envelope."))], output={"*": "the selected value; source, conditions, coverage and status of the original observation are repeated so a slice keeps its context", "selection": "pointer, start, received (list length or key count), and parent unit when present"})
 def read(ctx, args, target):
     if args.pointer and not args.pointer.startswith("/"):
         raise Failure("invalid_pointer", "A JSON Pointer starts with '/'.", "Use a pointer from inspect, e.g. /data.")
@@ -142,6 +143,12 @@ def read(ctx, args, target):
     if isinstance(value, list):
         selection["received"] = len(value)
         value = value[args.start :]
+    elif isinstance(value, dict):
+        selection["received"] = len(value)
+        keys = list(value)[args.start :]
+        value = {key: value[key] for key in keys[:args.limit]}
+    if pointer.startswith("/data/") and isinstance(saved.get("data"), dict) and "unit" in saved["data"]:
+        selection["unit"] = saved["data"]["unit"]
     result["data"], result["selection"] = value, selection
     return result
 
@@ -283,6 +290,7 @@ def main(argv=None):
             result = item.fn(ctx, args, target)
             result.setdefault("target", target)
         except Failure as exc:
+            exc.record()
             result = exc.observation.result if exc.observation is not None else output.plain(target)
             result["target"], result["status"], result["error"] = target if target is not None else result.get("target", item.path), "error", exc.info()
         except (OSError, sqlite3.Error) as exc:

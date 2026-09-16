@@ -21,6 +21,11 @@ class Failure(Exception):
     def info(self):
         return {"code": self.code, "message": self.message, "fix": self.fix}
 
+    def record(self):
+        """Persist the failure on its observation even when a caller returns a partial result."""
+        if self.observation is not None:
+            self.observation.result.update(status="error", error=self.info())
+
 
 def now():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")

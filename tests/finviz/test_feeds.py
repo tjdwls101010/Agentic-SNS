@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from pages import MAP_CHUNK, MAP_LOADER, MAP_RUNTIME, article_page, calendar_page, groups_page, insiders_page, map_page, news_page, pulse_page
 
 
@@ -33,7 +35,7 @@ def test_market_quotes_performance_and_bubbles_keep_source_shapes(client):
     quotes = {"6A": {"label": "AUD", "ticker": "6A", "last": 0.71145, "change": -0.29}, "ES": {"label": "S&P 500", "ticker": "ES", "last": 6600.0, "change": 0.1}}
     client.add("https://finviz.com/api/futures_all?timeframe=d", quotes)
     result = client.one("market", "quotes", "futures", "--filter", "S&P")
-    assert result["data"] == [quotes["ES"]] and result["coverage"]["received"] == 2
+    assert result["data"] == {"ES": quotes["ES"]} and result["coverage"]["received"] == 2
     client.add("https://finviz.com/api/forex_perf", {"USD": 0.0, "AUD": -0.19})
     assert client.one("market", "performance", "forex")["data"] == {"USD": 0.0, "AUD": -0.19}
     bubbles = [{"ticker": "CF", "company": "CF Industries", "x": 1.0, "y": 1.09, "size": 2.0e10, "color": "Basic Materials", "isETF": False}]
@@ -45,6 +47,7 @@ def test_market_map_resolves_classification_from_the_page_assets_and_degrades_to
     perf = {"nodes": {"RY": 1.2, "TD": -0.4}, "additional": {}, "subtype": "d1", "version": 15, "hash": "X"}
     client.add("https://finviz.com/api/map_perf?t=geo&st=d1", perf)
     client.add("https://finviz.com/map?t=geo", map_page())
+    client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", "/* legacy loader is in a preceding bundle */")
     client.add("https://finviz.com/assets/dist-legacy/1378.v1.61170fe2.js", MAP_LOADER)
     client.add("https://finviz.com/assets/dist-legacy/runtime.v1.22f44280.js", MAP_RUNTIME)
     client.add("https://finviz.com/assets/dist-legacy/62.v1.bbb222.js", MAP_CHUNK)
@@ -58,6 +61,48 @@ def test_market_map_resolves_classification_from_the_page_assets_and_degrades_to
     degraded = client.one("market", "map", "--type", "geo", code=8)
     assert degraded["status"] == "partial" and degraded["data"]["performance"] == perf["nodes"] and degraded["data"]["classification"] is None
     assert degraded["error"]["code"] == "asset_structure"
+    failed_asset = client.one("read", degraded["source"]["dependencies"][-1])["data"]
+    assert failed_asset["status"] == "error" and failed_asset["error"]["code"] == "asset_structure"
+
+
+@pytest.mark.parametrize("map_type,chunk,label", [("geo", 6207, "World"), ("sec_all", 7791, "All stocks"), ("sec", 8119, "S&P 500")])
+def test_map_loads_the_requested_universe_from_the_current_entry_script(client, map_type, chunk, label):
+    # Recorded 2026-09-16: map.v1.67823970.js module 30092; unrelated branches omitted.
+    loader = 'function o(e){switch(e){case i.IZ.World:return a(n.e(6207).then(n.t.bind(n,68379,23)));case i.IZ.SectorFull:return a(n.e(7791).then(n.t.bind(n,20375,23)));default:return a(n.e(8119).then(n.t.bind(n,10163,23)))}}'
+    loader = 'switch(layout){case i.IZ.World:render();break;default:return n.e(9999)};' + loader
+    client.add(f"https://finviz.com/api/map_perf?t={map_type}&st=d1", {"nodes": {"TEST": 1.2}, "subtype": "d1"})
+    client.add(f"https://finviz.com/map?t={map_type}", map_page())
+    client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", loader)
+    client.add("https://finviz.com/assets/dist-legacy/1378.v1.61170fe2.js", "/* no map loader */")
+    client.add("https://finviz.com/assets/dist-legacy/4740.v1.b05b832c.js", "/* no map loader */")
+    client.add("https://finviz.com/assets/dist-legacy/runtime.v1.22f44280.js", 'r.u=e=>e+".v1."+{6207:"world-test",7791:"full-test",8119:"sector-test"}[e]+".js"')
+    suffix = {6207: "world-test", 7791: "full-test", 8119: "sector-test"}[chunk]
+    url = f"https://finviz.com/assets/dist-legacy/{chunk}.v1.{suffix}.js"
+    tree = {"name": "Root", "children": [{"name": label, "children": [{"name": "TEST", "value": 123, "newField": "kept"}]}]}
+    client.add(url, "module.exports=" + json.dumps(tree))
+    result = client.one("market", "map", "--type", map_type)
+    assert result["data"]["classification"] == tree and result["data"]["classification_source"] == url
+    assert result["data"]["performance"] == {"TEST": 1.2}
+    client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", loader + loader.replace(str(chunk), "9999"))
+    ambiguous = client.one("market", "map", "--type", map_type, code=8)
+    assert ambiguous["error"]["code"] == "asset_structure" and ambiguous["data"]["classification"] is None
+    assert ambiguous["data"]["performance"] == {"TEST": 1.2}
+    client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", loader)
+    client.add(url, "a.exports=" + json.dumps(tree) + ";b.exports=" + json.dumps(tree))
+    roots = client.one("market", "map", "--type", map_type, code=8)
+    assert roots["error"]["code"] == "asset_structure" and "found 2" in roots["error"]["message"]
+    assert roots["data"]["classification"] is None and roots["data"]["performance"] == {"TEST": 1.2}
+
+
+def test_map_does_not_substitute_the_default_for_a_missing_requested_type(client):
+    client.add("https://finviz.com/api/map_perf?t=cap&st=d1", {"nodes": {"A": 2}, "subtype": "d1"})
+    client.add("https://finviz.com/map?t=cap", map_page())
+    client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", MAP_LOADER)
+    for name in ("1378.v1.61170fe2.js", "4740.v1.b05b832c.js"):
+        client.add("https://finviz.com/assets/dist-legacy/" + name, "/* no map loader */")
+    result = client.one("market", "map", "--type", "cap", code=8)
+    assert result["error"]["code"] == "asset_structure" and "no case for MarketCap" in result["error"]["message"]
+    assert result["data"]["classification"] is None and result["data"]["performance"] == {"A": 2}
 
 
 def test_calendar_pages_use_source_entries_and_confirm_date_page_and_sort(client):
@@ -172,3 +217,58 @@ def test_open_keeps_headerless_tables_and_drops_site_navigation_links(client):
     data = client.one("open", "https://finviz.com/news")["data"]
     assert data["tables"][0]["headers"] == [] and data["tables"][0]["rows"][0]["cells"][1] == "06:56AM"
     assert all(link["text"] not in ("Login", "Try Elite") for link in data["links"])
+
+
+@pytest.mark.parametrize("date", [[], ["--date", "2026-09-01"]])
+def test_economic_calendar_rejects_unsupported_pagination_before_fetching(client, date):
+    events = [{"event": "Budget", "date": "2026-09-01", "actual": "-$167B"}]
+    client.add("https://finviz.com/calendar/economic", calendar_page({"data": {"initialDateFrom": "2026-09-01", "entries": events}}))
+    client.add("https://finviz.com/api/calendar/economic?dateFrom=2026-09-01", events)
+    result = client.one("calendar", "economic", "--page", "2", *date, code=2)
+    assert result["error"]["code"] == "invalid_argument"
+    assert "--page" in result["error"]["fix"]
+
+
+def test_map_and_bubbles_report_selectors_without_inventing_confirmation(client):
+    client.add("https://finviz.com/api/map_perf?t=geo&st=d1", {"nodes": {"RY": 1.2}, "subtype": "d1"})
+    result = client.one("market", "map", "--type", "geo", "--performance-only")
+    assert result["conditions"]["type"] == {"requested": "geo", "status": "unverified", "evidence": None}
+    rows = [{"ticker": "RY", "x": 1.2, "y": 6, "size": 40, "color": 3, "futureField": "source"}]
+    client.add("https://finviz.com/api/bubbles?x=pe&y=volume&size=price&color=change&idx=dji", rows)
+    result = client.one("market", "bubbles", "--x", "pe", "--y", "volume", "--size", "price", "--color", "change", "--index", "dji")
+    assert result["conditions"] == {key: {"requested": value, "status": "unverified", "evidence": None} for key, value in {"x": "pe", "y": "volume", "size": "price", "color": "change", "index": "dji"}.items()}
+    saved = client.one("read", result["id"], "--pointer", "/data", "--limit", "1")
+    assert saved["conditions"] == result["conditions"] and saved["data"] == rows
+
+
+def test_quotes_selection_preserves_source_keys_without_requiring_ticker_fields(client):
+    quotes = {"6A": {"label": "AUD", "last": 0.71, "newField": {"scale": 1}}, "ES": {"label": "S&P 500", "last": 6600.0}, "ALIAS": {"ticker": "ES", "label": "Alias", "last": None}}
+    client.add("https://finviz.com/api/futures_all?timeframe=d", quotes)
+    assert client.one("market", "quotes", "futures")["data"] == quotes
+    result = client.one("market", "quotes", "futures", "--filter", "6a", "--limit", "1")
+    assert result["data"] == {"6A": quotes["6A"]}
+    assert result["coverage"] == {"received": 3, "shown": 1, "exhaustive": False}
+    assert client.one("read", result["id"], "--pointer", "/data")["data"] == quotes
+    assert client.one("market", "quotes", "futures", "--fields", "ES,ALIAS", "--limit", "1")["data"] == {"ES": quotes["ES"]}
+    assert client.one("market", "quotes", "futures", "--fields", "unknown", code=2)["error"]["code"] == "invalid_fields"
+    assert client.one("market", "quotes", "futures", "--limit", "0", code=7)["data"] == {}
+
+
+def test_open_excludes_plain_and_table_navigation_without_removing_data_links(client):
+    chrome = '<a href="/screener">Screener</a><table><tr><td><a href="/screener.ashx">Screener</a></td><td><a href="/login">Login</a></td><td><a href="/elite">Elite</a></td></tr></table><nav><table><tr><td>Site navigation</td></tr></table></nav>'
+    content = '<table><tr><td>Technology</td><td><a href="/screener?f=sec_technology">Members</a></td></tr></table><a href="https://example.com/helpful">Source</a>'
+    client.add("https://finviz.com/news", "<html><body>" + chrome + content + "</body></html>")
+    data = client.one("open", "https://finviz.com/news")["data"]
+    assert len(data["tables"]) == 1 and data["tables"][0]["rows"][0]["cells"] == ["Technology", "Members"]
+    assert data["links"] == [{"text": "Members", "url": "https://finviz.com/screener?f=sec_technology"}, {"text": "Source", "url": "https://example.com/helpful"}]
+
+
+def test_open_preserves_article_headers_and_content_links_like_the_article_reader(client):
+    url = "https://finviz.com/news/123/fed-decision-preview"
+    client.add(url, '<html><body><header><nav><a href="/login">Login</a></nav></header><article><header><h1>Fed Decision Preview</h1><p>By Reporter</p></header><p>First paragraph.</p><a href="/screener">Mentioned screener</a></article></body></html>')
+    expected = client.one("news", "article", url)["data"]
+    opened = client.one("open", url)["data"]
+    assert opened["article"] == expected
+    assert opened["article"]["title"] == "Fed Decision Preview"
+    assert "Fed Decision Preview By Reporter" in opened["article"]["text"]
+    assert opened["links"] == [{"text": "Mentioned screener", "url": "https://finviz.com/screener"}]

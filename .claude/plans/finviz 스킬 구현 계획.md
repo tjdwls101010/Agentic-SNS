@@ -195,7 +195,7 @@ frontmatter: `name: finviz`, `description`은 다음 초안을 다듬는다. "Re
 - 익명 접근만으로 범위의 모든 화면이 열린다(2026-09-15 실측). Elite 전용 항목(`data-elite-only`)은 발견 명령에서 표시만 한다.
 - 스크리너 뷰 181·191(ETF)은 111과 같은 표 구조다. 2단계 live에서 확인하고 다르면 choices에서 뺀다.
 - 구현은 `main`에서 `feat/finviz-skill-rewrite` 브랜치를 파 주 작업 폴더에서 진행한다. prunable worktree 두 개는 건드리지 않고 알린다.
-- `graphify-out`이 주 작업 폴더에 없으므로 머지 후 그래프 리빌드는 하지 않는다.
+- 2026-09-16 주 작업 폴더에 `graphify-out/`이 있음을 재확인했다. 이전 부재 판단을 정정하고 머지 후 Graphify를 리빌드한다.
 - 커밋·PR 제목은 `feat: Finviz 스킬 재작성` 형식, PR 본문은 무엇을 바꿨나·왜·영향·검증 4섹션.
 
 ## 코덱스 반영
@@ -204,4 +204,66 @@ frontmatter: `name: finviz`, `description`은 다음 초안을 다듬는다. "Re
 
 ## 실행 기록
 
-(구현 세션이 채운다.)
+### 2026-09-16 최종 리뷰 후속 수정
+
+이번 세션은 부모가 승인한 재작성의 최종 리뷰 12개 OPEN_ITEMS만 수정했다. 변경 범위는 `.claude/skills/finviz/`, `tests/finviz/`, 이 계획 파일로 한정했고 커밋·푸시·브랜치 변경·새 에이전트 실행은 하지 않았다. 최종 PR·머지 내역은 부모가 기록한다. 시작 시 이미 수정되어 있던 SKILL.md의 이상치 원칙(관측값을 임의로 오류라 배제하거나 근거 없는 원인을 붙이지 않음)은 보존했다. 기존의 다른 경로 변경은 손대지 않았다.
+
+TDD 지침은 `/Users/seongjin/.codex/skills/tdd/SKILL.md`에서 읽어 적용했다. 이 실행 환경에는 Skill 호출 도구 및 TaskCreate/TaskUpdate/ToolSearch가 노출되지 않아 호출·트래커 생성은 할 수 없었다. 사용자에게 이미 승인받은 seam(실제 CLI subprocess 입력·출력·종료 코드·저장 관측, 외부 curl만 대체)을 재확인한 것으로 처리하고 질문 없이 진행했다. 동작 수정은 항목별 재현 실패 확인 → 최소 수정 → 해당 테스트 통과 순으로 진행했다. 문서의 네 가지 오류는 기존 CLI 동작을 먼저 재현·검증한 뒤 설명만 바로잡았으며, 이를 억지로 코드 실패/수정으로 만들지 않았다. 완료 판정은 아래 각 재현의 통과와 전체 오프라인·Ruff 결과이며, 라이브·모델 시나리오 실패는 별도로 사실대로 남긴다.
+
+확인한 기존 리뷰 ID는 단계 2 `20260915-200755-finviz-stage2-review-0062`, 단계 4 `20260915-202842-finviz-stage4-review-2f98`, 최종 `20260915-204017-finviz-final-review-cb3c`이다. 최종 결과는 `python3 /Users/seongjin/.claude/skills/codex/scripts/codex_bridge.py result --run 20260915-204017-finviz-final-review-cb3c`로 읽었다. 단계 2·4 로그와 기존 테스트도 읽었고, 추가 독립 리뷰 에이전트는 실행하지 않았다.
+
+| 최종 OPEN_ITEM | 수정·완료 판정 | 검증 |
+|---|---|---|
+| 이전 지적: 합산 start 불일치 | 두 번째 `r=21` 응답이 첫 페이지를 돌려주면 합산도 `not_applied`, 페이지별 근거·원문 행은 그대로 보존 | `test_aggregate_reports_a_later_page_returning_the_wrong_start` 실패 → 통과 |
+| 이전 지적: economic page 무시 | `calendar economic --page 2`를 날짜 유무와 관계없이 `invalid_argument`, 종료 2로 거절 | `test_economic_calendar_rejects_unsupported_pagination_before_fetching` 2경우 실패 → 통과 |
+| 이전 지적: map/bubbles 조건 누락 | map `type`, bubbles `x/y/size/color/index`를 저장·출력하며 확인 근거 없는 선택은 `unverified` | `test_map_and_bubbles_report_selectors_without_inventing_confirmation` map·bubbles 누락을 차례로 재현 → 통과 |
+| 이전 지적: revenue/quotes 계약 변경 | revenue `{unit,series}`, quotes 티커 키 객체 복원; `--fields`는 각각 시리즈명/티커 키, `--filter`와 `--limit`으로 축소 가능 | 기존 형태 테스트 수정 후 실패 → 통과; revenue·quotes selection 테스트로 단위·출처 URL·추가 원문 필드·키·전체 저장 자료 확인 |
+| 이전 지적: 일반·표 메뉴 노출 | 본문 컨테이너 밖의 사이트 메뉴 링크를 표 추출 전에 제외; 쿼리가 있는 자료 링크·외부 출처·헤더 없는 실제 표 보존 | `test_open_excludes_plain_and_table_navigation_without_removing_data_links` 실패 → 통과 |
+| N1: 큰 합산 자료에서 후속 페이지 복구 불가 | `--pages > 1`은 별도 합산 ID에 선택 전 모든 행과 `source.pages` 저장; 각 페이지 ID는 독립 원문·자료를 유지 | `test_oversized_aggregate_and_every_page_are_recoverable_without_fetching` 실패 → 통과; 빈 export 선택에도 저장된 전체 행이 남는 테스트 추가 |
+| N2: 내부에서 잡힌 실패가 ok로 저장 | 공유 `Failure.record()`를 최상위·스크리너·맵의 실패 처리에서 사용; 원래 오류와 raw 읽기 경고 보존 | `test_caught_later_page_failure_is_saved_with_original_error` HTTP 429·구조 변경 2경우 실패 → 통과; 맵 자산 실패 저장도 검증 |
+| N3: 기사 header 삭제 | article/main/본문 컨테이너의 헤더·제목·작성자·본문 링크 보존 | `test_open_preserves_article_headers_and_content_links_like_the_article_reader` 실패 → 통과 |
+| 문서: leaf help가 모든 기본값을 설명 | root help는 공통 옵션, leaf help는 자체 인자, schema는 공통 인자와 기본값 포함으로 정정 | `test_help_and_schema_disclose_shared_defaults_and_parser_errors_use_stderr` |
+| 문서: 일반 /data 부분 읽기 보장 | `inspect`로 실제 컬렉션 포인터를 찾으며 earnings는 `/data/records`; 큰 개별 레코드는 더 작게 선택한다고 설명 | `test_nested_earnings_recovery_requires_the_record_pointer_not_the_data_object` |
+| 문서: 모든 오류에 fix | JSON 오류와 stderr usage·종료 2인 argparse 오류를 구분 | bogus earnings dataset의 stdout 공백·stderr invalid choice 검증 |
+| 문서: 모든 결과에 conditions/coverage | 두 필드가 선택적으로 존재하며 부재가 확인·완전성을 뜻하지 않는다고 정정 | profile 결과에 두 필드가 없는 사실을 CLI에서 검증 |
+
+복원한 객체 인터페이스에서도 저장 자료를 선택할 수 있도록 `read --start/--limit`은 선택한 객체의 키도 자른다(그 안의 중첩 컬렉션까지 자르지는 않음). 매출 시리즈 포인터를 읽으면 상위 `unit`을 `selection.unit`에 동반해 값의 문맥을 보존한다. 합산의 `read ID --raw`는 합산 JSON이며, 실제 HTTP 원문은 `source.pages`의 각 ID에서 읽도록 schema에 명시했다. 합산은 첫 페이지 HTTP 메타데이터를 전체 자료의 출처로 가장하지 않고 페이지 ID 목록을 출처로 삼는다. navigation의 무쿼리 화면 링크 판정 한계와 바꿀 조건은 해당 코드의 `# 성진:` 주석에 남겼다.
+
+데이터·신뢰 경계 점검: quotes는 source key를 ticker 필드로 재구성하지 않아 ticker 필드가 없거나 중복되어도 자료를 잃지 않는다. revenue의 fiscal year·report end·SEC URL·unit·새 원문 필드, bubbles의 새 필드, 스크리너 문자열과 페이지 관측 ID를 보존하는 assertions가 통과했다. 로컬 선택 전 전체 자료는 저장소에서 다시 읽힌다. HTTPS/호스트/route 허용 목록·리디렉션 검증·중복 JSON 키 거절·응답 크기 제한 코드는 완화하지 않았다. 기존 외부 URL·금지 경로·외부 리디렉션·검증 화면·배열 정렬 검증도 전체 오프라인 실행에 포함되어 통과했다.
+
+검증 명령에서 `SCRATCH`는 `/private/tmp/claude-501/-Users-seongjin-Coding-Agentic-SNS/38f4ee2d-bba5-4734-a290-ce66cf434485/scratchpad`를 뜻한다. 임시 테스트 디렉터리·curl 임시 응답·로그·라이브 저장소·변경 전 재생 사본은 이 경로에 두었다. 테스트는 `TMPDIR="$SCRATCH" PYTHONDONTWRITEBYTECODE=1`로 실행했고 pytest 캐시를 비활성화했다.
+
+- 최종 오프라인: `uv run -q --frozen --group dev --project .claude/skills/finviz python -m pytest -p no:cacheprovider --basetemp "$SCRATCH/finviz-repairs-pytest" tests/finviz -q` → **71 passed, 41 deselected, 44.87s**, 종료 0. 독립 설치/한글·공백 경로 테스트 포함. 로그: `$SCRATCH/finviz-repairs-offline.log`.
+- 정적: `uv run -q --frozen --group dev --project .claude/skills/finviz ruff check --no-cache --config pyproject.toml .claude/skills/finviz/scripts tests/finviz` → **All checks passed**, 종료 0. 레포의 Ruff 설정을 따랐고 문단은 수동 하드랩하지 않았다.
+- 라이브: `uv run -q --frozen --group dev --project .claude/skills/finviz python -m pytest -p no:cacheprovider --basetemp "$SCRATCH/finviz-repairs-live" tests/finviz/test_live.py -m live -q` → **40 passed, 1 failed, 53.74s**, 종료 1. 실패는 `market map --type geo --fields classification_source,period`: `asset_structure`, `The loader has no case for World.`, partial/종료 8. 성과 자료는 저장되고 분류만 비어 있다. 로그: `$SCRATCH/finviz-repairs-live.log`.
+- 라이브 실패 분리: 위 실행에서 저장한 응답만 curl 대체에 공급해 `git show HEAD`로 얻은 수정 전 전체 CLI와 수정 후 CLI를 동일 입력으로 재생했다. 둘 다 동일한 `World` loader 오류·partial·종료 8이다. 이번 변경에서 발생한 회귀는 아니며 JS 분류 로더 변경은 12개 지적 밖이라 확장 수정하지 않았다. 결과: `$SCRATCH/finviz-map-replay/HEAD.json`, `$SCRATCH/finviz-map-replay/repaired.json`. **전체 라이브 통과를 막는 잔여 항목**으로 부모에게 전달한다.
+- 합산 복구 라이브 확인: 실제 CLI에 `--max-chars 1000 screen run --pages 2` → 종료 9, 반환 ID의 `/source/pages` → 2개 독립 ID, `/data --start 20 --limit 1` → 둘째 페이지 첫 행과 일치, 둘째 페이지 `/conditions/start` → requested 21/evidence 21/confirmed. **PASS**, 합산 ID `7b46986fa39f4c6c94cde46a7b21d247`. 전체 호출 인자·출력: `$SCRATCH/finviz-repairs-live-aggregate.json`; 저장소: `$SCRATCH/finviz-repairs-live-aggregate.sqlite3`.
+- 모델 시나리오: 판정 run `20260915-203906-finviz-scn-grader-a2c2`의 **9 PASS·1 FAIL**을 유지한다. FAIL은 Claude Code `large`: 2025-02-14 mean 5.2783을 근거 없이 오류 취급, 연중 안정·관세 해석·17건 하향 수정의 의미를 과장했다. 숫자 조작이 확인됐다는 판정은 아니며 원본 CLI 응답 부재에 따른 검증 한계도 판정에 있다. 이후 Claude large 재실행(`models/claude-large2.jsonl`, session `5826d21d-ff7e-49c4-a25d-cd8f412e243b`)은 five_hour 사용량 한도로 HTTP 429/API error가 나서 검증되지 않았다. 10/10으로 바꾸거나 이번 세션에서 모델을 새로 실행하지 않았다.
+
+최종 12개 지적에 대응한 수정과 재현은 완료했다. 기존 전체 완료 기준 중 라이브 세계 지도 분류 1건과 모델 시나리오 1건의 통과는 충족하지 않았으며, 새 독립 최종 리뷰·PR·머지 완료를 주장하지 않는다.
+
+### 2026-09-16 맵 로더 후속 수정 — 기존 라이브 차단 해소
+
+부모가 맵 로더도 원래 전체 구현 범위라고 명시하여 앞 기록의 세계 지도 차단 항목을 이어서 수정했다. 이번 추가 변경은 `.claude/skills/finviz/scripts/markets.py`, `tests/finviz/test_feeds.py`, 이 계획 파일뿐이다. TDD 지침과 기존 승인 CLI subprocess·저장 관측 seam을 적용했으며 curl만 대체했다. 완료 판정은 현재 진입 파일 구조의 종류별 CLI 재현 통과, 모호한 후보 거절, 전체 오프라인 및 실제 맵 조회 성공으로 정했다. 커밋·푸시·브랜치 변경·새 에이전트·모델 시나리오 재실행은 하지 않았다.
+
+저장된 실패 응답(`finviz-repairs-live/test_anonymous_source_provides29/observations.sqlite3`)을 먼저 확인했다. 기존에 검사한 숫자 번들에는 분류 로더가 없고, 저장된 HTML이 가리키는 `map.v1.67823970.js`를 읽으니 module 30092의 `function o(e){switch(e){case i.IZ.World:return a(n.e(6207).then(n.t.bind(n,68379,23)));...}}`가 실제 로더였다. SectorFull 분기는 7791, 같은 switch의 기본 섹터 분기는 8119였다. 이 숫자는 진단에서 관측한 사실과 테스트 픽스처에만 쓰며 구현에 하드코딩하지 않았다. 진단용 추가 응답은 `$SCRATCH/finviz-map-diagnosis.sqlite3`에 저장했다.
+
+현재 `map` 진입 파일을 먼저 검사하고, 이전 구조를 위해 앞쪽 숫자 번들 최대 10개 검사도 유지한다. 지도용 World·SectorFull 반환 분기가 있는 동일 switch 안에서 요청 종류의 chunk를 찾으며 기본 섹터만 그 switch의 default를 사용한다. 다른 레이아웃 switch의 default를 섞지 않고, 요청 종류가 없으면 다른 종류로 대체하지 않는다. 여러 로더 후보 및 여러 Root 객체는 `asset_structure`/partial/종료 8로 거절하고 성과 자료는 보존한다. chunk 해시는 기존처럼 실제 runtime 매니페스트에서 읽는다. JavaScript를 실행하거나 URL 신뢰 경계를 완화하지 않았다. 지원하는 switch 형태와 검사 범위의 한계는 코드의 `# 성진:` 주석에 남겼다.
+
+`test_map_loads_the_requested_universe_from_the_current_entry_script`에서 geo/sec_all/sec 세 경우가 기존 코드로 각각 종료 8인 것을 먼저 확인(3 failed)한 뒤 진입 파일 검사로 통과시켰다. 이어 서로 다른 로더 후보 두 개를 넣었을 때 잘못 성공하는 재현(3 failed)을 확인한 뒤 switch 범위와 단일 후보 검증을 추가했다. 같은 CLI 테스트는 추가 원문 필드 보존·무관한 default 무시·중복 Root 거절도 검증한다. `test_map_does_not_substitute_the_default_for_a_missing_requested_type`은 cap 분기가 없을 때 default로 대체하지 않음을 검증한다. 기존 앞쪽 번들 로더 픽스처도 계속 통과한다.
+
+- 전체 오프라인: `TMPDIR="$SCRATCH" PYTHONDONTWRITEBYTECODE=1 uv run -q --frozen --group dev --project .claude/skills/finviz python -m pytest -p no:cacheprovider --basetemp "$SCRATCH/finviz-map-pytest" tests/finviz -q` → **75 passed, 41 deselected, 33.97s**, 종료 0. 로그: `$SCRATCH/finviz-map-offline.log`.
+- 최종 맵 라이브: `TMPDIR="$SCRATCH" PYTHONDONTWRITEBYTECODE=1 uv run -q --frozen --group dev --project .claude/skills/finviz python -m pytest -p no:cacheprovider --basetemp "$SCRATCH/finviz-map-live-final" tests/finviz/test_live.py -m live -k 'market and map' -q` → **1 passed, 40 deselected, 3.97s**, 종료 0. 앞서 실패했던 geo 분류 조회가 통과했다. 로그: `$SCRATCH/finviz-map-live-final.log`.
+- 종류별 추가 라이브: 같은 실제 CLI로 `market map --type sec --fields classification_source,period` 및 `--type sec_all`을 실행 → **둘 다 종료 0**, 저장된 `/data/classification/name`도 각각 `Root`. sec는 `8119.v1.e0fc3674.js`, sec_all은 `7791.v1.e3ae587f.js`를 반환해 서로 다른 실제 자산 선택을 확인했다. 관측 ID는 각각 `90535da3b8e54c14a0d3c0243283deed`, `3813dca1a7814f74a3c99eb202737279`; 결과 `$SCRATCH/finviz-map-types.json`, 저장소 `$SCRATCH/finviz-map-types.sqlite3`.
+- Ruff: `uv run -q --frozen --group dev --project .claude/skills/finviz ruff check --no-cache --config pyproject.toml .claude/skills/finviz/scripts tests/finviz` → **All checks passed**, 종료 0. 범위 내 `git diff --check`도 종료 0.
+
+세계 지도 로더의 라이브 차단은 해소했다. 전체 라이브 41건을 다시 실행한 것은 아니며, 앞 실행 40 PASS·1 FAIL과 이번 해당 맵 재검증 결과를 구분해 기록한다. 모델 시나리오는 기존 9 PASS·1 FAIL 및 Claude 재실행 사용량 제한 기록 그대로이며 이후 처리는 부모가 맡는다. PR·머지 세부 사항도 부모에게 남긴다.
+
+### 2026-09-16 최종 검증과 전달 준비
+
+- 후속 수정 실행: `20260916-224820-finviz-final-repair-6d1c`, 지도 로더 수정: `20260916-230448-finviz-map-repair-1e3d`. 기존 최종 리뷰의 12개 항목과 실서비스 지도 로더 변경을 수정했다.
+- 부모 세션 회귀: `uv run -q --frozen --group dev --project .claude/skills/finviz python -m pytest tests/finviz -q -p no:cacheprovider` → **75 passed, 41 deselected**.
+- 부모 세션 라이브: `uv run -q --frozen --group dev --project .claude/skills/finviz python -m pytest tests/finviz/test_live.py -m live -q -p no:cacheprovider` → **41 passed**. 지도 실패는 현재 해소됐다.
+- Ruff 검사 통과. `validate_harness.py --path . --json` → **오류 0, 경고 0**. Finviz 범위 `git diff --check` 통과.
+- Claude large 시나리오를 2026-09-16 재실행했다. 원본 transcript는 세션 scratchpad의 `models/claude-large3.jsonl`. 독립 판정 `20260916-231059-finviz-delivery-verification-63a8` → **LARGE_SCENARIO PASS**, 표의 날짜·평균값 18/18개가 실제 도구 응답과 일치하고 일시 급락을 보존했다. 이전 9 PASS·1 FAIL 기록을 지우지 않으며, 실패 사례 수정 후 재검증으로 누적 최종 시나리오는 **10 PASS**다. 모든 시나리오를 최종 버전에서 동시에 다시 실행했다는 뜻은 아니다.
+- 같은 독립 검증은 지정된 최종 리뷰 항목에 **NO_BLOCKERS**를 반환했다. 리뷰어는 코드를 읽고 시나리오 응답을 대조했으며 테스트 실행은 부모 세션의 위 결과와 구별한다.

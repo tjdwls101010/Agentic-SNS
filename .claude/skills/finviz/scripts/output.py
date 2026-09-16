@@ -98,6 +98,19 @@ def select(result, args, leaf):
         coverage.setdefault("received", total)
         coverage["shown"] = len(records)
         coverage.setdefault("exhaustive", False)
+    elif (leaf.keyed or leaf.records) and isinstance(records, dict):
+        keys = list(records)
+        if fields:
+            missing = [f for f in fields if f not in records]
+            if missing:
+                raise Failure("invalid_fields", "Unknown fields " + ", ".join(missing) + ".", "Available fields: " + ", ".join(records) + ".")
+            keys = fields
+        if args.filter:
+            keys = [k for k in keys if args.filter.lower() in k.lower() or args.filter.lower() in searchable(records[k])]
+        limit = leaf.default_limit if args.limit is None else args.limit
+        selected = {k: records[k] for k in keys[:limit]}
+        result["data"] = dict(data, **{leaf.records: selected}) if leaf.records else selected
+        result["coverage"] = dict(result.get("coverage") or {}, received=len(records), shown=len(selected), exhaustive=False)
     elif isinstance(data, dict) and fields:
         missing = [f for f in fields if f not in data]
         if missing:
@@ -120,7 +133,7 @@ def finalize(result, args, leaf, request):
             result["status"], result["error"] = "error", exc.info()
         else:
             records = records_at(result.get("data"), leaf.records)
-            if (is_empty(result.get("data")) or (leaf.records and isinstance(records, list) and not records)) and result["status"] != "partial":
+            if (is_empty(result.get("data")) or (leaf.records and isinstance(records, (list, dict)) and not records)) and result["status"] != "partial":
                 result["status"] = "empty"
                 result.setdefault("warnings", []).append("The source returned no usable items; this is not proof that the data does not exist.")
     ordered = ["target", "request", "id", "observed_at", "source", "conditions", "coverage", "continuation", "selection", "status", "data", "warnings", "error"]

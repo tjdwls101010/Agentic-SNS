@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 from urllib.parse import urlencode
+from uuid import uuid4
 
 import markup
 import output
@@ -93,7 +94,7 @@ RUN_ARGS = [
 ]
 
 
-@leaf("screen", "run", help="Run the screener with filters, a signal, a view or custom columns, sorting and paging; rows keep source strings.", args=RUN_ARGS, output={"[]": "one record per row keyed by the column headers, plus ticker and url (and observation_id when more than one page or --out); with --out the data is {path, rows_written, pages} instead", "conditions": "filters, signal, columns, sort and start as confirmed by each page's own controls; pages that disagree show evidence per observation id", "coverage": "received rows across pages, shown after selection, source_total from the page count, pages fetched, exhaustive false", "continuation": "{start} for the next page, or for the page that failed"}, narrow=["--fields", "--limit", "--out", "--pages 1"])
+@leaf("screen", "run", help="Run the screener with filters, a signal, a view or custom columns, sorting and paging; rows keep source strings.", args=RUN_ARGS, output={"id": "when --pages > 1, a saved aggregate of all received rows before selection or export; source.pages lists independent page IDs; read ID --raw returns the aggregate JSON, while page IDs return source HTML", "[]": "one record per row keyed by the column headers, plus ticker and url (and observation_id when more than one page or --out); with --out the data is {path, rows_written, pages} instead", "conditions": "filters, signal, columns, sort and start as confirmed by each page's own controls; pages that disagree show evidence per observation id", "coverage": "received rows across pages, shown after selection, source_total from the page count, pages fetched, exhaustive false", "continuation": "{start} for the next page, or for the page that failed"}, narrow=["--fields", "--limit", "--out", "--pages 1"])
 def run(ctx, args, target):
     if args.pages < 1:
         raise Failure("invalid_pages", "--pages must be at least 1.", "Use --pages 1 for a single page.")
@@ -108,6 +109,7 @@ def run(ctx, args, target):
             obs, page = screener_page(ctx, query)
             headers, records = page_records(page, obs)
         except Failure as exc:
+            exc.record()
             if index == 0:
                 raise
             failure = exc
@@ -144,6 +146,14 @@ def run(ctx, args, target):
             result["warnings"].append("No rows were written; the source returned no matching rows or the selection removed them all.")
     else:
         result["data"] = selected
+    if args.pages > 1:
+        result["id"] = uuid4().hex
+        result["source"] = {"pages": [obs.id for obs in pages]}
+        saved = {k: v for k, v in result.items() if k != "selection_applied"}
+        saved["data"] = tagged
+        saved["status"] = "partial" if failure else "ok" if tagged else "empty"
+        saved["coverage"] = dict(result["coverage"], shown=len(tagged))
+        ctx.store.save(saved, json.dumps(saved, ensure_ascii=False).encode("utf-8"))
     return result
 
 
@@ -154,7 +164,7 @@ def merge_conditions(pages):
     for key in dict.fromkeys(k for obs in pages for k in obs.result.get("conditions", {})):
         found = [(obs.id, obs.result["conditions"].get(key)) for obs in pages if key in obs.result.get("conditions", {})]
         statuses = {c["status"] for _, c in found}
-        if len(statuses) == 1 or key == "start":
+        if len(statuses) == 1:
             merged[key] = found[0][1]
         else:
             worst = max(statuses, key=order.get)

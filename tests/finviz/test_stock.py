@@ -3,6 +3,24 @@ from pages import stock_overview
 OVERVIEW = "https://finviz.com/stock?t=A&ty=c"
 
 
+def test_revenue_selection_keeps_units_named_series_and_every_source_record_field(client):
+    from pages import stock_section
+
+    values = [{"fiscal_year": "2025", "report_end_date": "2025-10-31", "source_filing_url": "https://www.sec.gov/x", "value": 12.5, "newField": {"restated": True}}]
+    series = {"Products / A": values, "Products B": values, "Services": []}
+    client.add("https://finviz.com/stock?t=A&ty=rv", stock_section({"products_and_services": {"unit": "USD", "revenues": series}}))
+    result = client.one("stock", "revenue", "A", "--filter", "products", "--limit", "1")
+    assert result["data"] == {"unit": "USD", "series": {"Products / A": values}}
+    assert result["coverage"] == {"received": 3, "shown": 1, "exhaustive": False}
+    assert client.one("read", result["id"], "--pointer", "/data")["data"] == {"unit": "USD", "series": series}
+    assert client.one("stock", "revenue", "A", "--fields", "Services")["data"] == {"unit": "USD", "series": {"Services": []}}
+    assert client.one("stock", "revenue", "A", "--fields", "unknown", code=2)["error"]["code"] == "invalid_fields"
+    assert client.one("stock", "revenue", "A", "--filter", "missing", code=7)["data"] == {"unit": "USD", "series": {}}
+    saved_slice = client.one("read", result["id"], "--pointer", "/data/series", "--start", "1", "--limit", "1")
+    assert saved_slice["data"] == {"Products B": values}
+    assert saved_slice["selection"]["unit"] == "USD"
+
+
 def test_snapshot_keeps_duplicate_metric_labels_with_their_own_definitions_and_header_facts(client):
     client.add(OVERVIEW, stock_overview())
     result = client.one("stock", "snapshot", "A")
@@ -85,8 +103,8 @@ def test_forecast_dividends_revenue_and_short_interest_keep_source_records(clien
     revenue = {"products_and_services": {"revenues": {"Instrumentation": [{"fiscal_year": "2014", "report_end_date": "2014-10-31", "source_filing_url": "https://www.sec.gov/x", "value": 831000000.0}]}, "unit": "USD"}, "regions": {"revenues": {"Americas": []}, "unit": "USD"}, "segment": {"revenues": {}, "unit": "USD"}}
     client.add("https://finviz.com/stock?t=A&ty=rv", stock_section(revenue))
     data = client.one("stock", "revenue", "A")["data"]
-    assert data == [{"name": "Instrumentation", "unit": "USD", "values": revenue["products_and_services"]["revenues"]["Instrumentation"]}]
-    assert client.one("stock", "revenue", "A", "--by", "regions")["data"] == [{"name": "Americas", "unit": "USD", "values": []}]
+    assert data == {"unit": "USD", "series": revenue["products_and_services"]["revenues"]}
+    assert client.one("stock", "revenue", "A", "--by", "regions")["data"] == {"unit": "USD", "series": {"Americas": []}}
     assert client.one("stock", "revenue", "A", "--by", "segment", code=7)["status"] == "empty"
     short = [{"ticker": "A", "timestamp": 1579064400, "shortInterest": 5.19, "sharesFloat": 306.66, "averageVolume": 1609239.97}]
     client.add("https://finviz.com/stock?t=A&ty=si", stock_section(short))
@@ -145,9 +163,19 @@ def test_empty_record_sets_inside_a_dict_report_empty_and_too_large_points_at_th
     assert "--pointer /data/records" in error["fix"]
 
 
+def test_nested_earnings_recovery_requires_the_record_pointer_not_the_data_object(client):
+    records = [{"fiscalPeriod": "2025FY", "note": "x" * 650} for _ in range(60)]
+    client.add("https://finviz.com/stock?t=A&ty=ea", stock_section(dict(EARNINGS, earningsData=records)))
+    result = client.one("stock", "earnings", "A", code=9)
+    assert client.one("read", result["id"], "--pointer", "/data", "--start", "0", "--limit", "20", code=9)["error"]["code"] == "too_large"
+    assert client.one("read", result["id"], "--pointer", "/data/records", "--start", "0", "--limit", "20")["data"] == records[:20]
+
+
 def test_profile_links_and_price_bar_field_names_follow_the_contract(client):
     client.add(OVERVIEW, stock_overview())
-    profile = client.one("stock", "profile", "A")["data"]
+    result = client.one("stock", "profile", "A")
+    assert "conditions" not in result and "coverage" not in result
+    profile = result["data"]
     assert profile["links"] == {"website": "http://example.com"} and profile["peers"] == ["WAT", "MTD"]
     bars = {"date": [1788872400], "open": [1.0], "high": [2.0], "low": [0.5], "close": [1.5], "volume": [10]}
     client.add("https://finviz.com/api/quote?instrument=stock&ticker=A&timeframe=d&barsCount=1", bars)

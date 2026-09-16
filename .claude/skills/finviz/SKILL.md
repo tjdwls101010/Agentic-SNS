@@ -11,7 +11,7 @@ Run the installed skill's locked CLI from any working directory:
 uv run -q --frozen --project "${CLAUDE_SKILL_DIR}" python "${CLAUDE_SKILL_DIR}/scripts/finviz.py" --help
 ```
 
-If the host leaves `${CLAUDE_SKILL_DIR}` literal, replace it with the absolute directory containing this SKILL.md. `--help` lists the groups, `GROUP LEAF --help` lists every argument with its default, and `schema GROUP LEAF` gives the output keys, the arguments that narrow a result and the exit codes; none of that is repeated here because a second copy is a second thing that can go stale. Every fetched response is saved under the `id` in its result, so `read ID --pointer /data` re-reads it in slices without another request, and every error carries a `fix` naming the next step.
+If the host leaves `${CLAUDE_SKILL_DIR}` literal, replace it with the absolute directory containing this SKILL.md. `--help` lists the groups and shared options; `GROUP LEAF --help` explains the leaf's own arguments, while `schema GROUP LEAF` includes shared arguments and defaults, output keys, narrowing arguments and exit codes. Every fetched response is saved: use `inspect ID` to find its record collection, then `read ID --pointer POINTER --start N --limit N` to select entries without another request. Nested earnings records live at `/data/records`; selecting `/data` does not slice the lists inside that object. JSON errors carry a `fix`; argument-parser errors instead print usage on stderr and exit 2.
 
 ## Which surface the question needs
 
@@ -23,7 +23,7 @@ A stock page shows `EPS next Y` twice, once as a next-year EPS amount and once a
 
 ## Scope travels with the observation
 
-Receiving rows does not establish that a filter, sort, page or date was applied: an unknown filter such as `cap_bogus` still returns twenty rows with HTTP 200. Each result carries `conditions` marked `confirmed`, `not_applied` or `unverified` with the page's own evidence, and `coverage` with what was received, what is shown after `--limit`, `--fields` or `--filter`, and the source's own total when it states one. The custom screener view has no filter controls, so filters stay `unverified` there; run the same filters on the overview view to confirm them. A page sequence can change while it is being collected, so a finished `--pages` run is not a single-moment census of the market.
+Receiving rows does not establish that a filter, sort, page or date was applied: an unknown filter such as `cap_bogus` still returns twenty rows with HTTP 200. Results with tracked selectors carry `conditions` marked `confirmed`, `not_applied` or `unverified` with the source's evidence; collection results can carry `coverage` with received and shown counts and the source's own total when available. These fields are optional: their absence does not confirm a selector or establish completeness. The custom screener view has no filter controls, so filters stay `unverified` there; run the same filters on the overview view to confirm them. A page sequence can change while it is being collected, so a finished `--pages` run is not a single-moment census of the market. A record that looks anomalous, such as an estimate mean that drops for a week and recovers, is still the source's record: report it as observed and leave its cause open rather than dismissing it or supplying a reason the data does not contain.
 
 ## Time belongs to each observation
 
@@ -35,4 +35,4 @@ News lists locate articles on other hosts: `url` is where the claim lives, and o
 
 ## When a result is too large
 
-`too_large` is not a failure. The response is already saved under its `id`, and the fix names both the arguments that narrow this command and the `read` slice that reaches the rest without another request.
+`too_large` means the output exceeded its budget; it does not mean the source was empty. The response is already saved under its `id`, and the fix names narrowing arguments and a starting `read` slice. Reduce the slice further if individual records are large. A multi-page screen saves an aggregate whose `source.pages` lists the independently readable page IDs; `read` and `inspect` recover those pages without fetching them again.

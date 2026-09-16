@@ -69,12 +69,12 @@ def performance(ctx, args, target):
 KIND = (("kind",), dict(choices=["futures", "forex", "crypto"], help="Market surface."))
 
 
-@leaf("market", "quotes", help="Current quotes for every futures, forex or crypto instrument Finviz lists.", args=[KIND, (("--timeframe",), dict(default="d", help="Source timeframe for the change fields, e.g. d, w, m."))], output={"[]": "one record per instrument as published: label, ticker, last, change, changeUsd, prevClose, high, low"}, narrow=["--filter", "--fields", "--limit"])
+@leaf("market", "quotes", help="Current quotes for every futures, forex or crypto instrument Finviz lists.", args=[KIND, (("--timeframe",), dict(default="d", help="Source timeframe for the change fields, e.g. d, w, m."))], output={"{}": "ticker -> quote as published, including extra source fields; --fields selects ticker keys, --filter matches keys or quote values, --limit counts instruments"}, keyed=True, narrow=["--filter", "--fields", "--limit"])
 def quotes(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/" + args.kind + "_all?" + urlencode({"timeframe": args.timeframe}))
     source = obs.json()
     obs.result["conditions"] = {"timeframe": condition(args.timeframe, "unverified", None)}
-    obs.result["target"], obs.result["data"] = args.kind, list(source.values()) if isinstance(source, dict) else source
+    obs.result["target"], obs.result["data"] = args.kind, source
     return obs.result
 
 
@@ -93,7 +93,7 @@ def market_map(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/map_perf?" + urlencode({"t": args.type, "st": args.period}))
     perf = obs.json()
     obs.result["target"] = args.type
-    obs.result["conditions"] = {"period": condition(args.period, ("confirmed" if perf.get("subtype") == args.period else "not_applied") if perf.get("subtype") else "unverified", perf.get("subtype"))}
+    obs.result["conditions"] = {"type": condition(args.type), "period": condition(args.period, ("confirmed" if perf.get("subtype") == args.period else "not_applied") if perf.get("subtype") else "unverified", perf.get("subtype"))}
     obs.result["data"] = {"period": perf.get("subtype"), "version": perf.get("version"), "performance": perf.get("nodes"), "classification": None, "classification_source": None}
     if args.performance_only:
         return obs.result
@@ -102,6 +102,7 @@ def market_map(ctx, args, target):
         tree, source = classification(ctx, args.type, dependencies)
         obs.result["data"].update(classification=tree, classification_source=source)
     except Failure as exc:
+        exc.record()
         obs.result["status"], obs.result["error"] = "partial", exc.info()
         obs.result["warnings"] = ["The classification tree could not be resolved; performance values are complete."]
     obs.result["source"]["dependencies"] = dependencies
@@ -125,17 +126,20 @@ def classification(ctx, map_type, dependencies):
         raise page_obs.fail("asset_structure", "The map page no longer references a map entry or runtime script.", "Use --performance-only; the classification tree is unavailable until the loader is understood again.")
     enum = TYPES[map_type]
     chunk = None
-    # 성진: 진입 스크립트 앞의 숫자 번들 최대 10개만 검사한다; Finviz가 로더를 이 범위 밖으로 옮기면 넓힌다.
-    for url in reversed([a for a in assets[:entry] if re.search(r"/\d+\.v", a)][-10:]):
+    # 성진: 진입 파일과 그 앞의 숫자 번들 최대 10개만 검사한다; Finviz가 로더를 이 범위 밖으로 옮기면 넓힌다.
+    for url in [assets[entry], *reversed([a for a in assets[:entry] if re.search(r"/\d+\.v", a)][-10:])]:
         loader_obs, loader = asset(url)
-        if "SectorFull" not in loader and "IZ.World" not in loader:
-            continue
-        if enum == "Sector":
-            match = re.search(r"case\s+[\w$.]+\.World:[\s\S]*?default:return[^;]{0,150}?\.e\((\d+)\)", loader[loader.find("case "):])
-        else:
-            match = re.search(r"case\s+[\w$.]+\." + enum + r":return[^;]{0,150}?\.e\((\d+)\)", loader)
-        if match:
-            chunk = match.group(1)
+        candidates = []
+        # 성진: 현재 로더의 중첩 중괄호 없는 switch만 해석한다; 분기가 블록문으로 바뀌면 구조 오류로 멈추고 파서를 확장한다.
+        for body in re.findall(r"switch\s*\([^{}]*\)\s*\{([^{}]*)\}", loader):
+            if not all(re.search(r"case\s+[\w$.]+\." + name + r":\s*return", body) for name in ("World", "SectorFull")):
+                continue
+            selector = r"default" if enum == "Sector" else r"case\s+[\w$.]+\." + enum
+            candidates.extend(re.findall(selector + r":\s*return[^;{}]{0,150}?\.e\((\d+)\)", body))
+        if len(candidates) > 1:
+            raise loader_obs.fail("asset_structure", "Multiple loader branches for " + enum + ".", "Use --performance-only; ambiguous map loaders are not guessed.")
+        if candidates:
+            chunk = candidates[0]
             break
     if chunk is None:
         raise page_obs.fail("asset_structure", "The loader has no case for " + enum + ".", "Use --performance-only; no other map universe was substituted.")
@@ -160,5 +164,6 @@ def classification(ctx, map_type, dependencies):
 @leaf("market", "bubbles", help="Bubble chart data: one record per stock with the chosen x, y, size and color fields.", args=[(("--x",), dict(default="sector", help="X field.")), (("--y",), dict(default="lastChange", help="Y field.")), (("--size",), dict(default="marketCap", help="Size field.")), (("--color",), dict(default="sector", help="Color field.")), (("--index",), dict(default="sp500", help="Stock universe, e.g. sp500."))], output={"[]": "{ticker, company, x, y, size, color, isETF} as published"}, narrow=["--filter", "--fields", "--limit"])
 def bubbles(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/bubbles?" + urlencode({"x": args.x, "y": args.y, "size": args.size, "color": args.color, "idx": args.index}))
+    obs.result["conditions"] = {key: condition(getattr(args, key)) for key in ("x", "y", "size", "color", "index")}
     obs.result["target"], obs.result["data"] = args.index, obs.json()
     return obs.result
