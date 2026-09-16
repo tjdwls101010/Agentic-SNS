@@ -175,6 +175,7 @@ def test_table_returns_rows_once_without_spacer_cells_and_selects_row_ranges(cli
     assert [part["text"] for part in table["context"]] == [
         "Products and Services Performance",
         "Net sales by category (dollars in millions):",
+        "(1) Includes accessories.",
     ]
     assert table["caption"] == {"text": "Sales"}
     assert table["footnotes"] == [{"text": "(1) Includes accessories.", "anchor": "fn1"}]

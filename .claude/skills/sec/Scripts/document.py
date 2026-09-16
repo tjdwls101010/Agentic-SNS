@@ -220,7 +220,10 @@ def _html_blocks(text, url):
                 if heading(target):
                     continue
                 parent = target.getparent()
-                candidates = [target, parent, target.getnext(), parent.getnext() if parent is not None else None]
+                # An anchor tag marks where a note sits; the note is the block around it, not the marker itself.
+                marker = isinstance(target.tag, str) and target.tag.lower() == 'a'
+                candidates = ([parent, target] if marker else [target, parent])
+                candidates += [target.getnext(), parent.getnext() if parent is not None else None]
                 target = next((c for c in candidates if c is not None and c is not node and c not in containers
                                and not heading(c) and _dom_text(c, nonbody_tags)), None)
                 if target is None:
@@ -231,6 +234,10 @@ def _html_blocks(text, url):
         context = next((r['text'] for r in reversed(records) if r['kind'] in ('caption', 'context') and r['text']), '')
         header_row = next((r['row'] for r in records if r['kind'] == 'cell' and r['text']), None)
         header = ' | '.join(r['text'] for r in records if r['kind'] == 'cell' and r['row'] == header_row and r['text'])
+        # 성진: 표 뒤 두 블록까지 문맥으로 싣는다, 번호 주석이 더 멀리 떨어진 공시가 나오면 범위를 넓힌다.
+        following = max((r['block'] for r in records if r['kind'] == 'cell'), default=block_index) + 1
+        records.extend({'kind': 'context', 'text': b['text'], 'block': i}
+                       for i, b in enumerate(blocks[following:following + 2], following) if b['text'])
         # 성진: 표를 고르기 위한 힌트라 200자로 끊는다, 전체 문맥과 헤더는 table이 레코드로 돌려준다.
         outlines.append({'kind': 'table', 'text': table_id, 'table_id': table_id, 'block': block_index, 'offset': 0,
                          'url': url, 'rows': len(rows), 'context': context[:200], 'header': header[:200]})

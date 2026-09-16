@@ -288,7 +288,7 @@ def test_synthetic_table_exposes_cell_image_links_and_context(tmp_path):
     from reader import table, links
     doc, store = snapshot(tmp_path, b'<p>Balance sheet</p><table><tr><td>Assets <img src="assets.jpg" alt="Asset breakdown"><a href="#f1">1</a></td></tr></table><p id="f1">Includes cash</p>')
     result = table(doc, store, table_id='table-0')
-    assert result['context'] == [{'text': 'Balance sheet'}]
+    assert result['context'] == [{'text': 'Balance sheet'}, {'text': 'Includes cash'}]
     (cell,) = result['rows'][0]['cells']
     assert cell['text'] == 'Assets 1'
     assert {'kind': 'image', 'text': 'Asset breakdown', 'url': URL.rsplit('/', 1)[0] + '/assets.jpg'} in cell['links']
@@ -572,3 +572,25 @@ def test_a_split_context_and_caption_say_they_are_partial(tmp_path):
     assert ''.join(page['caption']['text'] for page in pages if 'caption' in page) == 'K' * 1500
     whole = table(doc, store, table_id='table-0', budget=24000)
     assert whole['context'] == [{'text': 'C' * 1500}] and whole['caption'] == {'text': 'K' * 1500}
+
+
+def test_a_marker_anchor_yields_the_note_it_marks_not_the_marker(tmp_path):
+    from reader import table
+    body = (b'<html><body><table><tr><td>Revenue <a href="#n">(1)</a></td></tr></table>'
+            b'<p><a id="n">(1)</a> Excludes <b>returns</b>.</p></body></html>')
+    doc, store = snapshot(tmp_path, body)
+    assert table(doc, store, table_id='table-0')['footnotes'] == [
+        {'text': '(1) Excludes returns.', 'anchor': 'n'}
+    ]
+
+
+def test_table_context_includes_the_prose_that_follows_it(tmp_path):
+    from reader import table
+    body = (b'<html><body><p>Cash and equivalents (in millions):</p>'
+            b'<table><tr><th>Type</th><th>2025</th></tr><tr><td>Cash</td><td>29,943</td></tr></table>'
+            b'<p>(1) Includes $2.6 billion of restricted cash.</p>'
+            b'<p>Unrelated later section.</p></body></html>')
+    doc, store = snapshot(tmp_path, body)
+    context = [part['text'] for part in table(doc, store, table_id='table-0')['context']]
+    assert 'Cash and equivalents (in millions):' in context
+    assert '(1) Includes $2.6 billion of restricted cash.' in context
