@@ -41,5 +41,10 @@ def cli(tmp_path, capsys, monkeypatch):
         assert "tests@example.org" not in output
         return code, json.loads(output)
 
+    def text(*args):
+        code = main(["--env-file", str(identity), "--cache-dir", str(tmp_path / "cache"), *args])
+        return code, capsys.readouterr().out
+
+    run.text = text
     run.calls, run.replies, run.identity, run.cache = calls, replies, identity, tmp_path / "cache"
     return run

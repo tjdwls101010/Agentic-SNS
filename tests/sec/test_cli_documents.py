@@ -206,3 +206,26 @@ def test_oversized_response_names_this_command_own_narrowing_options(cli):
     assert code == 0 and whole["rows"][0]["cells"][0]["text"] == "42"
     code, long_read = cli("read", opened["snapshot_id"], "--max-chars", "1024")
     assert code == 0 and long_read["has_more"] is True and long_read["text"].startswith("zzz")
+
+
+def test_read_returns_prose_once_as_plain_text_with_a_short_header(cli):
+    prose = "Apple Inc. faces competition. " * 400 + "FINAL SENTENCE."
+    cli.replies.append(("integration.htm", 200, ("<html><p>" + prose + "</p></html>").encode(), {"content-type": "text/html"}))
+    code, opened = cli("open", URL)
+    assert code == 0
+    snapshot = opened["snapshot_id"]
+    cli.identity.write_text('EDGAR_IDENTITY=""')
+    code, output = cli.text("read", snapshot)
+    assert code == 0
+    header, _, body = output.partition("\n\n")
+    assert header.splitlines()[0] == "source_url: " + URL
+    keys = [line.split(":")[0] for line in header.splitlines()]
+    assert {"source_url", "snapshot_id", "status", "extraction_complete", "has_more", "next_position"} <= set(keys)
+    assert body.rstrip("\n") == prose[: len(body.rstrip("\n"))]
+    assert "\\n" not in output and '"text"' not in output
+    assert len(body) / len(output) > 0.9
+    code, structured = cli("read", snapshot)
+    assert code == 0 and structured["text"] == body.rstrip("\n")
+    assert all(set(item) <= {"kind", "position", "anchor", "path", "parent", "attributes"} for item in structured["items"])
+    code, rest = cli.text("read", snapshot, "--position", structured["next_position"])
+    assert code == 0 and rest.rstrip("\n").endswith("FINAL SENTENCE.")
