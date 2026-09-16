@@ -1,35 +1,131 @@
 """Budgeted navigation over one immutable snapshot; no parsing or network access."""
 import json
+import re
 from bisect import bisect_right
+from urllib.parse import unquote
 
 from output import SecError
 from store import digest
 
 
+def fingerprint(snapshot):
+    # Ten characters: short enough to repeat on every item, wide enough that two snapshots in one session differ.
+    return snapshot.id[:10]
+
+
 def position(snapshot, block, offset=0):
-    return f'{snapshot.id}:{block}:{offset}'
+    # Short enough to repeat on every item, specific enough that another copy's position is refused.
+    return f'{fingerprint(snapshot)}:{block}:{offset}'
 
 
 def _position(snapshot, value, default):
     if value is None:
         return default
     try:
-        sid, block, offset = value.split(':')
+        *sid, block, offset = value.split(':')
         block, offset = int(block), int(offset)
-        if sid != snapshot.id or block < 0 or offset < 0:
+        if sid not in ([fingerprint(snapshot)], [snapshot.id]) or block < 0 or offset < 0:
             raise ValueError
         blocks = snapshot.data['blocks']
         if block > len(blocks) or (block == len(blocks) and offset) or (block < len(blocks) and offset > len(blocks[block]['text'])):
             raise ValueError
         return block, offset
     except (ValueError, AttributeError):
-        raise SecError('invalid_position', 'Position belongs to a different snapshot or is out of range.', 'Use a position returned for this snapshot.') from None
+        raise SecError('invalid_position', 'Position belongs to a different snapshot or is out of range.',
+                       'Use a position this snapshot returned; positions start with its own fingerprint.') from None
 
 
-def _page(snapshot, store, operation, options, items, cursor, limit, budget):
-    if not isinstance(limit, int) or not 1 <= limit <= 20 or not isinstance(budget, int) or not 1024 <= budget <= 12000:
-        raise SecError('invalid_budget', 'Limit must be 1..20 and budget must be 1024..12000 characters.', 'Use the defaults or values in these ranges.')
-    query = {'version': 2, 'operation': operation, 'snapshot_id': snapshot.id, 'options': options, 'limit': limit, 'budget': budget}
+# Budget bounds: the host tool truncates Bash results around 30,000 characters, so the ceiling stays below that.
+MIN_BUDGET, DEFAULT_BUDGET, MAX_BUDGET = 1024, 12000, 24000
+NARROWING = {'outline': '--kind', 'find': 'a more specific query', 'read': '--position and --end',
+             'table': '--rows', 'links': '--kind'}
+OUTLINE_KINDS = ('toc', 'heading', 'table', 'anchor', 'internal_link')
+DEFAULT_OUTLINE_KINDS = ('toc', 'heading', 'table')
+# Fields the model acts on; block bookkeeping stays inside the position string.
+INTERNAL = ('block', 'offset', 'text_offset', 'text_complete', 'context_block', 'target_resolved')
+
+
+def _anchor_or_url(item, source_url):
+    url = item.get('url', '')
+    if url.startswith(source_url + '#'):
+        return {'anchor': unquote(url[len(source_url) + 1:])}
+    return {'url': url} if url else {}
+
+
+def _prose(snapshot):
+    # In XML the path and attributes are the evidence; everywhere else the text carries its own structure.
+    return snapshot.data['format'] != 'xml'
+
+
+def _public(operation, item, source_url, prose=True):
+    if operation == 'table':
+        # A cell keeps only what distinguishes it: place, span beyond one, header role, text and its position.
+        public = {k: v for k, v in item.items() if k in ('kind', 'row', 'column', 'text', 'position', 'scope', 'headers') and v not in ('', None)}
+        public.update({k: item[k] for k in ('colspan', 'rowspan') if item.get(k, 1) != 1})
+        if item.get('header'):
+            public['header'] = True
+        if item.get('text_complete') is False:
+            public['text_complete'] = False
+        public.update(_anchor_or_url(item, source_url))
+        return public
+    public = {k: v for k, v in item.items() if k not in INTERNAL and v != ''}
+    if operation == 'read' and prose:
+        public.pop('text', None)
+    if operation == 'outline':
+        public.pop('context_position', None)
+    if item.get('kind') in ('table', 'anchor'):
+        public.pop('text', None) if item['kind'] == 'table' else None
+        public.pop('url', None)
+    elif operation != 'links' and 'url' in public:
+        # The envelope carries source_url once; an item names only the anchor observed in the original DOM.
+        url = public.pop('url')
+        if url.startswith(source_url + '#'):
+            public['anchor'] = unquote(url[len(source_url) + 1:])
+    if operation == 'links' and 'target_resolved' in item:
+        public['target_resolved'] = item['target_resolved']
+    return public
+
+
+def _assemble_table(result):
+    # Context, caption and footnotes lead the record stream, so they arrive with the first rows and then page like them.
+    table = {k: v for k, v in result.items() if k != 'items'}
+    rows = []
+    for item in result['items']:
+        kind = item.pop('kind', 'cell')
+        if kind in ('context', 'caption', 'footnote'):
+            note = {k: v for k, v in item.items() if k in ('text', 'anchor', 'url', 'text_complete')}
+            if kind == 'caption':
+                table['caption'] = note
+            elif kind == 'context':
+                table.setdefault('context', []).append(note)
+            else:
+                table.setdefault('footnotes', []).append(note)
+            continue
+        row = next((r for r in rows if r['row'] == item['row']), None)
+        if row is None:
+            row = {'row': item['row'], 'cells': []}
+            if 'position' in item:
+                row['position'] = item['position']
+            rows.append(row)
+        item.pop('row')
+        item.pop('position', None)
+        if kind == 'cell':
+            row['cells'].append(item)
+        else:
+            cell = next((c for c in row['cells'] if c['column'] == item['column']), None)
+            link = {'kind': kind, **{k: v for k, v in item.items() if k in ('text', 'anchor', 'url')}}
+            if cell is None:
+                row['cells'].append({'column': item['column'], 'links': [link]})
+            else:
+                cell.setdefault('links', []).append(link)
+    table['rows'] = rows
+    return table
+
+
+def _page(snapshot, store, operation, options, items, cursor, budget, finish=lambda result: result):
+    if not isinstance(budget, int) or not MIN_BUDGET <= budget <= MAX_BUDGET:
+        raise SecError('invalid_budget', f'max-chars must be {MIN_BUDGET}..{MAX_BUDGET} characters.', 'Use the default or a value in this range.')
+    query = {'version': 3, 'operation': operation, 'snapshot_id': snapshot.id, 'options': options, 'budget': budget}
     # Validate saved bytes on every public read, including callers holding a snapshot object.
     encoded = json.dumps(snapshot.data, sort_keys=True, ensure_ascii=False).encode()
     if digest(encoded) != snapshot.id:
@@ -42,14 +138,19 @@ def _page(snapshot, store, operation, options, items, cursor, limit, budget):
     result = {'snapshot_id': snapshot.id, 'items': [], 'next_cursor': '0' * 64, 'has_more': True,
               'scope_complete': False, 'remaining_items': len(items), 'returned_chars': budget, 'extraction_complete': snapshot.data['extraction_complete'],
               'source_url': snapshot.data['source']['url'], 'status': snapshot.data['status']}
+    # An excerpt has to carry the limitations of the extraction it came from, not only that one exists.
+    if snapshot.data['warnings']:
+        result['warnings'] = snapshot.data['warnings']
+    prose = _prose(snapshot)
     if operation == 'read':
-        result['text'] = ''
+        if prose:
+            result['text'] = ''
         result['next_position'] = position(snapshot, len(snapshot.data['blocks']), max((len(b['text']) for b in snapshot.data['blocks']), default=0))
 
     def size():
-        return len(json.dumps(result, ensure_ascii=False, indent=2)) + 1
+        return len(json.dumps(finish(json.loads(json.dumps(result))), ensure_ascii=False, indent=2)) + 1
 
-    while index < len(items) and len(result['items']) < limit:
+    while index < len(items):
         original = items[index]
         text = original.get('text', '')
         remaining = text[offset:]
@@ -58,17 +159,20 @@ def _page(snapshot, store, operation, options, items, cursor, limit, budget):
             item['position'] = position(snapshot, original['block'], original.get('offset', 0) + (offset if operation == 'read' else 0))
         if 'context_block' in original:
             item['context_position'] = position(snapshot, original['context_block'], 0)
-        result['items'].append(item)
+        public = _public(operation, item, snapshot.data['source']['url'], prose)
+        result['items'].append(public)
         prefix = result.get('text', '')
-        if operation == 'read':
+        if operation == 'read' and prose:
             result['text'] = prefix + remaining
         if size() > budget:
             lo, hi = 0, len(remaining)
-            item['text_complete'] = False
+            if 'text' in public:
+                public['text_complete'] = False
             while lo < hi:
                 mid = (lo + hi + 1) // 2
-                item['text'] = remaining[:mid]
-                if operation == 'read':
+                if 'text' in public:
+                    public['text'] = remaining[:mid]
+                if operation == 'read' and prose:
                     result['text'] = prefix + remaining[:mid]
                 if size() <= budget:
                     lo = mid
@@ -76,13 +180,15 @@ def _page(snapshot, store, operation, options, items, cursor, limit, budget):
                     hi = mid - 1
             if lo == 0:
                 result['items'].pop()
-                if operation == 'read':
+                if operation == 'read' and prose:
                     result['text'] = prefix
                 if not result['items']:
-                    raise SecError('budget_too_small', 'One item has metadata larger than this budget.', 'Increase budget or follow the original source URL.')
+                    raise SecError('budget_too_small', 'This response cannot fit in the requested budget.',
+                                   f"Select less with {NARROWING[operation]}, or raise --max-chars up to {MAX_BUDGET}.")
                 break
-            item['text'] = remaining[:lo]
-            if operation == 'read':
+            if 'text' in public:
+                public['text'] = remaining[:lo]
+            if operation == 'read' and prose:
                 result['text'] = prefix + remaining[:lo]
             offset += lo
             break
@@ -98,7 +204,10 @@ def _page(snapshot, store, operation, options, items, cursor, limit, budget):
     result['returned_chars'] = size()
     # The number's own decimal width is part of the serialized budget.
     result['returned_chars'] = size()
-    return result
+    if result['returned_chars'] > budget:
+        raise SecError('budget_too_small', 'This response cannot fit in the requested budget.',
+                       f"Select less with {NARROWING[operation]}, or raise --max-chars up to {MAX_BUDGET}.")
+    return finish(result)
 
 
 def _canonical(snapshot):
@@ -112,7 +221,7 @@ def _canonical(snapshot):
     return text, starts
 
 
-def read(snapshot, store, *, position=None, end=None, cursor=None, limit=20, budget=12000):
+def read(snapshot, store, *, position=None, end=None, cursor=None, budget=DEFAULT_BUDGET):
     start = _position(snapshot, position, (0, 0))
     stop = _position(snapshot, end, (len(snapshot.data['blocks']), 0))
     if stop < start:
@@ -122,23 +231,32 @@ def read(snapshot, store, *, position=None, end=None, cursor=None, limit=20, bud
     start_offset = starts[start[0]] + start[1]
     stop_offset = starts[stop[0]] + stop[1]
     items = []
-    for i, block in enumerate(snapshot.data['blocks']):
+    blocks = snapshot.data['blocks']
+    structured = not _prose(snapshot)
+    for i, block in enumerate(blocks):
         lo = max(starts[i], start_offset)
         hi = min(starts[i + 1], stop_offset)
         if hi <= lo and not (block.get('empty') and start <= (i, 0) < stop):
             continue
-        items.append(dict(block, text=text[lo:hi], block=i, offset=lo - starts[i]))
-    return _page(snapshot, store, 'read', {'position': position, 'end': end}, items, cursor, limit, budget)
+        value = text[lo:hi]
+        # The separator the joined stream adds between blocks is not part of the value at this path.
+        if structured and hi == starts[i + 1] and i + 1 < len(blocks):
+            value = value[:-1]
+        items.append(dict(block, text=value, block=i, offset=lo - starts[i]))
+    return _page(snapshot, store, 'read', {'position': position, 'end': end}, items, cursor, budget)
 
 
-def outline(snapshot, store, *, cursor=None, limit=20, budget=12000):
-    return _page(snapshot, store, 'outline', {}, snapshot.data['outline'], cursor, limit, budget)
+def outline(snapshot, store, *, kinds=DEFAULT_OUTLINE_KINDS, cursor=None, budget=DEFAULT_BUDGET):
+    kinds = tuple(kinds)
+    if not kinds or any(kind not in OUTLINE_KINDS for kind in kinds):
+        raise SecError('invalid_argument', 'Unknown outline kind.', 'Use kinds from: ' + ', '.join(OUTLINE_KINDS) + '.')
+    items = [item for item in snapshot.data['outline'] if item['kind'] in kinds]
+    return _page(snapshot, store, 'outline', {'kinds': sorted(kinds)}, items, cursor, budget)
 
 
-def find(snapshot, store, *, query, case_sensitive=False, cursor=None, limit=20, budget=12000):
+def find(snapshot, store, *, query, case_sensitive=False, cursor=None, budget=DEFAULT_BUDGET):
     if not query:
         raise SecError('invalid_query', 'Search text cannot be empty.', 'Provide a nonempty literal string.')
-    import re
     pattern = re.compile(re.escape(query), 0 if case_sensitive else re.IGNORECASE)
     text, starts = _canonical(snapshot)
     block_starts = starts[:-1]
@@ -155,18 +273,29 @@ def find(snapshot, store, *, query, case_sensitive=False, cursor=None, limit=20,
         items.append({'block': block, 'offset': offset, 'match_end': position(snapshot, *locate(match.end())),
                       'text': text[max(0, match.start() - 60):match.end() + 100],
                       'url': snapshot.data['blocks'][block].get('url', snapshot.data['source']['url'])})
-    return _page(snapshot, store, 'find', {'query': query, 'case_sensitive': case_sensitive}, items, cursor, limit, budget)
+    return _page(snapshot, store, 'find', {'query': query, 'case_sensitive': case_sensitive}, items, cursor, budget)
 
 
-def links(snapshot, store, *, kind=None, cursor=None, limit=20, budget=12000):
+def links(snapshot, store, *, kind=None, cursor=None, budget=DEFAULT_BUDGET):
     if kind not in (None, 'image', 'internal', 'external'):
         raise SecError('invalid_kind', 'Unknown link kind.', 'Use image, internal or external.')
     items = [item for item in snapshot.data['links'] if kind is None or item['kind'] == kind]
-    return _page(snapshot, store, 'links', {'kind': kind}, items, cursor, limit, budget)
+    return _page(snapshot, store, 'links', {'kind': kind}, items, cursor, budget)
 
 
-def table(snapshot, store, *, table_id, cursor=None, limit=20, budget=12000):
+def table(snapshot, store, *, table_id, rows=None, cursor=None, budget=DEFAULT_BUDGET):
     selected = next((t for t in snapshot.data['tables'] if t['table_id'] == table_id), None)
     if selected is None:
-        raise SecError('invalid_table', 'Table identifier is not in this snapshot.', 'Use table_id from open output.')
-    return _page(snapshot, store, 'table', {'table_id': table_id}, selected['items'], cursor, limit, budget)
+        raise SecError('invalid_table', 'Table identifier is not in this snapshot.', 'Use table_id from open or outline output.')
+    last = selected['rows'] - 1
+    span = re.fullmatch(r'(\d+)(?:-(\d+))?', rows or '')
+    first, final = (int(span[1]), int(span[2] or span[1])) if span else (0, last)
+    if not span and rows or first > final or final > last:
+        raise SecError('invalid_argument', 'Row range is outside this table.', f'Use rows within 0-{last}, e.g. --rows 2-5.')
+    framing = [r for r in selected['items'] if r['kind'] in ('context', 'caption', 'footnote') and r['text']]
+    # Empty layout cells carry no evidence; the original DOM keeps them.
+    body = [r for r in selected['items']
+            if r['kind'] not in ('context', 'caption', 'footnote')
+            and first <= r['row'] <= final and (r['text'] or r['kind'] != 'cell')]
+    return _page(snapshot, store, 'table', {'table_id': table_id, 'rows': rows}, framing + body, cursor, budget,
+                 _assemble_table)

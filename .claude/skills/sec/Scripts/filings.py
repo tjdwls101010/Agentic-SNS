@@ -79,9 +79,10 @@ def company(query, transport, offset=0, names_only=False):
 
 
 def resolve(query, transport):
+    # Turning a name into a CIK is how the request was read, not where the returned items came from.
     if query.isdecimal():
-        return cik(query), []
-    items, sources, _ = company(query, transport)
+        return cik(query)
+    items, _, _ = company(query, transport)
     exact = [item for item in items if item["match"] == "exact_ticker"]
     if len(exact) != 1:
         raise SecError(
@@ -89,7 +90,7 @@ def resolve(query, transport):
             "An exact company selection is required.",
             "Run company, then use a returned CIK or exact ticker.",
         )
-    return exact[0]["cik"], sources
+    return exact[0]["cik"]
 
 
 def query_options(args):
@@ -97,8 +98,8 @@ def query_options(args):
 
 
 def validate_options(args):
-    if hasattr(args, "budget") and not 1024 <= args.budget <= 12000:
-        raise SecError("invalid_budget", "max-chars must be 1024..12000.", "Use a budget within this range.")
+    if hasattr(args, "budget") and not 1024 <= args.budget <= 24000:
+        raise SecError("invalid_budget", "max-chars must be 1024..24000.", "Use a budget within this range.")
     if hasattr(args, "limit") and not 1 <= args.limit <= 100:
         raise SecError("invalid_argument", "limit must be between 1 and 100.", "Choose a limit from 1 to 100.")
     if hasattr(args, "query") and not args.query.strip():
@@ -209,7 +210,7 @@ def filings(args, store, transport):
     if args.cursor:
         state = store.resume(args.cursor, query_options(args))
     else:
-        identifier, sources = resolve(args.query, transport)
+        identifier = resolve(args.query, transport)
         value, source = transport.json(f"https://data.sec.gov/submissions/CIK{identifier}.json")
         if cik(value["cik"]) != identifier:
             raise SecError("invalid_response", "SEC returned a different CIK.", "Verify the company identifier.")
@@ -230,7 +231,7 @@ def filings(args, store, transport):
             "cik": identifier,
             "pending": filing_rows(value["filings"]["recent"], identifier, args),
             "files": files,
-            "sources": sources + [source],
+            "sources": [source],
             "exhausted": not files,
             "seen": [],
         }
@@ -277,11 +278,11 @@ def search(args, store, transport):
     if args.cursor:
         state = store.resume(args.cursor, query_options(args))
     else:
-        identifier, sources = resolve(args.company, transport) if args.company else (None, [])
+        identifier = resolve(args.company, transport) if args.company else None
         state = {
             "cik": identifier,
             "pending": [],
-            "sources": sources,
+            "sources": [],
             "exhausted": False,
             "seen": [],
             "offset": 0,
@@ -351,9 +352,6 @@ def search(args, store, transport):
         )
     result = listing(args, store, state)
     result.update(search_status(state, bool(result["next_cursor"])))
-    result["snapshot_scope"] = (
-        "Only fetched pages are fixed; new remote pages are timestamped and document IDs deduplicated."
-    )
     return result
 
 
@@ -377,7 +375,7 @@ def open_filing(args, store, transport):
                 "A bare accession requires its filing company.",
                 "Supply --company with the CIK or ticker; the accession prefix may identify a filing agent.",
             )
-        identifier, _ = resolve(args.company, transport)
+        identifier = resolve(args.company, transport)
         url = archive_url(identifier, number, number + "-index.html")
     if filing_location(url) is None:
         raise SecError(
@@ -395,9 +393,6 @@ def open_filing(args, store, transport):
         summary = snapshot.summary()
         summary["source"] = source
         summary["tables"] = summary["tables"][: args.limit]
-        summary["table_discovery"] = (
-            "Run outline with this snapshot_id and follow next_cursor; kind=table entries contain every table_id."
-        )
         summary["returned_chars"] = args.budget
         while len(json.dumps(summary, ensure_ascii=False, indent=2)) + 1 > args.budget and summary["tables"]:
             summary["tables"].pop()
@@ -487,13 +482,15 @@ def execute(args, store):
         from document import load_snapshot
 
         snapshot = load_snapshot(store, args.snapshot)
-        options = {"cursor": args.cursor, "limit": args.limit, "budget": args.budget}
-        if args.command == "find":
+        options = {"cursor": args.cursor, "budget": args.budget}
+        if args.command == "outline":
+            options["kinds"] = [kind.strip() for kind in args.kind.split(",")]
+        elif args.command == "find":
             options.update(query=args.query, case_sensitive=args.case_sensitive)
         elif args.command == "read":
             options.update(position=args.position, end=args.end)
         elif args.command == "table":
-            options["table_id"] = args.table_id
+            options.update(table_id=args.table_id, rows=args.rows)
         elif args.command == "links":
             options["kind"] = args.kind
         return getattr(reader, args.command)(snapshot, store, **options)

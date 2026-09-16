@@ -617,3 +617,39 @@ def test_schema_default_text_works_without_identity(capsys, tmp_path):
     output = capsys.readouterr().out
     assert 'commands:' in output
     assert 'Error [' not in output
+
+
+def test_sources_carry_only_what_the_returned_items_came_from(cli):
+    tickers = {"fields": ["cik", "name", "ticker", "exchange"], "data": [[320193, "Apple Inc.", "AAPL", "Nasdaq"]]}
+    submissions = {
+        "cik": "320193",
+        "filings": {
+            "recent": {
+                "accessionNumber": ["0000320193-24-000123"],
+                "filingDate": ["2024-11-01"],
+                "reportDate": ["2024-09-28"],
+                "form": ["10-K"],
+                "primaryDocument": ["aapl.htm"],
+            },
+            "files": [],
+        },
+    }
+    cli.replies.append(("company_tickers_exchange.json", 200, tickers, {}))
+    code, company = cli("company", "AAPL")
+    assert code == 0 and [source["url"] for source in company["sources"]] == [
+        "https://www.sec.gov/files/company_tickers_exchange.json"
+    ]
+    cli.replies.append(("company_tickers_exchange.json", 200, tickers, {}))
+    cli.replies.append(("CIK0000320193.json", 200, submissions, {}))
+    code, filings = cli("filings", "AAPL")
+    assert code == 0 and filings["items"][0]["accessionNumber"] == "0000320193-24-000123"
+    assert [source["url"] for source in filings["sources"]] == [
+        "https://data.sec.gov/submissions/CIK0000320193.json"
+    ]
+    cli.replies.append(("company_tickers_exchange.json", 200, tickers, {}))
+    cli.replies.append(
+        ("search-index", 200, {"timed_out": False, "hits": {"total": {"value": 0, "relation": "eq"}, "hits": []}}, {})
+    )
+    code, search = cli("search", "competition", "--company", "AAPL")
+    assert code == 0 and len(search["sources"]) == 1
+    assert search["sources"][0]["url"].startswith("https://efts.sec.gov/LATEST/search-index")

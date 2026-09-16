@@ -25,10 +25,10 @@ def parser():
         "filings": "List company filings newest first, keeping submission dates, report dates and amendments distinct.",
         "search": "Search filing and exhibit text since 2001 by default; each document remains a separate hit.",
         "open": "Open a filing index to list exhibits, or save an original document as an immutable reading snapshot.",
-        "outline": "List source anchors, detected headings and every table ID in a saved snapshot; follow next_cursor to finish.",
+        "outline": "List a saved snapshot's contents links, detected headings and tables with their context; --kind selects anchors or link targets instead.",
         "find": "Find a literal string in one saved snapshot; matching ignores case unless --case-sensitive is set.",
         "read": "Read a saved snapshot range using opaque positions; no identity or network access is required.",
-        "table": "Read one table with cell structure and context; get table IDs from open or the complete outline.",
+        "table": "Read one table as rows of non-empty cells with its context, caption and footnotes; empty layout cells are omitted.",
         "links": "List original links or images and their context in one saved snapshot; no external links are fetched.",
         "doctor": "Check requester configuration without printing its value; optionally test the SEC connection.",
         "schema": "Describe command inputs, output fields, defaults and error recovery without an identity.",
@@ -86,19 +86,19 @@ def parser():
             sub.add_argument(
                 "--cursor", help="Opaque continuation for this operation; repeat the same snapshot and all options."
             )
-            sub.add_argument(
-                "--limit",
-                type=int,
-                default=20,
-                help="Maximum returned items, 1–20 (default 20); long items continue through next_cursor.",
-            )
         if name in ["open", "outline", "find", "read", "table", "links"]:
             sub.add_argument(
                 "--max-chars",
                 dest="budget",
                 type=int,
                 default=12000,
-                help="Document response budget including its envelope, 1024–12000 characters (default 12000); filing-index lists use --limit.",
+                help="Response budget including its envelope, 1024–24000 characters (default 12000); the only page boundary for reader commands, kept below the host's ~30,000-character tool-output truncation.",
+            )
+        if name == "outline":
+            sub.add_argument(
+                "--kind",
+                default="toc,heading,table",
+                help="Comma-separated kinds from toc, heading, table, anchor, internal_link (default toc,heading,table); anchors are citation targets, not navigation.",
             )
         if name == "find":
             sub.add_argument("query", help="Nonempty literal text to find in snapshot text and table cells.")
@@ -117,11 +117,22 @@ def parser():
             sub.add_argument(
                 "table_id", help="Table identifier from open.tables or any outline entry whose kind is table."
             )
+            sub.add_argument(
+                "--rows",
+                help="Original row numbers to return, e.g. 2-5 or 7 (default all rows); context, caption and footnotes always accompany them.",
+            )
         if name == "links":
             sub.add_argument(
                 "--kind",
                 choices=["image", "internal", "external"],
                 help="Filter image links, in-document anchors, or external links; default returns all kinds without fetching them.",
+            )
+        if name == "schema":
+            sub.add_argument(
+                "command_name",
+                nargs="?",
+                choices=list(descriptions),
+                help="Describe one command instead of every command and output section.",
             )
         if name == "doctor":
             sub.add_argument(
@@ -130,7 +141,13 @@ def parser():
     return p
 
 
-def schema():
+# Each command's output fields live in one section; a scoped request carries only that command's own contract.
+SECTIONS = {"company": ("company", "listing"), "filings": ("listing",), "search": ("search", "listing"),
+            "open": ("documents", "listing"), "outline": ("reading",), "find": ("reading",), "read": ("reading",),
+            "table": ("reading",), "links": ("reading",), "doctor": (), "schema": ()}
+
+
+def schema(command=None):
     p = parser()
     subs = next(a for a in p._actions if isinstance(a, argparse._SubParsersAction))
 
@@ -143,12 +160,14 @@ def schema():
             "help": action.help,
         }
 
-    return {
+    full = {
         "version": 1,
         "global_options": [describe(action) for action in p._actions if action.option_strings],
         "defaults": {
             "limit": 20,
             "max_chars": 12000,
+            "max_chars_ceiling": 24000,
+            "max_chars_reason": "the host truncates tool output around 30,000 characters; 12000 keeps several reads in one context window",
             "requests_per_second": 2,
             "search_from": "2001-01-01",
             "sort": "date",
@@ -193,26 +212,26 @@ def schema():
             "format": "html, xml, sgml, text, pdf or image; PDF/image open succeeds with unsupported status and original access path",
             "encoding": "selected encoding, original declarations, inferred/conflict/loss flags",
             "blocks": "number of saved reading blocks",
-            "tables": "bounded first table summaries; table_count is the total, tables_has_more marks omitted summaries",
-            "table_discovery": "run outline on snapshot_id and follow next_cursor; kind=table entries expose every table_id",
-            "warnings": "extraction limitations such as encoding_loss, unsupported_format or image_content_not_extracted",
+            "tables": "first table entries {table_id, rows, position, context, header}; context is the caption or nearest preceding prose and header the first row; table_count is the total, tables_has_more marks omitted entries and outline lists them all",
+            "warnings": "extraction limitations: encoding_loss, inline_xbrl_metadata_excluded, external_entities_not_expanded, unsupported_format or image_content_not_extracted",
             "extraction_complete": "document extraction completeness; distinct from finishing the selected output range",
             "returned_chars": "actual emitted character count including the trailing newline; document summary obeys --max-chars",
         },
         "reading": {
             "snapshot_id": "same immutable snapshot for outline/find/read/table/links; no identity, fetch or reparsing is required",
-            "position": "opaque snapshot-bound internal position; use returned values unchanged and do not turn them into SEC URL fragments",
-            "items": "outline: source anchors/toc/internal links, detected headings and tables; find: literal-match context and match_end; read: selected blocks; table: context/caption/cells with row/column/spans/header plus links; links: kind/url/context",
+            "position": "<fingerprint>:<block>:<offset>, where the fingerprint is the first ten characters of snapshot_id; repeat it unchanged, a position whose fingerprint differs is refused, and it is not a SEC URL fragment",
+            "items": "outline: {kind, text, position} plus anchor when the original DOM had one, and table_id/rows/context/header (first 200 characters each) for tables; find: match text with position and match_end; read: prose in text once with {kind, position} items, or XML items carrying path, parent and attributes; table: rows of non-empty cells with column/spans/header/links and one position per row, with context, caption and footnotes leading the record stream as {text} objects that carry text_complete false while they continue; links: kind/url/text/position/context_position",
             "context_position": "when present, a saved internal location for surrounding evidence",
-            "url": "an original source URL; an anchor is exposed only when observed in the original DOM",
+            "url": "links carry the original source URL; outline and find entries carry anchor instead, and only when that anchor was observed in the original DOM",
             "next_position": "read continuation position, or null at selected range end; --end remains exclusive",
             "next_cursor": "immutable continuation bound to operation, snapshot and all query/limit/budget options; repeat those options",
             "has_more": "more content remains within the selected operation or range",
             "scope_complete": "selected range/output returned completely; does not imply extraction_complete",
             "remaining_items": "unreturned operation items, including an item whose text is only partially returned",
-            "text_complete": "false on a long item continued by next_cursor; text_offset is its returned slice offset",
-            "returned_chars": "actual emitted characters including envelope and trailing newline; --max-chars 1024..12000, --limit 1..20",
+            "text_complete": "false on an item whose text continues through next_cursor",
+            "returned_chars": "actual emitted characters including envelope and trailing newline; --max-chars 1024..24000 is the only page boundary",
             "extraction_complete": "whether extraction is complete independently of output pagination",
+            "warnings": "the snapshot's extraction limitations, repeated on every excerpt and omitted when there are none",
         },
         "recovery": {
             "identity_required": "configure the user-supplied email in Scripts/.env or --env-file; cached readers, help and schema need no identity",
@@ -222,11 +241,17 @@ def schema():
             "filing_mismatch": "verify the exact accession and a declared filer CIK; never substitute the latest filing",
             "access_denied/rate_limited": "check identity and pause before retrying; 403/429 are never automatically retried",
             "parse_failed": "inspect the original source; parsing failures are errors rather than empty documents",
-            "budget_too_small": "increase --max-chars within 1024..12000 or follow the original URL",
+            "budget_too_small": "increase --max-chars within 1024..24000 or follow the original URL",
             "invalid_table": "follow outline continuations for every table_id in this snapshot",
             "invalid_position": "use a position returned for this same snapshot",
         },
     }
+    if command is None:
+        return full
+    scoped = {"version": full["version"], "defaults": full["defaults"], "commands": {command: full["commands"][command]},
+              "error": full["error"]}
+    scoped.update({section: full[section] for section in SECTIONS[command]})
+    return scoped
 
 
 def main(argv=None):
@@ -235,7 +260,7 @@ def main(argv=None):
     try:
         args = parser().parse_args(argv)
         if args.command == "schema":
-            result = schema()
+            result = schema(args.command_name)
         else:
             from filings import dispatch
 

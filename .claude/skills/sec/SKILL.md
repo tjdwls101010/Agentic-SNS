@@ -1,6 +1,6 @@
 ---
 name: sec
-description: Read original SEC EDGAR company filings and exhibits, identify companies and reporting periods, and follow evidence through text, tables and images. Use for SEC·EDGAR·미국 공시, company filing forms such as 10-K, 10-Q, 8-K, 20-F or Form 4, and SEC filing URLs. Not for SEC rules or enforcement, current stock prices, general news, or sec meaning seconds.
+description: Read original SEC EDGAR company filings and exhibits, identify companies and reporting periods, and follow evidence through text, tables and images. Use for SEC·EDGAR·미국 공시, company filing forms such as 10-K, 10-Q, 8-K, 20-F or Form 4, SEC filing URLs, and for the text inside them — risk factors, management's discussion, financial statement tables, exhibits and their images, including 연차보고서·분기보고서 원문, 위험요인, 사업보고서 표 — even when EDGAR is not named. Not for SEC rules or enforcement, current stock prices, general news, or sec meaning seconds.
 ---
 
 # SEC
@@ -12,10 +12,10 @@ Find the right EDGAR source and read as much of it as the question needs. The CL
 Resolve this skill's installed directory and use its locked environment, including when the working directory is another project:
 
 ```bash
-uv run --isolated --frozen --project "${CLAUDE_SKILL_DIR}/Scripts" python "${CLAUDE_SKILL_DIR}/Scripts/sec.py" --help
+uv run -q --isolated --frozen --project "${CLAUDE_SKILL_DIR}/Scripts" python "${CLAUDE_SKILL_DIR}/Scripts/sec.py" --help
 ```
 
-If the host does not substitute `${CLAUDE_SKILL_DIR}`, replace it with the absolute directory containing this SKILL.md. Command help and `schema` own the arguments, output fields and recovery instructions. Their settings diagnosis is the place to resolve access problems; another account's identity is not a substitute for the configured requester.
+If the host does not substitute `${CLAUDE_SKILL_DIR}`, replace it with the absolute directory containing this SKILL.md. In zsh, expanding one variable containing a whole command does not split it into an executable and arguments; invoke the command directly or use a shell function that forwards `"$@"`. Command help and `schema`, which takes a command name to describe just that one, own the arguments, output fields and recovery instructions. Their settings diagnosis is the place to resolve access problems; another account's identity is not a substitute for the configured requester.
 
 ## Choose the company and period
 
@@ -41,6 +41,6 @@ Text extraction cannot establish what a chart shows. Image and PDF links expose 
 
 ## What an incomplete read means
 
-A completed selected range says what was returned, not that the document was fully extracted. Missing contents, unsupported media, decoding uncertainty, parsing failure and access failure have different implications. Preserve the reported limitation; none establishes that the original contains no relevant information.
+A completed selected range says what was returned, not that the document was fully extracted. Preserve the reported status and warnings, which name the limitation; none of them establishes that the original contains no relevant information.
 
 Search totals can be lower bounds, and a timed-out or capped search is not exhaustive even if the displayed page is complete. Received pages are saved observations; a later remote page can reflect a changed index. Use their observation times and duplicate handling to describe coverage without claiming an unseen result set was frozen.

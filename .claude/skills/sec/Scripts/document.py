@@ -22,9 +22,13 @@ class DocumentSnapshot:
     id: str
     data: dict
 
+    def table_entry(self, table):
+        return {'table_id': table['table_id'], 'rows': table['rows'], 'position': f"{self.id[:10]}:{table['block']}:0",
+                'context': table['context'], 'header': table['header']}
+
     def summary(self):
         return {'snapshot_id': self.id, 'source': self.data['source'], 'status': self.data['status'],
-                'format': self.data['format'], 'blocks': len(self.data['blocks']), 'tables': [{k: v for k, v in t.items() if k != 'items'} for t in self.data['tables'][:20]],
+                'format': self.data['format'], 'blocks': len(self.data['blocks']), 'tables': [self.table_entry(t) for t in self.data['tables'][:20]],
                 'table_count': len(self.data['tables']), 'tables_has_more': len(self.data['tables']) > 20,
                 'encoding': self.data['encoding'], 'warnings': self.data['warnings'],
                 'extraction_complete': self.data['extraction_complete']}
@@ -140,6 +144,7 @@ def _html_blocks(text, url):
 
     walk(root)
     flush()
+    contents = {}
     for node, item in link_nodes.items():
         item['context_block'] = min(item['block'], max(0, len(blocks) - 1))
         if item['kind'] == 'internal' and item['target_resolved']:
@@ -148,7 +153,14 @@ def _html_blocks(text, url):
             if target_position is not None:
                 target_block = target_position['block']
                 kind = 'toc' if target_block < len(blocks) and blocks[target_block]['kind'] == 'heading' else 'internal_link'
-                outlines.append(dict(item, kind=kind, block=target_block, offset=target_position['offset']))
+                entry = dict(item, kind=kind, block=target_block, offset=target_position['offset'])
+                # A contents row often links its item number, title and page separately; one target is one entry.
+                if kind == 'toc' and (target_block, entry['offset']) in contents:
+                    contents[(target_block, entry['offset'])]['text'] += ' ' + entry['text']
+                    continue
+                if kind == 'toc':
+                    contents[(target_block, entry['offset'])] = entry
+                outlines.append(entry)
     tables = []
     for node in table_nodes:
         if node not in node_blocks:
@@ -191,20 +203,55 @@ def _html_blocks(text, url):
                         records.append(dict(link_nodes[descendant], row=r, column=column))
                 column += colspan
         seen = set()
+        containers = set(node.iterancestors())
         for anchor in node.xpath('.//a[starts-with(@href, "#")]'):
             fragment = unquote(anchor.get('href')[1:])
             if fragment in seen:
                 continue
             seen.add(fragment)
             if fragment in anchors:
+                # The note is the nearest prose at or beside the anchor: never a container holding this table,
+                # and never a heading, which is navigation the outline already carries as a contents entry.
+                def heading(candidate):
+                    index = node_blocks.get(candidate)
+                    return index is not None and index < len(blocks) and blocks[index]['kind'] == 'heading'
+
                 target = anchors[fragment]
-                if not _dom_text(target, nonbody_tags) and target.getparent() is not None:
-                    target = target.getparent()
+                if heading(target):
+                    continue
+                parent = target.getparent()
+                # An anchor tag marks where a note sits; the note is the block around it, not the marker itself.
+                marker = isinstance(target.tag, str) and target.tag.lower() == 'a'
+                candidates = ([parent, target] if marker else [target, parent])
+                candidates += [target.getnext(), parent.getnext() if parent is not None else None]
+                target = next((c for c in candidates if c is not None and c is not node and c not in containers
+                               and not heading(c) and _dom_text(c, nonbody_tags)), None)
+                if target is None:
+                    continue
                 records.append({'kind': 'footnote', 'text': _dom_text(target, nonbody_tags),
                                 'url': urljoin(url, anchor.get('href')), 'block': node_blocks.get(target, 0)})
-        outlines.append({'kind': 'table', 'text': table_id, 'table_id': table_id, 'block': block_index, 'offset': 0, 'url': url})
+        # The caption or the nearest preceding prose names the table; the first row shows what it measures.
+        context = next((r['text'] for r in reversed(records) if r['kind'] in ('caption', 'context') and r['text']), '')
+        header_row = next((r['row'] for r in records if r['kind'] == 'cell' and r['text']), None)
+        header = ' | '.join(r['text'] for r in records if r['kind'] == 'cell' and r['row'] == header_row and r['text'])
+        # 성진: 표 뒤 두 블록까지 문맥으로 싣고 다른 표의 셀로 표시된 블록은 건너뛴다, 표가 곧바로 이어지면 그 표의 머리 조각이 딸려올 수 있다.
+        following = max((r['block'] for r in records if r['kind'] == 'cell'), default=block_index) + 1
+        trailing = []
+        for index in range(following, min(following + 20, len(blocks))):
+            if len(trailing) == 2:
+                break
+            if blocks[index]['text'] and 'table_id' not in blocks[index]:
+                trailing.append({'kind': 'context', 'text': blocks[index]['text'], 'block': index})
+        records.extend(trailing)
+        # 성진: 표를 고르기 위한 힌트라 200자로 끊는다, 전체 문맥과 헤더는 table이 레코드로 돌려준다.
+        outlines.append({'kind': 'table', 'text': table_id, 'table_id': table_id, 'block': block_index, 'offset': 0,
+                         'url': url, 'rows': len(rows), 'context': context[:200], 'header': header[:200]})
         tables.append({'table_id': table_id, 'rows': len(rows), 'block': block_index, 'items': records,
+                       'context': context, 'header': header,
                        'parent_table_id': table_ids.get(next(node.iterancestors('table'), None))})
+    # Reading order: a contents entry precedes the heading it points to, then tables at that position.
+    rank = {'toc': 0, 'heading': 1, 'table': 2, 'anchor': 3, 'internal_link': 4}
+    outlines.sort(key=lambda item: (item['block'], item['offset'], rank[item['kind']]))
     return blocks, outlines, link_items, tables, excluded_metadata
 
 
@@ -303,7 +350,7 @@ def _parse_document(source, store):
         outlines, link_items, tables = [], [], []
     warnings = ['encoding_loss'] if encoding['loss'] else []
     if excluded_metadata:
-        warnings.append('nonbody_inline_xbrl_metadata_omitted_from_reader_original_preserved')
+        warnings.append('inline_xbrl_metadata_excluded')
     if binary:
         warnings.append('unsupported_format')
     if any(item['kind'] == 'image' for item in link_items):
@@ -334,6 +381,9 @@ def parse_document(source, store):
 
 
 def load_snapshot(store, snapshot_id):
+    if not re.fullmatch(r'[0-9a-f]{64}', snapshot_id or ''):
+        raise SecError('invalid_snapshot', 'This is not a saved document snapshot identifier.',
+                       'Use the snapshot_id returned by open, or open the source again.')
     try:
         data = json.loads(store.get(snapshot_id))
         if data['version'] != 1 or not all(isinstance(data[k], list) for k in ('blocks', 'tables', 'links', 'outline')):
