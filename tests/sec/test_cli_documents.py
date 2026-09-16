@@ -117,7 +117,8 @@ def test_outline_defaults_to_contents_and_tables_and_exposes_table_context(cli):
     (table,) = opened["tables"]
     assert table["table_id"] == "table-0" and table["rows"] == 2
     assert table["context"] == "Sales table" and table["header"] == "Category | 2025"
-    assert re.fullmatch(r"\d+:\d+", table["position"])
+    assert re.fullmatch(r"[0-9a-f]{6}:\d+:\d+", table["position"])
+    assert table["position"].startswith(snapshot[:6] + ":")
     cli.identity.write_text('EDGAR_IDENTITY=""')
     code, read = cli("read", snapshot, "--position", table["position"])
     assert code == 0 and read["text"].startswith("Sales table\nCategory\n2025")
@@ -178,7 +179,7 @@ def test_table_returns_rows_once_without_spacer_cells_and_selects_row_ranges(cli
     header, iphone, mac, total = table["rows"]
     assert header["header"] is True and "header" not in iphone
     assert header["cells"] == [{"column": 1, "colspan": 2, "text": "2025"}, {"column": 3, "text": "2024"}]
-    assert re.fullmatch(r"\d+:\d+", header["position"])
+    assert re.fullmatch(r"[0-9a-f]{6}:\d+:\d+", header["position"])
     assert [c["text"] for c in iphone["cells"]] == ["iPhone (1)", "$", "209,586", "201,183"]
     assert iphone["cells"][0]["links"] == [{"kind": "internal", "text": "(1)", "anchor": "fn1"}]
     assert mac["cells"][0]["links"] == [{"kind": "image", "text": "Mac icon", "url": URL.rsplit("/", 1)[0] + "/mac.png"}]
@@ -319,3 +320,26 @@ def test_reader_responses_carry_the_snapshot_warnings(cli):
     assert code == 0 and clean["warnings"] == []
     code, read = cli("read", clean["snapshot_id"])
     assert code == 0 and "warnings" not in read
+
+
+def test_a_position_from_another_snapshot_is_refused_and_schema_describes_emitted_fields(cli):
+    cli.replies.append(("integration.htm", 200, b"<html><p>Alpha beta gamma.</p></html>", {"content-type": "text/html"}))
+    code, first = cli("open", URL)
+    assert code == 0
+    cli.replies.append(("other.htm", 200, b"<html><p>Delta epsilon zeta.</p></html>", {"content-type": "text/html"}))
+    code, second = cli("open", URL.replace("integration", "other"))
+    assert code == 0 and second["snapshot_id"] != first["snapshot_id"]
+    cli.identity.write_text('EDGAR_IDENTITY=""')
+    code, hit = cli("find", first["snapshot_id"], "beta")
+    assert code == 0
+    position = hit["items"][0]["position"]
+    code, same = cli("read", first["snapshot_id"], "--position", position)
+    assert code == 0 and same["text"].startswith("beta")
+    code, error = cli("read", second["snapshot_id"], "--position", position)
+    assert code == 2 and error["error"]["code"] == "invalid_position"
+    code, scoped = cli("schema", "read")
+    assert code == 0 and "text_offset" not in str(scoped)
+    assert "snapshot" in scoped["reading"]["position"]
+    code, whole = cli("schema")
+    assert code == 0 and "text_offset" not in str(whole)
+    assert "anchor" in whole["reading"]["items"] and "rows" in whole["reading"]["items"]

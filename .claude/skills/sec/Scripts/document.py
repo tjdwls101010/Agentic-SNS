@@ -23,7 +23,7 @@ class DocumentSnapshot:
     data: dict
 
     def table_entry(self, table):
-        return {'table_id': table['table_id'], 'rows': table['rows'], 'position': f"{table['block']}:0",
+        return {'table_id': table['table_id'], 'rows': table['rows'], 'position': f"{self.id[:6]}:{table['block']}:0",
                 'context': table['context'], 'header': table['header']}
 
     def summary(self):

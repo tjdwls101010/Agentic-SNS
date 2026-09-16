@@ -8,9 +8,13 @@ from output import SecError
 from store import digest
 
 
+def fingerprint(snapshot):
+    return snapshot.id[:6]
+
+
 def position(snapshot, block, offset=0):
-    # The snapshot argument already names the copy; positions carry only block:offset.
-    return f'{block}:{offset}'
+    # Short enough to repeat on every item, specific enough that another copy's position is refused.
+    return f'{fingerprint(snapshot)}:{block}:{offset}'
 
 
 def _position(snapshot, value, default):
@@ -19,14 +23,15 @@ def _position(snapshot, value, default):
     try:
         *sid, block, offset = value.split(':')
         block, offset = int(block), int(offset)
-        if sid not in ([], [snapshot.id]) or block < 0 or offset < 0:
+        if sid not in ([fingerprint(snapshot)], [snapshot.id]) or block < 0 or offset < 0:
             raise ValueError
         blocks = snapshot.data['blocks']
         if block > len(blocks) or (block == len(blocks) and offset) or (block < len(blocks) and offset > len(blocks[block]['text'])):
             raise ValueError
         return block, offset
     except (ValueError, AttributeError):
-        raise SecError('invalid_position', 'Position belongs to a different snapshot or is out of range.', 'Use a position returned for this snapshot.') from None
+        raise SecError('invalid_position', 'Position belongs to a different snapshot or is out of range.',
+                       'Use a position this snapshot returned; positions start with its own fingerprint.') from None
 
 
 # Budget bounds: the host tool truncates Bash results around 30,000 characters, so the ceiling stays below that.

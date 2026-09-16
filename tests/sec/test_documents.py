@@ -356,6 +356,7 @@ def test_review_next_position_preserves_unreturned_block_separator(tmp_path):
     assert first['has_more']
     assert first['text'] + read(doc, store, position=first['next_position'])['text'] == 'A' * 1500 + '\nEND'
     assert read(doc, store, position=f'{doc.id}:0:1500', end=f'{doc.id}:1:0')['text'] == '\n'
+    assert first['next_position'].startswith(doc.id[:6] + ':')
 
 
 @pytest.mark.parametrize('headers', [{'Content-Type': 'application/xml'}, {'Content-Type': 'text/xml'}, {}])
@@ -411,14 +412,18 @@ def test_nonbody_metadata_is_excluded_from_table_cell_text_too(tmp_path):
 
 
 # Output density: the snapshot argument already names the copy, so positions carry only block:offset.
-def test_positions_are_block_offset_and_snapshot_prefixed_positions_are_still_accepted(tmp_path):
+def test_positions_name_their_snapshot_by_fingerprint(tmp_path):
     from reader import find, outline
     doc, store = snapshot(tmp_path, b'<h2 id="a">Alpha</h2><p>beta gamma</p>')
+    short = doc.id[:6]
     hit = find(doc, store, query='gamma')['items'][0]
-    assert hit['position'] == '1:5' and hit['match_end'] == '2:0'
-    assert read(doc, store, position='1:5')['text'] == 'gamma'
-    assert read(doc, store, position=f'{doc.id}:1:5', end='1:10')['text'] == 'gamma'
-    assert outline(doc, store)['items'][0]['position'] == '0:0'
+    assert hit['position'] == f'{short}:1:5' and hit['match_end'] == f'{short}:2:0'
+    assert read(doc, store, position=f'{short}:1:5')['text'] == 'gamma'
+    assert read(doc, store, position=f'{doc.id}:1:5', end=f'{short}:1:10')['text'] == 'gamma'
+    assert outline(doc, store)['items'][0]['position'] == f'{short}:0:0'
+    with pytest.raises(SecError) as bare:
+        read(doc, store, position='1:5')
+    assert bare.value.code == 'invalid_position'
     other = parse_document(SourceDocument(b'<p>other</p>', {'url': URL}), store)
     with pytest.raises(SecError) as error:
         read(doc, store, position=f'{other.id}:0:0')
