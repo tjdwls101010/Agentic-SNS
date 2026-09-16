@@ -79,9 +79,10 @@ def company(query, transport, offset=0, names_only=False):
 
 
 def resolve(query, transport):
+    # Turning a name into a CIK is how the request was read, not where the returned items came from.
     if query.isdecimal():
-        return cik(query), []
-    items, sources, _ = company(query, transport)
+        return cik(query)
+    items, _, _ = company(query, transport)
     exact = [item for item in items if item["match"] == "exact_ticker"]
     if len(exact) != 1:
         raise SecError(
@@ -89,7 +90,7 @@ def resolve(query, transport):
             "An exact company selection is required.",
             "Run company, then use a returned CIK or exact ticker.",
         )
-    return exact[0]["cik"], sources
+    return exact[0]["cik"]
 
 
 def query_options(args):
@@ -209,7 +210,7 @@ def filings(args, store, transport):
     if args.cursor:
         state = store.resume(args.cursor, query_options(args))
     else:
-        identifier, sources = resolve(args.query, transport)
+        identifier = resolve(args.query, transport)
         value, source = transport.json(f"https://data.sec.gov/submissions/CIK{identifier}.json")
         if cik(value["cik"]) != identifier:
             raise SecError("invalid_response", "SEC returned a different CIK.", "Verify the company identifier.")
@@ -230,7 +231,7 @@ def filings(args, store, transport):
             "cik": identifier,
             "pending": filing_rows(value["filings"]["recent"], identifier, args),
             "files": files,
-            "sources": sources + [source],
+            "sources": [source],
             "exhausted": not files,
             "seen": [],
         }
@@ -277,11 +278,11 @@ def search(args, store, transport):
     if args.cursor:
         state = store.resume(args.cursor, query_options(args))
     else:
-        identifier, sources = resolve(args.company, transport) if args.company else (None, [])
+        identifier = resolve(args.company, transport) if args.company else None
         state = {
             "cik": identifier,
             "pending": [],
-            "sources": sources,
+            "sources": [],
             "exhausted": False,
             "seen": [],
             "offset": 0,
@@ -374,7 +375,7 @@ def open_filing(args, store, transport):
                 "A bare accession requires its filing company.",
                 "Supply --company with the CIK or ticker; the accession prefix may identify a filing agent.",
             )
-        identifier, _ = resolve(args.company, transport)
+        identifier = resolve(args.company, transport)
         url = archive_url(identifier, number, number + "-index.html")
     if filing_location(url) is None:
         raise SecError(
