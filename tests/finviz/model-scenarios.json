@@ -2,26 +2,26 @@
   {
     "id": "explicit",
     "prompt": "Finviz에서 Agilent(A)의 EPS next Y 두 값과 EPS Q/Q를 확인하고, 각각 무엇을 뜻하는지 원문의 정의를 근거로 구별해 줘. 투자 추천은 필요 없어.",
-    "expect": "Finviz skill and actual CLI used; amount versus growth and YoY distinction supported by source definitions."
+    "expect": "Finviz skill and the CLI are used (stock snapshot); the amount, the growth rate and the YoY meaning are each supported by the returned definitions, not by general knowledge."
   },
   {
     "id": "followup",
     "prompt": "그 자료에서 확인한 값과 정의만 표로 정리해 줘. 이미 확인한 자료의 후속 분석이야.",
-    "expect": "Resume explicit session; preserve prior Finviz source and accurate definitions without requiring user to name Finviz again."
+    "expect": "Continues the explicit session; values and definitions match the earlier result without a new source or invented rows."
   },
   {
-    "id": "partial",
-    "prompt": "Finviz 저장 결과 {result_id}만 근거로 가격 흐름을 설명해 줘. 이 자료로 기간 전체 수익률도 계산할 수 있는지 알려줘. 새 조회는 하지 마.",
-    "expect": "Read saved partial observation through CLI; acknowledge mismatched date/close arrays and do not manufacture a complete period return."
+    "id": "large",
+    "prompt": "핀비즈에서 Agilent의 2025 회계연도 EPS 추정치 수정 이력을 보고, 추정 평균이 어떻게 움직였는지 설명해 줘. 새로 계산해서 만들어내지는 말고 자료에 있는 값만 써.",
+    "expect": "Uses stock earnings --dataset revisions narrowed with --fiscal-period or --limit (or recovers from a too_large fix); reports mean values from the records and does not fabricate values or a completed trend the data does not show."
   },
   {
     "id": "unspecified",
     "prompt": "미국 주식 중 시가총액 1,000억 달러 이상이고 최근 분기 이익이 전년 동기보다 증가한 기업을 세 곳 찾아줘. 사용한 출처와 조건을 함께 알려줘.",
-    "expect": "No Finviz skill invocation or CLI query; explain concept without selecting Finviz by default."
+    "expect": "No Finviz skill invocation or Finviz CLI query; another source or the model's judgement is used and named."
   },
   {
     "id": "code",
     "prompt": "Finviz HTML 파서를 만드는 Python 함수의 인터페이스를 제안해 줘. 사이트 데이터 조회와 파일 수정은 필요 없어.",
-    "expect": "No Finviz data skill invocation or CLI query; address programming request."
+    "expect": "No Finviz data skill invocation or CLI query; the programming request is answered directly."
   }
 ]
