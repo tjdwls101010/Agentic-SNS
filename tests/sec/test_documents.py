@@ -36,7 +36,7 @@ def table_pages(doc, store, table_id, **options):
 
 
 def cells(pages):
-    return [dict(cell, row=row['row'], header=row.get('header', False), position=row['position'])
+    return [dict(cell, row=row['row'], header=cell.get('header', row.get('header', False)), position=row['position'])
             for page in pages for row in page['rows'] for cell in row['cells']]
 
 
@@ -97,8 +97,7 @@ def test_synthetic_table_spans_nested_direct_tail_footnotes_and_long_cells(tmp_p
     fragments = [x for x in found if x['row'] == 2 and x['column'] == 0 and 'text' in x]
     assert ''.join(x['text'] for x in fragments) == long_cell + ' nested bold tail after1innerend'
     assert fragments[0]['text_complete'] is False and 'text_complete' not in fragments[-1]
-    assert any('USD in millions' in x for x in pages[0]['context'])
-    assert 'USD in millions' in ' '.join(pages[0]['context'])
+    assert 'USD in millions' in ' '.join(part['text'] for part in pages[0]['context'])
     assert any('Includes subsidiaries' in note['text'] for note in pages[0]['footnotes'])
     assert all('context' not in page for page in pages[1:])
     assert links(doc, store, kind='image')['items'][0]['url'].endswith('/cell.jpg')
@@ -210,7 +209,7 @@ def test_real_apple_table_preserves_years_units_values_and_spans(tmp_path):
     text = '\n'.join(x['text'] for x in found if 'text' in x)
     for expected in ['September 28, 2024', 'September 30, 2023', 'September 24, 2022', '391,035', '383,285', '394,328']:
         assert expected in text
-    assert any('In millions, except number of shares' in x for x in pages[0]['context'])
+    assert any('In millions, except number of shares' in part['text'] for part in pages[0]['context'])
     assert any(x.get('colspan') == 15 and x['text'] == 'Years ended' for x in found)
     assert not any(x.get('text') == '' for x in found)
 
@@ -289,7 +288,7 @@ def test_synthetic_table_exposes_cell_image_links_and_context(tmp_path):
     from reader import table, links
     doc, store = snapshot(tmp_path, b'<p>Balance sheet</p><table><tr><td>Assets <img src="assets.jpg" alt="Asset breakdown"><a href="#f1">1</a></td></tr></table><p id="f1">Includes cash</p>')
     result = table(doc, store, table_id='table-0')
-    assert result['context'] == ['Balance sheet']
+    assert result['context'] == [{'text': 'Balance sheet'}]
     (cell,) = result['rows'][0]['cells']
     assert cell['text'] == 'Assets 1'
     assert {'kind': 'image', 'text': 'Asset breakdown', 'url': URL.rsplit('/', 1)[0] + '/assets.jpg'} in cell['links']
@@ -356,7 +355,7 @@ def test_review_next_position_preserves_unreturned_block_separator(tmp_path):
     assert first['has_more']
     assert first['text'] + read(doc, store, position=first['next_position'])['text'] == 'A' * 1500 + '\nEND'
     assert read(doc, store, position=f'{doc.id}:0:1500', end=f'{doc.id}:1:0')['text'] == '\n'
-    assert first['next_position'].startswith(doc.id[:6] + ':')
+    assert first['next_position'].startswith(doc.id[:10] + ':')
 
 
 @pytest.mark.parametrize('headers', [{'Content-Type': 'application/xml'}, {'Content-Type': 'text/xml'}, {}])
@@ -415,7 +414,7 @@ def test_nonbody_metadata_is_excluded_from_table_cell_text_too(tmp_path):
 def test_positions_name_their_snapshot_by_fingerprint(tmp_path):
     from reader import find, outline
     doc, store = snapshot(tmp_path, b'<h2 id="a">Alpha</h2><p>beta gamma</p>')
-    short = doc.id[:6]
+    short = doc.id[:10]
     hit = find(doc, store, query='gamma')['items'][0]
     assert hit['position'] == f'{short}:1:5' and hit['match_end'] == f'{short}:2:0'
     assert read(doc, store, position=f'{short}:1:5')['text'] == 'gamma'
@@ -487,10 +486,10 @@ def test_mixed_header_row_keeps_which_cell_is_a_header_and_keeps_open_rowspans(t
             b'<tr><th>2025</th><th>2024</th></tr></table>')
     doc, store = snapshot(tmp_path, body)
     mixed, spanning, headers = table(doc, store, table_id='table-0')['rows']
-    assert 'header' not in mixed
+    assert all('header' not in row for row in (mixed, spanning, headers))
     assert mixed['cells'][0]['header'] is True and 'header' not in mixed['cells'][1]
     assert spanning['cells'][0]['rowspan'] == 0
-    assert headers['header'] is True and all('header' not in cell for cell in headers['cells'])
+    assert all(cell['header'] is True for cell in headers['cells'])
 
 
 def test_selecting_no_records_still_obeys_the_budget_and_every_row_keeps_a_position(tmp_path):
@@ -501,7 +500,7 @@ def test_selecting_no_records_still_obeys_the_budget_and_every_row_keeps_a_posit
     doc, store = snapshot(tmp_path, body)
     empty = table(doc, store, table_id='table-0', rows='0', budget=1024)
     assert empty['rows'] == [] and empty['returned_chars'] <= 1024
-    assert empty['has_more'] and 'C' * 100 in empty['context'][0]
+    assert empty['has_more'] and 'C' * 100 in empty['context'][0]['text']
     # Framing pages with the rows, so even the smallest allowed budget makes progress instead of refusing the table.
     smallest = table(doc, store, table_id='table-0', budget=1024)
     assert smallest['returned_chars'] <= 1024 and smallest['has_more']
@@ -527,3 +526,49 @@ def test_footnote_is_the_note_beside_the_anchor_and_never_a_navigation_section(t
     result = table(doc, store, table_id='table-0')
     assert 'footnotes' not in result
     assert result['rows'][0]['cells'][0]['links'] == [{'kind': 'internal', 'text': 'see', 'anchor': 'n'}]
+
+
+def test_inline_anchor_keeps_its_whole_note_and_a_standalone_anchor_uses_the_next_block(tmp_path):
+    from reader import table
+    inline = (b'<html><body><table><tr><td>Revenue <a href="#n">(1)</a></td></tr></table>'
+              b'<p><a id="n"></a>Excludes <b>returns</b>.</p></body></html>')
+    doc, store = snapshot(tmp_path, inline)
+    assert table(doc, store, table_id='table-0')['footnotes'] == [{'text': 'Excludes returns.', 'anchor': 'n'}]
+    standalone = (b'<html><body><div><table><tr><td>Revenue <a href="#n">(1)</a></td></tr></table>'
+                  b'<a id="n"></a><p>Excludes returns.</p></div></body></html>')
+    doc, store = snapshot(tmp_path, standalone)
+    assert table(doc, store, table_id='table-0')['footnotes'] == [{'text': 'Excludes returns.', 'anchor': 'n'}]
+
+
+def test_xml_range_read_keeps_a_newline_the_original_contains(tmp_path):
+    from reader import find
+    doc, store = snapshot(tmp_path, b'<root><n>A\nB</n><m>C</m></root>', {'Content-Type': 'application/xml'})
+    hit = find(doc, store, query='B')['items'][0]
+    assert read(doc, store, end=hit['position'])['items'][0]['text'] == 'A\n'
+    assert read(doc, store)['items'][0]['text'] == 'A\nB'
+
+
+def test_a_header_cell_split_across_pages_does_not_make_its_row_a_header_row(tmp_path):
+    body = ('<table><tr><th>' + 'Revenue ' * 250 + '</th><td>42</td></tr></table>').encode()
+    doc, store = snapshot(tmp_path, body)
+    pages = table_pages(doc, store, 'table-0', budget=1024)
+    assert len(pages) > 1
+    assert all('header' not in row for page in pages for row in page['rows'])
+    found = cells(pages)
+    assert all(cell.get('header') for cell in found if cell['column'] == 0)
+    assert not any(cell.get('header') for cell in found if cell['column'] == 1)
+
+
+def test_a_split_context_and_caption_say_they_are_partial(tmp_path):
+    from reader import table
+    body = ('<p>' + 'C' * 1500 + '</p><table><caption>' + 'K' * 1500 + '</caption>'
+            '<tr><td>42</td></tr></table>').encode()
+    doc, store = snapshot(tmp_path, body)
+    first = table(doc, store, table_id='table-0', budget=1024)
+    assert first['context'][0]['text_complete'] is False
+    assert 0 < len(first['context'][0]['text']) < 1500
+    pages = table_pages(doc, store, 'table-0', budget=1024)
+    assert ''.join(part['text'] for page in pages for part in page.get('context', [])) == 'C' * 1500
+    assert ''.join(page['caption']['text'] for page in pages if 'caption' in page) == 'K' * 1500
+    whole = table(doc, store, table_id='table-0', budget=24000)
+    assert whole['context'] == [{'text': 'C' * 1500}] and whole['caption'] == {'text': 'K' * 1500}

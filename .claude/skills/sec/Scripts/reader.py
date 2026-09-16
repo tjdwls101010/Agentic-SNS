@@ -9,7 +9,8 @@ from store import digest
 
 
 def fingerprint(snapshot):
-    return snapshot.id[:6]
+    # Ten characters: short enough to repeat on every item, wide enough that two snapshots in one session differ.
+    return snapshot.id[:10]
 
 
 def position(snapshot, block, offset=0):
@@ -68,9 +69,6 @@ def _public(operation, item, source_url, prose=True):
         public.update(_anchor_or_url(item, source_url))
         return public
     public = {k: v for k, v in item.items() if k not in INTERNAL and v != ''}
-    if operation == 'read':
-        # The separator between blocks belongs to the joined stream, not to the value at this path.
-        public['text'] = public.get('text', '').removesuffix('\n')
     if operation == 'read' and prose:
         public.pop('text', None)
     if operation == 'outline':
@@ -97,9 +95,9 @@ def _assemble_table(result):
         if kind in ('context', 'caption', 'footnote'):
             note = {k: v for k, v in item.items() if k in ('text', 'anchor', 'url', 'text_complete')}
             if kind == 'caption':
-                table['caption'] = note['text']
+                table['caption'] = note
             elif kind == 'context':
-                table.setdefault('context', []).append(note['text'])
+                table.setdefault('context', []).append(note)
             else:
                 table.setdefault('footnotes', []).append(note)
             continue
@@ -120,12 +118,6 @@ def _assemble_table(result):
                 row['cells'].append({'column': item['column'], 'links': [link]})
             else:
                 cell.setdefault('links', []).append(link)
-    for row in rows:
-        # A row is a header row only when every cell is one; a mixed row keeps the mark on the cell.
-        if row['cells'] and all(cell.get('header') for cell in row['cells']):
-            row['header'] = True
-            for cell in row['cells']:
-                cell.pop('header')
     table['rows'] = rows
     return table
 
@@ -239,12 +231,18 @@ def read(snapshot, store, *, position=None, end=None, cursor=None, budget=DEFAUL
     start_offset = starts[start[0]] + start[1]
     stop_offset = starts[stop[0]] + stop[1]
     items = []
-    for i, block in enumerate(snapshot.data['blocks']):
+    blocks = snapshot.data['blocks']
+    structured = not _prose(snapshot)
+    for i, block in enumerate(blocks):
         lo = max(starts[i], start_offset)
         hi = min(starts[i + 1], stop_offset)
         if hi <= lo and not (block.get('empty') and start <= (i, 0) < stop):
             continue
-        items.append(dict(block, text=text[lo:hi], block=i, offset=lo - starts[i]))
+        value = text[lo:hi]
+        # The separator the joined stream adds between blocks is not part of the value at this path.
+        if structured and hi == starts[i + 1] and i + 1 < len(blocks):
+            value = value[:-1]
+        items.append(dict(block, text=value, block=i, offset=lo - starts[i]))
     return _page(snapshot, store, 'read', {'position': position, 'end': end}, items, cursor, budget)
 
 

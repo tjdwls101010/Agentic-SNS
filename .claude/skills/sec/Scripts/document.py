@@ -23,7 +23,7 @@ class DocumentSnapshot:
     data: dict
 
     def table_entry(self, table):
-        return {'table_id': table['table_id'], 'rows': table['rows'], 'position': f"{self.id[:6]}:{table['block']}:0",
+        return {'table_id': table['table_id'], 'rows': table['rows'], 'position': f"{self.id[:10]}:{table['block']}:0",
                 'context': table['context'], 'header': table['header']}
 
     def summary(self):
@@ -220,7 +220,7 @@ def _html_blocks(text, url):
                 if heading(target):
                     continue
                 parent = target.getparent()
-                candidates = [target, target.getnext(), parent, parent.getnext() if parent is not None else None]
+                candidates = [target, parent, target.getnext(), parent.getnext() if parent is not None else None]
                 target = next((c for c in candidates if c is not None and c is not node and c not in containers
                                and not heading(c) and _dom_text(c, nonbody_tags)), None)
                 if target is None:

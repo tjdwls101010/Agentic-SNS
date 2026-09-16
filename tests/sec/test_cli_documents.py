@@ -117,8 +117,8 @@ def test_outline_defaults_to_contents_and_tables_and_exposes_table_context(cli):
     (table,) = opened["tables"]
     assert table["table_id"] == "table-0" and table["rows"] == 2
     assert table["context"] == "Sales table" and table["header"] == "Category | 2025"
-    assert re.fullmatch(r"[0-9a-f]{6}:\d+:\d+", table["position"])
-    assert table["position"].startswith(snapshot[:6] + ":")
+    assert re.fullmatch(r"[0-9a-f]{10}:\d+:\d+", table["position"])
+    assert table["position"].startswith(snapshot[:10] + ":")
     cli.identity.write_text('EDGAR_IDENTITY=""')
     code, read = cli("read", snapshot, "--position", table["position"])
     assert code == 0 and read["text"].startswith("Sales table\nCategory\n2025")
@@ -172,14 +172,20 @@ def test_table_returns_rows_once_without_spacer_cells_and_selects_row_ranges(cli
     code, table = cli("table", opened["snapshot_id"], "table-0")
     assert code == 0 and table["scope_complete"] is True and table["next_cursor"] is None
     assert "items" not in table
-    assert table["context"] == ["Products and Services Performance", "Net sales by category (dollars in millions):"]
-    assert table["caption"] == "Sales"
+    assert [part["text"] for part in table["context"]] == [
+        "Products and Services Performance",
+        "Net sales by category (dollars in millions):",
+    ]
+    assert table["caption"] == {"text": "Sales"}
     assert table["footnotes"] == [{"text": "(1) Includes accessories.", "anchor": "fn1"}]
     assert [row["row"] for row in table["rows"]] == [1, 2, 3, 4]
     header, iphone, mac, total = table["rows"]
-    assert header["header"] is True and "header" not in iphone
-    assert header["cells"] == [{"column": 1, "colspan": 2, "text": "2025"}, {"column": 3, "text": "2024"}]
-    assert re.fullmatch(r"[0-9a-f]{6}:\d+:\d+", header["position"])
+    assert all(cell["header"] is True for cell in header["cells"]) and "header" not in str(iphone["cells"])
+    assert header["cells"] == [
+        {"column": 1, "colspan": 2, "text": "2025", "header": True},
+        {"column": 3, "text": "2024", "header": True},
+    ]
+    assert re.fullmatch(r"[0-9a-f]{10}:\d+:\d+", header["position"])
     assert [c["text"] for c in iphone["cells"]] == ["iPhone (1)", "$", "209,586", "201,183"]
     assert iphone["cells"][0]["links"] == [{"kind": "internal", "text": "(1)", "anchor": "fn1"}]
     assert mac["cells"][0]["links"] == [{"kind": "image", "text": "Mac icon", "url": URL.rsplit("/", 1)[0] + "/mac.png"}]

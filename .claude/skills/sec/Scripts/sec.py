@@ -219,8 +219,8 @@ def schema(command=None):
         },
         "reading": {
             "snapshot_id": "same immutable snapshot for outline/find/read/table/links; no identity, fetch or reparsing is required",
-            "position": "<snapshot fingerprint>:<block>:<offset>; repeat it unchanged, it is refused against another snapshot, and it is not a SEC URL fragment",
-            "items": "outline: {kind, text, position} plus anchor when the original DOM had one, and table_id/rows/context/header (first 200 characters each) for tables; find: match text with position and match_end; read: prose in text once with {kind, position} items, or XML items carrying path, parent and attributes; table: rows of non-empty cells with column/spans/links and one position per row, with context/caption/footnotes leading the record stream; links: kind/url/text/position/context_position",
+            "position": "<fingerprint>:<block>:<offset>, where the fingerprint is the first ten characters of snapshot_id; repeat it unchanged, a position whose fingerprint differs is refused, and it is not a SEC URL fragment",
+            "items": "outline: {kind, text, position} plus anchor when the original DOM had one, and table_id/rows/context/header (first 200 characters each) for tables; find: match text with position and match_end; read: prose in text once with {kind, position} items, or XML items carrying path, parent and attributes; table: rows of non-empty cells with column/spans/header/links and one position per row, with context, caption and footnotes leading the record stream as {text} objects that carry text_complete false while they continue; links: kind/url/text/position/context_position",
             "context_position": "when present, a saved internal location for surrounding evidence",
             "url": "links carry the original source URL; outline and find entries carry anchor instead, and only when that anchor was observed in the original DOM",
             "next_position": "read continuation position, or null at selected range end; --end remains exclusive",
