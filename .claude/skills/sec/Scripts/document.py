@@ -234,10 +234,15 @@ def _html_blocks(text, url):
         context = next((r['text'] for r in reversed(records) if r['kind'] in ('caption', 'context') and r['text']), '')
         header_row = next((r['row'] for r in records if r['kind'] == 'cell' and r['text']), None)
         header = ' | '.join(r['text'] for r in records if r['kind'] == 'cell' and r['row'] == header_row and r['text'])
-        # 성진: 표 뒤 두 블록까지 문맥으로 싣는다, 번호 주석이 더 멀리 떨어진 공시가 나오면 범위를 넓힌다.
+        # 성진: 표 뒤 두 블록까지 문맥으로 싣고 다른 표의 셀로 표시된 블록은 건너뛴다, 표가 곧바로 이어지면 그 표의 머리 조각이 딸려올 수 있다.
         following = max((r['block'] for r in records if r['kind'] == 'cell'), default=block_index) + 1
-        records.extend({'kind': 'context', 'text': b['text'], 'block': i}
-                       for i, b in enumerate(blocks[following:following + 2], following) if b['text'])
+        trailing = []
+        for index in range(following, min(following + 20, len(blocks))):
+            if len(trailing) == 2:
+                break
+            if blocks[index]['text'] and 'table_id' not in blocks[index]:
+                trailing.append({'kind': 'context', 'text': blocks[index]['text'], 'block': index})
+        records.extend(trailing)
         # 성진: 표를 고르기 위한 힌트라 200자로 끊는다, 전체 문맥과 헤더는 table이 레코드로 돌려준다.
         outlines.append({'kind': 'table', 'text': table_id, 'table_id': table_id, 'block': block_index, 'offset': 0,
                          'url': url, 'rows': len(rows), 'context': context[:200], 'header': header[:200]})
