@@ -492,7 +492,7 @@ def execute(args, store):
         elif args.command == "read":
             options.update(position=args.position, end=args.end)
         elif args.command == "table":
-            options["table_id"] = args.table_id
+            options.update(table_id=args.table_id, rows=args.rows)
         elif args.command == "links":
             options["kind"] = args.kind
         return getattr(reader, args.command)(snapshot, store, **options)

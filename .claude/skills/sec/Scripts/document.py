@@ -203,15 +203,26 @@ def _html_blocks(text, url):
                         records.append(dict(link_nodes[descendant], row=r, column=column))
                 column += colspan
         seen = set()
+        containers = set(node.iterancestors())
         for anchor in node.xpath('.//a[starts-with(@href, "#")]'):
             fragment = unquote(anchor.get('href')[1:])
             if fragment in seen:
                 continue
             seen.add(fragment)
             if fragment in anchors:
+                # The note is the nearest prose at or beside the anchor: never a container holding this table,
+                # and never a heading, which is navigation the outline already carries as a contents entry.
+                def heading(candidate):
+                    index = node_blocks.get(candidate)
+                    return index is not None and index < len(blocks) and blocks[index]['kind'] == 'heading'
+
                 target = anchors[fragment]
-                if not _dom_text(target, nonbody_tags) and target.getparent() is not None:
-                    target = target.getparent()
+                parent = target.getparent()
+                candidates = [target, parent, parent.getnext() if parent is not None else None]
+                target = next((c for c in candidates if c is not None and c is not node and c not in containers
+                               and not heading(c) and _dom_text(c, nonbody_tags)), None)
+                if target is None:
+                    continue
                 records.append({'kind': 'footnote', 'text': _dom_text(target, nonbody_tags),
                                 'url': urljoin(url, anchor.get('href')), 'block': node_blocks.get(target, 0)})
         # The caption or the nearest preceding prose names the table; the first row shows what it measures.

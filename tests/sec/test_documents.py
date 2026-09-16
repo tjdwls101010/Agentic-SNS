@@ -27,6 +27,19 @@ def snapshot(tmp_path, body, headers=None):
     return parse_document(SourceDocument(body, {'url': URL}, headers or {}), store), store
 
 
+def table_pages(doc, store, table_id, **options):
+    from reader import table
+    pages = [table(doc, store, table_id=table_id, **options)]
+    while pages[-1]['has_more']:
+        pages.append(table(doc, store, table_id=table_id, cursor=pages[-1]['next_cursor'], **options))
+    return pages
+
+
+def cells(pages):
+    return [dict(cell, row=row['row'], header=row.get('header', False), position=row['position'])
+            for page in pages for row in page['rows'] for cell in row['cells']]
+
+
 def test_synthetic_no_toc_preserves_direct_tail_inline_text_and_stable_snapshot(tmp_path):
     body = b'<html><body><div>Direct <span>inline</span> tail<div>nested</div> final</div></body></html>'
     doc, store = snapshot(tmp_path, body)
@@ -70,24 +83,23 @@ def test_synthetic_outline_links_and_find_share_real_anchor_and_position(tmp_pat
 
 
 def test_synthetic_table_spans_nested_direct_tail_footnotes_and_long_cells(tmp_path):
-    from reader import table, links, find
+    from reader import links, find
     long_cell = 'Direct ' + 'z' * 18000 + ' tail end'
     body = '<h2>Results</h2><p>USD in millions</p><table><tr><th rowspan="2">Metric</th><th colspan="2">2025 and 2024</th></tr><tr><th>2025</th><th>2024</th></tr><tr><td>' + long_cell + '<div>nested <b>bold</b> tail</div> after<a href="#fn">1</a><img src="cell.jpg"><table><tr><td>inner</td></tr></table>end</td><td>42</td><td>41</td></tr></table><p id="fn">1. Includes subsidiaries.</p>'
     doc, store = snapshot(tmp_path, body.encode())
     tables = doc.summary()['tables']
     assert len(tables) == 2
-    result = table(doc, store, table_id=tables[0]['table_id'])
-    pages = [result]
-    while pages[-1]['has_more']:
-        pages.append(table(doc, store, table_id=tables[0]['table_id'], cursor=pages[-1]['next_cursor']))
-    items = [item for page in pages for item in page['items']]
-    cells = [x for x in items if x['kind'] == 'cell']
-    assert any(x['rowspan'] == 2 and x['header'] for x in cells)
-    assert any(x['colspan'] == 2 and x['text'] == '2025 and 2024' for x in cells)
-    fragments = [x['text'] for x in cells if x['row'] == 2 and x['column'] == 0]
-    assert ''.join(fragments) == long_cell + ' nested bold tail after1innerend'
-    assert any('USD in millions' in x['text'] for x in items if x['kind'] == 'context')
-    assert any(x['kind'] == 'footnote' and 'Includes subsidiaries' in x['text'] for x in items)
+    pages = table_pages(doc, store, tables[0]['table_id'])
+    assert len(pages) > 1
+    found = cells(pages)
+    assert any(x.get('rowspan') == 2 and x['header'] for x in found)
+    assert any(x.get('colspan') == 2 and x['text'] == '2025 and 2024' for x in found)
+    fragments = [x for x in found if x['row'] == 2 and x['column'] == 0 and 'text' in x]
+    assert ''.join(x['text'] for x in fragments) == long_cell + ' nested bold tail after1innerend'
+    assert fragments[0]['text_complete'] is False and 'text_complete' not in fragments[-1]
+    assert any('USD in millions' in x for x in pages[0]['context'])
+    assert all('USD in millions' in ' '.join(page['context']) for page in pages)
+    assert all(any('Includes subsidiaries' in note['text'] for note in page['footnotes']) for page in pages)
     assert links(doc, store, kind='image')['items'][0]['url'].endswith('/cell.jpg')
     assert find(doc, store, query='tail end')['items']
     assert all(len(json.dumps(page, ensure_ascii=False)) <= 12000 for page in pages)
@@ -189,20 +201,16 @@ def test_real_microsoft_risk_tail_remains_findable_and_readable(tmp_path):
 
 
 def test_real_apple_table_preserves_years_units_values_and_spans(tmp_path):
-    from reader import table
     doc, store = real_snapshot(tmp_path, 'apple.html')
-    page = table(doc, store, table_id='table-22')
-    items = []
-    while True:
-        items.extend(page['items'])
-        assert len(json.dumps(page, ensure_ascii=False)) <= 12000
-        if not page['has_more']:
-            break
-        page = table(doc, store, table_id='table-22', cursor=page['next_cursor'])
-    text = '\n'.join(x['text'] for x in items)
-    for expected in ['September 28, 2024', 'September 30, 2023', 'September 24, 2022', '391,035', '383,285', '394,328', 'In millions, except number of shares']:
+    pages = table_pages(doc, store, 'table-22')
+    assert all(len(json.dumps(page, ensure_ascii=False, indent=2)) <= 12000 for page in pages)
+    found = cells(pages)
+    text = '\n'.join(x['text'] for x in found if 'text' in x)
+    for expected in ['September 28, 2024', 'September 30, 2023', 'September 24, 2022', '391,035', '383,285', '394,328']:
         assert expected in text
-    assert any(x.get('colspan') == 15 and x['text'] == 'Years ended' for x in items)
+    assert any('In millions, except number of shares' in x for x in pages[0]['context'])
+    assert any(x.get('colspan') == 15 and x['text'] == 'Years ended' for x in found)
+    assert not any(x.get('text') == '' for x in found)
 
 
 def test_real_form4_preserves_holding_path(tmp_path):
@@ -245,15 +253,9 @@ def test_synthetic_budget_covers_pretty_output_and_reports_remaining_scope(tmp_p
 
 
 def test_synthetic_long_nested_cell_fragments_keep_valid_document_positions(tmp_path):
-    from reader import table
     doc, store = snapshot(tmp_path, ('<table><tr><td>short<div>' + 'B' * 6000 + '</div>tail</td></tr></table>').encode())
-    page = table(doc, store, table_id='table-0', budget=2000)
-    while True:
-        for item in page['items']:
-            read(doc, store, position=item['position'])
-        if not page['has_more']:
-            break
-        page = table(doc, store, table_id='table-0', budget=2000, cursor=page['next_cursor'])
+    for cell in cells(table_pages(doc, store, 'table-0', budget=2000)):
+        read(doc, store, position=cell['position'])
 
 
 def test_synthetic_many_tables_are_discoverable_with_bounded_open_and_outline(tmp_path):
@@ -284,8 +286,13 @@ def test_synthetic_empty_xml_reference_attributes_are_readable_without_declarati
 def test_synthetic_table_exposes_cell_image_links_and_context(tmp_path):
     from reader import table, links
     doc, store = snapshot(tmp_path, b'<p>Balance sheet</p><table><tr><td>Assets <img src="assets.jpg" alt="Asset breakdown"><a href="#f1">1</a></td></tr></table><p id="f1">Includes cash</p>')
-    records = table(doc, store, table_id='table-0')['items']
-    assert any(x['kind'] == 'image' and x['url'].endswith('/assets.jpg') and x['row'] == 0 for x in records)
+    result = table(doc, store, table_id='table-0')
+    assert result['context'] == ['Balance sheet']
+    (cell,) = result['rows'][0]['cells']
+    assert cell['text'] == 'Assets 1'
+    assert {'kind': 'image', 'text': 'Asset breakdown', 'url': URL.rsplit('/', 1)[0] + '/assets.jpg'} in cell['links']
+    assert {'kind': 'internal', 'text': '1', 'anchor': 'f1'} in cell['links']
+    assert result['footnotes'] == [{'text': 'Includes cash', 'anchor': 'f1'}]
     image = links(doc, store, kind='image')['items'][0]
     assert image['context_position']
     assert read(doc, store, position=image['context_position'])['text']
@@ -319,7 +326,7 @@ def test_synthetic_find_cursor_rejects_query_operation_changes_and_corruption(tm
 def test_review_nested_table_keeps_separate_numeric_cells(tmp_path):
     from reader import table
     doc, store = snapshot(tmp_path, b'<table><tr><td><table><tr><td>10</td><td>20</td></tr><tr><td>30</td><td>40</td></tr></table></td></tr></table>')
-    outer = table(doc, store, table_id='table-0')['items'][0]
+    outer = table(doc, store, table_id='table-0')['rows'][0]['cells'][0]
     assert outer['text'] == '10 20 30 40'
     assert read(doc, store)['text'] == '10\n20\n30\n40'
 
@@ -398,8 +405,7 @@ def test_nonbody_metadata_is_excluded_from_table_cell_text_too(tmp_path):
             b'</td></tr></table></body></html>')
     doc, store = snapshot(tmp_path, body)
     assert 'MACHINE_ONLY_FACT' not in read(doc, store)['text']
-    cells = [item for item in table(doc, store, table_id='table-0')['items'] if item['kind'] == 'cell']
-    assert cells[0]['text'] == '100 units'
+    assert table(doc, store, table_id='table-0')['rows'][0]['cells'][0]['text'] == '100 units'
 
 
 # Output density: the snapshot argument already names the copy, so positions carry only block:offset.
@@ -439,3 +445,29 @@ def test_reader_pages_are_bounded_by_budget_alone(tmp_path):
     assert len(page['items']) == 60 and page['scope_complete']
     small = outline(doc, store, budget=1024)
     assert 0 < len(small['items']) < 60 and small['has_more'] and small['next_cursor']
+
+
+def test_table_anchor_to_a_container_of_the_table_is_not_a_footnote(tmp_path):
+    from reader import table
+    body = (b'<html><body><div id="top"><p>Annual report</p>'
+            b'<table><tr><td>Revenue <a href="#top">top</a> <a href="#note">2</a></td></tr></table>'
+            b'</div><p><a name="note"></a></p><p>2. Revenue excludes returns.</p></body></html>')
+    doc, store = snapshot(tmp_path, body)
+    result = table(doc, store, table_id='table-0')
+    assert result.get('footnotes') == [{'text': '2. Revenue excludes returns.', 'anchor': 'note'}]
+    links = result['rows'][0]['cells'][0]['links']
+    assert {'kind': 'internal', 'text': 'top', 'anchor': 'top'} in links
+
+
+def test_contents_link_inside_a_table_is_navigation_not_a_footnote(tmp_path):
+    from reader import table, outline
+    body = (b'<html><body><table><tr><td><a href="#item1">Item 1. Business</a></td>'
+            b'<td>Revenue <a href="#fn1">(1)</a></td></tr></table>'
+            b'<h2 id="item1">Item 1. Business</h2><p>Narrative.</p>'
+            b'<p id="fn1">(1) Excludes returns.</p></body></html>')
+    doc, store = snapshot(tmp_path, body)
+    result = table(doc, store, table_id='table-0')
+    assert result['footnotes'] == [{'text': '(1) Excludes returns.', 'anchor': 'fn1'}]
+    anchors = [link['anchor'] for cell in result['rows'][0]['cells'] for link in cell.get('links', [])]
+    assert anchors == ['item1', 'fn1']
+    assert any(x['kind'] == 'toc' and x['anchor'] == 'item1' for x in outline(doc, store)['items'])

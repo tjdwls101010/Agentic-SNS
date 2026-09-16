@@ -28,7 +28,7 @@ def parser():
         "outline": "List a saved snapshot's contents links, detected headings and tables with their context; --kind selects anchors or link targets instead.",
         "find": "Find a literal string in one saved snapshot; matching ignores case unless --case-sensitive is set.",
         "read": "Read a saved snapshot range using opaque positions; no identity or network access is required.",
-        "table": "Read one table with cell structure and context; get table IDs from open or the complete outline.",
+        "table": "Read one table as rows of non-empty cells with its context, caption and footnotes; empty layout cells are omitted.",
         "links": "List original links or images and their context in one saved snapshot; no external links are fetched.",
         "doctor": "Check requester configuration without printing its value; optionally test the SEC connection.",
         "schema": "Describe command inputs, output fields, defaults and error recovery without an identity.",
@@ -117,6 +117,10 @@ def parser():
             sub.add_argument(
                 "table_id", help="Table identifier from open.tables or any outline entry whose kind is table."
             )
+            sub.add_argument(
+                "--rows",
+                help="Original row numbers to return, e.g. 2-5 or 7 (default all rows); context, caption and footnotes always accompany them.",
+            )
         if name == "links":
             sub.add_argument(
                 "--kind",
@@ -203,7 +207,7 @@ def schema():
         "reading": {
             "snapshot_id": "same immutable snapshot for outline/find/read/table/links; no identity, fetch or reparsing is required",
             "position": "opaque snapshot-bound internal position; use returned values unchanged and do not turn them into SEC URL fragments",
-            "items": "outline: {kind, text, position} plus url only for a verified anchor and table_id/rows/context/header for tables; find: match text with position and match_end; read: {kind, position} per returned block while text carries the prose once; table: context/caption/cells with row/column/spans/header plus links; links: kind/url/text/position/context_position",
+            "items": "outline: {kind, text, position} plus url only for a verified anchor and table_id/rows/context/header for tables; find: match text with position and match_end; read: {kind, position} per returned block while text carries the prose once; table: context/caption/footnotes once per page plus rows of non-empty cells with column/spans/links and one position per row; links: kind/url/text/position/context_position",
             "context_position": "when present, a saved internal location for surrounding evidence",
             "url": "an original source URL; an anchor is exposed only when observed in the original DOM",
             "next_position": "read continuation position, or null at selected range end; --end remains exclusive",

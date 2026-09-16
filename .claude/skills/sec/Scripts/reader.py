@@ -1,5 +1,6 @@
 """Budgeted navigation over one immutable snapshot; no parsing or network access."""
 import json
+import re
 from bisect import bisect_right
 from urllib.parse import unquote
 
@@ -30,15 +31,33 @@ def _position(snapshot, value, default):
 
 # Budget bounds: the host tool truncates Bash results around 30,000 characters, so the ceiling stays below that.
 MIN_BUDGET, DEFAULT_BUDGET, MAX_BUDGET = 1024, 12000, 24000
+NARROWING = {'outline': '--kind', 'find': 'a more specific query', 'read': '--position and --end',
+             'table': '--rows', 'links': '--kind'}
 OUTLINE_KINDS = ('toc', 'heading', 'table', 'anchor', 'internal_link')
 DEFAULT_OUTLINE_KINDS = ('toc', 'heading', 'table')
 # Fields the model acts on; block bookkeeping stays inside the position string.
 INTERNAL = ('block', 'offset', 'text_offset', 'text_complete', 'context_block', 'target_resolved')
 
 
+def _anchor_or_url(item, source_url):
+    url = item.get('url', '')
+    if url.startswith(source_url + '#'):
+        return {'anchor': unquote(url[len(source_url) + 1:])}
+    return {'url': url} if url else {}
+
+
 def _public(operation, item, source_url):
     if operation == 'table':
-        return item
+        # A cell keeps only what distinguishes it: place, span beyond one, header role, text and its position.
+        public = {k: v for k, v in item.items() if k in ('kind', 'row', 'column', 'text', 'position', 'scope', 'headers') and v not in ('', None)}
+        public.pop('position', None) if item.get('kind') != 'cell' else None
+        public.update({k: item[k] for k in ('colspan', 'rowspan') if item.get(k, 1) > 1})
+        if item.get('header'):
+            public['header'] = True
+        if item.get('text_complete') is False:
+            public['text_complete'] = False
+        public.update(_anchor_or_url(item, source_url))
+        return public
     public = {k: v for k, v in item.items() if k not in INTERNAL and v != ''}
     if operation == 'read':
         public.pop('text', None)
@@ -57,7 +76,40 @@ def _public(operation, item, source_url):
     return public
 
 
-def _page(snapshot, store, operation, options, items, cursor, budget):
+def _assemble_table(framing):
+    # Context, caption and footnotes are what make cells interpretable, so every page carries them.
+    def assemble(result):
+        table = {k: v for k, v in result.items() if k != 'items'}
+        table.update(framing)
+        rows = []
+        for item in result['items']:
+            kind = item.pop('kind', 'cell')
+            row = next((r for r in rows if r['row'] == item['row']), None)
+            if row is None:
+                row = {'row': item['row'], 'cells': []}
+                if 'position' in item:
+                    row['position'] = item['position']
+                rows.append(row)
+            if item.pop('header', False):
+                row['header'] = True
+            item.pop('row')
+            item.pop('position', None)
+            if kind == 'cell':
+                row['cells'].append(item)
+            else:
+                cell = next((c for c in row['cells'] if c['column'] == item['column']), None)
+                link = {'kind': kind, **{k: v for k, v in item.items() if k in ('text', 'anchor', 'url')}}
+                if cell is None:
+                    row['cells'].append({'column': item['column'], 'links': [link]})
+                else:
+                    cell.setdefault('links', []).append(link)
+        table['rows'] = rows
+        return table
+
+    return assemble
+
+
+def _page(snapshot, store, operation, options, items, cursor, budget, finish=lambda result: result):
     if not isinstance(budget, int) or not MIN_BUDGET <= budget <= MAX_BUDGET:
         raise SecError('invalid_budget', f'max-chars must be {MIN_BUDGET}..{MAX_BUDGET} characters.', 'Use the default or a value in this range.')
     query = {'version': 3, 'operation': operation, 'snapshot_id': snapshot.id, 'options': options, 'budget': budget}
@@ -78,7 +130,7 @@ def _page(snapshot, store, operation, options, items, cursor, budget):
         result['next_position'] = position(snapshot, len(snapshot.data['blocks']), max((len(b['text']) for b in snapshot.data['blocks']), default=0))
 
     def size():
-        return len(json.dumps(result, ensure_ascii=False, indent=2)) + 1
+        return len(json.dumps(finish(json.loads(json.dumps(result))), ensure_ascii=False, indent=2)) + 1
 
     while index < len(items):
         original = items[index]
@@ -89,16 +141,19 @@ def _page(snapshot, store, operation, options, items, cursor, budget):
             item['position'] = position(snapshot, original['block'], original.get('offset', 0) + (offset if operation == 'read' else 0))
         if 'context_block' in original:
             item['context_position'] = position(snapshot, original['context_block'], 0)
-        result['items'].append(_public(operation, item, snapshot.data['source']['url']))
+        public = _public(operation, item, snapshot.data['source']['url'])
+        result['items'].append(public)
         prefix = result.get('text', '')
         if operation == 'read':
             result['text'] = prefix + remaining
         if size() > budget:
             lo, hi = 0, len(remaining)
-            item['text_complete'] = False
+            if 'text' in public:
+                public['text_complete'] = False
             while lo < hi:
                 mid = (lo + hi + 1) // 2
-                item['text'] = remaining[:mid]
+                if 'text' in public:
+                    public['text'] = remaining[:mid]
                 if operation == 'read':
                     result['text'] = prefix + remaining[:mid]
                 if size() <= budget:
@@ -110,9 +165,11 @@ def _page(snapshot, store, operation, options, items, cursor, budget):
                 if operation == 'read':
                     result['text'] = prefix
                 if not result['items']:
-                    raise SecError('budget_too_small', 'One item has metadata larger than this budget.', 'Increase budget or follow the original source URL.')
+                    raise SecError('budget_too_small', 'This response cannot fit in the requested budget.',
+                                   f"Select less with {NARROWING[operation]}, or raise --max-chars up to {MAX_BUDGET}.")
                 break
-            item['text'] = remaining[:lo]
+            if 'text' in public:
+                public['text'] = remaining[:lo]
             if operation == 'read':
                 result['text'] = prefix + remaining[:lo]
             offset += lo
@@ -129,7 +186,7 @@ def _page(snapshot, store, operation, options, items, cursor, budget):
     result['returned_chars'] = size()
     # The number's own decimal width is part of the serialized budget.
     result['returned_chars'] = size()
-    return result
+    return finish(result)
 
 
 def _canonical(snapshot):
@@ -173,7 +230,6 @@ def outline(snapshot, store, *, kinds=DEFAULT_OUTLINE_KINDS, cursor=None, budget
 def find(snapshot, store, *, query, case_sensitive=False, cursor=None, budget=DEFAULT_BUDGET):
     if not query:
         raise SecError('invalid_query', 'Search text cannot be empty.', 'Provide a nonempty literal string.')
-    import re
     pattern = re.compile(re.escape(query), 0 if case_sensitive else re.IGNORECASE)
     text, starts = _canonical(snapshot)
     block_starts = starts[:-1]
@@ -200,8 +256,28 @@ def links(snapshot, store, *, kind=None, cursor=None, budget=DEFAULT_BUDGET):
     return _page(snapshot, store, 'links', {'kind': kind}, items, cursor, budget)
 
 
-def table(snapshot, store, *, table_id, cursor=None, budget=DEFAULT_BUDGET):
+def table(snapshot, store, *, table_id, rows=None, cursor=None, budget=DEFAULT_BUDGET):
     selected = next((t for t in snapshot.data['tables'] if t['table_id'] == table_id), None)
     if selected is None:
-        raise SecError('invalid_table', 'Table identifier is not in this snapshot.', 'Use table_id from open output.')
-    return _page(snapshot, store, 'table', {'table_id': table_id}, selected['items'], cursor, budget)
+        raise SecError('invalid_table', 'Table identifier is not in this snapshot.', 'Use table_id from open or outline output.')
+    last = selected['rows'] - 1
+    span = re.fullmatch(r'(\d+)(?:-(\d+))?', rows or '')
+    first, final = (int(span[1]), int(span[2] or span[1])) if span else (0, last)
+    if not span and rows or first > final or final > last:
+        raise SecError('invalid_argument', 'Row range is outside this table.', f'Use rows within 0-{last}, e.g. --rows 2-5.')
+    framing = {}
+    for record in selected['items']:
+        if record['kind'] == 'context' and record['text']:
+            framing.setdefault('context', []).append(record['text'])
+        elif record['kind'] == 'caption' and record['text']:
+            framing['caption'] = record['text']
+        elif record['kind'] == 'footnote' and record['text']:
+            note = {'text': record['text']}
+            note.update(_anchor_or_url(record, snapshot.data['source']['url']))
+            framing.setdefault('footnotes', []).append(note)
+    # Empty layout cells carry no evidence; the original DOM keeps them.
+    records = [r for r in selected['items']
+               if r['kind'] not in ('context', 'caption', 'footnote')
+               and first <= r['row'] <= final and (r['text'] or r['kind'] != 'cell')]
+    return _page(snapshot, store, 'table', {'table_id': table_id, 'rows': rows}, records, cursor, budget,
+                 _assemble_table(framing))

@@ -20,7 +20,7 @@ def test_open_decodes_http_charset_and_readers_use_same_cached_snapshot_without_
     code, read = cli("read", snapshot, "--position", position, "--end", end)
     assert code == 0 and read["text"] == "Competition"
     code, cells = cli("table", snapshot, opened["tables"][0]["table_id"])
-    assert code == 0 and "42" in str(cells["items"])
+    assert code == 0 and "42" in str(cells["rows"])
     code, links = cli("links", snapshot, "--kind", "image")
     assert code == 0 and "chart.png" in str(links["items"])
     code, outline = cli("outline", snapshot)
@@ -150,3 +150,59 @@ def test_reader_commands_have_no_item_limit_and_reject_it(cli):
     reader_options = {name: [o["names"][0] for o in c["options"]] for name, c in result["commands"].items()}
     for name in ("outline", "find", "read", "table", "links"):
         assert "--limit" not in reader_options[name], name
+
+
+SALES_TABLE = (
+    b"<html><body><p>Products and Services Performance</p><p>Net sales by category (dollars in millions):</p>"
+    b"<table><caption>Sales</caption><tr><td></td><td></td><td></td></tr>"
+    b"<tr><th></th><th colspan=\"2\">2025</th><th>2024</th></tr>"
+    b'<tr><td>iPhone <a href="#fn1">(1)</a></td><td>$</td><td>209,586</td><td>201,183</td></tr>'
+    b'<tr><td>Mac <img src="mac.png" alt="Mac icon"></td><td></td><td>33,708</td><td>29,984</td></tr>'
+    b"<tr><td>Total</td><td>$</td><td>243,294</td><td>231,167</td></tr></table>"
+    b'<p id="fn1">(1) Includes accessories.</p></body></html>'
+)
+
+
+def test_table_returns_rows_once_without_spacer_cells_and_selects_row_ranges(cli):
+    cli.replies.append(("integration.htm", 200, SALES_TABLE, {"content-type": "text/html"}))
+    code, opened = cli("open", URL)
+    assert code == 0
+    cli.identity.write_text('EDGAR_IDENTITY=""')
+    code, table = cli("table", opened["snapshot_id"], "table-0")
+    assert code == 0 and table["scope_complete"] is True and table["next_cursor"] is None
+    assert "items" not in table
+    assert table["context"] == ["Products and Services Performance", "Net sales by category (dollars in millions):"]
+    assert table["caption"] == "Sales"
+    assert table["footnotes"] == [{"text": "(1) Includes accessories.", "anchor": "fn1"}]
+    assert [row["row"] for row in table["rows"]] == [1, 2, 3, 4]
+    header, iphone, mac, total = table["rows"]
+    assert header["header"] is True and "header" not in iphone
+    assert header["cells"] == [{"column": 1, "colspan": 2, "text": "2025"}, {"column": 3, "text": "2024"}]
+    assert re.fullmatch(r"\d+:\d+", header["position"])
+    assert [c["text"] for c in iphone["cells"]] == ["iPhone (1)", "$", "209,586", "201,183"]
+    assert iphone["cells"][0]["links"] == [{"kind": "internal", "text": "(1)", "anchor": "fn1"}]
+    assert mac["cells"][0]["links"] == [{"kind": "image", "text": "Mac icon", "url": URL.rsplit("/", 1)[0] + "/mac.png"}]
+    assert [c["column"] for c in mac["cells"]] == [0, 2, 3]
+    code, read = cli("read", opened["snapshot_id"], "--position", total["position"])
+    assert code == 0 and read["text"].startswith("Total\n$\n243,294")
+    code, part = cli("table", opened["snapshot_id"], "table-0", "--rows", "2-3")
+    assert code == 0 and [row["row"] for row in part["rows"]] == [2, 3] and part["scope_complete"] is True
+    assert part["context"] == table["context"] and "footnotes" in part
+    code, error = cli("table", opened["snapshot_id"], "table-0", "--rows", "9")
+    assert code == 2 and error["error"]["code"] == "invalid_argument" and "0-4" in error["error"]["fix"]
+    assert len(cli.calls) == 1
+
+
+def test_oversized_response_names_this_command_own_narrowing_options(cli):
+    body = b"<html><body><p>" + b"z" * 4000 + b"</p><table><tr><td>42</td></tr></table></body></html>"
+    cli.replies.append(("integration.htm", 200, body, {"content-type": "text/html"}))
+    code, opened = cli("open", URL)
+    assert code == 0
+    cli.identity.write_text('EDGAR_IDENTITY=""')
+    code, error = cli("table", opened["snapshot_id"], "table-0", "--max-chars", "1024")
+    assert code == 2 and error["error"]["code"] == "budget_too_small"
+    assert "--rows" in error["error"]["fix"] and "--max-chars up to 24000" in error["error"]["fix"]
+    code, whole = cli("table", opened["snapshot_id"], "table-0")
+    assert code == 0 and whole["rows"][0]["cells"][0]["text"] == "42"
+    code, long_read = cli("read", opened["snapshot_id"], "--max-chars", "1024")
+    assert code == 0 and long_read["has_more"] is True and long_read["text"].startswith("zzz")
