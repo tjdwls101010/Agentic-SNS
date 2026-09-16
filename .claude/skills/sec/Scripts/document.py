@@ -335,7 +335,7 @@ def _parse_document(source, store):
         outlines, link_items, tables = [], [], []
     warnings = ['encoding_loss'] if encoding['loss'] else []
     if excluded_metadata:
-        warnings.append('nonbody_inline_xbrl_metadata_omitted_from_reader_original_preserved')
+        warnings.append('inline_xbrl_metadata_excluded')
     if binary:
         warnings.append('unsupported_format')
     if any(item['kind'] == 'image' for item in link_items):
@@ -366,6 +366,9 @@ def parse_document(source, store):
 
 
 def load_snapshot(store, snapshot_id):
+    if not re.fullmatch(r'[0-9a-f]{64}', snapshot_id or ''):
+        raise SecError('invalid_snapshot', 'This is not a saved document snapshot identifier.',
+                       'Use the snapshot_id returned by open, or open the source again.')
     try:
         data = json.loads(store.get(snapshot_id))
         if data['version'] != 1 or not all(isinstance(data[k], list) for k in ('blocks', 'tables', 'links', 'outline')):

@@ -351,9 +351,6 @@ def search(args, store, transport):
         )
     result = listing(args, store, state)
     result.update(search_status(state, bool(result["next_cursor"])))
-    result["snapshot_scope"] = (
-        "Only fetched pages are fixed; new remote pages are timestamped and document IDs deduplicated."
-    )
     return result
 
 

@@ -127,6 +127,13 @@ def parser():
                 choices=["image", "internal", "external"],
                 help="Filter image links, in-document anchors, or external links; default returns all kinds without fetching them.",
             )
+        if name == "schema":
+            sub.add_argument(
+                "command_name",
+                nargs="?",
+                choices=list(descriptions),
+                help="Describe one command instead of every command and output section.",
+            )
         if name == "doctor":
             sub.add_argument(
                 "--live", action="store_true", help="Check the SEC ticker endpoint through the identified transport."
@@ -134,7 +141,13 @@ def parser():
     return p
 
 
-def schema():
+# Each command's output fields live in one section; a scoped request carries only that command's own contract.
+SECTIONS = {"company": ("company", "listing"), "filings": ("listing",), "search": ("search", "listing"),
+            "open": ("documents", "listing"), "outline": ("reading",), "find": ("reading",), "read": ("reading",),
+            "table": ("reading",), "links": ("reading",), "doctor": (), "schema": ()}
+
+
+def schema(command=None):
     p = parser()
     subs = next(a for a in p._actions if isinstance(a, argparse._SubParsersAction))
 
@@ -147,7 +160,7 @@ def schema():
             "help": action.help,
         }
 
-    return {
+    full = {
         "version": 1,
         "global_options": [describe(action) for action in p._actions if action.option_strings],
         "defaults": {
@@ -200,7 +213,7 @@ def schema():
             "encoding": "selected encoding, original declarations, inferred/conflict/loss flags",
             "blocks": "number of saved reading blocks",
             "tables": "first table entries {table_id, rows, position, context, header}; context is the caption or nearest preceding prose and header the first row; table_count is the total, tables_has_more marks omitted entries and outline lists them all",
-            "warnings": "extraction limitations such as encoding_loss, unsupported_format or image_content_not_extracted",
+            "warnings": "extraction limitations: encoding_loss, inline_xbrl_metadata_excluded, external_entities_not_expanded, unsupported_format or image_content_not_extracted",
             "extraction_complete": "document extraction completeness; distinct from finishing the selected output range",
             "returned_chars": "actual emitted character count including the trailing newline; document summary obeys --max-chars",
         },
@@ -232,6 +245,12 @@ def schema():
             "invalid_position": "use a position returned for this same snapshot",
         },
     }
+    if command is None:
+        return full
+    scoped = {"version": full["version"], "defaults": full["defaults"], "commands": {command: full["commands"][command]},
+              "error": full["error"]}
+    scoped.update({section: full[section] for section in SECTIONS[command]})
+    return scoped
 
 
 def main(argv=None):
@@ -240,7 +259,7 @@ def main(argv=None):
     try:
         args = parser().parse_args(argv)
         if args.command == "schema":
-            result = schema()
+            result = schema(args.command_name)
         else:
             from filings import dispatch
 

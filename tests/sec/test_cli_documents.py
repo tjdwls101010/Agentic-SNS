@@ -229,3 +229,31 @@ def test_read_returns_prose_once_as_plain_text_with_a_short_header(cli):
     assert all(set(item) <= {"kind", "position", "anchor", "path", "parent", "attributes"} for item in structured["items"])
     code, rest = cli.text("read", snapshot, "--position", structured["next_position"])
     assert code == 0 and rest.rstrip("\n").endswith("FINAL SENTENCE.")
+
+
+def test_recovery_codes_and_warnings_match_what_schema_lists(cli):
+    body = (b'<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL"><body>'
+            b'<ix:header><ix:hidden>MACHINE_ONLY</ix:hidden></ix:header><p>Narrative.</p></body></html>')
+    cli.replies.append(("integration.htm", 200, body, {"content-type": "text/html"}))
+    code, opened = cli("open", URL)
+    assert code == 0 and opened["warnings"] == ["inline_xbrl_metadata_excluded"]
+    code, schema = cli("schema")
+    assert "inline_xbrl_metadata_excluded" in schema["documents"]["warnings"]
+    code, error = cli("read", "not-a-snapshot")
+    assert code == 2 and error["error"]["code"] == "invalid_snapshot"
+    assert "open" in error["error"]["fix"] and "cursor" not in error["error"]["fix"]
+    code, error = cli("read", "f" * 64)
+    assert code == 2 and error["error"]["code"] == "missing_snapshot"
+    code, error = cli("filings", "320193", "--cursor", "not-a-cursor")
+    assert code == 2 and error["error"]["code"] == "invalid_cursor"
+
+
+def test_schema_scopes_to_one_command_and_responses_carry_no_prose_guidance(cli):
+    code, whole = cli("schema")
+    assert code == 0 and len(whole["commands"]) == 11
+    code, scoped = cli("schema", "read")
+    assert code == 0 and list(scoped["commands"]) == ["read"]
+    assert scoped["reading"] and "documents" not in scoped and "search" not in scoped
+    assert len(cli.last_output) < 5000  # one command's contract, well under a quarter of the full surface
+    code, error = cli("schema", "nosuchcommand")
+    assert code == 2 and "read" in error["error"]["message"] and error["error"]["fix"]
