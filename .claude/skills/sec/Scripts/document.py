@@ -217,8 +217,10 @@ def _html_blocks(text, url):
                     return index is not None and index < len(blocks) and blocks[index]['kind'] == 'heading'
 
                 target = anchors[fragment]
+                if heading(target):
+                    continue
                 parent = target.getparent()
-                candidates = [target, parent, parent.getnext() if parent is not None else None]
+                candidates = [target, target.getnext(), parent, parent.getnext() if parent is not None else None]
                 target = next((c for c in candidates if c is not None and c is not node and c not in containers
                                and not heading(c) and _dom_text(c, nonbody_tags)), None)
                 if target is None:

@@ -8,8 +8,8 @@ class SecError(Exception):
 
 
 # What a passage needs beside it: where it came from, what it is part of, and how to continue.
-HEADER = ("source_url", "snapshot_id", "status", "extraction_complete", "has_more", "next_position", "next_cursor",
-          "returned_chars")
+HEADER = ("source_url", "snapshot_id", "status", "extraction_complete", "warnings", "has_more", "next_position",
+          "next_cursor", "returned_chars")
 
 
 def passage(value):
@@ -30,7 +30,11 @@ def render(value, as_json):
         error = value["error"]
         return f"Error [{error['code']}]: {error['message']}\nFix: {error['fix']}"
     if "next_position" in value or "text" in value:
-        header = [f"{key}: {value[key]}" for key in HEADER if value.get(key) is not None]
+        header = [
+            f"{key}: {', '.join(value[key]) if isinstance(value[key], list) else value[key]}"
+            for key in HEADER
+            if value.get(key) is not None
+        ]
         return "\n".join(header) + "\n\n" + passage(value)
     return "\n".join(f"{key}: {json.dumps(item, ensure_ascii=False)}" for key, item in value.items())
 

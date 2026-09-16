@@ -508,3 +508,17 @@ def test_selecting_no_records_still_obeys_the_budget_and_every_row_keeps_a_posit
         fragments = [cell for cell in cells(pages) if cell['column'] == 0 and cell['row'] == 1]
         assert ''.join(cell.get('text', '') for cell in fragments) == 'X' * 1300 + 'note'
         assert any(cell.get('links') for cell in fragments)
+
+
+def test_footnote_is_the_note_beside_the_anchor_and_never_a_navigation_section(tmp_path):
+    from reader import table
+    adjacent = (b'<html><body><div><table><tr><td>Revenue <a href="#n">(1)</a></td></tr></table>'
+                b'<a id="n"></a><p>(1) Excludes returns.</p></div></body></html>')
+    doc, store = snapshot(tmp_path, adjacent)
+    assert table(doc, store, table_id='table-0')['footnotes'] == [{'text': '(1) Excludes returns.', 'anchor': 'n'}]
+    navigation = (b'<html><body><table><tr><td>Revenue <a href="#n">see</a></td></tr></table>'
+                  b'<div><p>Overview.</p><h2 id="n">Business</h2><p>Unrelated narrative.</p></div></body></html>')
+    doc, store = snapshot(tmp_path, navigation)
+    result = table(doc, store, table_id='table-0')
+    assert 'footnotes' not in result
+    assert result['rows'][0]['cells'][0]['links'] == [{'kind': 'internal', 'text': 'see', 'anchor': 'n'}]

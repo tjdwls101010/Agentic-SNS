@@ -141,6 +141,9 @@ def _page(snapshot, store, operation, options, items, cursor, budget, finish=lam
     result = {'snapshot_id': snapshot.id, 'items': [], 'next_cursor': '0' * 64, 'has_more': True,
               'scope_complete': False, 'remaining_items': len(items), 'returned_chars': budget, 'extraction_complete': snapshot.data['extraction_complete'],
               'source_url': snapshot.data['source']['url'], 'status': snapshot.data['status']}
+    # An excerpt has to carry the limitations of the extraction it came from, not only that one exists.
+    if snapshot.data['warnings']:
+        result['warnings'] = snapshot.data['warnings']
     prose = _prose(snapshot)
     if operation == 'read':
         if prose:

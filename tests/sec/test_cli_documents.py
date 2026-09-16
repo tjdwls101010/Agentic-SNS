@@ -288,3 +288,34 @@ def test_structured_documents_keep_their_paths_in_the_default_rendering(cli):
     assert code == 0 and "text" not in structured
     assert structured["items"][0]["path"] == "/ownershipDocument[1]/nonDerivativeTransaction[1]/shares[1]"
     assert structured["items"][0]["text"] == "10"
+
+
+def test_reader_responses_carry_the_snapshot_warnings(cli):
+    body = (
+        b'<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL"><body>'
+        b"<ix:header><ix:hidden>MACHINE</ix:hidden></ix:header><p>Narrative text.</p>"
+        b'<img src="chart.png" alt="chart"><table><tr><td>42</td></tr></table></body></html>'
+    )
+    cli.replies.append(("integration.htm", 200, body, {"content-type": "text/html"}))
+    code, opened = cli("open", URL)
+    assert code == 0
+    assert set(opened["warnings"]) == {"inline_xbrl_metadata_excluded", "image_content_not_extracted"}
+    snapshot = opened["snapshot_id"]
+    cli.identity.write_text('EDGAR_IDENTITY=""')
+    for args in (
+        ["read", snapshot],
+        ["outline", snapshot],
+        ["find", snapshot, "Narrative"],
+        ["table", snapshot, "table-0"],
+        ["links", snapshot],
+    ):
+        code, result = cli(*args)
+        assert code == 0 and result["warnings"] == opened["warnings"], args
+    code, output = cli.text("read", snapshot)
+    assert "warnings: inline_xbrl_metadata_excluded, image_content_not_extracted" in output.partition("\n\n")[0]
+    cli.replies.append(("clean.htm", 200, b"<html><p>Plain narrative.</p></html>", {"content-type": "text/html"}))
+    cli.identity.write_text('EDGAR_IDENTITY="SEC fixture tests tests@example.org"')
+    code, clean = cli("open", URL.replace("integration", "clean"))
+    assert code == 0 and clean["warnings"] == []
+    code, read = cli("read", clean["snapshot_id"])
+    assert code == 0 and "warnings" not in read
