@@ -98,8 +98,9 @@ def test_synthetic_table_spans_nested_direct_tail_footnotes_and_long_cells(tmp_p
     assert ''.join(x['text'] for x in fragments) == long_cell + ' nested bold tail after1innerend'
     assert fragments[0]['text_complete'] is False and 'text_complete' not in fragments[-1]
     assert any('USD in millions' in x for x in pages[0]['context'])
-    assert all('USD in millions' in ' '.join(page['context']) for page in pages)
-    assert all(any('Includes subsidiaries' in note['text'] for note in page['footnotes']) for page in pages)
+    assert 'USD in millions' in ' '.join(pages[0]['context'])
+    assert any('Includes subsidiaries' in note['text'] for note in pages[0]['footnotes'])
+    assert all('context' not in page for page in pages[1:])
     assert links(doc, store, kind='image')['items'][0]['url'].endswith('/cell.jpg')
     assert find(doc, store, query='tail end')['items']
     assert all(len(json.dumps(page, ensure_ascii=False)) <= 12000 for page in pages)
@@ -124,9 +125,10 @@ def test_synthetic_xml_paths_repeated_records_tail_and_external_entity_disabled(
     block = read(doc, store, position=result['position'])['items'][0]
     assert block['path'] == '/ownershipDocument[1]/transaction[2]/shares[1]'
     assert block['parent'] == '/ownershipDocument[1]/transaction[2]'
-    text = read(doc, store)['text']
-    assert 'root:' not in text
-    assert 'before' in text and 'bold' in text and 'after' in text
+    values = [item['text'] for item in read(doc, store)['items']]
+    assert 'read' not in read(doc, store)
+    assert not any('root:' in value for value in values)
+    assert 'before' in values and 'bold' in values and 'after' in values
     assert not doc.data['extraction_complete']
     assert 'external_entities_not_expanded' in doc.data['warnings']
 
@@ -471,3 +473,38 @@ def test_contents_link_inside_a_table_is_navigation_not_a_footnote(tmp_path):
     anchors = [link['anchor'] for cell in result['rows'][0]['cells'] for link in cell.get('links', [])]
     assert anchors == ['item1', 'fn1']
     assert any(x['kind'] == 'toc' and x['anchor'] == 'item1' for x in outline(doc, store)['items'])
+
+
+def test_mixed_header_row_keeps_which_cell_is_a_header_and_keeps_open_rowspans(tmp_path):
+    from reader import table
+    body = (b'<table><tr><th>Revenue</th><td>42</td></tr>'
+            b'<tr><th rowspan="0">Segment</th><td>Americas</td></tr>'
+            b'<tr><th>2025</th><th>2024</th></tr></table>')
+    doc, store = snapshot(tmp_path, body)
+    mixed, spanning, headers = table(doc, store, table_id='table-0')['rows']
+    assert 'header' not in mixed
+    assert mixed['cells'][0]['header'] is True and 'header' not in mixed['cells'][1]
+    assert spanning['cells'][0]['rowspan'] == 0
+    assert headers['header'] is True and all('header' not in cell for cell in headers['cells'])
+
+
+def test_selecting_no_records_still_obeys_the_budget_and_every_row_keeps_a_position(tmp_path):
+    from reader import table
+    body = ('<p>' + 'C' * 1500 + '</p><table><tr><td></td><td></td></tr>'
+            '<tr><td>' + 'X' * 1300 + '<a href="https://example.com/note">note</a></td><td>42</td></tr>'
+            '<tr><td>Total</td><td>43</td></tr></table>').encode()
+    doc, store = snapshot(tmp_path, body)
+    empty = table(doc, store, table_id='table-0', rows='0', budget=1024)
+    assert empty['rows'] == [] and empty['returned_chars'] <= 1024
+    assert empty['has_more'] and 'C' * 100 in empty['context'][0]
+    # Framing pages with the rows, so even the smallest allowed budget makes progress instead of refusing the table.
+    smallest = table(doc, store, table_id='table-0', budget=1024)
+    assert smallest['returned_chars'] <= 1024 and smallest['has_more']
+    for budget in (1024, 3000, 12000):
+        pages = table_pages(doc, store, 'table-0', budget=budget)
+        assert all(len(json.dumps(page, ensure_ascii=False, indent=2)) + 1 <= budget for page in pages)
+        assert all('position' in row for page in pages for row in page['rows'])
+        assert [cell for cell in cells(pages) if cell.get('text') == '42']
+        fragments = [cell for cell in cells(pages) if cell['column'] == 0 and cell['row'] == 1]
+        assert ''.join(cell.get('text', '') for cell in fragments) == 'X' * 1300 + 'note'
+        assert any(cell.get('links') for cell in fragments)

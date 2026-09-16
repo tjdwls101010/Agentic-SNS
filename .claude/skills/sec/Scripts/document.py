@@ -229,8 +229,9 @@ def _html_blocks(text, url):
         context = next((r['text'] for r in reversed(records) if r['kind'] in ('caption', 'context') and r['text']), '')
         header_row = next((r['row'] for r in records if r['kind'] == 'cell' and r['text']), None)
         header = ' | '.join(r['text'] for r in records if r['kind'] == 'cell' and r['row'] == header_row and r['text'])
+        # 성진: 표를 고르기 위한 힌트라 200자로 끊는다, 전체 문맥과 헤더는 table이 레코드로 돌려준다.
         outlines.append({'kind': 'table', 'text': table_id, 'table_id': table_id, 'block': block_index, 'offset': 0,
-                         'url': url, 'rows': len(rows), 'context': context, 'header': header})
+                         'url': url, 'rows': len(rows), 'context': context[:200], 'header': header[:200]})
         tables.append({'table_id': table_id, 'rows': len(rows), 'block': block_index, 'items': records,
                        'context': context, 'header': header,
                        'parent_table_id': table_ids.get(next(node.iterancestors('table'), None))})

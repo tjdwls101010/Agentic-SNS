@@ -194,14 +194,20 @@ def test_table_returns_rows_once_without_spacer_cells_and_selects_row_ranges(cli
 
 
 def test_oversized_response_names_this_command_own_narrowing_options(cli):
-    body = b"<html><body><p>" + b"z" * 4000 + b"</p><table><tr><td>42</td></tr></table></body></html>"
+    data_uri = "data:image/png;base64," + "A" * 2000
+    body = (
+        b"<html><body><p>" + b"z" * 4000 + b'</p><img src="' + data_uri.encode() + b'" alt="chart">'
+        b"<table><tr><td>42</td></tr></table></body></html>"
+    )
     cli.replies.append(("integration.htm", 200, body, {"content-type": "text/html"}))
     code, opened = cli("open", URL)
     assert code == 0
     cli.identity.write_text('EDGAR_IDENTITY=""')
-    code, error = cli("table", opened["snapshot_id"], "table-0", "--max-chars", "1024")
+    code, error = cli("links", opened["snapshot_id"], "--kind", "image", "--max-chars", "1024")
     assert code == 2 and error["error"]["code"] == "budget_too_small"
-    assert "--rows" in error["error"]["fix"] and "--max-chars up to 24000" in error["error"]["fix"]
+    assert "--kind" in error["error"]["fix"] and "--max-chars up to 24000" in error["error"]["fix"]
+    code, table = cli("table", opened["snapshot_id"], "table-0", "--max-chars", "1024")
+    assert code == 0 and table["returned_chars"] <= 1024
     code, whole = cli("table", opened["snapshot_id"], "table-0")
     assert code == 0 and whole["rows"][0]["cells"][0]["text"] == "42"
     code, long_read = cli("read", opened["snapshot_id"], "--max-chars", "1024")
@@ -257,3 +263,28 @@ def test_schema_scopes_to_one_command_and_responses_carry_no_prose_guidance(cli)
     assert len(cli.last_output) < 5000  # one command's contract, well under a quarter of the full surface
     code, error = cli("schema", "nosuchcommand")
     assert code == 2 and "read" in error["error"]["message"] and error["error"]["fix"]
+
+
+FORM4 = (
+    b'<?xml version="1.0"?><ownershipDocument>'
+    b"<nonDerivativeTransaction><shares>10</shares><footnoteId id=\"F1\"/></nonDerivativeTransaction>"
+    b"<nonDerivativeTransaction><shares>20</shares><footnoteId id=\"F2\"/></nonDerivativeTransaction>"
+    b'<footnotes><footnote id="F1">Gift.</footnote></footnotes></ownershipDocument>'
+)
+
+
+def test_structured_documents_keep_their_paths_in_the_default_rendering(cli):
+    url = URL.replace(".htm", ".xml")
+    cli.replies.append(("integration.xml", 200, FORM4, {"content-type": "application/xml"}))
+    code, opened = cli("open", url)
+    assert code == 0 and opened["format"] == "xml"
+    cli.identity.write_text('EDGAR_IDENTITY=""')
+    code, output = cli.text("read", opened["snapshot_id"])
+    body = output.partition("\n\n")[2]
+    assert "/ownershipDocument[1]/nonDerivativeTransaction[1]/shares[1]: 10" in body
+    assert "/ownershipDocument[1]/nonDerivativeTransaction[2]/shares[1]: 20" in body
+    assert 'footnoteId[1] {"id": "F1"}' in body
+    code, structured = cli("read", opened["snapshot_id"])
+    assert code == 0 and "text" not in structured
+    assert structured["items"][0]["path"] == "/ownershipDocument[1]/nonDerivativeTransaction[1]/shares[1]"
+    assert structured["items"][0]["text"] == "10"

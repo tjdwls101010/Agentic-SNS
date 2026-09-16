@@ -46,12 +46,16 @@ def _anchor_or_url(item, source_url):
     return {'url': url} if url else {}
 
 
-def _public(operation, item, source_url):
+def _prose(snapshot):
+    # In XML the path and attributes are the evidence; everywhere else the text carries its own structure.
+    return snapshot.data['format'] != 'xml'
+
+
+def _public(operation, item, source_url, prose=True):
     if operation == 'table':
         # A cell keeps only what distinguishes it: place, span beyond one, header role, text and its position.
         public = {k: v for k, v in item.items() if k in ('kind', 'row', 'column', 'text', 'position', 'scope', 'headers') and v not in ('', None)}
-        public.pop('position', None) if item.get('kind') != 'cell' else None
-        public.update({k: item[k] for k in ('colspan', 'rowspan') if item.get(k, 1) > 1})
+        public.update({k: item[k] for k in ('colspan', 'rowspan') if item.get(k, 1) != 1})
         if item.get('header'):
             public['header'] = True
         if item.get('text_complete') is False:
@@ -60,6 +64,9 @@ def _public(operation, item, source_url):
         return public
     public = {k: v for k, v in item.items() if k not in INTERNAL and v != ''}
     if operation == 'read':
+        # The separator between blocks belongs to the joined stream, not to the value at this path.
+        public['text'] = public.get('text', '').removesuffix('\n')
+    if operation == 'read' and prose:
         public.pop('text', None)
     if operation == 'outline':
         public.pop('context_position', None)
@@ -76,37 +83,46 @@ def _public(operation, item, source_url):
     return public
 
 
-def _assemble_table(framing):
-    # Context, caption and footnotes are what make cells interpretable, so every page carries them.
-    def assemble(result):
-        table = {k: v for k, v in result.items() if k != 'items'}
-        table.update(framing)
-        rows = []
-        for item in result['items']:
-            kind = item.pop('kind', 'cell')
-            row = next((r for r in rows if r['row'] == item['row']), None)
-            if row is None:
-                row = {'row': item['row'], 'cells': []}
-                if 'position' in item:
-                    row['position'] = item['position']
-                rows.append(row)
-            if item.pop('header', False):
-                row['header'] = True
-            item.pop('row')
-            item.pop('position', None)
-            if kind == 'cell':
-                row['cells'].append(item)
+def _assemble_table(result):
+    # Context, caption and footnotes lead the record stream, so they arrive with the first rows and then page like them.
+    table = {k: v for k, v in result.items() if k != 'items'}
+    rows = []
+    for item in result['items']:
+        kind = item.pop('kind', 'cell')
+        if kind in ('context', 'caption', 'footnote'):
+            note = {k: v for k, v in item.items() if k in ('text', 'anchor', 'url', 'text_complete')}
+            if kind == 'caption':
+                table['caption'] = note['text']
+            elif kind == 'context':
+                table.setdefault('context', []).append(note['text'])
             else:
-                cell = next((c for c in row['cells'] if c['column'] == item['column']), None)
-                link = {'kind': kind, **{k: v for k, v in item.items() if k in ('text', 'anchor', 'url')}}
-                if cell is None:
-                    row['cells'].append({'column': item['column'], 'links': [link]})
-                else:
-                    cell.setdefault('links', []).append(link)
-        table['rows'] = rows
-        return table
-
-    return assemble
+                table.setdefault('footnotes', []).append(note)
+            continue
+        row = next((r for r in rows if r['row'] == item['row']), None)
+        if row is None:
+            row = {'row': item['row'], 'cells': []}
+            if 'position' in item:
+                row['position'] = item['position']
+            rows.append(row)
+        item.pop('row')
+        item.pop('position', None)
+        if kind == 'cell':
+            row['cells'].append(item)
+        else:
+            cell = next((c for c in row['cells'] if c['column'] == item['column']), None)
+            link = {'kind': kind, **{k: v for k, v in item.items() if k in ('text', 'anchor', 'url')}}
+            if cell is None:
+                row['cells'].append({'column': item['column'], 'links': [link]})
+            else:
+                cell.setdefault('links', []).append(link)
+    for row in rows:
+        # A row is a header row only when every cell is one; a mixed row keeps the mark on the cell.
+        if row['cells'] and all(cell.get('header') for cell in row['cells']):
+            row['header'] = True
+            for cell in row['cells']:
+                cell.pop('header')
+    table['rows'] = rows
+    return table
 
 
 def _page(snapshot, store, operation, options, items, cursor, budget, finish=lambda result: result):
@@ -125,8 +141,10 @@ def _page(snapshot, store, operation, options, items, cursor, budget, finish=lam
     result = {'snapshot_id': snapshot.id, 'items': [], 'next_cursor': '0' * 64, 'has_more': True,
               'scope_complete': False, 'remaining_items': len(items), 'returned_chars': budget, 'extraction_complete': snapshot.data['extraction_complete'],
               'source_url': snapshot.data['source']['url'], 'status': snapshot.data['status']}
+    prose = _prose(snapshot)
     if operation == 'read':
-        result['text'] = ''
+        if prose:
+            result['text'] = ''
         result['next_position'] = position(snapshot, len(snapshot.data['blocks']), max((len(b['text']) for b in snapshot.data['blocks']), default=0))
 
     def size():
@@ -141,10 +159,10 @@ def _page(snapshot, store, operation, options, items, cursor, budget, finish=lam
             item['position'] = position(snapshot, original['block'], original.get('offset', 0) + (offset if operation == 'read' else 0))
         if 'context_block' in original:
             item['context_position'] = position(snapshot, original['context_block'], 0)
-        public = _public(operation, item, snapshot.data['source']['url'])
+        public = _public(operation, item, snapshot.data['source']['url'], prose)
         result['items'].append(public)
         prefix = result.get('text', '')
-        if operation == 'read':
+        if operation == 'read' and prose:
             result['text'] = prefix + remaining
         if size() > budget:
             lo, hi = 0, len(remaining)
@@ -154,7 +172,7 @@ def _page(snapshot, store, operation, options, items, cursor, budget, finish=lam
                 mid = (lo + hi + 1) // 2
                 if 'text' in public:
                     public['text'] = remaining[:mid]
-                if operation == 'read':
+                if operation == 'read' and prose:
                     result['text'] = prefix + remaining[:mid]
                 if size() <= budget:
                     lo = mid
@@ -162,7 +180,7 @@ def _page(snapshot, store, operation, options, items, cursor, budget, finish=lam
                     hi = mid - 1
             if lo == 0:
                 result['items'].pop()
-                if operation == 'read':
+                if operation == 'read' and prose:
                     result['text'] = prefix
                 if not result['items']:
                     raise SecError('budget_too_small', 'This response cannot fit in the requested budget.',
@@ -170,7 +188,7 @@ def _page(snapshot, store, operation, options, items, cursor, budget, finish=lam
                 break
             if 'text' in public:
                 public['text'] = remaining[:lo]
-            if operation == 'read':
+            if operation == 'read' and prose:
                 result['text'] = prefix + remaining[:lo]
             offset += lo
             break
@@ -186,6 +204,9 @@ def _page(snapshot, store, operation, options, items, cursor, budget, finish=lam
     result['returned_chars'] = size()
     # The number's own decimal width is part of the serialized budget.
     result['returned_chars'] = size()
+    if result['returned_chars'] > budget:
+        raise SecError('budget_too_small', 'This response cannot fit in the requested budget.',
+                       f"Select less with {NARROWING[operation]}, or raise --max-chars up to {MAX_BUDGET}.")
     return finish(result)
 
 
@@ -265,19 +286,10 @@ def table(snapshot, store, *, table_id, rows=None, cursor=None, budget=DEFAULT_B
     first, final = (int(span[1]), int(span[2] or span[1])) if span else (0, last)
     if not span and rows or first > final or final > last:
         raise SecError('invalid_argument', 'Row range is outside this table.', f'Use rows within 0-{last}, e.g. --rows 2-5.')
-    framing = {}
-    for record in selected['items']:
-        if record['kind'] == 'context' and record['text']:
-            framing.setdefault('context', []).append(record['text'])
-        elif record['kind'] == 'caption' and record['text']:
-            framing['caption'] = record['text']
-        elif record['kind'] == 'footnote' and record['text']:
-            note = {'text': record['text']}
-            note.update(_anchor_or_url(record, snapshot.data['source']['url']))
-            framing.setdefault('footnotes', []).append(note)
+    framing = [r for r in selected['items'] if r['kind'] in ('context', 'caption', 'footnote') and r['text']]
     # Empty layout cells carry no evidence; the original DOM keeps them.
-    records = [r for r in selected['items']
-               if r['kind'] not in ('context', 'caption', 'footnote')
-               and first <= r['row'] <= final and (r['text'] or r['kind'] != 'cell')]
-    return _page(snapshot, store, 'table', {'table_id': table_id, 'rows': rows}, records, cursor, budget,
-                 _assemble_table(framing))
+    body = [r for r in selected['items']
+            if r['kind'] not in ('context', 'caption', 'footnote')
+            and first <= r['row'] <= final and (r['text'] or r['kind'] != 'cell')]
+    return _page(snapshot, store, 'table', {'table_id': table_id, 'rows': rows}, framing + body, cursor, budget,
+                 _assemble_table)
