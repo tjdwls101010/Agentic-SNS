@@ -65,7 +65,8 @@ def test_bubbles_default_to_a_named_index_the_budget_fits(client):
     client.add("https://finviz.com/api/bubbles?x=sector&y=lastChange&size=marketCap&color=sector&idx=dji", rows)
     result = client.one("market", "bubbles")
     assert result["data"] == rows and result["request"]["index"] == "dji"
-    assert client.raw("market", "bubbles", "--index", "nasdaq", code=2).stderr.count("invalid choice")
+    refused = client.one("market", "bubbles", "--index", "nasdaq", code=2)
+    assert refused["error"]["code"] == "invalid_argument" and "sp500" in refused["error"]["message"]
 
 
 def test_market_map_resolves_classification_from_the_page_assets_and_degrades_to_partial(client):
@@ -243,9 +244,9 @@ def test_insider_trades_keep_ticker_owner_and_filing_links_and_confirm_the_trans
 
 def test_bubble_axes_are_a_closed_set_the_source_validates(client):
     """An axis the API does not accept is answered with HTTP 400, so a guess costs a request; the parser refuses it first."""
-    refused = client.raw("market", "bubbles", "--x", "industry", code=2)
-    assert refused.stdout == "" or "invalid choice" in refused.stdout
-    assert "invalid choice" in refused.stderr and "marketCap" in refused.stderr
+    refused = client.one("market", "bubbles", "--x", "industry", code=2)
+    assert refused["error"]["code"] == "invalid_argument"
+    assert "marketCap" in refused["error"]["message"] and "--help" in refused["error"]["fix"]
     rows = [{"ticker": "AAPL", "x": 1.0, "y": 2.0, "size": 3.0, "color": "Technology"}]
     client.add("https://finviz.com/api/bubbles?x=PE&y=perfYtd&size=marketCap&color=sector&idx=dji", rows)
     assert client.one("market", "bubbles", "--x", "PE", "--y", "perfYtd")["data"] == rows

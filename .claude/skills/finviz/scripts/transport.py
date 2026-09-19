@@ -129,8 +129,8 @@ def parse_headers(text):
     return fields
 
 
-def fetch(url, options):
-    """GET a Finviz URL through curl, following up to five same-site redirects; raise Failure carrying the observation on any non-2xx outcome."""
+def fetch(url, options, keep=None):
+    """GET a Finviz URL through curl, following up to five same-site redirects; raise Failure carrying the observation on any non-2xx outcome. Every response received on the way, including a redirect's own, is handed to `keep` so the envelope's promise that received responses are saved holds for the whole chain."""
     validate_url(url)
     origin, redirects = url, []
     for _ in range(6):
@@ -159,7 +159,9 @@ def fetch(url, options):
                 validate_url(location)
             except Failure as exc:
                 raise Failure(exc.code, "Redirect to " + location + " refused: " + exc.message, exc.fix, obs)
-            redirects.append({"url": url, "http_status": status})
+            redirects.append({"url": url, "http_status": status, "id": obs.id})
+            if keep is not None:
+                keep(obs)
             url = location
             continue
         if status in (401, 403, 429):

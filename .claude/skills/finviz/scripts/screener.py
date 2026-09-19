@@ -30,7 +30,7 @@ def screener_page(ctx, query):
     return obs, markup.soup(obs)
 
 
-@leaf("screen", "filters", help="List the current screener filters: id, label, definition and, on request, the value strings --filters accepts.", args=[(("--options",), dict(action="store_true", help="Attach each filter's option values; the whole catalog of options is about fifteen times the size of the filter list, so narrow with --filter when asking for it."))], output={"[]": "{id, label, definition, option_count} and, with --options, options: [{value, label}] whose values go to screen run --filters, plus elite_only labels an anonymous read cannot select"}, narrow=["--filter", "--fields", "--limit"])
+@leaf("screen", "filters", help="List the current screener filters: id, label, definition and, on request, the value strings --filters accepts.", args=[(("--options",), dict(action="store_true", help="Attach each filter's option values; the whole catalog of options is about fifteen times the size of the filter list, so narrow with --filter when asking for it."))], output={"list of filters": "{id, label, definition, option_count} and, with --options, options: [{value, label}] whose values go to screen run --filters, plus elite_only labels an anonymous read cannot select"}, narrow=["--filter", "--fields", "--limit"])
 def filters(ctx, args, target):
     obs, page = screener_page(ctx, {"ft": "4"})
     found = []
@@ -52,7 +52,7 @@ def filters(ctx, args, target):
     return obs.result
 
 
-@leaf("screen", "signals", help="List the screener signals (top gainers, new high, unusual volume, patterns) that --signal accepts.", output={"[]": "{value, label}; pass value to screen run --signal"}, narrow=["--filter"])
+@leaf("screen", "signals", help="List the screener signals (top gainers, new high, unusual volume, patterns) that --signal accepts.", output={"list of signals": "{value, label}; pass value to screen run --signal"}, narrow=["--filter"])
 def signals(ctx, args, target):
     obs, page = screener_page(ctx, {"ft": "4"})
     options = markup.selects(page).get("signalSelect")
@@ -63,7 +63,7 @@ def signals(ctx, args, target):
     return obs.result
 
 
-@leaf("screen", "columns", help="List the columns available to the custom view: id, title, index and category.", output={"[]": "{id, title, index, category}; pass ids or indices to screen run --columns"}, narrow=["--filter", "--limit"])
+@leaf("screen", "columns", help="List the columns available to the custom view: id, title, index and category.", output={"list of columns": "{id, title, index, category}; pass ids or indices to screen run --columns"}, narrow=["--filter", "--limit"])
 def columns(ctx, args, target):
     obs, page = screener_page(ctx, {"v": "152"})
     obs.result["target"], obs.result["data"] = "columns", column_catalog(page, obs)
@@ -78,7 +78,7 @@ def column_catalog(page, obs):
     return [{"id": c["id"], "title": c["title"], "index": c["index"], "category": categories[c["categoryIndex"]] if c.get("categoryIndex") is not None and c["categoryIndex"] < len(categories) else None} for c in settings.get("columnsMap", {}).values()]
 
 
-@leaf("screen", "views", help="Describe the table views --view accepts; offline.", output={"[]": "{name, view_id, description}"})
+@leaf("screen", "views", help="Describe the table views --view accepts; offline.", output={"list of views": "{name, view_id, description}"})
 def views(ctx, args, target):
     return output.plain("views", [{"name": name, "view_id": view_id, "description": description} for name, (view_id, description) in VIEWS.items()])
 
@@ -96,7 +96,7 @@ RUN_ARGS = [
 ]
 
 
-@leaf("screen", "run", help="Run the screener with filters, a signal, a view or custom columns, sorting and paging; rows keep source strings.", args=RUN_ARGS, output={"id": "when --pages > 1, a saved aggregate of all received rows before selection or export; source.pages lists independent page IDs; read ID --raw returns the aggregate JSON, while page IDs return source HTML", "[]": "one record per row keyed by the column headers, plus ticker and url (and observation_id when more than one page or --out); with --out the data is {path, rows_written, pages} instead", "conditions": "filters, signal, columns, sort and start as confirmed by each page's own controls; pages that disagree show evidence per observation id", "sort_keys": "the sort keys this view's own column headers carry, for --sort", "coverage": "received rows across pages, shown after selection, source_total from the page count, pages fetched, exhaustive false", "continuation": "{start} for the next page, or for the page that failed"}, narrow=["--fields", "--limit", "--out", "--pages 1"])
+@leaf("screen", "run", help="Run the screener with filters, a signal, a view or custom columns, sorting and paging; rows keep source strings.", args=RUN_ARGS, output={"id": "when --pages > 1, a saved aggregate of all received rows before selection or export; source.pages lists independent page IDs; read ID --raw returns the aggregate JSON, while page IDs return source HTML", "list of rows": "one record per row keyed by the column headers, plus ticker and url (and observation_id when more than one page or --out); with --out the data is {path, rows_written, pages} instead", "conditions": "filters, signal, columns, sort and start as confirmed by each page's own controls; pages that disagree show evidence per observation id", "sort_keys": "the sort keys this view's own column headers carry, for --sort", "coverage": "received rows across pages, shown after selection, source_total from the page count, pages fetched, exhaustive false", "continuation": "{start} for the next page, or for the page that failed"}, narrow=["--fields", "--limit", "--out", "--pages 1"])
 def run(ctx, args, target):
     if args.pages < 1:
         raise Failure("invalid_pages", "--pages must be at least 1.", "Use --pages 1 for a single page.")

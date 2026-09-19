@@ -40,12 +40,14 @@ def test_redirect_to_external_host_is_refused_and_internal_redirect_keeps_reques
     client.add("https://finviz.com/api/suggestions?input=Out", "", status=302, headers={"Location": "https://evil.example/x"})
     result = client.one("search", "Out", code=2)
     assert result["error"]["code"] == "unsupported_url"
-    client.add("https://finviz.com/api/suggestions?input=In", "", status=301, headers={"Location": "/api/suggestions?input=IN"})
+    client.add("https://finviz.com/api/suggestions?input=In", "moved along", status=301, headers={"Location": "/api/suggestions?input=IN"})
     client.add("https://finviz.com/api/suggestions?input=IN", [{"ticker": "IN"}])
     result = client.one("search", "In")
     assert result["source"]["url"].endswith("input=IN")
     assert result["source"]["requested_url"].endswith("input=In")
-    assert result["source"]["redirects"] == [{"url": "https://finviz.com/api/suggestions?input=In", "http_status": 301}]
+    hop = result["source"]["redirects"][0]
+    assert hop["url"] == "https://finviz.com/api/suggestions?input=In" and hop["http_status"] == 301
+    assert client.one("read", hop["id"], "--raw")["data"] == "moved along"  # every received response is saved, the chain included
 
 
 def test_selection_filters_fields_and_limits_records_and_rejects_unknown_fields(client):

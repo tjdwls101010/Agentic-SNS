@@ -19,7 +19,7 @@ ENVELOPE = {
     "request": "the arguments the command actually used, after defaults",
     "id": "saved observation ID for read/inspect; every fetched response is saved even when extraction fails",
     "observed_at": "UTC time this CLI received the response; not a market or reporting time",
-    "source": "url, requested_url, http_status and redirects; response headers stay in the store: read ID --pointer /source/headers",
+    "source": "url, requested_url, http_status and redirects, each with the id of the response it returned; response headers stay in the store: read ID --pointer /source/headers",
     "conditions": "only the parameters you chose: {requested, status: confirmed|not_applied|unverified, evidence}; HTTP 200 alone never confirms a condition",
     "coverage": "received = items extracted from this response, shown = items after local selection, source_total = provider claim; exhaustive is false because remote lists change between pages",
     "continuation": "arguments that fetch the next page of the same query; absent when none was found, which does not prove completeness",

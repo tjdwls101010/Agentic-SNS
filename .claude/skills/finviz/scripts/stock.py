@@ -56,7 +56,7 @@ def profile(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("ratings", "Analyst rating actions from the overview page.", {"[]": "rows keyed by the table headers: Date, Action, Analyst, Rating Change, Price Target Change"}, narrow=["--limit", "--filter"])
+@stock_leaf("ratings", "Analyst rating actions from the overview page.", {"list of rating actions": "rows keyed by the table headers: Date, Action, Analyst, Rating Change, Price Target Change"}, narrow=["--limit", "--filter"])
 def ratings(ctx, args, ticker):
     obs, page = stock_page(ctx, ticker, "c")
     table = page.select_one("table.js-table-ratings")
@@ -64,7 +64,7 @@ def ratings(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("news", "Headlines listed on the overview page; each links to its external source.", {"[]": "{time, title, url, source} newest first; time is Finviz's display text and the article body lives at url"}, narrow=["--limit", "--filter"], default_limit=40)
+@stock_leaf("news", "Headlines listed on the overview page; each links to its external source.", {"list of headlines": "{time, title, url, source} newest first; time is Finviz's display text and the article body lives at url"}, narrow=["--limit", "--filter"], default_limit=40)
 def news(ctx, args, ticker):
     obs, page = stock_page(ctx, ticker, "c")
     items = []
@@ -106,7 +106,7 @@ def ownership(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("flows", "ETF fund flows and assets under management by day, as published on the overview page.", {"[]": "{date, aum, flow} oldest first, ending at the most recent day; ETFs only"}, narrow=["--limit"], default_limit=120, recent=True)
+@stock_leaf("flows", "ETF fund flows and assets under management by day, as published on the overview page.", {"list of days": "{date, aum, flow} oldest first, ending at the most recent day; ETFs only"}, narrow=["--limit"], default_limit=120, recent=True)
 def flows(ctx, args, ticker):
     obs, page = stock_page(ctx, ticker, "c")
     if page.select_one("script#route-init-data-fundflows-0") is None:
@@ -157,7 +157,7 @@ def revenue(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("short-interest", "Short interest history with float and average volume.", {"[]": "{ticker, timestamp (epoch), shortInterest, sharesFloat, averageVolume} as published, oldest first and ending at the most recent reading"}, narrow=["--limit"], recent=True)
+@stock_leaf("short-interest", "Short interest history with float and average volume.", {"list of readings": "{ticker, timestamp (epoch), shortInterest, sharesFloat, averageVolume} as published, oldest first and ending at the most recent reading"}, narrow=["--limit"], recent=True)
 def short_interest(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "si")
     obs.result["data"] = init if isinstance(init, list) else []

@@ -1,6 +1,7 @@
 """Read-only Finviz CLI: one JSON document on stdout, diagnostics on stderr. `schema` describes every command from the parser itself."""
 
 import argparse
+import json
 import os
 from pathlib import Path
 import re
@@ -29,7 +30,7 @@ GROUPS = {
     "inspect": "List the JSON pointers inside a saved observation",
 }
 COMMON = [
-    (("--max-chars",), dict(type=int, default=20000, help="Maximum output characters; larger results become a too_large error with narrowing advice, never a truncated document.")),
+    (("--max-chars",), dict(type=int, default=20000, help="Maximum output characters; larger results become a too_large error with narrowing advice, never a truncated document. The default is a safety boundary rather than the working limit: each command's own default range is what keeps a result to one screen, and this catches the cases where that range is still too wide. Raise it when you deliberately want a whole catalogue, chain or page in one document, and the too_large message names the exact size to pass.")),
     (("--filter",), dict(default=None, help="Case-insensitive substring; keeps records whose own values or scalar lists contain it (nested objects such as option lists are not searched).")),
     (("--fields",), dict(default=None, help="Comma-separated record fields to keep; unknown names return the available ones. Where the data is a mapping, these are the fields inside each entry and --keys chooses the entries.")),
     (("--keys",), dict(default=None, help="Comma-separated entries to keep where the data is a mapping, e.g. instruments or series names; unknown names return the available ones.")),
@@ -74,14 +75,15 @@ class Context:
 
     def observe(self, url):
         try:
-            obs = fetch(url, self.args)
+            obs = fetch(url, self.args, keep=self.pending.append)
         except Failure as exc:
             if exc.observation is not None:
                 self.pending.append(exc.observation)
             raise
         self.pending.append(obs)
-        if self.item is not None:
-            obs.result["command"] = self.item.path  # store-only: finalize never prints it, and read uses it to find this leaf's context fields
+        for pending in self.pending:
+            if self.item is not None:
+                pending.result.setdefault("command", self.item.path)  # store-only: finalize never prints it, and read uses it to find this leaf's context fields
         return obs
 
     def flush(self):
@@ -93,7 +95,7 @@ class Context:
 # ---- built-in leaves -------------------------------------------------------------------------------------------------
 
 
-@leaf("search", help="Find security candidates by company name or ticker fragment.", args=[(("query",), dict(help="Company name or ticker fragment."))], output={"[]": "candidates as returned: ticker, company, exchange and any extra source fields"}, narrow=["--limit", "--filter"])
+@leaf("search", help="Find security candidates by company name or ticker fragment.", args=[(("query",), dict(metavar="QUERY", help="Company name or ticker fragment."))], output={"list of candidates": "as returned: ticker, company, exchange and any extra source fields"}, narrow=["--limit", "--filter"])
 def search(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/suggestions?" + urlencode({"input": args.query}))
     obs.result["target"] = args.query
@@ -120,7 +122,7 @@ def doctor(ctx, args, target):
     return result
 
 
-@leaf("read", help="Read a saved observation, or a JSON Pointer inside it, without a new request.", args=[(("id",), dict(help="Observation ID from an earlier result.")), (("--pointer",), dict(default="", help="JSON Pointer into the saved envelope, e.g. /data or /data/rows/0; / or empty is the whole envelope, /source/headers the response headers.")), (("--start",), dict(type=int, default=0, help="Zero-based start among list entries or object keys at the selected pointer; nested collections are not sliced.")), (("--raw",), dict(action="store_true", help="Return the received response text instead of the extracted envelope.")), (("--chars",), dict(default=None, help="Character range START-END of the raw text, e.g. 0-20000 or 20000- for the rest; END is exclusive and continuation names the next window. Needs --raw, because --start and --limit cut containers rather than one string."))], output={"*": "the selected value; source, conditions, coverage and the status of the original observation are repeated so a slice keeps what it was observed with", "selection": "pointer, start, received (list length, key count or raw character count), shown, and context: the data fields this leaf declares a slice cannot be read without"}, narrow=["--pointer", "--start", "--limit", "--chars"])
+@leaf("read", help="Read a saved observation, or a JSON Pointer inside it, without a new request.", args=[(("id",), dict(metavar="ID", help="Observation ID from an earlier result.")), (("--pointer",), dict(default="", help="JSON Pointer into the saved envelope, e.g. /data or /data/rows/0; / or empty is the whole envelope, /source/headers the response headers.")), (("--start",), dict(type=int, default=0, help="Zero-based start among list entries or object keys at the selected pointer; nested collections are not sliced.")), (("--raw",), dict(action="store_true", help="Return the received response text instead of the extracted envelope.")), (("--chars",), dict(default=None, help="Character range START-END of the raw text, e.g. 0-20000 or 20000- for the rest; END is exclusive and continuation names the next window. Needs --raw, because --start and --limit cut containers rather than one string."))], output={"*": "the selected value; source, conditions, coverage and the status of the original observation are repeated so a slice keeps what it was observed with", "selection": "pointer, start, received (list length, key count or raw character count), shown, and context: the data fields this leaf declares a slice cannot be read without"}, narrow=["--pointer", "--start", "--limit", "--chars"])
 def read(ctx, args, target):
     if args.pointer and not args.pointer.startswith("/"):
         raise Failure("invalid_pointer", "A JSON Pointer starts with '/'.", "Use a pointer from inspect, e.g. /data.")
@@ -184,7 +186,7 @@ def char_range(spec, total):
     return start, end
 
 
-@leaf("inspect", help="List pointers, types and sizes inside a saved observation without printing its records.", args=[(("id",), dict(help="Observation ID from an earlier result.")), (("--depth",), dict(type=int, default=4, help="How many levels to descend."))], output={"[]": "{pointer, type, count} for each container; lists show their first item's shape"})
+@leaf("inspect", help="List pointers, types and sizes inside a saved observation without printing its records.", args=[(("id",), dict(metavar="ID", help="Observation ID from an earlier result.")), (("--depth",), dict(type=int, default=4, help="How many levels to descend."))], output={"list of containers": "{pointer, type, count}; lists show their first item's shape"})
 def inspect(ctx, args, target):
     saved = ctx.store.get(args.id)
 
@@ -203,7 +205,7 @@ def inspect(ctx, args, target):
     return result
 
 
-@leaf("schema", help="Describe groups, commands, arguments with defaults, output shapes, statuses and exit codes; offline.", args=[(("scope",), dict(nargs="*", help="Optional GROUP or GROUP LEAF to describe in detail."))], output={"groups": "group -> command -> one-line purpose (unscoped)", "arguments": "name -> {help, default, choices, required} for the scoped command, shared options included", "output": "data key -> meaning for the scoped command", "narrowing": "arguments that reduce output size for the scoped command", "envelope": "meaning of each result field", "statuses": "result statuses", "exit_codes": "process exit code per outcome"})
+@leaf("schema", help="Describe groups, commands, arguments with defaults, output shapes, statuses and exit codes; offline.", args=[(("scope",), dict(nargs="*", metavar="SCOPE", help="Optional GROUP or GROUP LEAF to describe in detail."))], output={"groups": "group -> command -> one-line purpose (unscoped)", "arguments": "name -> {help, default, choices, required} for the scoped command, shared options included", "output": "data key -> meaning for the scoped command", "narrowing": "arguments that reduce output size for the scoped command", "envelope": "meaning of each result field", "statuses": "result statuses", "exit_codes": "process exit code per outcome"})
 def schema(ctx, args, target):
     parser = build_parser()
     scope = args.scope
@@ -232,6 +234,13 @@ class Formatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionH
     pass
 
 
+class Parser(argparse.ArgumentParser):
+    """The module promises one JSON document on stdout; an argument error is one too, with the same code and exit status as any other input error."""
+
+    def error(self, message):
+        raise Failure("invalid_argument", message, "Correct the arguments; " + self.prog + " --help lists them and schema describes their defaults and choices.")
+
+
 def describe_actions(actions):
     described = {}
     for action in actions:
@@ -252,16 +261,16 @@ def leaf_parser(parser, item):
 
 
 def epilog(item):
-    return "Output keys: " + ", ".join(item.output) + ("; --limit defaults to " + str(item.default_limit) + " records here" if item.default_limit else "") + ". Full contract: schema " + item.path + ". Shared options (--fields, --limit, --filter, --max-chars, --store, timeouts) are accepted here too; finviz.py --help explains them."
+    return "Output: " + ", ".join(item.output) + ("; without --limit the " + ("newest " if item.recent else "first ") + str(item.default_limit) + " records are kept and coverage reports the rest" if item.default_limit else "") + ". Full contract: schema " + item.path + ". Shared options (--fields, --keys, --limit, --filter, --max-chars, --store) are accepted here too; finviz.py --help explains them."
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(prog="finviz.py", description="Read public Finviz data. stdout: one JSON document; stderr: diagnostics. `schema [GROUP [LEAF]]` describes every command offline.", formatter_class=Formatter, epilog="Shared options may be written before GROUP or after the command.")
+    parser = Parser(prog="finviz.py", description="Read public Finviz data. stdout: one JSON document; stderr: diagnostics. `schema [GROUP [LEAF]]` describes every command offline.", formatter_class=Formatter, epilog="Shared options may be written before GROUP or after the command.")
     hidden = argparse.ArgumentParser(add_help=False, description="Shared options, accepted after the command as well as before GROUP.")
     for flags, options in COMMON:
         parser.add_argument(*flags, help=options["help"], **without(options, "help"))
         hidden.add_argument(*flags, help=argparse.SUPPRESS, default=argparse.SUPPRESS, **without(options, "help", "default"))
-    groups = parser.add_subparsers(dest="group", metavar="GROUP", required=True)
+    groups = parser.add_subparsers(dest="group", metavar="GROUP", parser_class=Parser, required=True)
     by_group = {}
     for item in LEAVES:
         by_group.setdefault(item.group, []).append(item)
@@ -272,7 +281,7 @@ def build_parser():
                 sub.add_argument(*flags, help=options["help"], **without(options, "help"))
             continue
         group = groups.add_parser(name, help=GROUPS[name], description=GROUPS[name] + ".", formatter_class=Formatter)
-        leaves = group.add_subparsers(dest="leaf", metavar="LEAF", required=True)
+        leaves = group.add_subparsers(dest="leaf", metavar="LEAF", parser_class=Parser, required=True)
         for item in items:
             sub = leaves.add_parser(item.name, help=item.help, description=item.help, parents=[hidden], formatter_class=Formatter, epilog=epilog(item))
             for flags, options in item.args:
@@ -303,10 +312,14 @@ def load_modules():
 def main(argv=None):
     load_modules()
     parser = build_parser()
-    args = parser.parse_args(argv)
-    item = find_leaf(args)
-    if args.max_chars <= 0 or args.timeout <= 0 or args.connect_timeout <= 0 or args.max_bytes <= 0 or (args.limit is not None and args.limit < 0):
-        parser.error("limits must be positive")
+    try:
+        args = parser.parse_args(argv)
+        item = find_leaf(args)
+        if args.max_chars <= 0 or args.timeout <= 0 or args.connect_timeout <= 0 or args.max_bytes <= 0 or (args.limit is not None and args.limit < 0):
+            parser.error("limits must be positive")
+    except Failure as exc:
+        print(json.dumps({"status": "error", "results": [{"target": " ".join(argv if argv is not None else sys.argv[1:]), "status": "error", "error": exc.info()}]}, ensure_ascii=False, separators=(",", ":")))
+        return output.EXIT_CODES["invalid"]
     try:
         store = Store(args.store)
     except (OSError, sqlite3.Error) as exc:

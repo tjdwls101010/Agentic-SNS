@@ -34,7 +34,7 @@ def options(ctx, args, target):
     return obs.result
 
 
-@leaf("groups", "table", help="Group table for a view: overview, valuation, performance, financial or custom; rows keep source strings.", args=[GROUP_ARG, (("--view",), dict(default="overview", choices=list(GROUP_VIEWS), help="Table view.")), (("--sort",), dict(default=None, help="Sort key from groups options; write --sort=-marketcap for descending."))], output={"[]": "rows keyed by the table headers plus filter, the screener filter value that selects the group's stocks", "conditions": "group and sort as confirmed by the page controls"}, narrow=["--fields", "--filter", "--limit"])
+@leaf("groups", "table", help="Group table for a view: overview, valuation, performance, financial or custom; rows keep source strings.", args=[GROUP_ARG, (("--view",), dict(default="overview", choices=list(GROUP_VIEWS), help="Table view.")), (("--sort",), dict(default=None, help="Sort key from groups options; write --sort=-marketcap for descending."))], output={"list of groups": "rows keyed by the table headers plus filter, the screener filter value that selects the group's stocks", "conditions": "group and sort as confirmed by the page controls"}, narrow=["--fields", "--filter", "--limit"])
 def table(ctx, args, target):
     query = dict(group_query(args.group_key), v=GROUP_VIEWS[args.view], o=args.sort)
     obs = ctx.observe("https://finviz.com/groups?" + urlencode({k: v for k, v in query.items() if v is not None}))
@@ -56,7 +56,7 @@ def table(ctx, args, target):
     return obs.result
 
 
-@leaf("groups", "performance", help="Performance of every group over all standard periods from Finviz's groups API.", args=[GROUP_ARG], output={"[]": "{ticker, label, screenerUrl, perfT, perfW, perfM, perfQ, perfH, perfY, perfYtd} per group; percentages as published"}, narrow=["--filter", "--fields", "--limit"])
+@leaf("groups", "performance", help="Performance of every group over all standard periods from Finviz's groups API.", args=[GROUP_ARG], output={"list of groups": "{ticker, label, screenerUrl, perfT, perfW, perfM, perfQ, perfH, perfY, perfYtd} per group; percentages as published"}, narrow=["--filter", "--fields", "--limit"])
 def performance(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/groups_perf?" + urlencode({k: v for k, v in group_query(args.group_key).items() if v is not None}))
     records = obs.json()
@@ -66,13 +66,13 @@ def performance(ctx, args, target):
     return obs.result
 
 
-KIND = (("kind",), dict(choices=["futures", "forex", "crypto"], help="Market surface."))
+KIND = (("kind",), dict(metavar="KIND", choices=["futures", "forex", "crypto"], help="Market surface: futures, forex or crypto."))
 
 
 SPARKLINE = ("sparkline", "sparklineDateChanges")
 
 
-@leaf("market", "quotes", help="Current quotes for every futures, forex or crypto instrument Finviz lists.", args=[KIND, (("--timeframe",), dict(default="d", help="Source timeframe for the change fields, e.g. d, w, m.")), (("--sparkline",), dict(action="store_true", help="Keep each instrument's intraday sparkline points, which are about nine tenths of the response; the saved observation keeps them either way."))], output={"{}": "ticker -> quote as published, including extra source fields; the sparkline point arrays are left out unless --sparkline asks for them; --fields selects ticker keys, --filter matches keys or quote values, --limit counts instruments"}, keyed=True, narrow=["--filter", "--keys", "--fields", "--limit"])
+@leaf("market", "quotes", help="Current quotes for every futures, forex or crypto instrument Finviz lists.", args=[KIND, (("--timeframe",), dict(default="d", help="Source timeframe for the change fields, e.g. d, w, m.")), (("--sparkline",), dict(action="store_true", help="Keep each instrument's intraday sparkline points, which are about nine tenths of the response; the saved observation keeps them either way."))], output={"mapping of ticker to quote": "the quote as published, including extra source fields; the sparkline point arrays are left out unless --sparkline asks for them; --fields selects ticker keys, --filter matches keys or quote values, --limit counts instruments"}, keyed=True, narrow=["--filter", "--keys", "--fields", "--limit"])
 def quotes(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/" + args.kind + "_all?" + urlencode({"timeframe": args.timeframe}))
     source = obs.json()
@@ -83,7 +83,7 @@ def quotes(ctx, args, target):
     return obs.result
 
 
-@leaf("market", "performance", help="Period performance per instrument for futures, forex or crypto.", args=[KIND], output={"{}": "instrument -> performance value as published; --keys chooses instruments"}, keyed=True, narrow=["--keys", "--filter"])
+@leaf("market", "performance", help="Period performance per instrument for futures, forex or crypto.", args=[KIND], output={"mapping of instrument to performance": "the value as published; --keys chooses instruments"}, keyed=True, narrow=["--keys", "--filter"])
 def market_performance(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/" + args.kind + "_perf")
     obs.result["target"], obs.result["data"] = args.kind, obs.json()
@@ -171,7 +171,7 @@ AXES = ["PB", "PC", "PE", "PEG", "PFCF", "PS", "averageVolume", "beta", "curRati
 AXIS_HELP = " axis; the accepted fields are listed under choices in schema market bubbles."
 
 
-@leaf("market", "bubbles", help="Bubble chart data: one record per stock with the chosen x, y, size and color fields.", args=[(("--x",), dict(default="sector", choices=AXES, metavar="FIELD", help="X" + AXIS_HELP)), (("--y",), dict(default="lastChange", choices=AXES, metavar="FIELD", help="Y" + AXIS_HELP)), (("--size",), dict(default="marketCap", choices=AXES, metavar="FIELD", help="Size" + AXIS_HELP)), (("--color",), dict(default="sector", choices=AXES, metavar="FIELD", help="Colour" + AXIS_HELP)), (("--index",), dict(default="dji", choices=["dji", "ndx", "sp500", "rut", "sec_all"], help="Stock universe: dji 30 names, ndx 100, sp500 500, rut 2000, sec_all every listed stock. The source does not refuse an unknown name, it silently answers with every stock, so the choices are closed here. Universes above ndx need --limit, --fields or read slices to stay inside --max-chars."))], output={"[]": "{ticker, company, x, y, size, color, isETF} as published"}, narrow=["--filter", "--fields", "--limit"])
+@leaf("market", "bubbles", help="Bubble chart data: one record per stock with the chosen x, y, size and color fields.", args=[(("--x",), dict(default="sector", choices=AXES, metavar="FIELD", help="X" + AXIS_HELP)), (("--y",), dict(default="lastChange", choices=AXES, metavar="FIELD", help="Y" + AXIS_HELP)), (("--size",), dict(default="marketCap", choices=AXES, metavar="FIELD", help="Size" + AXIS_HELP)), (("--color",), dict(default="sector", choices=AXES, metavar="FIELD", help="Colour" + AXIS_HELP)), (("--index",), dict(default="dji", choices=["dji", "ndx", "sp500", "rut", "sec_all"], help="Stock universe: dji 30 names, ndx 100, sp500 500, rut 2000, sec_all every listed stock. The source does not refuse an unknown name, it silently answers with every stock, so the choices are closed here. Universes above ndx need --limit, --fields or read slices to stay inside --max-chars."))], output={"list of stocks": "{ticker, company, x, y, size, color, isETF} as published"}, narrow=["--filter", "--fields", "--limit"])
 def bubbles(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/bubbles?" + urlencode({"x": args.x, "y": args.y, "size": args.size, "color": args.color, "idx": args.index}))
     obs.result["conditions"] = {key: condition(getattr(args, key)) for key in ("x", "y", "size", "color", "index")}
