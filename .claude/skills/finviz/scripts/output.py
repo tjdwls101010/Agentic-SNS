@@ -2,6 +2,7 @@
 
 import json
 import re
+import shlex
 import sys
 
 from transport import Failure, now
@@ -238,7 +239,8 @@ def too_large_fix(results, leaf, size, max_chars, args=None):
         if smaller >= shown:
             # 성진: 더 줄일 수 없는데 같은 --limit을 다시 권하면 회복이 제자리를 돈다; 한 항목이 예산보다 큰 경우의 길은 원자료 창이다.
             return head + "One entry at " + here + " is already larger than the budget, so read the response text in windows with read " + str(getattr(args, "id", "")) + " --raw --chars 0-" + str(max(1, int(max_chars * 0.8))) + ", or rerun with --max-chars " + str(size) + "."
-        kept = ("".join(" --filter " + repr(args.filter) if args.filter else "") + ("".join(" --keys " + args.keys) if getattr(args, "keys", None) else "") + ("".join(" --fields " + args.fields) if args.fields else ""))
+        # 성진: 값에 공백이 있으면(예: 열 이름 "Market Cap") 인용하지 않은 복구 명령은 그대로 실행했을 때 파서가 거절한다.
+        kept = "".join(" " + flag + " " + shlex.quote(value) for flag, value in (("--filter", args.filter), ("--keys", getattr(args, "keys", None)), ("--fields", args.fields)) if value)
         return head + "Read a smaller slice of the same selection: read " + str(getattr(args, "id", "")) + " --pointer " + here + kept + " --start " + str(selection.get("start", 0)) + " --limit " + str(smaller) + ". Or rerun with --max-chars " + str(size) + "."
     if getattr(args, "from_id", None):
         # 성진: --from은 남의 관측을 읽은 것이라 그 id에는 이 절이 없다; 그 id로 읽으라고 하면 다른 절이 성공적으로 나온다.

@@ -193,7 +193,7 @@ def test_a_read_recovery_keeps_the_selection_it_was_recovering_from(client):
     client.add("https://finviz.com/api/suggestions?input=A", source)
     saved = client.one("search", "A")["id"]
     error = client.run("--max-chars", "1000", "read", saved, "--pointer", "/data", "--filter", "Trump", code=9)["results"][0]["error"]
-    assert "--filter 'Trump'" in error["fix"], error["fix"]  # quoted, because a filter can hold spaces
+    assert "--filter Trump" in error["fix"], error["fix"]
     command = shlex.split(error["fix"].split("read ")[1].split(". Or rerun")[0])
     recovered = client.one("read", *command)
     assert recovered["data"] and all("Trump" in row["note"] for row in recovered["data"])
@@ -207,3 +207,28 @@ def test_the_smallest_error_document_does_not_offer_an_id_it_does_not_have(clien
     assert "results" in doc and doc["results"][0]["status"] == "error"
     assert "id" not in doc["results"][0] or doc["results"][0]["id"]
     assert "saved id" not in doc["results"][0]["error"]["fix"]
+
+
+def test_a_recovery_command_survives_being_tokenised(client):
+    """A field name with a space made the fix's own command unparseable when run as written."""
+    source = [{"Market Cap": "4827.02B", "Ticker": "T%d" % n, "note": "x" * 300} for n in range(40)]
+    client.add("https://finviz.com/api/suggestions?input=A", source)
+    saved = client.one("search", "A")["id"]
+    error = client.run("--max-chars", "1000", "read", saved, "--pointer", "/data", "--fields", "Ticker,Market Cap", code=9)["results"][0]["error"]
+    command = shlex.split(error["fix"].split("read ")[1].split(". Or rerun")[0])
+    recovered = client.one("read", *command)
+    assert recovered["status"] == "ok" and "Market Cap" in recovered["data"][0]
+
+
+def test_coverage_keeps_the_units_of_the_data_it_counts(client):
+    """The envelope's key count is not a row count: reporting it as coverage put two units in one object."""
+    source = [{"ticker": "T%d" % n} for n in range(40)]
+    client.add("https://finviz.com/api/suggestions?input=A", source)
+    saved = client.one("search", "A")["id"]
+    whole = client.one("read", saved)
+    assert "coverage" not in whole  # the observation recorded none, and the envelope's key count is not one
+    assert whole["selection"]["received"] == len(whole["data"])  # that count is the selection's business
+    rows = client.one("read", saved, "--pointer", "/data", "--limit", "1")
+    assert rows["coverage"] == {"received": 40, "shown": 1}
+    meta = client.one("read", saved, "--pointer", "/source")
+    assert "coverage" not in meta and meta["selection"]["received"] == len(meta["data"])

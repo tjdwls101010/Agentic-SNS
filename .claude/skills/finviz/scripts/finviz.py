@@ -195,7 +195,9 @@ def read(ctx, args, target):
         value = output.select({"data": value, "coverage": result.get("coverage")}, args, item)["data"]
     if isinstance(value, (list, dict)):
         selection["shown"] = len(value)
-        result["coverage"] = dict(result.get("coverage") or {}, received=selection["received"], shown=len(value))
+        if pointer.startswith("/data"):
+            # 성진: 봉투 키나 메타데이터의 개수는 coverage가 세는 단위(행·항목)가 아니다; 그 수는 selection이 이미 말한다.
+            result["coverage"] = dict(result.get("coverage") or {}, received=selection["received"], shown=len(value))
     if pointer.startswith("/data/") and isinstance(saved.get("data"), dict):
         origin = next((item for item in LEAVES if item.path == saved.get("command")), None)
         carried = {f: saved["data"][f] for f in (origin.context if origin else ()) if f in saved["data"] and pointer != "/data/" + f}
