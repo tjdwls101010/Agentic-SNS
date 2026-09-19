@@ -409,3 +409,12 @@ def test_open_preserves_article_headers_and_content_links_like_the_article_reade
     assert opened["article"]["title"] == "Fed Decision Preview"
     assert opened["article"]["paragraphs"] == ["By Reporter", "First paragraph."]
     assert opened["links"] == [{"text": "Mentioned screener", "url": "https://finviz.com/screener"}]
+
+
+def test_reading_a_mapping_chooses_entries_before_counting_them(client):
+    quotes = {"6A": {"label": "AUD", "last": 0.71}, "6B": {"label": "GBP", "last": 1.3}, "ES": {"label": "S&P", "last": 6600.0}}
+    client.add("https://finviz.com/api/futures_all?timeframe=d", quotes)
+    saved = client.one("market", "quotes", "futures")["id"]
+    picked = client.one("read", saved, "--pointer", "/data", "--keys", "6B", "--fields", "label", "--limit", "1")
+    assert picked["data"] == {"6B": {"label": "GBP"}} and picked["selection"]["shown"] == 1
+    assert client.one("read", saved, "--pointer", "/data", "--filter", "NEVER_MATCH", code=7)["data"] == {}

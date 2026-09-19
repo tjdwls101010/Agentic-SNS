@@ -20,7 +20,7 @@ SORT_ARG = (("--sort",), dict(default=None, help="Source sort key, e.g. earnings
 # 성진: 한 calendar() 함수가 네 리프를 맡는 것은 구현의 편의이고, 그 편의를 모델의 선택지로 청구하지 않는다 — 리프는 자기가 받는 인자만 광고한다.
 CALENDAR_ARGS = {"earnings": [DATE_ARG, PAGE_ARG, SORT_ARG], "dividends": [DATE_ARG, PAGE_ARG, SORT_ARG], "economic": [DATE_ARG, SORT_ARG], "season": []}
 CALENDAR_HELP = {"earnings": "Earnings calendar: report dates with EPS and sales estimates, actuals and surprises.", "dividends": "Dividend calendar: ex-dates with ordinary and special amounts and yields.", "economic": "Economic calendar: events with actual, previous and forecast values.", "season": "Earnings season preview: upcoming report counts per day with estimates."}
-CALENDAR_OUTPUT = {"date_from": "the start date the source states it used; null when the response states none, as the paging API does", "items": "source records: earnings carry epsEstimate/epsActual/salesEstimate and isEarningDateEstimate; dividends carry exdate, ordinary, special, yield; economic carry event, actual, previous, forecast; season carries date and estimates", "totals_per_day": "season only: report counts per day"}
+CALENDAR_OUTPUT = {"date_from": "the start date the source states it used; null when the response states none, as the paging API does", "items": "source records: earnings carry epsEstimate/epsActual/salesEstimate and isEarningDateEstimate; dividends carry exdate, ordinary, special, yield; economic carry event, actual, previous, forecast; season carries date and estimates", "totals_per_day": "season only: report counts per day, over the source's whole preview; --limit narrows items and leaves this summary as the source stated it"}
 
 
 def calendar_leaf(kind):

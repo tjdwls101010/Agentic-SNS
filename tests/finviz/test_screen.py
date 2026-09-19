@@ -237,3 +237,11 @@ def test_aggregate_keeps_unselected_rows_even_when_export_selection_is_empty(cli
     assert [row["ticker"] for row in saved["data"]] == ["AAPL", "MSFT", "GOOG"]
     assert saved["data"][2]["Market Cap"] == "2T"
     assert json.loads(client.one("read", result["id"], "--raw")["data"]) == saved
+
+
+def test_a_single_page_screen_that_returned_nothing_is_stored_as_empty(client):
+    from pages import screener_table
+    client.add("https://finviz.com/screener?v=111&ft=4&r=1", screener_table([], total=0, page_values=(1,)))
+    result = client.one("screen", "run", code=7)
+    assert result["status"] == "empty"
+    assert client.one("read", result["id"], code=7)["data"]["status"] == "empty"

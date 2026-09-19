@@ -7,6 +7,7 @@ import sys
 from transport import Failure, now
 
 INPUT_CODES = {"export_exists", "missing_curl", "redirect_limit"}
+SMALLEST_DOCUMENT = 200  # measured: the shortest JSON document that still carries a code, a message and how to recover is ~155 characters
 DIAGNOSTIC_DATA = {"array_alignment"}  # the refused payload is the diagnosis here: the arrays that did not line up
 EXIT_CODES = {"ok": 0, "invalid": 2, "access_restricted": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}
 STATUSES = {
@@ -176,8 +177,8 @@ def settle_empty(result, leaf):
     that observation reported success. A result the model filtered to nothing is a different thing and stays a
     property of the printed result, not of the observation.
     """
-    if result.get("status") != "ok":
-        return result
+    if result.get("status") != "ok" or result.get("data") is None:
+        return result  # a response nothing was extracted from, such as a redirect hop, is not an empty extraction
     records = records_at(result.get("data"), leaf.records)
     if is_empty(result.get("data")) or (leaf.records and isinstance(records, (list, dict)) and not records):
         result["status"] = "empty"
@@ -237,7 +238,8 @@ def too_large_fix(results, leaf, size, max_chars, args=None):
         if smaller >= shown:
             # 성진: 더 줄일 수 없는데 같은 --limit을 다시 권하면 회복이 제자리를 돈다; 한 항목이 예산보다 큰 경우의 길은 원자료 창이다.
             return head + "One entry at " + here + " is already larger than the budget, so read the response text in windows with read " + str(getattr(args, "id", "")) + " --raw --chars 0-" + str(max(1, int(max_chars * 0.8))) + ", or rerun with --max-chars " + str(size) + "."
-        return head + "Read a smaller slice of the same pointer: read " + str(getattr(args, "id", "")) + " --pointer " + here + " --start " + str(selection.get("start", 0)) + " --limit " + str(smaller) + ". Or rerun with --max-chars " + str(size) + "."
+        kept = ("".join(" --filter " + repr(args.filter) if args.filter else "") + ("".join(" --keys " + args.keys) if getattr(args, "keys", None) else "") + ("".join(" --fields " + args.fields) if args.fields else ""))
+        return head + "Read a smaller slice of the same selection: read " + str(getattr(args, "id", "")) + " --pointer " + here + kept + " --start " + str(selection.get("start", 0)) + " --limit " + str(smaller) + ". Or rerun with --max-chars " + str(size) + "."
     if getattr(args, "from_id", None):
         # 성진: --from은 남의 관측을 읽은 것이라 그 id에는 이 절이 없다; 그 id로 읽으라고 하면 다른 절이 성공적으로 나온다.
         return "Result needs " + str(size) + " characters; limit is " + str(max_chars) + ". Narrow with " + narrow + ", or rerun without --from so this section is observed and saved under its own id. Or rerun with --max-chars " + str(size) + "."
@@ -279,7 +281,9 @@ def too_large_document(results, error, max_chars):
             return text
     # 성진: 가장 짧은 형태에도 복구에 필요한 둘은 남긴다 — 저장된 id와 통과할 수 있는 크기.
     size = re.search(r"--max-chars (\d+)", error["fix"])
-    smallest = [{"id": results[0].get("id"), "status": "error", "error": error_info(error["code"], error["message"], "Rerun with --max-chars " + size[1] + ", or read the saved id." if size else "Raise --max-chars.")}]
+    ident = results[0].get("id")
+    advice = "Rerun with --max-chars " + size[1] + "." if size else "Raise --max-chars."
+    smallest = [{k: v for k, v in {"id": ident, "status": "error", "error": error_info(error["code"], error["message"], advice)}.items() if v is not None}]
     for attempt in ([rows[0]] if len(results) == 1 else [dropped], smallest):
         text = json.dumps({"status": "error", "results": attempt}, ensure_ascii=False, separators=(",", ":"))
         if len(text) <= max_chars:

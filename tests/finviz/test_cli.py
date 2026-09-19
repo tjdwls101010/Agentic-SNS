@@ -1,3 +1,4 @@
+import shlex
 import json
 import re
 
@@ -172,3 +173,37 @@ def test_reading_an_empty_saved_response_is_empty_not_an_argument_error(client):
     client.add("https://finviz.com/api/suggestions?input=A", "", status=429, headers={"Retry-After": "5"})
     failed = client.one("search", "A", code=5)
     assert client.one("read", failed["id"], "--raw", code=7)["data"] == ""
+
+
+def test_a_read_reports_how_much_it_actually_returned(client):
+    """coverage.shown said 40 while the slice held one row, because read skipped the step that updates it."""
+    source = [{"ticker": "T%d" % n, "note": "keep" if n < 3 else "drop"} for n in range(40)]
+    client.add("https://finviz.com/api/suggestions?input=A", source)
+    saved = client.one("search", "A")["id"]
+    one = client.one("read", saved, "--pointer", "/data", "--limit", "1")
+    assert len(one["data"]) == 1 and one["selection"]["shown"] == 1
+    assert one["coverage"]["shown"] == 1 and one["coverage"]["received"] == 40
+    none = client.one("read", saved, "--pointer", "/data", "--filter", "NEVER_MATCH_THIS", code=7)
+    assert none["data"] == [] and none["coverage"]["shown"] == 0
+
+
+def test_a_read_recovery_keeps_the_selection_it_was_recovering_from(client):
+    """Dropping --filter from the fix returns the first rows instead of the matches the model asked for."""
+    source = [{"ticker": "T%d" % n, "note": ("Trump" if n % 10 == 0 else "other") + "x" * 400} for n in range(40)]
+    client.add("https://finviz.com/api/suggestions?input=A", source)
+    saved = client.one("search", "A")["id"]
+    error = client.run("--max-chars", "1000", "read", saved, "--pointer", "/data", "--filter", "Trump", code=9)["results"][0]["error"]
+    assert "--filter 'Trump'" in error["fix"], error["fix"]  # quoted, because a filter can hold spaces
+    command = shlex.split(error["fix"].split("read ")[1].split(". Or rerun")[0])
+    recovered = client.one("read", *command)
+    assert recovered["data"] and all("Trump" in row["note"] for row in recovered["data"])
+
+
+def test_the_smallest_error_document_does_not_offer_an_id_it_does_not_have(client):
+    refused = client.one("--max-chars", "120", "schema", code=2)  # a budget no error document fits is refused where it is given
+    assert refused["error"]["code"] == "invalid_argument" and "200" in refused["error"]["message"]
+    doc = client.run("--max-chars", "200", "schema", code=9)
+    assert len(json.dumps(doc, separators=(",", ":"))) <= 200
+    assert "results" in doc and doc["results"][0]["status"] == "error"
+    assert "id" not in doc["results"][0] or doc["results"][0]["id"]
+    assert "saved id" not in doc["results"][0]["error"]["fix"]
