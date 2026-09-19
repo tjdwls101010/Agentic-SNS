@@ -126,6 +126,16 @@ def table_with_header(page, header):
     return None
 
 
+def sort_keys(table):
+    """Column label -> the source sort key its header link carries; static headers have none and are left out."""
+    found = {}
+    for header in table.select("th[onclick]"):
+        key = query_param("https://finviz.com/" + header["onclick"].split("'")[1], "o") if "'" in header.get("onclick", "") else None
+        if key:
+            found[text(header)] = key.lstrip("-")
+    return found
+
+
 def sort_condition(requested, page, controls):
     """Confirm a sort key from the selected header (its toggle link names the key; a leading - means it is currently ascending) or the order control."""
     key = requested.lstrip("-")

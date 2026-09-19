@@ -96,7 +96,7 @@ RUN_ARGS = [
 ]
 
 
-@leaf("screen", "run", help="Run the screener with filters, a signal, a view or custom columns, sorting and paging; rows keep source strings.", args=RUN_ARGS, output={"id": "when --pages > 1, a saved aggregate of all received rows before selection or export; source.pages lists independent page IDs; read ID --raw returns the aggregate JSON, while page IDs return source HTML", "[]": "one record per row keyed by the column headers, plus ticker and url (and observation_id when more than one page or --out); with --out the data is {path, rows_written, pages} instead", "conditions": "filters, signal, columns, sort and start as confirmed by each page's own controls; pages that disagree show evidence per observation id", "coverage": "received rows across pages, shown after selection, source_total from the page count, pages fetched, exhaustive false", "continuation": "{start} for the next page, or for the page that failed"}, narrow=["--fields", "--limit", "--out", "--pages 1"])
+@leaf("screen", "run", help="Run the screener with filters, a signal, a view or custom columns, sorting and paging; rows keep source strings.", args=RUN_ARGS, output={"id": "when --pages > 1, a saved aggregate of all received rows before selection or export; source.pages lists independent page IDs; read ID --raw returns the aggregate JSON, while page IDs return source HTML", "[]": "one record per row keyed by the column headers, plus ticker and url (and observation_id when more than one page or --out); with --out the data is {path, rows_written, pages} instead", "conditions": "filters, signal, columns, sort and start as confirmed by each page's own controls; pages that disagree show evidence per observation id", "sort_keys": "the sort keys this view's own column headers carry, for --sort", "coverage": "received rows across pages, shown after selection, source_total from the page count, pages fetched, exhaustive false", "continuation": "{start} for the next page, or for the page that failed"}, narrow=["--fields", "--limit", "--out", "--pages 1"])
 def run(ctx, args, target):
     if args.pages < 1:
         raise Failure("invalid_pages", "--pages must be at least 1.", "Use --pages 1 for a single page.")
@@ -133,6 +133,7 @@ def run(ctx, args, target):
     result["conditions"] = merge_conditions(pages)
     result["coverage"] = {"received": total, "shown": len(selected), "source_total": pages[-1].result["coverage"]["source_total"], "exhaustive": False, "pages": len(pages)}
     result["warnings"] = list(dict.fromkeys(w for obs in pages for w in obs.result.get("warnings", [])))
+    result["sort_keys"] = pages[0].result.get("sort_keys") or {}
     if start is not None:
         result["continuation"] = {"start": start}
     if failure is not None:
@@ -192,6 +193,7 @@ def page_records(page, obs):
     table = page.select_one("table.screener_table")
     if table is None:
         raise obs.fail("structure_changed", "No screener table was found.", "Read the saved raw page with read ID --raw; the view may not be a table view.")
+    obs.result["sort_keys"] = markup.sort_keys(table)
     return markup.table_records(table, obs.url)
 
 

@@ -23,6 +23,7 @@ ENVELOPE = {
     "conditions": "only the parameters you chose: {requested, status: confirmed|not_applied|unverified, evidence}; HTTP 200 alone never confirms a condition",
     "coverage": "received = items extracted from this response, shown = items after local selection, source_total = provider claim; exhaustive is false because remote lists change between pages",
     "continuation": "arguments that fetch the next page of the same query; absent when none was found, which does not prove completeness",
+    "sort_keys": "column label -> the sort key --sort accepts for it, read from this page's own header links; write -key for descending. Columns the source does not sort are absent",
     "data": "the command's documented shape; source strings keep their units and signs, JSON API values are native, missing values are null",
     "warnings": "limitations that affect how the data can be used",
     "error": "{code, message, fix}",
@@ -150,7 +151,7 @@ def finalize(result, args, leaf, request):
     if result["status"] == "error" and result.get("error", {}).get("code") not in DIAGNOSTIC_DATA:
         # 성진: 오류 결과가 만들지 못했다고 말한 페이로드를 실으면 그 문서가 예산을 넘어 진단이 too_large에 가려진다. array_alignment만 원본 배열을 진단용으로 남긴다.
         result.pop("data", None)
-    ordered = ["target", "request", "id", "observed_at", "source", "conditions", "coverage", "continuation", "selection", "status", "data", "warnings", "error"]
+    ordered = ["target", "request", "id", "observed_at", "source", "conditions", "coverage", "continuation", "sort_keys", "selection", "status", "data", "warnings", "error"]
     return {k: result[k] for k in ordered if k in result and result[k] not in (None, {}, [])} | ({"data": result.get("data")} if result["status"] != "error" else {})
 
 

@@ -89,6 +89,16 @@ def test_run_resolves_column_ids_through_the_catalog_and_confirms_selected_colum
     assert client.one("screen", "run", "--columns", "ticker,nope", code=2)["error"]["code"] == "invalid_columns"
 
 
+def test_a_sortable_table_publishes_the_keys_its_own_headers_carry(client):
+    """--sort wants a key from the column header links, and nothing in a normal result showed one."""
+    client.add("https://finviz.com/screener?v=111&ft=4&r=1", screener_table(ROWS))
+    result = client.one("screen", "run")
+    assert result["sort_keys"] == {"No.": "no.", "Ticker": "ticker", "Company": "company", "Market Cap": "marketcap"}
+    client.add("https://finviz.com/screener?v=111&ft=4&o=-marketcap&r=1", screener_table(ROWS, sort=("marketcap", "descending")))
+    followed = client.one("screen", "run", "--sort=-" + result["sort_keys"]["Market Cap"])
+    assert followed["conditions"]["sort"]["status"] == "confirmed"
+
+
 def test_run_confirms_signal_and_sort_from_page_controls(client):
     client.add("https://finviz.com/screener?v=111&ft=4&s=ta_topgainers&o=-marketcap&r=1", screener_table(ROWS, signal="ta_topgainers", sort=("marketcap", "descending")))
     result = client.one("screen", "run", "--signal", "ta_topgainers", "--sort=-marketcap")

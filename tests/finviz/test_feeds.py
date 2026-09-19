@@ -236,8 +236,19 @@ def test_insider_trades_keep_ticker_owner_and_filing_links_and_confirm_the_trans
     assert row["Ticker"] == "ENLT" and row["ticker"] == "ENLT" and row["Owner"] == "Paz Amit" and row["Transaction"] == "Sale"
     assert row["owner_url"] == "https://finviz.com/insidertrading?oc=2108367&tc=7&b=2" and row["filing_url"] == "http://www.sec.gov/Archives/edgar/data/1/x.xml"
     assert result["conditions"]["transaction"] == {"requested": "sale", "status": "confirmed", "evidence": "Sale Transactions"}
+    assert result["sort_keys"] == {"Ticker": "ticker"}
     client.add("https://finviz.com/insidertrading?tc=7&oc=2108367", insiders_page())
     assert client.one("insiders", "trades", "--owner", "2108367")["conditions"]["owner"]["status"] == "unverified"
+
+
+def test_bubble_axes_are_a_closed_set_the_source_validates(client):
+    """An axis the API does not accept is answered with HTTP 400, so a guess costs a request; the parser refuses it first."""
+    refused = client.raw("market", "bubbles", "--x", "industry", code=2)
+    assert refused.stdout == "" or "invalid choice" in refused.stdout
+    assert "invalid choice" in refused.stderr and "marketCap" in refused.stderr
+    rows = [{"ticker": "AAPL", "x": 1.0, "y": 2.0, "size": 3.0, "color": "Technology"}]
+    client.add("https://finviz.com/api/bubbles?x=PE&y=perfYtd&size=marketCap&color=sector&idx=dji", rows)
+    assert client.one("market", "bubbles", "--x", "PE", "--y", "perfYtd")["data"] == rows
 
 
 def test_open_reads_any_supported_finviz_url_generically_and_refuses_others(client):
@@ -303,9 +314,9 @@ def test_map_and_bubbles_report_selectors_without_inventing_confirmation(client)
     result = client.one("market", "map", "--type", "geo")
     assert result["conditions"]["type"] == {"requested": "geo", "status": "unverified", "evidence": None}
     rows = [{"ticker": "RY", "x": 1.2, "y": 6, "size": 40, "color": 3, "futureField": "source"}]
-    client.add("https://finviz.com/api/bubbles?x=pe&y=volume&size=price&color=change&idx=dji", rows)
-    result = client.one("market", "bubbles", "--x", "pe", "--y", "volume", "--size", "price", "--color", "change", "--index", "dji")
-    assert result["conditions"] == {key: {"requested": value, "status": "unverified", "evidence": None} for key, value in {"x": "pe", "y": "volume", "size": "price", "color": "change", "index": "dji"}.items()}
+    client.add("https://finviz.com/api/bubbles?x=PE&y=perf52w&size=sales&color=sector&idx=ndx", rows)
+    result = client.one("market", "bubbles", "--x", "PE", "--y", "perf52w", "--size", "sales", "--color", "sector", "--index", "ndx")
+    assert result["conditions"] == {key: {"requested": value, "status": "unverified", "evidence": None} for key, value in {"x": "PE", "y": "perf52w", "size": "sales", "color": "sector", "index": "ndx"}.items()}
     saved = client.one("read", result["id"], "--pointer", "/data", "--limit", "1")
     assert saved["conditions"] == result["conditions"] and saved["data"] == rows
 

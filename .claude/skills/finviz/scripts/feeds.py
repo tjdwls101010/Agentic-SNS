@@ -184,7 +184,7 @@ def article(ctx, args, target):
 TRANSACTIONS = {"all": "7", "buy": "1", "sale": "2"}
 
 
-@leaf("insiders", "trades", help="Latest insider trades across the market, with owner pages and SEC Form 4 links.", args=[(("--transaction",), dict(default="all", choices=list(TRANSACTIONS), help="Transaction type.")), (("--owner",), dict(default=None, help="Owner id from a row's owner_url to list one insider's trades.")), (("--sort",), dict(default=None, help="Source sort key from the column header links, e.g. -transactiondate.")), (("--value",), dict(default=None, help="Source transaction-value threshold parameter."))], output={"[]": "rows keyed by the table headers plus ticker, url (stock page), owner_url and filing_url, newest first"}, narrow=["--filter", "--fields", "--limit"], default_limit=20)
+@leaf("insiders", "trades", help="Latest insider trades across the market, with owner pages and SEC Form 4 links.", args=[(("--transaction",), dict(default="all", choices=list(TRANSACTIONS), help="Transaction type.")), (("--owner",), dict(default=None, help="Owner id from a row's owner_url to list one insider's trades.")), (("--sort",), dict(default=None, help="Source sort key; every result lists the keys this table's headers carry under sort_keys, and a leading - sorts descending.")), (("--value",), dict(default=None, help="Source transaction-value threshold parameter."))], output={"[]": "rows keyed by the table headers plus ticker, url (stock page), owner_url and filing_url, newest first"}, narrow=["--filter", "--fields", "--limit"], default_limit=20)
 def trades(ctx, args, target):
     query = {"tc": TRANSACTIONS[args.transaction], "oc": args.owner, "o": args.sort, "tv": args.value}
     obs = ctx.observe("https://finviz.com/insidertrading?" + urlencode({k: v for k, v in query.items() if v is not None}))
@@ -204,6 +204,7 @@ def trades(ctx, args, target):
     for name in ("owner", "sort", "value"):
         if getattr(args, name):
             conditions[name] = condition(getattr(args, name))
+    obs.result["sort_keys"] = markup.sort_keys(node)
     obs.result["target"], obs.result["conditions"], obs.result["data"] = args.transaction, conditions, rows
     return obs.result
 
