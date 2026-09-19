@@ -17,11 +17,8 @@ If the host does not substitute `${CLAUDE_SKILL_DIR}`, replace it with the absol
 
 Discover in three steps: `--help` for the groups, `schema GROUP` for its commands, `schema GROUP LEAF` for that command's arguments, default window, units, known limits and gotchas. The interface owns all of that. Nothing here repeats it, because a copy of it here would go on asserting the old contract after the command changed.
 
-## Choose the target and keep it
+Reuse returned symbols, expirations and keys exactly as they came back, in your answer as well as in the next call: adding or removing punctuation in a symbol names a different instrument.
 
-A name search returns candidates, not an identity. An equity, its depositary receipt and a similarly named fund are different instruments that answer differently, so use the exchange and instrument type to choose, and ask when the remaining ambiguity would change the answer.
-
-Report symbols exactly as they came back. Adding or removing punctuation names a different instrument, and a screening result is the set matching the conditions you sent — never an independently verified census of a market.
 
 ## Numbers arrive without their units
 

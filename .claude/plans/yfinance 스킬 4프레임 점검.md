@@ -771,3 +771,64 @@ holders institutional AAPL
 | "대범위도 창으로 주면 항상 성공" | 기본창 절단과 예산 절단을 구별할 수 없게 만든다 | 예산 절단은 `partial`(R1) |
 
 **독립 레인이 없었으면 두 번째와 세 번째는 그대로 구현됐을 것이다.**
+
+---
+
+# 구현 기록 (2026-09-19, PR #16 `refactor/yfinance-contract-recovery`)
+
+스쿼시 머지는 PR 제목만 `main`에 남기므로, 다음 세션이 알아야 하는 결정은 여기 적는다. diff가 보여주는 것은 적지 않는다.
+
+## 계획을 따르지 않은 곳과 그 이유
+
+**G1 수정을 `yf.MarketRegion` 닫힌 선택지로 하지 않았다.** 계획은 `yfinance_cli.py:124`가 `market status`에 쓰는 그 enum을 `sector`·`industry`에도 쓰라고 했는데, 그 enum은 `US/GB/ASIA/EUROPE/RATES/COMMODITIES/CURRENCIES/CRYPTOCURRENCIES` 여덟 개뿐이고 `quote/marketSummary` 엔드포인트용이다. `Sector`·`Industry`는 ISO 3166-1 alpha-2를 받는 **다른 이름공간**이라(`domain.py:24`), 지시대로 했으면 계획이 G1에서 직접 실측해 "작동한다"고 확인한 `KR`·`JP`·`DE`가 전부 argparse에서 거절됐을 것이다.
+
+대신 서비스되는 코드를 실측했다: 각 코드로 `sector technology --dataset top-companies`를 부르고 US와 같은 종목이 오면 조용한 대체로 판정했다. 서비스되는 것 29개(`market.py:DOMAIN_REGIONS`), 대체에 걸린 것은 `ZZ`·`XX`·`UK`·`EU`뿐 아니라 **`NL`·`CH`·`IE`·`ZA`·`AT`·`BE` 등 실제 Yahoo 지역판이 있는 나라들도 포함**된다. `MX`·`NZ`·`VN`은 라이브러리가 예외를 던진다. 이 목록이 낡는 조건은 Yahoo가 지역을 추가하는 것이고, `test_live.py`가 `KR`로 탐침한다.
+
+## 계획의 수치가 틀린 곳
+
+**리프는 45개가 아니라 53개였고, 제거 후 40개가 아니라 49개다.** `COMMANDS` 실집계다. 계획의 "45→40"에 맞추려고 리프를 더 지우지 않았다 — 제거 근거는 S1~S4의 것이지 개수가 아니다. 이 숫자를 코드나 SKILL.md에 박지 않았으므로 다음에 또 어긋나도 조용히 거짓이 되지는 않는다.
+
+`screen run`의 필드 수도 계획은 93개, 이번 실측은 88개다. 같은 이유로 어디에도 적지 않았다.
+
+## 계획에 없던 발견 (전부 실측으로 확인)
+
+- **`prices quote` 안에 100배 충돌이 있다.** `dividendYield` 0.32(퍼센트, = 0.32%)와 `trailingAnnualDividendYield` 0.0031(비율, = 0.31%)이 같은 측정이다. `fiftyTwoWeekChangePercent` 31.26과 `52WeekChange` 0.3126도 같은 쌍이다. G2는 리프 **사이**의 충돌이었는데 이건 한 리프 **안**에 있다.
+- **`screen` 질의의 성장률 임계는 퍼센트 포인트다.** `BTWN quarterlyrevenuegrowth.quarterly 20 30`이 quote `revenueGrowth` 0.242인 기업을 주고, 같은 뜻으로 쓴 `0.20 0.30`은 0.2%대 성장 기업 26개를 준다. 둘 다 실패하지 않는다. 출력의 단위를 질의에 그대로 옮기면 100배 틀린 채 그럴듯한 목록이 나온다.
+- **`ytd return`의 raw 3.654가 원천 표기로 "365.40%"다.** 그리고 overview는 `market_weight`(밑줄), 구성종목 표는 `market weight`(공백)로 같은 값을 다르게 부른다.
+- **`--interval 30m`이 15m에서 리샘플된다.** 계획의 "검증하지 않은 것"에 있던 항목이고, 오류 메시지가 15m을 이름 붙이는 이유가 이것이다.
+- **`fund operations`의 `Total Net Assets`는 백만 달러가 아니다.** SPY가 513,975.7을 보고하는데 같은 펀드의 `totalAssets`는 811,937,038,336(= 811,937백만)이다. 계획이 "백만 달러로 보임"이라고 남긴 추정을 **반증**했다. `units`에 `scale: unverified`로 싣고 `gotchas`가 이 대조를 적는다.
+
+## 반증한 함정 후보
+
+- `financials income`의 `BasicContinuousOperations`류가 주당 값이라는 후보(코덱스): GE·F·T에서 그 필드 자체가 반환되지 않는다. 반환되는 것은 `NetIncomeContinuousOperations`이고 명백히 총액이다.
+- `fund equity`의 `Median Market Cap`이 백만 단위라는 후보: SPY·QQQ·IWM 모두 NA라 판정 불가. `units`에 스케일을 선언하지 않았다.
+
+## 모델 기본값에 맞서 쓴 줄 (모델이 바뀌면 재검토)
+
+SKILL.md의 **"Do not settle the question from the magnitude — plausible-looking numbers are exactly where this goes wrong"** 한 문장이 여기 해당한다. 교정 대상은 "값의 크기로 단위를 추론하는" 기본 성향이다. 0.04를 PER로 보고 이상하다고 느끼는 모델은 많지만, **느낀 뒤에 역수인지 다른 단위인지 판정할 근거가 인터페이스에 없으면 그럴듯한 쪽으로 정한다** — G3가 그 사례다. 모델이 바뀌어 `units`를 항상 먼저 읽는다면 이 문장은 잉여가 된다.
+
+`units`를 `gotchas`보다 먼저 두는 구조 자체도 같은 성격이다: 함정을 산문으로 나열하면 목록에 있는 것만 피한다는 가정 위에 서 있다.
+
+## 하지 않은 것
+
+- **SKILL.md 문단 제거 시험을 전부 돌리지는 않았다.** 계획이 지목한 두 후보 중 `## Choose the target and keep it`만 제거해 시나리오 2건으로 확인했다(아래). 나머지 다섯 문단은 돌리지 않았다 — 문단×시나리오라 비용이 크고, 이번에 고친 것을 확인하는 시나리오는 어차피 레일이라 판별력이 낮다.
+- **`tests/yfinance`의 CI 잡이 실제로는 돌지 않고 있다.** `.github/workflows/test.yml`("Social skill checks")이 레포에서 `disabled_manually` 상태다. 이번 PR에서 통과한 체크는 finviz 워크플로뿐이고, yfinance 잡은 2026-09-16 sec PR 때부터 한 번도 돌지 않았다. 이 PR에서 건드리지 않았다 — 다시 켜면 이 스킬과 무관한 다른 스킬들의 잡까지 함께 살아나므로 성진의 결정이다. 같은 명령을 로컬에서 `--isolated`로 돌려 312 passed를 확인했다.
+- Yahoo 429 임계는 이번에도 재현되지 않았다(약 400회 호출).
+- `epsTrailingTwelveMonths`의 ADR 환산 단위는 선언하지 않았다. 모델 시나리오 2번이 실제로 이 공백을 지적했다 — TM의 TTM EPS 22.52가 어느 통화·어느 주당 단위인지 스키마가 말하지 않아, 제공된 `trailingPE`와 일치한다는 것만이 근거였다. 다음 세션의 후보다.
+
+## 계약이 서로 물린 곳 (하나만 고치면 깨진다)
+
+- `leaves.recent`와 `read`의 창 방향은 **반대**다. 첫 호출은 리프가 선언한 끝을 남기고(최신), `read`는 `--start`부터 앞으로 걸어간다. `read`에도 `recent`를 적용하면 `--start`를 올려도 같은 꼬리가 반복되고, **합계만 보면 완독한 것처럼 보인다** — 이번 구현 중 실제로 그렇게 통과한 적이 있다. `output.select`의 `paging` 분기가 그 자리다.
+- `budget.shrink`가 창을 줄이면 `continuation`을 **다시 계산**해야 한다. 축소 전 개수로 둔 continuation을 따라가면 줄어든 만큼의 행을 건너뛴다.
+- `too_large_fix`가 이름 붙이는 `--max-chars`는 **축소 전** 크기다. 축소 후 크기를 실으면 그 값으로 다시 돌려도 또 넘친다.
+
+## 제거 시험 결과 — 한 문단을 실제로 뺐고, 빼는 쪽이 옳았다
+
+`## Choose the target and keep it` 전체를 제거하고 시나리오 2건을 격리 세션에서 돌렸다.
+
+- 토요타 PER: 통과. 제거 전과 **같은 답**이고, USD 호가와 JPY 재무제표를 섞지 않은 것도 그대로다.
+- "애플 ADR 말고 보통주": 통과. 그리고 모델이 스스로 *"`EQUITY` 분류 자체는 보통주와 예탁증서를 엄밀히 구분하지 않습니다"*라고 적었다 — **그 문단이 하려던 말을 문단 없이 일반 역량이 공급했다.**
+
+계획의 예측("남을 만한 건 심볼 문장부호뿐일 수 있다")이 맞았다. 그래서 문단은 지우고, 문장부호 한 문장만 `## Execute and discover`로 옮겼다. 그건 일반 역량이 공급하지 않는다 — 심볼에서 점 하나를 빼면 다른 상품이 된다는 것은 이 데이터 원천의 사실이지 추론할 수 있는 규칙이 아니다.
+
+**이 판정의 조건**: `gpt-6-astra` medium, 시나리오 2건. 모델이 바뀌면 다시 봐야 한다 — 정체성 구분을 스스로 하지 않는 모델에게는 그 문단이 다시 기여한다. 지운 문단의 원문은 이 PR의 diff에 있다.
