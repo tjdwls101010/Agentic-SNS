@@ -13,7 +13,8 @@ def test_unscoped_schema_lists_every_group_and_command_with_shared_options(clien
 
 
 def test_every_command_documents_arguments_with_help_and_default_and_matches_its_help_text(client):
-    groups = client.one("schema")["data"]["groups"]
+    unscoped = client.one("schema")["data"]
+    groups, shared = unscoped["groups"], set(unscoped["shared_options"])
     for group, leaves in groups.items():
         for leaf in leaves:
             scope = [group] + ([leaf] if leaf else [])
@@ -23,7 +24,7 @@ def test_every_command_documents_arguments_with_help_and_default_and_matches_its
             for name, spec in data["arguments"].items():
                 assert spec["help"], (scope, name)
                 assert "default" in spec, (scope, name)
-                if name.startswith("--") and name not in ("--max-chars", "--filter", "--fields", "--limit", "--store", "--connect-timeout", "--timeout", "--max-bytes"):
+                if name.startswith("--") and name not in shared:  # shared options are explained by finviz.py --help, not repeated per leaf
                     assert name in help_text, (scope, name)
             assert "schema " + " ".join(scope) in help_text, scope
 
@@ -40,11 +41,19 @@ def test_shared_options_work_before_the_group_and_after_the_command(client):
     assert list(itertools.chain(before)) == before
 
 
-def test_help_and_schema_disclose_shared_defaults_and_parser_errors_use_stderr(client):
-    assert "--max-bytes" in client.raw("--help", code=0).stdout
+def test_help_and_schema_disclose_shared_defaults_and_parser_errors_stay_in_the_json_contract(client):
+    root_help = client.raw("--help", code=0).stdout
+    assert "--max-chars" in root_help and "--max-bytes" not in root_help  # transport limits are the operator's, not a choice in the model's list
     leaf_help = client.raw("stock", "earnings", "--help", code=0).stdout
-    assert "finviz.py --help" in leaf_help and "--max-bytes" not in leaf_help
+    assert "finviz.py --help" in leaf_help and "Maximum output characters" not in leaf_help  # named in the epilog, explained once at the root
     schema = client.one("schema", "stock", "earnings")["data"]
-    assert schema["arguments"]["--max-bytes"]["default"] == 16777216
-    invalid = client.raw("stock", "earnings", "A", "--dataset", "bogus", code=2)
-    assert invalid.stdout == "" and "invalid choice" in invalid.stderr
+    assert schema["arguments"]["--max-chars"]["default"] == 20000
+    limits = client.one("doctor")["data"]["transport"]
+    assert limits["timeout"] == 60 and limits["connect_timeout"] == 10 and limits["max_bytes"] == 16777216
+    assert limits["set_by"] == "defaults"
+    invalid = client.one("stock", "earnings", "A", "--dataset", "bogus", code=2)
+    assert invalid["error"]["code"] == "invalid_argument" and "invalid choice" in invalid["error"]["message"]
+    assert client.raw("stock", "earnings", "A", "--dataset", "bogus", code=2).stderr == ""
+    unknown = client.one("stock", "nosuchleaf", code=2)
+    assert unknown["error"]["code"] == "invalid_argument" and "nosuchleaf" in unknown["error"]["message"]
+    assert client.one("nosuchgroup", code=2)["error"]["code"] == "invalid_argument"

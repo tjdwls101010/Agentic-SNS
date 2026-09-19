@@ -109,7 +109,8 @@ def article(page, base):
     body = page.select_one("article, .text-justify")
     if body is None:
         return None
-    return {"title": text(page.h1), "paragraphs": [text(p) for p in body.select("p")], "text": text(body), "links": [{"text": text(a), "url": urljoin(base, a["href"])} for a in body.select("a[href]")], "images": [urljoin(base, img["src"]) for img in body.select("img[src]")]}
+    # 성진: 단락 목록과 전문을 함께 싣던 것을 단락만 남긴다(실측 1.01배 중복). 단락 밖 텍스트는 링크 라벨이고 links가 그대로 들고 있다.
+    return {"title": text(page.h1), "paragraphs": [text(p) for p in body.select("p")], "links": [{"text": text(a), "url": urljoin(base, a["href"])} for a in body.select("a[href]")], "images": [urljoin(base, img["src"]) for img in body.select("img[src]")]}
 
 
 def total_count(page):
@@ -124,6 +125,16 @@ def table_with_header(page, header):
         if any(markup_text == header for markup_text in (text(th) for th in table.select("th") if th.find_parent("table") is table)):
             return table
     return None
+
+
+def sort_keys(table):
+    """Column label -> the source sort key its header link carries; static headers have none and are left out."""
+    found = {}
+    for header in table.select("th[onclick]"):
+        key = query_param("https://finviz.com/" + header["onclick"].split("'")[1], "o") if "'" in header.get("onclick", "") else None
+        if key:
+            found[text(header)] = key.lstrip("-")
+    return found
 
 
 def sort_condition(requested, page, controls):

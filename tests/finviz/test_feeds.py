@@ -39,8 +39,34 @@ def test_market_quotes_performance_and_bubbles_keep_source_shapes(client):
     client.add("https://finviz.com/api/forex_perf", {"USD": 0.0, "AUD": -0.19})
     assert client.one("market", "performance", "forex")["data"] == {"USD": 0.0, "AUD": -0.19}
     bubbles = [{"ticker": "CF", "company": "CF Industries", "x": 1.0, "y": 1.09, "size": 2.0e10, "color": "Basic Materials", "isETF": False}]
-    client.add("https://finviz.com/api/bubbles?x=sector&y=lastChange&size=marketCap&color=sector&idx=sp500", bubbles)
+    client.add("https://finviz.com/api/bubbles?x=sector&y=lastChange&size=marketCap&color=sector&idx=dji", bubbles)
     assert client.one("market", "bubbles")["data"] == bubbles
+
+
+def test_quotes_leave_out_the_rendering_sparklines_until_they_are_asked_for(client):
+    """Each instrument carries a 300-point sparkline that is 90% of the response; the quote itself is what the screen shows."""
+    quotes = {"ES": {"label": "S&P 500", "last": 6600.0, "sparkline": [1, 2, 3], "sparklineDateChanges": ["a"], "change": 0.1}}
+    client.add("https://finviz.com/api/futures_all?timeframe=d", quotes)
+    assert client.one("market", "quotes", "futures")["data"] == {"ES": {"label": "S&P 500", "last": 6600.0, "change": 0.1}}
+    assert client.one("market", "quotes", "futures", "--sparkline")["data"] == quotes
+
+
+def test_market_map_defaults_to_performance_and_takes_the_classification_tree_on_request(client):
+    """Resolving the tree costs five more requests and is 85% of the response; the map's numbers are the answer to a performance question."""
+    client.add("https://finviz.com/api/map_perf?t=sec&st=d1", {"nodes": {"AAPL": 1.0}, "subtype": "d1", "version": 15})
+    default = client.one("market", "map")
+    assert default["data"]["performance"] == {"AAPL": 1.0} and default["data"]["classification"] is None
+    assert "dependencies" not in default["source"]
+
+
+def test_bubbles_default_to_a_named_index_the_budget_fits(client):
+    """An unknown idx is not refused by the source, it silently returns all 5,906 stocks, so the universe is a closed choice."""
+    rows = [{"ticker": "AAPL", "x": 1.0, "y": 2.0, "size": 3.0, "color": "Technology", "isETF": False}]
+    client.add("https://finviz.com/api/bubbles?x=sector&y=lastChange&size=marketCap&color=sector&idx=dji", rows)
+    result = client.one("market", "bubbles")
+    assert result["data"] == rows and result["request"]["index"] == "dji"
+    refused = client.one("market", "bubbles", "--index", "nasdaq", code=2)
+    assert refused["error"]["code"] == "invalid_argument" and "sp500" in refused["error"]["message"]
 
 
 def test_market_map_resolves_classification_from_the_page_assets_and_degrades_to_partial(client):
@@ -51,18 +77,20 @@ def test_market_map_resolves_classification_from_the_page_assets_and_degrades_to
     client.add("https://finviz.com/assets/dist-legacy/1378.v1.61170fe2.js", MAP_LOADER)
     client.add("https://finviz.com/assets/dist-legacy/runtime.v1.22f44280.js", MAP_RUNTIME)
     client.add("https://finviz.com/assets/dist-legacy/62.v1.bbb222.js", MAP_CHUNK)
-    result = client.one("market", "map", "--type", "geo")
+    result = client.one("market", "map", "--type", "geo", "--classification")
     assert result["data"]["performance"] == perf["nodes"] and result["data"]["period"] == "d1"
     assert result["data"]["classification"]["children"][0]["children"][0]["children"][0] == {"name": "RY", "description": "Royal Bank Of Canada", "value": 294647}
     assert result["data"]["classification_source"].endswith("62.v1.bbb222.js")
-    only = client.one("market", "map", "--type", "geo", "--performance-only")
+    only = client.one("market", "map", "--type", "geo")
     assert only["data"]["classification"] is None and "source" not in only["data"] or only["data"].get("classification_source") is None
     client.add("https://finviz.com/assets/dist-legacy/62.v1.bbb222.js", "module.exports={name:'Other'}")
-    degraded = client.one("market", "map", "--type", "geo", code=8)
+    degraded = client.one("market", "map", "--type", "geo", "--classification", code=8)
     assert degraded["status"] == "partial" and degraded["data"]["performance"] == perf["nodes"] and degraded["data"]["classification"] is None
     assert degraded["error"]["code"] == "asset_structure"
     failed_asset = client.one("read", degraded["source"]["dependencies"][-1])["data"]
     assert failed_asset["status"] == "error" and failed_asset["error"]["code"] == "asset_structure"
+    replayed = client.one("read", degraded["id"], code=8)  # a recovery path must not launder the gap it is recovering from
+    assert replayed["status"] == "partial"
 
 
 @pytest.mark.parametrize("map_type,chunk,label", [("geo", 6207, "World"), ("sec_all", 7791, "All stocks"), ("sec", 8119, "S&P 500")])
@@ -80,16 +108,16 @@ def test_map_loads_the_requested_universe_from_the_current_entry_script(client, 
     url = f"https://finviz.com/assets/dist-legacy/{chunk}.v1.{suffix}.js"
     tree = {"name": "Root", "children": [{"name": label, "children": [{"name": "TEST", "value": 123, "newField": "kept"}]}]}
     client.add(url, "module.exports=" + json.dumps(tree))
-    result = client.one("market", "map", "--type", map_type)
+    result = client.one("market", "map", "--type", map_type, "--classification")
     assert result["data"]["classification"] == tree and result["data"]["classification_source"] == url
     assert result["data"]["performance"] == {"TEST": 1.2}
     client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", loader + loader.replace(str(chunk), "9999"))
-    ambiguous = client.one("market", "map", "--type", map_type, code=8)
+    ambiguous = client.one("market", "map", "--type", map_type, "--classification", code=8)
     assert ambiguous["error"]["code"] == "asset_structure" and ambiguous["data"]["classification"] is None
     assert ambiguous["data"]["performance"] == {"TEST": 1.2}
     client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", loader)
     client.add(url, "a.exports=" + json.dumps(tree) + ";b.exports=" + json.dumps(tree))
-    roots = client.one("market", "map", "--type", map_type, code=8)
+    roots = client.one("market", "map", "--type", map_type, "--classification", code=8)
     assert roots["error"]["code"] == "asset_structure" and "found 2" in roots["error"]["message"]
     assert roots["data"]["classification"] is None and roots["data"]["performance"] == {"TEST": 1.2}
 
@@ -100,9 +128,29 @@ def test_map_does_not_substitute_the_default_for_a_missing_requested_type(client
     client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", MAP_LOADER)
     for name in ("1378.v1.61170fe2.js", "4740.v1.b05b832c.js"):
         client.add("https://finviz.com/assets/dist-legacy/" + name, "/* no map loader */")
-    result = client.one("market", "map", "--type", "cap", code=8)
+    result = client.one("market", "map", "--type", "cap", "--classification", code=8)
     assert result["error"]["code"] == "asset_structure" and "no case for MarketCap" in result["error"]["message"]
     assert result["data"]["classification"] is None and result["data"]["performance"] == {"A": 2}
+
+
+def test_calendar_date_is_judged_by_the_sources_own_start_date_not_by_the_returned_items(client):
+    """A source that ignores dateFrom still returns items on or after it; only the page's own initialDateFrom separates applied from ignored."""
+    entries = {"items": [{"ticker": "MU", "earningsDate": "2026-09-25T08:30:00"}], "page": 1, "totalPages": 1, "totalItemsCount": 1}
+    ignored = {"data": {"initialDateFrom": "2026-09-18", "initialSort": "earningsDate", "initialPage": 1, "entries": entries}}
+    client.add("https://finviz.com/calendar/earnings?dateFrom=2026-09-01", calendar_page(ignored))
+    result = client.one("calendar", "earnings", "--date", "2026-09-01")
+    assert result["conditions"]["date"] == {"requested": "2026-09-01", "status": "not_applied", "evidence": {"source_date_from": "2026-09-18"}}
+    assert result["data"]["date_from"] == "2026-09-18"
+    applied = {"data": {"initialDateFrom": "2026-09-01", "initialSort": "-earningsDate", "initialPage": 1, "entries": entries}}
+    client.add("https://finviz.com/calendar/earnings?dateFrom=2026-09-01&sort=-earningsDate", calendar_page(applied))
+    result = client.one("calendar", "earnings", "--date", "2026-09-01", "--sort=-earningsDate")
+    assert result["conditions"]["date"] == {"requested": "2026-09-01", "status": "confirmed", "evidence": {"source_date_from": "2026-09-01"}}
+    assert result["conditions"]["sort"] == {"requested": "-earningsDate", "status": "unverified", "evidence": {"source_sort": "-earningsDate"}}
+    client.add("https://finviz.com/api/calendar/earnings?dateFrom=2026-09-01&page=2&sort=earningsDate", dict(entries, page=2, totalPages=3))
+    paged = client.one("calendar", "earnings", "--date", "2026-09-01", "--page", "2")
+    assert paged["conditions"]["date"] == {"requested": "2026-09-01", "status": "unverified", "evidence": None}
+    assert paged["conditions"]["page"]["status"] == "confirmed"
+    assert "date_from" not in paged["data"] or paged["data"]["date_from"] is None
 
 
 def test_calendar_pages_use_source_entries_and_confirm_date_page_and_sort(client):
@@ -115,14 +163,14 @@ def test_calendar_pages_use_source_entries_and_confirm_date_page_and_sort(client
     later = [{"ticker": "ISPR", "earningsDate": "2026-09-21T08:30:00", "epsEstimate": 0.01}]
     client.add("https://finviz.com/api/calendar/earnings?dateFrom=2026-09-20&page=2&sort=earningsDate", dict(entries, items=later, page=2, totalPages=3))
     result = client.one("calendar", "earnings", "--date", "2026-09-20", "--page", "2")
-    assert result["data"] == {"date_from": "2026-09-20", "items": later}
-    assert result["conditions"] == {"date": {"requested": "2026-09-20", "status": "confirmed", "evidence": {"earliest_item": "2026-09-21T08:30:00"}}, "page": {"requested": 2, "status": "confirmed", "evidence": 2}}
+    assert result["data"] == {"date_from": None, "items": later}
+    assert result["conditions"] == {"date": {"requested": "2026-09-20", "status": "unverified", "evidence": None}, "page": {"requested": 2, "status": "confirmed", "evidence": 2}}
     assert result["continuation"] == {"page": 3}
     economic = [{"calendarId": 1, "event": "Monthly Budget Statement", "date": "2026-09-11T14:00:00", "actual": "-$167B", "forecast": "-$404B"}]
     client.add("https://finviz.com/calendar/economic", calendar_page({"data": {"initialDateFrom": "2026-09-14", "entries": economic}}))
     result = client.one("calendar", "economic")
     assert result["data"]["items"] == economic and result["coverage"]["received"] == 1
-    client.add("https://finviz.com/api/calendar/economic?dateFrom=2026-09-01", economic)
+    client.add("https://finviz.com/calendar/economic?dateFrom=2026-09-01", calendar_page({"data": {"initialDateFrom": "2026-09-01", "entries": economic}}))
     result = client.one("calendar", "economic", "--date", "2026-09-01")
     assert result["data"]["items"] == economic and result["conditions"]["date"]["status"] == "confirmed"
     client.add("https://finviz.com/calendar/dividends", calendar_page({"data": {"initialDateFrom": "2026-09-15", "initialPage": 1, "entries": dict(entries, totalPages=7, totalItemsCount=304)}}))
@@ -133,6 +181,28 @@ def test_calendar_pages_use_source_entries_and_confirm_date_page_and_sort(client
     client.add("https://finviz.com/calendar/earnings/season-preview", calendar_page({"data": {"initialDateFrom": "2026-09-14", "entries": [{"date": "2026-09-30", "ticker": "MU"}], "totalsPerDay": {"2026-09-30": 3}, "totalCount": 64}}))
     result = client.one("calendar", "season")
     assert result["data"]["items"] == [{"date": "2026-09-30", "ticker": "MU"}] and result["data"]["totals_per_day"] == {"2026-09-30": 3} and result["coverage"]["source_total"] == 64
+
+
+def test_each_calendar_takes_only_the_arguments_it_accepts(client):
+    """One shared argument list made season advertise --date, --page and --sort and then refuse all three."""
+    season = client.raw("calendar", "season", "--help", code=0).stdout
+    assert "--date" not in season and "--page" not in season and "--sort" not in season
+    economic = client.raw("calendar", "economic", "--help", code=0).stdout
+    assert "--date" in economic and "--sort" in economic and "--page" not in economic
+    earnings = client.raw("calendar", "earnings", "--help", code=0).stdout
+    assert "--date" in earnings and "--page" in earnings and "--sort" in earnings
+    refused = client.one("calendar", "season", "--date", "2026-09-01", code=2)
+    assert refused["error"]["code"] == "invalid_argument"
+    assert client.one("calendar", "economic", "--page", "2", code=2)["error"]["code"] == "invalid_argument"
+    assert "rejected by" not in " ".join(str(a) for a in client.one("schema", "calendar", "earnings")["data"]["arguments"].values())
+
+
+def test_inspect_lists_the_structure_the_model_cannot_know_in_advance(client):
+    client.add("https://finviz.com/api/suggestions?input=A", [{"ticker": "A", "nested": {"deep": [1]}}])
+    saved = client.one("search", "A")["id"]
+    pointers = [entry["pointer"] for entry in client.one("inspect", saved)["data"]]
+    assert "/data" in pointers and "/data/0/nested" in pointers
+    assert not [p for p in pointers if p in ("/", "/id", "/observed_at", "/status", "/source/url", "/source/http_status")]
 
 
 def test_news_headlines_by_time_by_source_and_stock_badges(client):
@@ -147,6 +217,38 @@ def test_news_headlines_by_time_by_source_and_stock_badges(client):
     assert stocks[0]["tickers"] == ["PSKY"] and stocks[0]["section"] is None
 
 
+def test_headline_and_calendar_defaults_are_one_screenful_and_keep_every_section(client):
+    """The page groups headlines into News and Blogs; a prefix cut of the flattened list would silently drop a whole section."""
+    items = [("0%d:00AM" % (i % 10), "Headline %d" % i, "https://example.com/%d" % i, "Source", ()) for i in range(60)]
+    client.add("https://finviz.com/news", news_page(items=tuple(items)))
+    result = client.one("news", "headlines")
+    assert result["coverage"] == {"received": 60, "shown": 40, "exhaustive": False}
+    assert {i["section"] for i in result["data"]} == {"News", "Blogs"}
+    assert len([i for i in result["data"] if i["section"] == "Blogs"]) == 20
+    assert [i["title"] for i in result["data"]][:2] == ["Headline 0", "Headline 1"]
+    events = [{"calendarId": n, "event": "Event %d" % n, "date": "2026-09-11T14:00:00"} for n in range(60)]
+    client.add("https://finviz.com/calendar/economic", calendar_page({"data": {"initialDateFrom": "2026-09-14", "entries": events}}))
+    economic = client.one("calendar", "economic")
+    assert economic["coverage"]["received"] == 60 and economic["coverage"]["shown"] == 40
+    rows = tuple(("T%d" % n, "Owner %d" % n, str(n), "Director", "Sep 12 '26", "Sale", "42.10", "10,000", "421,000", "50,000", "Sep 14 09:55 PM", "http://www.sec.gov/x.xml") for n in range(40))
+    client.add("https://finviz.com/insidertrading?tc=7", insiders_page(rows=rows))
+    trades = client.one("insiders", "trades")
+    assert trades["coverage"]["received"] == 40 and trades["coverage"]["shown"] == 20
+
+
+def test_a_default_window_narrows_the_answer_without_narrowing_the_search_or_the_observation(client):
+    """A window applied before --filter would answer "not in the news" from a result that holds the headline."""
+    items = [("0%d:00AM" % (i % 10), "Headline %d" % i, "https://example.com/%d" % i, "Source", ()) for i in range(60)]
+    client.add("https://finviz.com/news", news_page(items=tuple(items)))
+    default = client.one("news", "headlines")
+    assert default["coverage"] == {"received": 60, "shown": 40, "exhaustive": False}
+    found = client.one("news", "headlines", "--filter", "Headline 55")
+    assert [i["title"] for i in found["data"]] == ["Headline 55"] and found["coverage"]["received"] == 60
+    beyond = client.one("read", default["id"], "--pointer", "/data", "--start", "40", "--limit", "5")
+    assert beyond["selection"]["received"] == 60 and len(beyond["data"]) == 5  # the store keeps what the window left out
+    assert client.one("read", default["id"], "--pointer", "/data", "--filter", "Headline 55", "--limit", "1")["data"][0]["title"] == "Headline 55"
+
+
 def test_news_pulse_lists_rows_and_reads_one_explanation(client):
     client.add("https://finviz.com/news?v=6", pulse_page())
     result = client.one("news", "pulse")
@@ -159,7 +261,7 @@ def test_news_pulse_lists_rows_and_reads_one_explanation(client):
 def test_news_article_reads_finviz_hosted_articles_only(client):
     client.add("https://finviz.com/news/123/fed-decision-preview", article_page())
     data = client.one("news", "article", "https://finviz.com/news/123/fed-decision-preview")["data"]
-    assert data == {"title": "Fed Decision Preview", "paragraphs": ["First paragraph.", "Second paragraph."], "text": "First paragraph. Second paragraph. SEC filing", "links": [{"text": "SEC filing", "url": "https://www.sec.gov/x"}], "images": ["https://finviz.com/img/chart.png"]}
+    assert data == {"title": "Fed Decision Preview", "paragraphs": ["First paragraph.", "Second paragraph."], "links": [{"text": "SEC filing", "url": "https://www.sec.gov/x"}], "images": ["https://finviz.com/img/chart.png"]}
     assert client.one("news", "article", "https://www.marketwatch.com/story/x", code=2)["error"]["code"] == "unsupported_url"
 
 
@@ -170,8 +272,19 @@ def test_insider_trades_keep_ticker_owner_and_filing_links_and_confirm_the_trans
     assert row["Ticker"] == "ENLT" and row["ticker"] == "ENLT" and row["Owner"] == "Paz Amit" and row["Transaction"] == "Sale"
     assert row["owner_url"] == "https://finviz.com/insidertrading?oc=2108367&tc=7&b=2" and row["filing_url"] == "http://www.sec.gov/Archives/edgar/data/1/x.xml"
     assert result["conditions"]["transaction"] == {"requested": "sale", "status": "confirmed", "evidence": "Sale Transactions"}
+    assert result["sort_keys"] == {"Ticker": "ticker"}
     client.add("https://finviz.com/insidertrading?tc=7&oc=2108367", insiders_page())
     assert client.one("insiders", "trades", "--owner", "2108367")["conditions"]["owner"]["status"] == "unverified"
+
+
+def test_bubble_axes_are_a_closed_set_the_source_validates(client):
+    """An axis the API does not accept is answered with HTTP 400, so a guess costs a request; the parser refuses it first."""
+    refused = client.one("market", "bubbles", "--x", "industry", code=2)
+    assert refused["error"]["code"] == "invalid_argument"
+    assert "marketCap" in refused["error"]["message"] and "--help" in refused["error"]["fix"]
+    rows = [{"ticker": "AAPL", "x": 1.0, "y": 2.0, "size": 3.0, "color": "Technology"}]
+    client.add("https://finviz.com/api/bubbles?x=PE&y=perfYtd&size=marketCap&color=sector&idx=dji", rows)
+    assert client.one("market", "bubbles", "--x", "PE", "--y", "perfYtd")["data"] == rows
 
 
 def test_open_reads_any_supported_finviz_url_generically_and_refuses_others(client):
@@ -179,7 +292,10 @@ def test_open_reads_any_supported_finviz_url_generically_and_refuses_others(clie
     data = client.one("open", "https://finviz.com/quote.ashx?t=AAPL&p=d")["data"]
     assert data["metrics"] == [{"label": "Market Cap", "value": "4T", "definition": "Market capitalization", "unit": None}]
     assert data["tables"] == [{"headers": ["Date", "Action"], "rows": [{"Date": "Sep-09-26", "Action": "Resumed"}]}]
-    assert data["initial"] == {"init": {"a": 1}} and data["controls"] == {"x": [{"value": "1", "label": "one", "selected": True, "elite_only": False}]}
+    assert data["initial"] == {"init": 1} and data["controls"] == {"x": 1}  # collections come back as counts and are asked for by name
+    asked = client.one("open", "https://finviz.com/quote.ashx?t=AAPL&p=d", "--initial", "--options")["data"]
+    assert asked["initial"] == {"init": {"a": 1}}
+    assert asked["controls"] == {"x": [{"value": "1", "label": "one", "selected": True, "elite_only": False}]}
     assert data["links"] == [{"text": "MSFT", "url": "https://finviz.com/stock?t=MSFT"}]
     assert client.one("open", "https://www.sec.gov/cgi-bin/browse-edgar", code=2)["error"]["code"] == "unsupported_url"
     assert client.one("open", "https://finviz.com/register", code=2)["error"]["code"] == "unsupported_route"
@@ -188,22 +304,33 @@ def test_open_reads_any_supported_finviz_url_generically_and_refuses_others(clie
     assert json.dumps(data)  # generic output is plain JSON
 
 
-def test_calendar_kinds_are_real_commands_with_their_own_schema_and_sorting_goes_through_the_api(client):
+def test_calendar_kinds_are_real_commands_with_their_own_schema_and_the_first_page_sorts_without_a_second_request(client):
     assert client.one("schema", "calendar", "earnings")["data"]["command"] == "calendar earnings"
-    page = {"data": {"initialDateFrom": "2026-09-15", "initialSort": "earningsDate", "initialPage": 1, "entries": {"items": [{"ticker": "A", "earningsDate": "2026-09-15T08:30:00"}], "page": 1, "totalPages": 1}}}
-    client.add("https://finviz.com/calendar/earnings", calendar_page(page))
-    client.add("https://finviz.com/api/calendar/earnings?dateFrom=2026-09-15&page=1&sort=-earningsDate", {"items": [{"ticker": "Z", "earningsDate": "2026-09-30T08:30:00"}], "page": 1, "totalPages": 1})
+    sorted_page = {"data": {"initialDateFrom": "2026-09-15", "initialSort": "-earningsDate", "initialPage": 1, "entries": {"items": [{"ticker": "Z", "earningsDate": "2026-09-30T08:30:00"}], "page": 1, "totalPages": 1}}}
+    client.add("https://finviz.com/calendar/earnings?sort=-earningsDate", calendar_page(sorted_page))
     result = client.one("calendar", "earnings", "--sort=-earningsDate")
-    assert result["data"]["items"][0]["ticker"] == "Z" and result["conditions"]["sort"]["status"] == "unverified"
+    assert result["data"]["items"][0]["ticker"] == "Z"
+    assert result["conditions"]["sort"] == {"requested": "-earningsDate", "status": "unverified", "evidence": {"source_sort": "-earningsDate"}}
+    ignored = {"data": {"initialDateFrom": "2026-09-15", "initialSort": "earningsDate", "initialPage": 1, "entries": {"items": [{"ticker": "A"}], "page": 1, "totalPages": 1}}}
+    client.add("https://finviz.com/calendar/earnings?sort=marketCap", calendar_page(ignored))
+    assert client.one("calendar", "earnings", "--sort", "marketCap")["conditions"]["sort"] == {"requested": "marketCap", "status": "not_applied", "evidence": {"source_sort": "earningsDate"}}
+    # Measured 2026-09-19: the page repeats any sort key it is given, including one the API answers with HTTP 400,
+    # while an unusable date is replaced by the page's own default. So an agreeing sort echo confirms nothing.
+    repeated = {"data": {"initialDateFrom": "2026-09-15", "initialSort": "bogus", "initialPage": 1, "entries": {"items": [{"ticker": "A"}], "page": 1, "totalPages": 1}}}
+    client.add("https://finviz.com/calendar/earnings?sort=bogus", calendar_page(repeated))
+    echoed = client.one("calendar", "earnings", "--sort", "bogus")["conditions"]["sort"]
+    assert echoed == {"requested": "bogus", "status": "unverified", "evidence": {"source_sort": "bogus"}}
     assert client.one("calendar", "season", "--page", "2", code=2)["error"]["code"] == "invalid_argument"
     client.add("https://finviz.com/calendar/earnings", calendar_page({"data": {"initialDateFrom": "2026-09-15", "entries": {"items": [], "page": 1, "totalPages": 1, "totalItemsCount": 0}}}))
     empty = client.one("calendar", "earnings", code=7)
     assert empty["status"] == "empty" and empty["data"]["date_from"] == "2026-09-15" and empty["coverage"]["received"] == 0
+    replayed = client.one("read", empty["id"], code=7)  # a recovery path must not report success for a response that carried nothing
+    assert replayed["status"] == "empty" and replayed["data"]["status"] == "empty"
 
 
 def test_market_and_group_api_parameters_report_conditions(client):
     client.add("https://finviz.com/api/map_perf?t=sec&st=w1", {"nodes": {"AAPL": 1.0}, "subtype": "d1", "version": 15})
-    result = client.one("market", "map", "--period", "w1", "--performance-only")
+    result = client.one("market", "map", "--period", "w1")
     assert result["conditions"]["period"] == {"requested": "w1", "status": "not_applied", "evidence": "d1"}
     client.add("https://finviz.com/api/futures_all?timeframe=w", {"ES": {"ticker": "ES", "last": 1}})
     assert client.one("market", "quotes", "futures", "--timeframe", "w")["conditions"]["timeframe"]["status"] == "unverified"
@@ -223,22 +350,32 @@ def test_open_keeps_headerless_tables_and_drops_site_navigation_links(client):
 def test_economic_calendar_rejects_unsupported_pagination_before_fetching(client, date):
     events = [{"event": "Budget", "date": "2026-09-01", "actual": "-$167B"}]
     client.add("https://finviz.com/calendar/economic", calendar_page({"data": {"initialDateFrom": "2026-09-01", "entries": events}}))
-    client.add("https://finviz.com/api/calendar/economic?dateFrom=2026-09-01", events)
     result = client.one("calendar", "economic", "--page", "2", *date, code=2)
     assert result["error"]["code"] == "invalid_argument"
-    assert "--page" in result["error"]["fix"]
+    assert "--page" in result["error"]["message"] and "calendar economic --help" in result["error"]["fix"]
 
 
 def test_map_and_bubbles_report_selectors_without_inventing_confirmation(client):
     client.add("https://finviz.com/api/map_perf?t=geo&st=d1", {"nodes": {"RY": 1.2}, "subtype": "d1"})
-    result = client.one("market", "map", "--type", "geo", "--performance-only")
+    result = client.one("market", "map", "--type", "geo")
     assert result["conditions"]["type"] == {"requested": "geo", "status": "unverified", "evidence": None}
     rows = [{"ticker": "RY", "x": 1.2, "y": 6, "size": 40, "color": 3, "futureField": "source"}]
-    client.add("https://finviz.com/api/bubbles?x=pe&y=volume&size=price&color=change&idx=dji", rows)
-    result = client.one("market", "bubbles", "--x", "pe", "--y", "volume", "--size", "price", "--color", "change", "--index", "dji")
-    assert result["conditions"] == {key: {"requested": value, "status": "unverified", "evidence": None} for key, value in {"x": "pe", "y": "volume", "size": "price", "color": "change", "index": "dji"}.items()}
+    client.add("https://finviz.com/api/bubbles?x=PE&y=perf52w&size=sales&color=sector&idx=ndx", rows)
+    result = client.one("market", "bubbles", "--x", "PE", "--y", "perf52w", "--size", "sales", "--color", "sector", "--index", "ndx")
+    assert result["conditions"] == {key: {"requested": value, "status": "unverified", "evidence": None} for key, value in {"x": "PE", "y": "perf52w", "size": "sales", "color": "sector", "index": "ndx"}.items()}
     saved = client.one("read", result["id"], "--pointer", "/data", "--limit", "1")
     assert saved["conditions"] == result["conditions"] and saved["data"] == rows
+
+
+def test_a_mapping_is_narrowed_by_key_while_fields_reach_inside_each_value(client):
+    """--fields promised "record fields to keep" but silently chose instruments, so naming quote fields returned everything."""
+    quotes = {"6A": {"label": "AUD", "last": 0.71, "sparkline": [1, 2]}, "ES": {"label": "S&P 500", "last": 6600.0, "sparkline": [3]}}
+    client.add("https://finviz.com/api/futures_all?timeframe=d", quotes)
+    assert client.one("market", "quotes", "futures", "--keys", "ES")["data"] == {"ES": {"label": "S&P 500", "last": 6600.0}}
+    inside = client.one("market", "quotes", "futures", "--fields", "label", "--sparkline")
+    assert inside["data"] == {"6A": {"label": "AUD"}, "ES": {"label": "S&P 500"}}
+    assert client.one("market", "quotes", "futures", "--keys", "NOPE", code=2)["error"]["code"] == "invalid_keys"
+    assert client.one("market", "quotes", "futures", "--fields", "nope", code=2)["error"]["code"] == "invalid_fields"
 
 
 def test_quotes_selection_preserves_source_keys_without_requiring_ticker_fields(client):
@@ -249,8 +386,8 @@ def test_quotes_selection_preserves_source_keys_without_requiring_ticker_fields(
     assert result["data"] == {"6A": quotes["6A"]}
     assert result["coverage"] == {"received": 3, "shown": 1, "exhaustive": False}
     assert client.one("read", result["id"], "--pointer", "/data")["data"] == quotes
-    assert client.one("market", "quotes", "futures", "--fields", "ES,ALIAS", "--limit", "1")["data"] == {"ES": quotes["ES"]}
-    assert client.one("market", "quotes", "futures", "--fields", "unknown", code=2)["error"]["code"] == "invalid_fields"
+    assert client.one("market", "quotes", "futures", "--keys", "ES,ALIAS", "--limit", "1")["data"] == {"ES": quotes["ES"]}
+    assert client.one("market", "quotes", "futures", "--keys", "unknown", code=2)["error"]["code"] == "invalid_keys"
     assert client.one("market", "quotes", "futures", "--limit", "0", code=7)["data"] == {}
 
 
@@ -270,5 +407,14 @@ def test_open_preserves_article_headers_and_content_links_like_the_article_reade
     opened = client.one("open", url)["data"]
     assert opened["article"] == expected
     assert opened["article"]["title"] == "Fed Decision Preview"
-    assert "Fed Decision Preview By Reporter" in opened["article"]["text"]
+    assert opened["article"]["paragraphs"] == ["By Reporter", "First paragraph."]
     assert opened["links"] == [{"text": "Mentioned screener", "url": "https://finviz.com/screener"}]
+
+
+def test_reading_a_mapping_chooses_entries_before_counting_them(client):
+    quotes = {"6A": {"label": "AUD", "last": 0.71}, "6B": {"label": "GBP", "last": 1.3}, "ES": {"label": "S&P", "last": 6600.0}}
+    client.add("https://finviz.com/api/futures_all?timeframe=d", quotes)
+    saved = client.one("market", "quotes", "futures")["id"]
+    picked = client.one("read", saved, "--pointer", "/data", "--keys", "6B", "--fields", "label", "--limit", "1")
+    assert picked["data"] == {"6B": {"label": "GBP"}} and picked["selection"]["shown"] == 1
+    assert client.one("read", saved, "--pointer", "/data", "--filter", "NEVER_MATCH", code=7)["data"] == {}

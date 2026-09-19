@@ -8,7 +8,7 @@ from pages import screener_filters, screener_table
 
 def test_filters_list_ids_labels_definitions_and_combined_values_and_filter_narrows(client):
     client.add("https://finviz.com/screener?ft=4", screener_filters())
-    result = client.one("screen", "filters")
+    result = client.one("screen", "filters", "--options")
     assert [f["id"] for f in result["data"]] == ["cap", "sec"]
     cap = result["data"][0]
     assert cap["label"] == "Market Cap."
@@ -18,6 +18,21 @@ def test_filters_list_ids_labels_definitions_and_combined_values_and_filter_narr
     narrowed = client.one("screen", "filters", "--filter", "sector")
     assert [f["id"] for f in narrowed["data"]] == ["sec"]
     assert narrowed["coverage"] == {"received": 2, "shown": 1, "exhaustive": False}
+
+
+def test_filters_default_to_the_catalog_without_option_lists_and_attach_them_on_request(client):
+    """The option lists are 14x the catalog: the first call has to answer "which filters exist" inside the budget."""
+    client.add("https://finviz.com/screener?ft=4", screener_filters())
+    default = client.one("screen", "filters")
+    assert default["data"] == [
+        {"id": "cap", "label": "Market Cap.", "definition": "Market Cap. Total market value of a company's outstanding shares.", "option_count": 2},
+        {"id": "sec", "label": "Sector", "definition": "Sector Company sector.", "option_count": 1},
+    ]
+    assert default["coverage"] == {"received": 2, "shown": 2, "exhaustive": False}
+    attached = client.one("screen", "filters", "--options")
+    assert attached["data"][0]["options"] == [{"value": "cap_mega", "label": "Mega ($200bln and more)"}, {"value": "cap_largeover", "label": "+Large (over $10bln)"}]
+    one = client.one("screen", "filters", "--filter", "sector", "--options")
+    assert [f["id"] for f in one["data"]] == ["sec"] and one["data"][0]["options"] == [{"value": "sec_technology", "label": "Technology"}]
 
 
 def test_signals_list_values_and_labels_without_the_none_choice(client):
@@ -74,6 +89,16 @@ def test_run_resolves_column_ids_through_the_catalog_and_confirms_selected_colum
     assert client.one("screen", "run", "--columns", "ticker,nope", code=2)["error"]["code"] == "invalid_columns"
 
 
+def test_a_sortable_table_publishes_the_keys_its_own_headers_carry(client):
+    """--sort wants a key from the column header links, and nothing in a normal result showed one."""
+    client.add("https://finviz.com/screener?v=111&ft=4&r=1", screener_table(ROWS))
+    result = client.one("screen", "run")
+    assert result["sort_keys"] == {"No.": "no.", "Ticker": "ticker", "Company": "company", "Market Cap": "marketcap"}
+    client.add("https://finviz.com/screener?v=111&ft=4&o=-marketcap&r=1", screener_table(ROWS, sort=("marketcap", "descending")))
+    followed = client.one("screen", "run", "--sort=-" + result["sort_keys"]["Market Cap"])
+    assert followed["conditions"]["sort"]["status"] == "confirmed"
+
+
 def test_run_confirms_signal_and_sort_from_page_controls(client):
     client.add("https://finviz.com/screener?v=111&ft=4&s=ta_topgainers&o=-marketcap&r=1", screener_table(ROWS, signal="ta_topgainers", sort=("marketcap", "descending")))
     result = client.one("screen", "run", "--signal", "ta_topgainers", "--sort=-marketcap")
@@ -100,7 +125,7 @@ def test_run_follows_pages_into_a_jsonl_file_and_refuses_to_overwrite_it(client,
     assert len(out.read_text().splitlines()) == 7
     partial = client.one("screen", "run", "--filters", "sec_technology", "--pages", "2")
     assert partial["continuation"] == {"start": 41} and partial["coverage"]["pages"] == 2 and len(partial["data"]) == 4
-    error = client.run("--max-chars", "300", "screen", "run", "--filters", "sec_technology", "--pages", "2", code=9)["results"][0]["error"]
+    error = client.run("--max-chars", "800", "screen", "run", "--filters", "sec_technology", "--pages", "2", code=9)["results"][0]["error"]
     assert "--out" in error["fix"]
 
 
@@ -198,7 +223,7 @@ def test_caught_later_page_failure_is_saved_with_original_error(client, body, st
     assert saved["data"]["error"] == result["error"]
     raw = client.one("read", failed_id, "--raw")
     assert raw["data"] == body and any("original observation failed" in warning for warning in raw["warnings"])
-    assert client.one("read", result["id"])["data"]["status"] == "partial"
+    assert client.one("read", result["id"], code=8)["data"]["status"] == "partial"  # reading a partial aggregate stays partial
 
 
 def test_aggregate_keeps_unselected_rows_even_when_export_selection_is_empty(client, tmp_path):
@@ -212,3 +237,11 @@ def test_aggregate_keeps_unselected_rows_even_when_export_selection_is_empty(cli
     assert [row["ticker"] for row in saved["data"]] == ["AAPL", "MSFT", "GOOG"]
     assert saved["data"][2]["Market Cap"] == "2T"
     assert json.loads(client.one("read", result["id"], "--raw")["data"]) == saved
+
+
+def test_a_single_page_screen_that_returned_nothing_is_stored_as_empty(client):
+    from pages import screener_table
+    client.add("https://finviz.com/screener?v=111&ft=4&r=1", screener_table([], total=0, page_values=(1,)))
+    result = client.one("screen", "run", code=7)
+    assert result["status"] == "empty"
+    assert client.one("read", result["id"], code=7)["data"]["status"] == "empty"

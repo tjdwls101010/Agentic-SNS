@@ -137,10 +137,10 @@ python3 .claude/skills/twitter/scripts/twitter.py doctor
 The Finviz skill requires Python 3.11+, `uv` and curl 8.4+. It reads anonymous Finviz responses directly; no Aside account or Finviz login is needed. Name Finviz or provide its URL when asking the agent to use this source.
 
 ```bash
-uv run --isolated --frozen --project .claude/skills/finviz python .claude/skills/finviz/scripts/finviz.py doctor
-uv run --isolated --frozen --project .claude/skills/finviz python .claude/skills/finviz/scripts/finviz.py --help
+uv run -q --frozen --project .claude/skills/finviz python .claude/skills/finviz/scripts/finviz.py doctor
+uv run -q --frozen --project .claude/skills/finviz python .claude/skills/finviz/scripts/finviz.py --help
 ```
 
-For example: “Use Finviz to find large technology companies and compare the definitions and periods behind their earnings-growth figures.” The CLI owns the current command and data catalog. Anonymous API responses can be broader than the displayed free table; access restrictions remain restrictions. Map and bubble support is numerical, without a renderer. External news and SEC originals remain links for other readers.
+For example: “Use Finviz to find large technology companies and compare the definitions and periods behind their earnings-growth figures.” The CLI owns the current command and data catalog: `--help` lists the groups, `GROUP LEAF --help` a command's own arguments, and `schema GROUP LEAF` its full contract. Anonymous API responses can be broader than the displayed free table; access restrictions remain restrictions. Map and bubble support is numerical, without a renderer. External news and SEC originals remain links for other readers.
 
-Observations, including failed-extraction source responses, are stored locally under `~/.cache/finviz-skill/observations.sqlite3` unless `--store` or `FINVIZ_STORE` selects another location. `inspect` and `read` reuse those observations; `collect` checkpoints pagination and can export JSONL. Retain a store while using its result IDs and delete it when the material is no longer needed. Full data is saved even when terminal output is a preview.
+Observations, including failed-extraction source responses, are stored locally under `~/.cache/finviz-skill/observations.sqlite3` unless `--store` or `FINVIZ_STORE` selects another location. `inspect` and `read` reuse those observations without contacting Finviz again, and `read ID --raw --chars START-END` reaches a response too large to print. Each command answers with one screenful by default and reports what it left out under `coverage`; nothing is silently truncated, and a result over `--max-chars` is replaced by a `too_large` error naming how to narrow it. Retain a store while using its result IDs and delete it when the material is no longer needed.

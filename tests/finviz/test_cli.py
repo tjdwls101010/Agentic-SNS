@@ -1,4 +1,6 @@
+import shlex
 import json
+import re
 
 
 def test_search_returns_candidates_and_saved_observation_can_be_reread(client):
@@ -39,12 +41,14 @@ def test_redirect_to_external_host_is_refused_and_internal_redirect_keeps_reques
     client.add("https://finviz.com/api/suggestions?input=Out", "", status=302, headers={"Location": "https://evil.example/x"})
     result = client.one("search", "Out", code=2)
     assert result["error"]["code"] == "unsupported_url"
-    client.add("https://finviz.com/api/suggestions?input=In", "", status=301, headers={"Location": "/api/suggestions?input=IN"})
+    client.add("https://finviz.com/api/suggestions?input=In", "moved along", status=301, headers={"Location": "/api/suggestions?input=IN"})
     client.add("https://finviz.com/api/suggestions?input=IN", [{"ticker": "IN"}])
     result = client.one("search", "In")
     assert result["source"]["url"].endswith("input=IN")
     assert result["source"]["requested_url"].endswith("input=In")
-    assert result["source"]["redirects"] == [{"url": "https://finviz.com/api/suggestions?input=In", "http_status": 301}]
+    hop = result["source"]["redirects"][0]
+    assert hop["url"] == "https://finviz.com/api/suggestions?input=In" and hop["http_status"] == 301
+    assert client.one("read", hop["id"], "--raw")["data"] == "moved along"  # every received response is saved, the chain included
 
 
 def test_selection_filters_fields_and_limits_records_and_rejects_unknown_fields(client):
@@ -59,11 +63,34 @@ def test_selection_filters_fields_and_limits_records_and_rejects_unknown_fields(
 
 def test_oversized_output_becomes_too_large_error_with_saved_observation(client):
     client.add("https://finviz.com/api/suggestions?input=A", [{"ticker": "A", "company": "x" * 300}])
-    doc = client.run("--max-chars", "200", "search", "A", code=9)
+    doc = client.run("--max-chars", "700", "search", "A", code=9)
     error = doc["results"][0]["error"]
     assert error["code"] == "too_large"
     assert "--limit" in error["fix"] and "read " + doc["results"][0]["id"] in error["fix"]
+    tiny = client.raw("--max-chars", "250", "search", "A", code=9)
+    assert len(tiny.stdout.strip()) <= 250  # the replacement document obeys the budget it is reporting on
+    smallest = json.loads(tiny.stdout)["results"][0]
+    assert smallest["id"] and "--max-chars" in smallest["error"]["fix"]  # down to a saved id and the size that fits
     assert client.one("read", doc["results"][0]["id"], "--pointer", "/data/0/ticker")["data"] == "A"
+
+
+def test_an_input_error_is_not_hidden_behind_the_size_of_the_payload_it_rejected(client):
+    """finalize kept the unselected payload on an error result, so the real diagnosis lost to too_large at the default budget."""
+    client.add("https://finviz.com/api/suggestions?input=A", [{"ticker": "A" * 40, "company": "x" * 900} for _ in range(30)])
+    result = client.one("search", "A", "--fields", "bogus", code=2)
+    assert result["error"]["code"] == "invalid_fields"
+    assert "ticker" in result["error"]["fix"] and "company" in result["error"]["fix"]
+    assert "data" not in result
+
+
+def test_a_too_large_fix_sizes_its_own_slice_from_the_document_it_could_not_send(client):
+    """A constant --limit 20 is not a recovery when twenty records are what overflowed."""
+    client.add("https://finviz.com/api/suggestions?input=A", [{"ticker": "T%d" % n, "company": "x" * 1500} for n in range(40)])
+    error = client.run("search", "A", code=9)["results"][0]  # twenty of these records are themselves over the budget
+    slice_command = re.search(r"read (\w+) --pointer (\S+) --start (\d+) --limit (\d+)", error["error"]["fix"])
+    assert slice_command, error["error"]["fix"]
+    recovered = client.one("read", slice_command[1], "--pointer", slice_command[2], "--start", slice_command[3], "--limit", slice_command[4])
+    assert recovered["status"] == "ok" and recovered["data"]
 
 
 def test_invalid_pointer_and_unknown_id_are_input_errors(client):
@@ -72,9 +99,31 @@ def test_invalid_pointer_and_unknown_id_are_input_errors(client):
     assert client.one("read", saved, "--pointer", "/data/9", code=2)["error"]["code"] == "invalid_pointer"
     assert client.one("read", "nope", code=2)["error"]["code"] == "unknown_id"
     sliced = client.one("read", saved, "--pointer", "/data", "--start", "0", "--limit", "1")
-    assert sliced["selection"] == {"pointer": "/data", "start": 0, "received": 1} and sliced["data"] == [{"ticker": "A"}]
+    assert sliced["selection"] == {"pointer": "/data", "start": 0, "received": 1, "shown": 1} and sliced["data"] == [{"ticker": "A"}]
+    assert client.one("read", saved, "--pointer", "/data", "--limit", "0", code=7)["selection"]["shown"] == 0
     pointers = {e["pointer"]: e["type"] for e in client.one("inspect", saved)["data"]}
     assert pointers["/data"] == "list" and pointers["/data/0/ticker"] == "str"
+
+
+def test_raw_reading_is_sliceable_by_character_range_and_names_the_next_window(client):
+    """A raw response larger than the budget is one string: --start/--limit cut containers, so only a character range reaches it."""
+    body = json.dumps([{"ticker": "A", "company": "x" * 5000}])
+    client.add("https://finviz.com/api/suggestions?input=A", body)
+    saved = client.one("search", "A")["id"]
+    head = client.one("read", saved, "--raw", "--chars", "0-1000")
+    assert head["data"] == body[:1000]
+    assert head["selection"] == {"pointer": "/raw", "start": 0, "received": len(body), "shown": 1000}
+    assert head["continuation"] == {"chars": "1000-2000"}
+    tail = client.one("read", saved, "--raw", "--chars", str(len(body) - 10) + "-")
+    assert tail["data"] == body[-10:] and "continuation" not in tail
+    windows, start = [], 0
+    while start is not None:
+        window = client.one("--max-chars", "2000", "read", saved, "--raw", "--chars", str(start) + "-" + str(start + 1000))
+        windows.append(window["data"])
+        start = int(window["continuation"]["chars"].split("-")[0]) if "continuation" in window else None
+    assert "".join(windows) == body
+    oversized = client.run("--max-chars", "800", "read", saved, "--raw", code=9)["results"][0]
+    assert "--chars" in oversized["error"]["fix"]
 
 
 def test_doctor_runs_offline(client):
@@ -106,7 +155,7 @@ def test_read_hides_headers_unless_pointed_at_and_accepts_the_root_pointer(clien
     headers = client.one("read", saved, "--pointer", "/source/headers")["data"]
     assert headers["retry-after"] == "5"
     pointers = [e["pointer"] for e in client.one("inspect", saved)["data"]]
-    assert pointers[0] == "/" and "/source/headers" in pointers
+    assert pointers[0] == "/data" and "/source/headers" in pointers
 
 
 def test_local_storage_failures_stay_inside_the_json_contract(client, tmp_path):
@@ -118,3 +167,81 @@ def test_local_storage_failures_stay_inside_the_json_contract(client, tmp_path):
     blocked.write_text("x")
     result = client.one("screen", "run", "--out", str(blocked / "rows.jsonl"), code=6)
     assert result["error"]["code"] == "local_io"
+
+
+def test_reading_an_empty_saved_response_is_empty_not_an_argument_error(client):
+    client.add("https://finviz.com/api/suggestions?input=A", "", status=429, headers={"Retry-After": "5"})
+    failed = client.one("search", "A", code=5)
+    assert client.one("read", failed["id"], "--raw", code=7)["data"] == ""
+
+
+def test_a_read_reports_how_much_it_actually_returned(client):
+    """coverage.shown said 40 while the slice held one row, because read skipped the step that updates it."""
+    source = [{"ticker": "T%d" % n, "note": "keep" if n < 3 else "drop"} for n in range(40)]
+    client.add("https://finviz.com/api/suggestions?input=A", source)
+    saved = client.one("search", "A")["id"]
+    one = client.one("read", saved, "--pointer", "/data", "--limit", "1")
+    assert len(one["data"]) == 1 and one["selection"]["shown"] == 1
+    assert one["coverage"]["shown"] == 1 and one["coverage"]["received"] == 40
+    none = client.one("read", saved, "--pointer", "/data", "--filter", "NEVER_MATCH_THIS", code=7)
+    assert none["data"] == [] and none["coverage"]["shown"] == 0
+
+
+def test_a_read_recovery_keeps_the_selection_it_was_recovering_from(client):
+    """Dropping --filter from the fix returns the first rows instead of the matches the model asked for."""
+    source = [{"ticker": "T%d" % n, "note": ("Trump" if n % 10 == 0 else "other") + "x" * 400} for n in range(40)]
+    client.add("https://finviz.com/api/suggestions?input=A", source)
+    saved = client.one("search", "A")["id"]
+    error = client.run("--max-chars", "1000", "read", saved, "--pointer", "/data", "--filter", "Trump", code=9)["results"][0]["error"]
+    assert "--filter Trump" in error["fix"], error["fix"]
+    command = shlex.split(error["fix"].split("read ")[1].split(". Or rerun")[0])
+    recovered = client.one("read", *command)
+    assert recovered["data"] and all("Trump" in row["note"] for row in recovered["data"])
+
+
+def test_the_smallest_error_document_does_not_offer_an_id_it_does_not_have(client):
+    refused = client.one("--max-chars", "120", "schema", code=2)  # a budget no error document fits is refused where it is given
+    assert refused["error"]["code"] == "invalid_argument" and "200" in refused["error"]["message"]
+    doc = client.run("--max-chars", "200", "schema", code=9)
+    assert len(json.dumps(doc, separators=(",", ":"))) <= 200
+    assert "results" in doc and doc["results"][0]["status"] == "error"
+    assert "id" not in doc["results"][0] or doc["results"][0]["id"]
+    assert "saved id" not in doc["results"][0]["error"]["fix"]
+
+
+def test_a_recovery_command_survives_being_tokenised(client):
+    """A field name with a space made the fix's own command unparseable when run as written."""
+    source = [{"Market Cap": "4827.02B", "Ticker": "T%d" % n, "note": "x" * 300} for n in range(40)]
+    client.add("https://finviz.com/api/suggestions?input=A", source)
+    saved = client.one("search", "A")["id"]
+    error = client.run("--max-chars", "1000", "read", saved, "--pointer", "/data", "--fields", "Ticker,Market Cap", code=9)["results"][0]["error"]
+    command = shlex.split(error["fix"].split("read ")[1].split(". Or rerun")[0])
+    recovered = client.one("read", *command)
+    assert recovered["status"] == "ok" and "Market Cap" in recovered["data"][0]
+
+
+def test_coverage_keeps_the_units_of_the_data_it_counts(client):
+    """The envelope's key count is not a row count: reporting it as coverage put two units in one object."""
+    source = [{"ticker": "T%d" % n} for n in range(40)]
+    client.add("https://finviz.com/api/suggestions?input=A", source)
+    saved = client.one("search", "A")["id"]
+    whole = client.one("read", saved)
+    assert "coverage" not in whole  # the observation recorded none, and the envelope's key count is not one
+    assert whole["selection"]["received"] == len(whole["data"])  # that count is the selection's business
+    rows = client.one("read", saved, "--pointer", "/data", "--limit", "1")
+    assert rows["coverage"] == {"received": 40, "shown": 1}
+    meta = client.one("read", saved, "--pointer", "/source")
+    assert "coverage" not in meta and meta["selection"]["received"] == len(meta["data"])
+
+
+def test_reading_metadata_does_not_restate_its_size_as_the_observations_coverage(client):
+    """A list of page ids counted as rows put two units in one coverage object."""
+    from pages import screener_table
+    for start in (1, 21):
+        rows_here = [("T%d%d" % (start, n), ["Company %d" % n, "4T"]) for n in range(3)]
+        client.add("https://finviz.com/screener?v=111&ft=4&r=%d" % start, screener_table(rows_here, total=169, current=start, page_values=(1, 21)))
+    aggregate = client.one("screen", "run", "--pages", "2")
+    rows = aggregate["coverage"]["received"]
+    pages = client.one("read", aggregate["id"], "--pointer", "/source/pages")
+    assert len(pages["data"]) == 2 and pages["selection"]["shown"] == 2
+    assert pages["coverage"]["received"] == rows and pages["coverage"]["shown"] == rows  # rows, not page ids

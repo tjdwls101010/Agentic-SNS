@@ -10,7 +10,6 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 CLI = ROOT / ".claude/skills/finviz/scripts/finviz.py"
-FIXTURES = Path(__file__).parent / "fixtures"
 
 FAKE_CURL = """#!/usr/bin/env python3
 import json, os, pathlib, sys
@@ -32,11 +31,6 @@ pathlib.Path(args[args.index('--dump-header') + 1]).write_text(headers + '\\r\\n
 print(entry.get('status', 200), end='')
 sys.exit(entry.get('exit', 0))
 """
-
-
-def fixture(name):
-    path = FIXTURES / name
-    return json.loads(path.read_text()) if name.endswith(".json") else path.read_text()
 
 
 @pytest.fixture
