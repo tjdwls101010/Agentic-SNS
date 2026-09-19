@@ -105,6 +105,26 @@ def test_map_does_not_substitute_the_default_for_a_missing_requested_type(client
     assert result["data"]["classification"] is None and result["data"]["performance"] == {"A": 2}
 
 
+def test_calendar_date_is_judged_by_the_sources_own_start_date_not_by_the_returned_items(client):
+    """A source that ignores dateFrom still returns items on or after it; only the page's own initialDateFrom separates applied from ignored."""
+    entries = {"items": [{"ticker": "MU", "earningsDate": "2026-09-25T08:30:00"}], "page": 1, "totalPages": 1, "totalItemsCount": 1}
+    ignored = {"data": {"initialDateFrom": "2026-09-18", "initialSort": "earningsDate", "initialPage": 1, "entries": entries}}
+    client.add("https://finviz.com/calendar/earnings?dateFrom=2026-09-01", calendar_page(ignored))
+    result = client.one("calendar", "earnings", "--date", "2026-09-01")
+    assert result["conditions"]["date"] == {"requested": "2026-09-01", "status": "not_applied", "evidence": {"source_date_from": "2026-09-18"}}
+    assert result["data"]["date_from"] == "2026-09-18"
+    applied = {"data": {"initialDateFrom": "2026-09-01", "initialSort": "-earningsDate", "initialPage": 1, "entries": entries}}
+    client.add("https://finviz.com/calendar/earnings?dateFrom=2026-09-01&sort=-earningsDate", calendar_page(applied))
+    result = client.one("calendar", "earnings", "--date", "2026-09-01", "--sort=-earningsDate")
+    assert result["conditions"]["date"] == {"requested": "2026-09-01", "status": "confirmed", "evidence": {"source_date_from": "2026-09-01"}}
+    assert result["conditions"]["sort"] == {"requested": "-earningsDate", "status": "confirmed", "evidence": {"source_sort": "-earningsDate"}}
+    client.add("https://finviz.com/api/calendar/earnings?dateFrom=2026-09-01&page=2&sort=earningsDate", dict(entries, page=2, totalPages=3))
+    paged = client.one("calendar", "earnings", "--date", "2026-09-01", "--page", "2")
+    assert paged["conditions"]["date"] == {"requested": "2026-09-01", "status": "unverified", "evidence": None}
+    assert paged["conditions"]["page"]["status"] == "confirmed"
+    assert "date_from" not in paged["data"] or paged["data"]["date_from"] is None
+
+
 def test_calendar_pages_use_source_entries_and_confirm_date_page_and_sort(client):
     entries = {"items": [{"ticker": "BIOX", "earningsDate": "2026-09-15T08:30:00", "isEarningDateEstimate": False, "epsEstimate": 0.07, "epsActual": None}], "page": 1, "pageSize": 100, "totalItemsCount": 5, "totalPages": 1}
     client.add("https://finviz.com/calendar/earnings", calendar_page({"data": {"initialDateFrom": "2026-09-15", "initialSort": "earningsDate", "initialPage": 1, "entries": entries}, "version": 3}))
@@ -115,14 +135,14 @@ def test_calendar_pages_use_source_entries_and_confirm_date_page_and_sort(client
     later = [{"ticker": "ISPR", "earningsDate": "2026-09-21T08:30:00", "epsEstimate": 0.01}]
     client.add("https://finviz.com/api/calendar/earnings?dateFrom=2026-09-20&page=2&sort=earningsDate", dict(entries, items=later, page=2, totalPages=3))
     result = client.one("calendar", "earnings", "--date", "2026-09-20", "--page", "2")
-    assert result["data"] == {"date_from": "2026-09-20", "items": later}
-    assert result["conditions"] == {"date": {"requested": "2026-09-20", "status": "confirmed", "evidence": {"earliest_item": "2026-09-21T08:30:00"}}, "page": {"requested": 2, "status": "confirmed", "evidence": 2}}
+    assert result["data"] == {"date_from": None, "items": later}
+    assert result["conditions"] == {"date": {"requested": "2026-09-20", "status": "unverified", "evidence": None}, "page": {"requested": 2, "status": "confirmed", "evidence": 2}}
     assert result["continuation"] == {"page": 3}
     economic = [{"calendarId": 1, "event": "Monthly Budget Statement", "date": "2026-09-11T14:00:00", "actual": "-$167B", "forecast": "-$404B"}]
     client.add("https://finviz.com/calendar/economic", calendar_page({"data": {"initialDateFrom": "2026-09-14", "entries": economic}}))
     result = client.one("calendar", "economic")
     assert result["data"]["items"] == economic and result["coverage"]["received"] == 1
-    client.add("https://finviz.com/api/calendar/economic?dateFrom=2026-09-01", economic)
+    client.add("https://finviz.com/calendar/economic?dateFrom=2026-09-01", calendar_page({"data": {"initialDateFrom": "2026-09-01", "entries": economic}}))
     result = client.one("calendar", "economic", "--date", "2026-09-01")
     assert result["data"]["items"] == economic and result["conditions"]["date"]["status"] == "confirmed"
     client.add("https://finviz.com/calendar/dividends", calendar_page({"data": {"initialDateFrom": "2026-09-15", "initialPage": 1, "entries": dict(entries, totalPages=7, totalItemsCount=304)}}))
@@ -188,13 +208,16 @@ def test_open_reads_any_supported_finviz_url_generically_and_refuses_others(clie
     assert json.dumps(data)  # generic output is plain JSON
 
 
-def test_calendar_kinds_are_real_commands_with_their_own_schema_and_sorting_goes_through_the_api(client):
+def test_calendar_kinds_are_real_commands_with_their_own_schema_and_the_first_page_sorts_without_a_second_request(client):
     assert client.one("schema", "calendar", "earnings")["data"]["command"] == "calendar earnings"
-    page = {"data": {"initialDateFrom": "2026-09-15", "initialSort": "earningsDate", "initialPage": 1, "entries": {"items": [{"ticker": "A", "earningsDate": "2026-09-15T08:30:00"}], "page": 1, "totalPages": 1}}}
-    client.add("https://finviz.com/calendar/earnings", calendar_page(page))
-    client.add("https://finviz.com/api/calendar/earnings?dateFrom=2026-09-15&page=1&sort=-earningsDate", {"items": [{"ticker": "Z", "earningsDate": "2026-09-30T08:30:00"}], "page": 1, "totalPages": 1})
+    sorted_page = {"data": {"initialDateFrom": "2026-09-15", "initialSort": "-earningsDate", "initialPage": 1, "entries": {"items": [{"ticker": "Z", "earningsDate": "2026-09-30T08:30:00"}], "page": 1, "totalPages": 1}}}
+    client.add("https://finviz.com/calendar/earnings?sort=-earningsDate", calendar_page(sorted_page))
     result = client.one("calendar", "earnings", "--sort=-earningsDate")
-    assert result["data"]["items"][0]["ticker"] == "Z" and result["conditions"]["sort"]["status"] == "unverified"
+    assert result["data"]["items"][0]["ticker"] == "Z"
+    assert result["conditions"]["sort"] == {"requested": "-earningsDate", "status": "confirmed", "evidence": {"source_sort": "-earningsDate"}}
+    ignored = {"data": {"initialDateFrom": "2026-09-15", "initialSort": "earningsDate", "initialPage": 1, "entries": {"items": [{"ticker": "A"}], "page": 1, "totalPages": 1}}}
+    client.add("https://finviz.com/calendar/earnings?sort=marketCap", calendar_page(ignored))
+    assert client.one("calendar", "earnings", "--sort", "marketCap")["conditions"]["sort"] == {"requested": "marketCap", "status": "not_applied", "evidence": {"source_sort": "earningsDate"}}
     assert client.one("calendar", "season", "--page", "2", code=2)["error"]["code"] == "invalid_argument"
     client.add("https://finviz.com/calendar/earnings", calendar_page({"data": {"initialDateFrom": "2026-09-15", "entries": {"items": [], "page": 1, "totalPages": 1, "totalItemsCount": 0}}}))
     empty = client.one("calendar", "earnings", code=7)

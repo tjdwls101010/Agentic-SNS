@@ -13,9 +13,9 @@ CALENDAR_PATHS = {"earnings": "/calendar/earnings", "dividends": "/calendar/divi
 DATE_FIELDS = {"earnings": "earningsDate", "dividends": "exdate", "economic": "date", "season": "date"}
 
 
-CALENDAR_ARGS = [(("--date",), dict(default=None, help="Start date YYYY-MM-DD; without it the page's own default date is used and reported as date_from. Not accepted by season.")), (("--page",), dict(type=int, default=1, help="One-based page from a previous continuation; earnings and dividends page through the calendar API. Values other than 1 are rejected by economic and season.")), (("--sort",), dict(default=None, help="Source sort key for earnings, e.g. earningsDate or -earningsDate; sorting goes through the calendar API."))]
+CALENDAR_ARGS = [(("--date",), dict(default=None, help="Start date YYYY-MM-DD; the page states back the start date it used as date_from, and the date condition is judged from that echo. Not accepted by season.")), (("--page",), dict(type=int, default=1, help="One-based page from a previous continuation; pages after the first come from the calendar API, which states back no date or sort, so those conditions stay unverified. Values other than 1 are rejected by economic and season.")), (("--sort",), dict(default=None, help="Source sort key, e.g. earningsDate or -earningsDate; the page states the applied sort back as evidence."))]
 CALENDAR_HELP = {"earnings": "Earnings calendar: report dates with EPS and sales estimates, actuals and surprises.", "dividends": "Dividend calendar: ex-dates with ordinary and special amounts and yields.", "economic": "Economic calendar: events with actual, previous and forecast values.", "season": "Earnings season preview: upcoming report counts per day with estimates."}
-CALENDAR_OUTPUT = {"date_from": "the start date the source used", "items": "source records: earnings carry epsEstimate/epsActual/salesEstimate and isEarningDateEstimate; dividends carry exdate, ordinary, special, yield; economic carry event, actual, previous, forecast; season carries date and estimates", "totals_per_day": "season only: report counts per day"}
+CALENDAR_OUTPUT = {"date_from": "the start date the source states it used; null when the response states none, as the paging API does", "items": "source records: earnings carry epsEstimate/epsActual/salesEstimate and isEarningDateEstimate; dividends carry exdate, ordinary, special, yield; economic carry event, actual, previous, forecast; season carries date and estimates", "totals_per_day": "season only: report counts per day"}
 
 
 def calendar_leaf(kind):
@@ -28,7 +28,8 @@ def calendar(ctx, args, target):
         raise Failure("invalid_argument", "The economic calendar has no pagination.", "Omit --page; narrow with --date, --filter or --limit.")
     if args.kind == "season" and (args.date or args.page != 1 or args.sort):
         raise Failure("invalid_argument", "The season preview has no date, page or sort selectors.", "Run calendar season without them; select locally with --filter or --limit.")
-    use_api = args.kind != "season" and (args.date or args.page != 1 or args.sort)
+    # 성진: 페이지가 dateFrom·sort를 적용하고 그 값을 route-init-data에 되비추므로 1페이지는 페이지에서 읽는다. API는 되비추는 값이 없어 페이지를 넘길 때만 쓴다.
+    use_api = args.page != 1
     date_from = args.date
     if use_api and not date_from:
         page_obs, page_data = calendar_page_data(ctx, args.kind)
@@ -36,32 +37,33 @@ def calendar(ctx, args, target):
         if not date_from:
             raise page_obs.fail("structure_changed", "The calendar page does not state its default date.", "Pass --date explicitly.")
     if use_api:
-        query = {"dateFrom": date_from, "page": args.page if args.kind != "economic" else None, "sort": args.sort or ("earningsDate" if args.kind == "earnings" else None)}
+        query = {"dateFrom": date_from, "page": args.page, "sort": args.sort or ("earningsDate" if args.kind == "earnings" else None)}
         obs = ctx.observe("https://finviz.com/api/calendar/" + args.kind + "?" + urlencode({k: v for k, v in query.items() if v is not None}))
         root = obs.json()
         entries = root if isinstance(root, dict) else None
         items = root.get("items", []) if isinstance(root, dict) else root
         data = {}
+        stated_date, stated_sort = (None if args.date else date_from), None  # the API states no start date of its own
     else:
-        obs, data = calendar_page_data(ctx, args.kind)
+        obs, data = calendar_page_data(ctx, args.kind, {"dateFrom": args.date, "sort": args.sort})
         entries = data.get("entries") if isinstance(data.get("entries"), dict) else None
         items = entries.get("items", []) if entries else (data.get("entries") or [])
-        date_from = data.get("initialDateFrom")
+        stated_date, stated_sort = data.get("initialDateFrom"), data.get("initialSort")
+        date_from = stated_date
     if not isinstance(items, list):
         raise obs.fail("structure_changed", "The calendar response has no item list.", "Read the saved raw response with read ID --raw.")
     obs.result["target"] = args.kind
-    obs.result["data"] = {"date_from": date_from, "items": items}
+    obs.result["data"] = {"date_from": stated_date, "items": items}
     if args.kind == "season":
         obs.result["data"]["totals_per_day"] = data.get("totalsPerDay")
     conditions = {}
     if args.date:
-        dates = sorted(str(i.get(DATE_FIELDS[args.kind]) or "") for i in items if isinstance(i, dict))
-        conditions["date"] = condition(args.date, ("confirmed" if dates[0][:10] >= args.date else "not_applied") if dates and dates[0] else "unverified", {"earliest_item": dates[0]} if dates and dates[0] else None)
+        conditions["date"] = echoed_condition(args.date, stated_date, "source_date_from")
     if args.page != 1 or (use_api and args.kind != "economic"):
         observed = entries.get("page") if entries else None
         conditions["page"] = condition(args.page, ("confirmed" if observed == args.page else "not_applied") if observed is not None else "unverified", observed)
     if args.sort:
-        conditions["sort"] = condition(args.sort, "unverified", None)
+        conditions["sort"] = echoed_condition(args.sort, stated_sort, "source_sort")
     obs.result["conditions"] = conditions
     coverage = {"received": len(items), "exhaustive": False}
     if entries:
@@ -80,8 +82,16 @@ for _kind in CALENDAR_PATHS:
     calendar_leaf(_kind)(calendar)
 
 
-def calendar_page_data(ctx, kind):
-    obs = ctx.observe("https://finviz.com" + CALENDAR_PATHS[kind])
+def echoed_condition(requested, stated, evidence_key):
+    """Judge a selector by the value the source states back, never by whether the returned rows happen to satisfy it."""
+    if stated is None:
+        return condition(requested, "unverified", None)
+    return condition(requested, "confirmed" if str(stated) == str(requested) else "not_applied", {evidence_key: stated})
+
+
+def calendar_page_data(ctx, kind, query=None):
+    parameters = urlencode({k: v for k, v in (query or {}).items() if v is not None})
+    obs = ctx.observe("https://finviz.com" + CALENDAR_PATHS[kind] + ("?" + parameters if parameters else ""))
     root = markup.script_json(markup.soup(obs), obs, "route-init-data")
     data = root.get("data") if isinstance(root, dict) else None
     if not isinstance(data, dict):
