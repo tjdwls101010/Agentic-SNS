@@ -145,7 +145,7 @@ def test_calendar_date_is_judged_by_the_sources_own_start_date_not_by_the_return
     client.add("https://finviz.com/calendar/earnings?dateFrom=2026-09-01&sort=-earningsDate", calendar_page(applied))
     result = client.one("calendar", "earnings", "--date", "2026-09-01", "--sort=-earningsDate")
     assert result["conditions"]["date"] == {"requested": "2026-09-01", "status": "confirmed", "evidence": {"source_date_from": "2026-09-01"}}
-    assert result["conditions"]["sort"] == {"requested": "-earningsDate", "status": "confirmed", "evidence": {"source_sort": "-earningsDate"}}
+    assert result["conditions"]["sort"] == {"requested": "-earningsDate", "status": "unverified", "evidence": {"source_sort": "-earningsDate"}}
     client.add("https://finviz.com/api/calendar/earnings?dateFrom=2026-09-01&page=2&sort=earningsDate", dict(entries, page=2, totalPages=3))
     paged = client.one("calendar", "earnings", "--date", "2026-09-01", "--page", "2")
     assert paged["conditions"]["date"] == {"requested": "2026-09-01", "status": "unverified", "evidence": None}
@@ -236,6 +236,19 @@ def test_headline_and_calendar_defaults_are_one_screenful_and_keep_every_section
     assert trades["coverage"]["received"] == 40 and trades["coverage"]["shown"] == 20
 
 
+def test_a_default_window_narrows_the_answer_without_narrowing_the_search_or_the_observation(client):
+    """A window applied before --filter would answer "not in the news" from a result that holds the headline."""
+    items = [("0%d:00AM" % (i % 10), "Headline %d" % i, "https://example.com/%d" % i, "Source", ()) for i in range(60)]
+    client.add("https://finviz.com/news", news_page(items=tuple(items)))
+    default = client.one("news", "headlines")
+    assert default["coverage"] == {"received": 60, "shown": 40, "exhaustive": False}
+    found = client.one("news", "headlines", "--filter", "Headline 55")
+    assert [i["title"] for i in found["data"]] == ["Headline 55"] and found["coverage"]["received"] == 60
+    beyond = client.one("read", default["id"], "--pointer", "/data", "--start", "40", "--limit", "5")
+    assert beyond["selection"]["received"] == 60 and len(beyond["data"]) == 5  # the store keeps what the window left out
+    assert client.one("read", default["id"], "--pointer", "/data", "--filter", "Headline 55", "--limit", "1")["data"][0]["title"] == "Headline 55"
+
+
 def test_news_pulse_lists_rows_and_reads_one_explanation(client):
     client.add("https://finviz.com/news?v=6", pulse_page())
     result = client.one("news", "pulse")
@@ -248,7 +261,7 @@ def test_news_pulse_lists_rows_and_reads_one_explanation(client):
 def test_news_article_reads_finviz_hosted_articles_only(client):
     client.add("https://finviz.com/news/123/fed-decision-preview", article_page())
     data = client.one("news", "article", "https://finviz.com/news/123/fed-decision-preview")["data"]
-    assert data == {"title": "Fed Decision Preview", "paragraphs": ["First paragraph.", "Second paragraph."], "text": "First paragraph. Second paragraph. SEC filing", "links": [{"text": "SEC filing", "url": "https://www.sec.gov/x"}], "images": ["https://finviz.com/img/chart.png"]}
+    assert data == {"title": "Fed Decision Preview", "paragraphs": ["First paragraph.", "Second paragraph."], "links": [{"text": "SEC filing", "url": "https://www.sec.gov/x"}], "images": ["https://finviz.com/img/chart.png"]}
     assert client.one("news", "article", "https://www.marketwatch.com/story/x", code=2)["error"]["code"] == "unsupported_url"
 
 
@@ -297,14 +310,22 @@ def test_calendar_kinds_are_real_commands_with_their_own_schema_and_the_first_pa
     client.add("https://finviz.com/calendar/earnings?sort=-earningsDate", calendar_page(sorted_page))
     result = client.one("calendar", "earnings", "--sort=-earningsDate")
     assert result["data"]["items"][0]["ticker"] == "Z"
-    assert result["conditions"]["sort"] == {"requested": "-earningsDate", "status": "confirmed", "evidence": {"source_sort": "-earningsDate"}}
+    assert result["conditions"]["sort"] == {"requested": "-earningsDate", "status": "unverified", "evidence": {"source_sort": "-earningsDate"}}
     ignored = {"data": {"initialDateFrom": "2026-09-15", "initialSort": "earningsDate", "initialPage": 1, "entries": {"items": [{"ticker": "A"}], "page": 1, "totalPages": 1}}}
     client.add("https://finviz.com/calendar/earnings?sort=marketCap", calendar_page(ignored))
     assert client.one("calendar", "earnings", "--sort", "marketCap")["conditions"]["sort"] == {"requested": "marketCap", "status": "not_applied", "evidence": {"source_sort": "earningsDate"}}
+    # Measured 2026-09-19: the page repeats any sort key it is given, including one the API answers with HTTP 400,
+    # while an unusable date is replaced by the page's own default. So an agreeing sort echo confirms nothing.
+    repeated = {"data": {"initialDateFrom": "2026-09-15", "initialSort": "bogus", "initialPage": 1, "entries": {"items": [{"ticker": "A"}], "page": 1, "totalPages": 1}}}
+    client.add("https://finviz.com/calendar/earnings?sort=bogus", calendar_page(repeated))
+    echoed = client.one("calendar", "earnings", "--sort", "bogus")["conditions"]["sort"]
+    assert echoed == {"requested": "bogus", "status": "unverified", "evidence": {"source_sort": "bogus"}}
     assert client.one("calendar", "season", "--page", "2", code=2)["error"]["code"] == "invalid_argument"
     client.add("https://finviz.com/calendar/earnings", calendar_page({"data": {"initialDateFrom": "2026-09-15", "entries": {"items": [], "page": 1, "totalPages": 1, "totalItemsCount": 0}}}))
     empty = client.one("calendar", "earnings", code=7)
     assert empty["status"] == "empty" and empty["data"]["date_from"] == "2026-09-15" and empty["coverage"]["received"] == 0
+    replayed = client.one("read", empty["id"], code=7)  # a recovery path must not report success for a response that carried nothing
+    assert replayed["status"] == "empty" and replayed["data"]["status"] == "empty"
 
 
 def test_market_and_group_api_parameters_report_conditions(client):
@@ -386,5 +407,5 @@ def test_open_preserves_article_headers_and_content_links_like_the_article_reade
     opened = client.one("open", url)["data"]
     assert opened["article"] == expected
     assert opened["article"]["title"] == "Fed Decision Preview"
-    assert "Fed Decision Preview By Reporter" in opened["article"]["text"]
+    assert opened["article"]["paragraphs"] == ["By Reporter", "First paragraph."]
     assert opened["links"] == [{"text": "Mentioned screener", "url": "https://finviz.com/screener"}]

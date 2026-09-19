@@ -72,12 +72,16 @@ KIND = (("kind",), dict(metavar="KIND", choices=["futures", "forex", "crypto"], 
 SPARKLINE = ("sparkline", "sparklineDateChanges")
 
 
-@leaf("market", "quotes", help="Current quotes for every futures, forex or crypto instrument Finviz lists.", args=[KIND, (("--timeframe",), dict(default="d", help="Source timeframe for the change fields, e.g. d, w, m.")), (("--sparkline",), dict(action="store_true", help="Keep each instrument's intraday sparkline points, which are about nine tenths of the response; the saved observation keeps them either way."))], output={"mapping of ticker to quote": "the quote as published, including extra source fields; the sparkline point arrays are left out unless --sparkline asks for them; --fields selects ticker keys, --filter matches keys or quote values, --limit counts instruments"}, keyed=True, narrow=["--filter", "--keys", "--fields", "--limit"])
+def without_sparklines(data, args):
+    if args.sparkline or not isinstance(data, dict):
+        return data
+    return {key: {field: value for field, value in quote.items() if field not in SPARKLINE} if isinstance(quote, dict) else quote for key, quote in data.items()}
+
+
+@leaf("market", "quotes", help="Current quotes for every futures, forex or crypto instrument Finviz lists.", args=[KIND, (("--timeframe",), dict(default="d", help="Source timeframe for the change fields, e.g. d, w, m.")), (("--sparkline",), dict(action="store_true", help="Keep each instrument's intraday sparkline points, which are about nine tenths of the response; the saved observation keeps them either way."))], output={"mapping of ticker to quote": "the quote as published, including extra source fields; the sparkline point arrays are left out unless --sparkline asks for them; --keys chooses instruments, --fields chooses fields inside each quote, --filter matches keys or quote values, --limit counts instruments"}, keyed=True, window=without_sparklines, narrow=["--filter", "--keys", "--fields", "--limit"])
 def quotes(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/" + args.kind + "_all?" + urlencode({"timeframe": args.timeframe}))
     source = obs.json()
-    if not args.sparkline and isinstance(source, dict):
-        source = {k: {f: value for f, value in quote.items() if f not in SPARKLINE} if isinstance(quote, dict) else quote for k, quote in source.items()}
     obs.result["conditions"] = {"timeframe": condition(args.timeframe, "unverified", None)}
     obs.result["target"], obs.result["data"] = args.kind, source
     return obs.result

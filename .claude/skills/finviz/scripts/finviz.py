@@ -55,21 +55,21 @@ def transport_settings():
 
 
 class Leaf:
-    def __init__(self, group, name, help, output, fn, args, narrow, records, targets, default_limit, keyed, context, recent):
+    def __init__(self, group, name, help, output, fn, args, narrow, records, targets, default_limit, keyed, context, recent, window):
         self.group, self.name, self.help, self.output, self.fn = group, name, help, output, fn
         self.args, self.narrow, self.records, self.targets, self.default_limit = args, narrow, records, targets, default_limit
-        self.keyed, self.context, self.recent = keyed, list(context), recent
+        self.keyed, self.context, self.recent, self.window = keyed, list(context), recent, window
 
     @property
     def path(self):
         return self.group + (" " + self.name if self.name else "")
 
 
-def leaf(group, name=None, *, help, output, args=(), narrow=(), records=None, targets=None, default_limit=None, keyed=False, context=(), recent=False):
-    """Register a command. `records` names the collection inside data (None = data itself); `keyed` enables selection of mapping keys; `targets` names a positional list that yields one result per value; `context` names the data fields a slice of this result cannot be interpreted without, which read carries alongside the slice; `recent` marks a series published oldest first, where a limit keeps the newest records instead of the first."""
+def leaf(group, name=None, *, help, output, args=(), narrow=(), records=None, targets=None, default_limit=None, keyed=False, context=(), recent=False, window=None):
+    """Register a command. `records` names the collection inside data (None = data itself); `keyed` enables selection of mapping keys; `targets` names a positional list that yields one result per value; `context` names the data fields a slice of this result cannot be interpreted without, which read carries alongside the slice; `recent` marks a series published oldest first, where a limit keeps the newest records instead of the first; `window` is the leaf's own default range, applied to the printed result only, so the saved observation still holds everything the source returned."""
 
     def register(fn):
-        LEAVES.append(Leaf(group, name, help, output, fn, list(args), list(narrow), records, targets, default_limit, keyed, context, recent))
+        LEAVES.append(Leaf(group, name, help, output, fn, list(args), list(narrow), records, targets, default_limit, keyed, context, recent, window))
         return fn
 
     return register
@@ -160,6 +160,7 @@ def read(ctx, args, target):
     if args.chars and not args.raw:
         raise Failure("invalid_argument", "--chars selects characters of the raw response text.", "Add --raw, or select the extracted envelope with --pointer, --start and --limit.")
     pointer = "" if args.pointer == "/" else args.pointer
+    item = next(entry for entry in LEAVES if entry.path == "read")
     saved = ctx.store.get(args.id)
     if not pointer.startswith("/source/headers") and isinstance(saved.get("source"), dict):
         saved["source"] = {k: v for k, v in saved["source"].items() if k != "headers"}
@@ -187,7 +188,8 @@ def read(ctx, args, target):
     selection = {"pointer": pointer or "/", "start": args.start}
     if isinstance(value, list):
         selection["received"] = len(value)
-        value = value[args.start :][: args.limit] if args.limit is not None else value[args.start :]
+        value, _ = output.select_records(value[args.start :], args, item)  # --filter searches the slice before --limit cuts it
+        result["selection_applied"] = True
     elif isinstance(value, dict):
         selection["received"] = len(value)
         keys = list(value)[args.start :]
@@ -398,6 +400,8 @@ def main(argv=None):
             result["target"], result["status"], result["error"] = target if target is not None else result.get("target", item.path), "error", output.error_info("parse_error", type(exc).__name__ + ": " + str(exc)[:200], "The provider structure may have changed; read the saved raw response with read ID --raw.")
         finally:
             try:
+                if isinstance(result, dict) and not result.get("selection_applied"):
+                    output.settle_empty(result, item)
                 ctx.flush()
             except (OSError, sqlite3.Error) as exc:
                 result = dict(result, status="error", error=output.error_info("local_io", "Saving the observation failed: " + str(exc)[:200], "Check the --store path and disk space."))

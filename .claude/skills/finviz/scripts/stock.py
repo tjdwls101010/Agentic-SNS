@@ -41,14 +41,12 @@ def stock_leaf(name, help, output, **options):
     return leaf("stock", name, help=help, output=output, args=[TICKERS] + extra, targets="tickers", **options)
 
 
-@stock_leaf("snapshot", "Company or ETF header and every snapshot metric with its own definition; repeated labels stay separate.", {"ticker, name, last_close, as_of, change": "header facts as displayed; as_of is Finviz's quote time text", "metrics": "[{label, value, definition, unit}] in page order, where the same label can appear twice with different definitions. Asked for several tickers at once, each metric carries label and value only, because the definitions are the same page's text repeated per ticker; --fields label,value,definition brings them back."}, records="metrics", narrow=["--filter", "--fields", "--limit"], context=["ticker", "name", "last_close", "as_of", "change"], overview=True)
+@stock_leaf("snapshot", "Company or ETF header and every snapshot metric with its own definition; repeated labels stay separate.", {"ticker, name, last_close, as_of, change": "header facts as displayed; as_of is Finviz's quote time text", "metrics": "[{label, value, definition, unit}] in page order, where the same label can appear twice with different definitions. Asked for several tickers at once, each metric carries label and value only, because the definitions are the same page's text repeated per ticker; --fields label,value,definition brings them back."}, records="metrics", narrow=["--filter", "--fields", "--limit"], context=["ticker", "name", "last_close", "as_of", "change"], overview=True, window=lambda data, args: data if len(args.tickers) == 1 or args.fields else dict(data, metrics=[{"label": m["label"], "value": m["value"]} for m in data["metrics"]]))
 def snapshot(ctx, args, ticker):
     obs, page = stock_page(ctx, ticker, "c", args)
     found = markup.metrics(page)
     if not found:
         raise obs.fail("structure_changed", "No snapshot metrics were found.", "Read the saved raw page with read ID --raw.")
-    if len(args.tickers) > 1 and not args.fields:
-        found = [{"label": metric["label"], "value": metric["value"]} for metric in found]
     obs.result["data"] = dict(header(page), metrics=found)
     return obs.result
 
@@ -171,18 +169,12 @@ def short_interest(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("options", "Option chain for one expiry with Finviz's implied volatility and greeks.", {"expiries": "expiries the source offers; pass one to --expiry", "current_expiry": "the expiry the chain belongs to", "last_close, last_time": "underlying price context", "contracts": "[{strike, type, openInterest, bidPrice, askPrice, lastClose, iv, delta, gamma, theta, vega, rho, ...}] as published"}, args=[(("--expiry",), dict(default=None, help="Expiry YYYY-MM-DD from a previous result's expiries; the source's nearest expiry when omitted.")), (("--type",), dict(default=None, choices=["call", "put"], help="Keep only calls or only puts (local selection).")), (("--strikes",), dict(type=int, default=20, help="Keep the contracts on the N strikes nearest last_close, calls and puts alike, in source order; 0 keeps the whole expiry, which usually needs a larger --max-chars."))], records="contracts", narrow=["--strikes", "--type", "--fields", "--limit"], context=["current_expiry", "last_close", "last_time"])
-def options(ctx, args, ticker):
-    obs, page, init = section_data(ctx, ticker, "oc", e=args.expiry)
-    contracts = init.get("options") or []
-    obs.result["coverage"] = {"received": len(contracts)}
+def chain_window(data, args):
+    """The contracts a chain is read for: one side if asked, on the strikes nearest the underlying."""
+    contracts = data["contracts"]
     if args.type:
         contracts = [c for c in contracts if c.get("type") == args.type]
-    contracts = around_last_close(contracts, init.get("lastClose"), args.strikes)
-    if args.expiry:
-        obs.result["conditions"] = {"expiry": condition(args.expiry, "confirmed" if init.get("currentExpiry") == args.expiry else "not_applied", init.get("currentExpiry"))}
-    obs.result["data"] = {"expiries": init.get("expiries"), "current_expiry": init.get("currentExpiry"), "last_close": init.get("lastClose"), "last_time": init.get("lastTime"), "contracts": contracts}
-    return obs.result
+    return dict(data, contracts=around_last_close(contracts, data.get("last_close"), args.strikes))
 
 
 def around_last_close(contracts, last_close, keep):
@@ -192,6 +184,16 @@ def around_last_close(contracts, last_close, keep):
         return contracts
     chosen = set(sorted(strikes, key=lambda s: abs(s - last_close))[:keep])
     return [c for c in contracts if c.get("strike") in chosen]
+
+
+@stock_leaf("options", "Option chain for one expiry with Finviz's implied volatility and greeks.", {"expiries": "expiries the source offers; pass one to --expiry", "current_expiry": "the expiry the chain belongs to", "last_close, last_time": "underlying price context", "contracts": "[{strike, type, openInterest, bidPrice, askPrice, lastClose, iv, delta, gamma, theta, vega, rho, ...}] as published"}, args=[(("--expiry",), dict(default=None, help="Expiry YYYY-MM-DD from a previous result's expiries; the source's nearest expiry when omitted.")), (("--type",), dict(default=None, choices=["call", "put"], help="Keep only calls or only puts (local selection).")), (("--strikes",), dict(type=int, default=20, help="Keep the contracts on the N strikes nearest last_close, calls and puts alike, in source order; 0 keeps the whole expiry, which usually needs a larger --max-chars."))], records="contracts", window=chain_window, narrow=["--strikes", "--type", "--fields", "--limit"], context=["current_expiry", "last_close", "last_time"])
+def options(ctx, args, ticker):
+    obs, page, init = section_data(ctx, ticker, "oc", e=args.expiry)
+    contracts = init.get("options") or []
+    if args.expiry:
+        obs.result["conditions"] = {"expiry": condition(args.expiry, "confirmed" if init.get("currentExpiry") == args.expiry else "not_applied", init.get("currentExpiry"))}
+    obs.result["data"] = {"expiries": init.get("expiries"), "current_expiry": init.get("currentExpiry"), "last_close": init.get("lastClose"), "last_time": init.get("lastTime"), "contracts": contracts}
+    return obs.result
 
 
 @stock_leaf("filings", "SEC filing list for the company with links to the originals; 30 per page.", {"items": "[{form, filingDate, reportDate, description, filing (index URL), document (primary document URL), accessionNumber}]", "available_forms": "form types present for this company", "form_categories": "Finviz's form groupings"}, args=[(("--page",), dict(type=int, default=1, help="One-based page from a previous continuation.")), (("--sort",), dict(default=None, help="Source sort key, e.g. -filingDate (the default order).")), (("--form",), dict(default=None, help="Keep only this form type, e.g. 10-K (local selection; the source has no form filter)."))], records="items", narrow=["--form", "--limit", "--fields"])

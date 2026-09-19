@@ -198,6 +198,16 @@ def test_option_chains_default_to_the_strikes_around_the_last_close(client):
     assert [c["strike"] for c in client.one("stock", "options", "A")["data"]["contracts"]] == [20, 20, 60, 60, 150, 150, 155, 155, 900, 900]
 
 
+def test_the_strike_window_narrows_the_answer_and_the_observation_keeps_the_expiry(client):
+    from pages import stock_section
+    contracts = [{"strike": strike, "type": kind, "iv": 1.0} for strike in (20, 60, 150, 155, 900) for kind in ("call", "put")]
+    client.add("https://finviz.com/stock?t=A&ty=oc", stock_section({"expiries": ["2026-10-16"], "currentExpiry": "2026-10-16", "options": contracts, "lastClose": 152.0}))
+    near = client.one("stock", "options", "A", "--strikes", "2")
+    assert near["coverage"] == {"received": 10, "shown": 4, "exhaustive": False}
+    whole = client.one("read", near["id"], "--pointer", "/data/contracts")
+    assert whole["selection"]["received"] == 10 and [c["strike"] for c in whole["data"]] == [20, 20, 60, 60, 150, 150, 155, 155, 900, 900]
+
+
 def test_filings_page_through_source_entries_and_filter_forms_locally(client):
     filings = {"formCategories": [{"id": "annual-quarterly-current", "label": "All annual, quarterly, and current reports", "forms": ["10-K", "10-Q", "8-K"]}], "availableForms": ["4", "8-K", "10-K"], "initialPage": 2, "initialSort": "-filingDate", "initialFilter": None, "entries": {"items": [{"form": "4", "filingDate": "2026-09-10T00:00:00", "filing": "https://www.sec.gov/a-index.html"}, {"form": "10-K", "filingDate": "2025-12-19T00:00:00", "filing": "https://www.sec.gov/k-index.html"}], "page": 2, "pageSize": 2, "totalItemsCount": 1144, "totalPages": 572}}
     client.add("https://finviz.com/stock?t=A&ty=lf&page=2", stock_section(filings))

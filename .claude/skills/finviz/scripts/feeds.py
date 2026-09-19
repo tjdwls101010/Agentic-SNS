@@ -4,6 +4,7 @@ import re
 from urllib.parse import urlencode, urljoin, urlsplit
 
 import markup
+import output
 from finviz import condition, leaf
 from transport import Failure, PAGES, validate_url
 
@@ -15,7 +16,7 @@ DATE_FIELDS = {"earnings": "earningsDate", "dividends": "exdate", "economic": "d
 
 DATE_ARG = (("--date",), dict(default=None, help="Start date YYYY-MM-DD; the page states back the start date it used as date_from, and the date condition is judged from that echo."))
 PAGE_ARG = (("--page",), dict(type=int, default=1, help="One-based page from a previous continuation; pages after the first come from the calendar API, which states back no date or sort, so those conditions stay unverified."))
-SORT_ARG = (("--sort",), dict(default=None, help="Source sort key, e.g. earningsDate or -earningsDate; the page states the applied sort back as evidence."))
+SORT_ARG = (("--sort",), dict(default=None, help="Source sort key, e.g. earningsDate or -earningsDate. The page repeats whatever key it is given, so an agreeing echo cannot confirm the sort and the condition stays unverified; a disagreeing echo does report not_applied."))
 # 성진: 한 calendar() 함수가 네 리프를 맡는 것은 구현의 편의이고, 그 편의를 모델의 선택지로 청구하지 않는다 — 리프는 자기가 받는 인자만 광고한다.
 CALENDAR_ARGS = {"earnings": [DATE_ARG, PAGE_ARG, SORT_ARG], "dividends": [DATE_ARG, PAGE_ARG, SORT_ARG], "economic": [DATE_ARG, SORT_ARG], "season": []}
 CALENDAR_HELP = {"earnings": "Earnings calendar: report dates with EPS and sales estimates, actuals and surprises.", "dividends": "Dividend calendar: ex-dates with ordinary and special amounts and yields.", "economic": "Economic calendar: events with actual, previous and forecast values.", "season": "Earnings season preview: upcoming report counts per day with estimates."}
@@ -65,7 +66,7 @@ def calendar(ctx, args, target):
         observed = entries.get("page") if entries else None
         conditions["page"] = condition(args.page, ("confirmed" if observed == args.page else "not_applied") if observed is not None else "unverified", observed)
     if args.sort:
-        conditions["sort"] = echoed_condition(args.sort, stated_sort, "source_sort")
+        conditions["sort"] = echoed_condition(args.sort, stated_sort, "source_sort", validated=False)
     obs.result["conditions"] = conditions
     coverage = {"received": len(items), "exhaustive": False}
     if entries:
@@ -84,11 +85,18 @@ for _kind in CALENDAR_PATHS:
     calendar_leaf(_kind)(calendar)
 
 
-def echoed_condition(requested, stated, evidence_key):
-    """Judge a selector by the value the source states back, never by whether the returned rows happen to satisfy it."""
+def echoed_condition(requested, stated, evidence_key, validated=True):
+    """Judge a selector by the value the source states back, never by whether the returned rows happen to satisfy it.
+
+    An echo only confirms when the source refuses what it cannot use: the calendar page replaces an unusable date
+    with its own default, so an agreeing date was accepted, but it repeats any sort key it is handed, including one
+    the API rejects outright, so an agreeing sort echo is the request coming back and establishes nothing.
+    """
     if stated is None:
         return condition(requested, "unverified", None)
-    return condition(requested, "confirmed" if str(stated) == str(requested) else "not_applied", {evidence_key: stated})
+    if str(stated) != str(requested):
+        return condition(requested, "not_applied", {evidence_key: stated})
+    return condition(requested, "confirmed" if validated else "unverified", {evidence_key: stated})
 
 
 def calendar_page_data(ctx, kind, query=None):
@@ -115,7 +123,11 @@ def source_of(row):
     return None
 
 
-@leaf("news", "headlines", help="News headlines by time, by source, or the stock, ETF and crypto news lists.", args=[(("--kind",), dict(default="latest", choices=list(NEWS_VIEWS), help="Which news list to read."))], output={"list of headlines": "{time, title, url, source, section, tickers} in page order; url is the external article, tickers are Finviz's tagged symbols. Without --limit the newest headlines of every section are kept, so no section disappears from the list."}, narrow=["--filter", "--limit", "--fields"])
+def newest_per_section(items, args):
+    return output.across_sections(items, args.limit or 40, "section")
+
+
+@leaf("news", "headlines", help="News headlines by time, by source, or the stock, ETF and crypto news lists.", args=[(("--kind",), dict(default="latest", choices=list(NEWS_VIEWS), help="Which news list to read."))], window=newest_per_section, output={"list of headlines": "{time, title, url, source, section, tickers} in page order; url is the external article, tickers are Finviz's tagged symbols. Without --limit the newest headlines of every section are kept, so no section disappears from the list."}, narrow=["--filter", "--limit", "--fields"])
 def headlines(ctx, args, target):
     view = NEWS_VIEWS[args.kind]
     obs = ctx.observe("https://finviz.com/news" + ("?" + urlencode({"v": view}) if view else ""))
@@ -134,25 +146,8 @@ def headlines(ctx, args, target):
             items.append({"time": markup.text(time_cell), "title": markup.text(link), "url": urljoin(obs.url, link["href"]), "source": source_of(row) or (markup.text(heading) if heading is not None else None), "section": section, "tickers": [a["data-boxover-ticker"] for a in row.select("[data-boxover-ticker]")]})
     if not items:
         raise obs.fail("structure_changed", "No news rows were found.", "Read the saved raw page with read ID --raw.")
-    obs.result["coverage"] = {"received": len(items)}
-    obs.result["target"], obs.result["data"] = args.kind, across_sections(items, args.limit or 40)
+    obs.result["target"], obs.result["data"] = args.kind, items
     return obs.result
-
-
-def across_sections(items, keep):
-    """Keep `keep` headlines without losing a section: which list a headline came from is part of what it means, and the sections are concatenated, not interleaved."""
-    if len(items) <= keep:
-        return items
-    sections = {}
-    for position, item in enumerate(items):
-        sections.setdefault(item.get("section"), []).append(position)
-    chosen, depth = set(), 0
-    while len(chosen) < keep and any(len(positions) > depth for positions in sections.values()):
-        for positions in sections.values():
-            if depth < len(positions) and len(chosen) < keep:
-                chosen.add(positions[depth])
-        depth += 1
-    return [item for position, item in enumerate(items) if position in chosen]
 
 
 @leaf("news", "pulse", help="Market Pulse: Finviz's generated explanations of why stocks and the market moved; list them or read one by ID.", args=[(("id",), dict(nargs="?", metavar="ID", help="Pulse ID from the list; omitted lists the latest entries."))], output={"list of pulse entries": "{id, age, headline, tickers}", "one pulse entry, when an ID is given": "{id, ticker, dateTime, headline, summary (markdown), source, sentiment, catalyst, bulletPointsList} as published; a source-generated explanation, not independent evidence"}, narrow=["--filter", "--limit"])
@@ -172,7 +167,7 @@ def pulse(ctx, args, target):
     return obs.result
 
 
-@leaf("news", "article", help="Read a Finviz-hosted article (finviz.com/news/<id>/<slug>); other hosts need their own reader.", args=[(("url",), dict(metavar="URL", help="Article URL on finviz.com."))], output={"title, paragraphs, text": "article body as displayed", "links, images": "links and images inside the body"})
+@leaf("news", "article", help="Read a Finviz-hosted article (finviz.com/news/<id>/<slug>); other hosts need their own reader.", args=[(("url",), dict(metavar="URL", help="Article URL on finviz.com."))], output={"title, paragraphs": "the article body as displayed, one entry per paragraph", "links, images": "links and images inside the body; text outside the paragraphs is a link label and appears there"})
 def article(ctx, args, target):
     validate_url(args.url)
     obs = ctx.observe(args.url)
@@ -211,7 +206,27 @@ def trades(ctx, args, target):
     return obs.result
 
 
-@leaf("open", None, help="Read any supported finviz.com URL: JSON APIs come back as-is, pages through the generic extractor.", args=[(("url",), dict(metavar="URL", help="HTTPS finviz.com URL to a screener, stock, groups, map, news, calendar, insider or market page or API.")), (("--rows",), dict(type=int, default=10, help="Rows to keep per table; 0 keeps every row. A table that was cut reports rows_received beside its rows, and the dense pages this reader is pointed at carry several tables at once.")), (("--options",), dict(action="store_true", help="Attach each select control's option list instead of its option count; the screener page's controls alone carry a few hundred thousand characters of options.")), (("--initial",), dict(action="store_true", help="Attach the page's embedded JSON blocks instead of their key counts; these are the payloads the dedicated commands parse.")), (("--all-links",), dict(action="store_true", help="Keep every link on the page instead of the first 50; a dense page carries a few hundred, mostly peer and view links that its own command returns as data."))], output={"JSON API": "the response as published", "page": "{metrics, tables: [{headers, rows, rows_received}], initial: {script id: key count, or the JSON with --initial}, controls: {select id: option count, or the options with --options}, article, links}; a page's collections come back as counts and are asked for by name, and links_received counts the links before the 50-link default"}, narrow=["--fields", "--rows"])
+def page_window(data, args):
+    """What one look at a page shows: the top of each table, the names of its controls and embedded blocks, and the first links."""
+    if not isinstance(data, dict) or "tables" not in data:
+        return data  # a JSON API answered as published
+    tables = []
+    for table in data["tables"]:
+        kept = dict(table, rows=table["rows"][: args.rows] if args.rows else table["rows"])
+        if args.rows and len(table["rows"]) > args.rows:
+            kept["rows_received"] = len(table["rows"])
+        tables.append(kept)
+    shown = dict(data, tables=tables)
+    if not args.options:
+        shown["controls"] = {name: len(options) for name, options in data["controls"].items()}
+    if not args.initial:
+        shown["initial"] = {name: len(value) if isinstance(value, (dict, list)) else value for name, value in data["initial"].items()}
+    if not args.all_links and len(data["links"]) > 50:
+        shown["links"], shown["links_received"] = data["links"][:50], len(data["links"])
+    return shown
+
+
+@leaf("open", None, help="Read any supported finviz.com URL: JSON APIs come back as-is, pages through the generic extractor.", args=[(("url",), dict(metavar="URL", help="HTTPS finviz.com URL to a screener, stock, groups, map, news, calendar, insider or market page or API.")), (("--rows",), dict(type=int, default=10, help="Rows to keep per table; 0 keeps every row. A table that was cut reports rows_received beside its rows, and the dense pages this reader is pointed at carry several tables at once.")), (("--options",), dict(action="store_true", help="Attach each select control's option list instead of its option count; the screener page's controls alone carry a few hundred thousand characters of options.")), (("--initial",), dict(action="store_true", help="Attach the page's embedded JSON blocks instead of their key counts; these are the payloads the dedicated commands parse.")), (("--all-links",), dict(action="store_true", help="Keep every link on the page instead of the first 50; a dense page carries a few hundred, mostly peer and view links that its own command returns as data."))], window=page_window, output={"JSON API": "the response as published", "page": "{metrics, tables: [{headers, rows, rows_received}], initial: {script id: key count, or the JSON with --initial}, controls: {select id: option count, or the options with --options}, article, links}; a page's collections come back as counts and are asked for by name, and links_received counts the links before the 50-link default"}, narrow=["--fields", "--rows"])
 def open_url(ctx, args, target):
     validate_url(args.url)
     obs = ctx.observe(args.url)
@@ -238,10 +253,7 @@ def open_url(ctx, args, target):
             continue
         headers, rows = markup.table_records(node, obs.url)
         if rows and markup.text(node):
-            table = {"headers": headers, "rows": rows if not args.rows else rows[: args.rows]}
-            if args.rows and len(rows) > args.rows:
-                table["rows_received"] = len(rows)
-            tables.append(table)
+            tables.append({"headers": headers, "rows": rows})
     initial = {}
     for script in page.select("script[id]"):
         text = script.string or script.get_text()
@@ -250,12 +262,10 @@ def open_url(ctx, args, target):
                 parsed = markup.script_json(page, obs, script["id"])
             except Exception:
                 parsed = None
-            initial[script["id"]] = parsed if args.initial else (len(parsed) if isinstance(parsed, (dict, list)) else parsed)
+            initial[script["id"]] = parsed
     links = [{"text": markup.text(a), "url": urljoin(obs.url, a["href"])} for a in page.select("a[href]") if markup.text(a)]
     controls = markup.selects(page)
-    data = {"metrics": markup.metrics(page), "tables": tables, "initial": initial, "controls": controls if args.options else {name: len(options) for name, options in controls.items()}, "article": markup.article(page, obs.url), "links": links if args.all_links else links[:50]}
-    if not args.all_links and len(links) > 50:
-        data["links_received"] = len(links)
+    data = {"metrics": markup.metrics(page), "tables": tables, "initial": initial, "controls": controls, "article": markup.article(page, obs.url), "links": links}
     if not any((data["metrics"], tables, initial, controls, data["article"])):
         raise obs.fail("structure_changed", "No supported data structure was found on this page.", "Read the saved raw page with read ID --raw; the page may be visual-only or require an account.")
     obs.result["data"] = data

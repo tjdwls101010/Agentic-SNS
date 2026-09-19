@@ -1,6 +1,7 @@
 """Result envelopes, local selection (--fields/--filter/--limit), size limits, statuses and exit codes."""
 
 import json
+import re
 import sys
 
 from transport import Failure, now
@@ -65,13 +66,24 @@ def searchable(record):
     return json.dumps(record, ensure_ascii=False).lower()
 
 
-def select_records(records, args, leaf):
-    """Apply --filter, --fields and --limit to a record list; returns the kept records and the count before selection."""
+def with_records(data, leaf, records):
+    return dict(data, **{leaf.records: records}) if leaf.records else records
+
+
+def select_records(records, args, leaf, data=None):
+    """Apply --filter, the leaf's own default range and then --fields and --limit; returns the kept records and the count before any of it.
+
+    The order matters: a default range that ran first would make --filter search the window instead of the response,
+    and a question about a record outside it would come back empty from a result that holds it.
+    """
     total = len(records)
     fields = [f.strip() for f in args.fields.split(",")] if args.fields else None
     if args.filter:
         term = args.filter.lower()
         records = [r for r in records if term in searchable(r)]
+    if leaf.window is not None:
+        windowed = leaf.window(with_records(data if data is not None else records, leaf, records), args)
+        records = records_at(windowed, leaf.records) if leaf.records else windowed
     if fields and records and all(isinstance(r, dict) for r in records):
         known = list(dict.fromkeys(k for r in records for k in r))
         missing = [f for f in fields if f not in known]
@@ -83,6 +95,22 @@ def select_records(records, args, leaf):
     if limit is not None:
         records = records[-limit:] if leaf.recent and limit else records[:limit]
     return records, total
+
+
+def across_sections(items, keep, field):
+    """Keep `keep` records without losing a section: which list a record came from is part of what it means, and the sections are concatenated, not interleaved."""
+    if keep is None or len(items) <= keep:
+        return items
+    sections = {}
+    for position, item in enumerate(items):
+        sections.setdefault(item.get(field), []).append(position)
+    chosen, depth = set(), 0
+    while len(chosen) < keep and any(len(positions) > depth for positions in sections.values()):
+        for positions in sections.values():
+            if depth < len(positions) and len(chosen) < keep:
+                chosen.add(positions[depth])
+        depth += 1
+    return [item for position, item in enumerate(items) if position in chosen]
 
 
 def project(value, fields, key):
@@ -101,16 +129,16 @@ def select(result, args, leaf):
     records = records_at(data, leaf.records)
     fields = [f.strip() for f in args.fields.split(",")] if args.fields else None
     if isinstance(records, list):
-        records, total = select_records(records, args, leaf)
-        if leaf.records is None:
-            result["data"] = records
-        else:
-            result["data"] = dict(data, **{leaf.records: records})
+        records, total = select_records(records, args, leaf, data)
+        result["data"] = with_records(data, leaf, records)
         coverage = result["coverage"] = result.get("coverage") or {}
         coverage.setdefault("received", total)
         coverage["shown"] = len(records)
         coverage.setdefault("exhaustive", False)
     elif (leaf.keyed or leaf.records) and isinstance(records, dict):
+        if leaf.window is not None:
+            data = result["data"] = leaf.window(data, args)
+            records = records_at(data, leaf.records)
         keys = [k.strip() for k in args.keys.split(",")] if getattr(args, "keys", None) else list(records)
         missing = [k for k in keys if k not in records]
         if missing:
@@ -123,11 +151,36 @@ def select(result, args, leaf):
             selected = {k: project(value, fields, k) for k, value in selected.items()}
         result["data"] = dict(data, **{leaf.records: selected}) if leaf.records else selected
         result["coverage"] = dict(result.get("coverage") or {}, received=len(records), shown=len(selected), exhaustive=False)
-    elif isinstance(data, dict) and fields:
-        missing = [f for f in fields if f not in data]
-        if missing:
-            raise Failure("invalid_fields", "Unknown fields " + ", ".join(missing) + ".", "Available fields: " + ", ".join(data) + ".")
-        result["data"] = {f: data[f] for f in fields}
+    elif isinstance(data, dict) and (fields or getattr(args, "keys", None)):
+        chosen = [k.strip() for k in args.keys.split(",")] if getattr(args, "keys", None) else list(data)
+        unknown = [k for k in chosen if k not in data]
+        if unknown:
+            raise Failure("invalid_keys", "Unknown keys " + ", ".join(unknown) + ".", "Available keys: " + ", ".join(list(data)[:60]) + ("..." if len(data) > 60 else "") + ".")
+        kept = {k: data[k] for k in chosen}
+        if fields:
+            missing = [f for f in fields if f not in kept]
+            if missing and all(isinstance(v, dict) for v in kept.values()) and kept:
+                kept = {k: project(v, fields, k) for k, v in kept.items()}  # a mapping of records: the fields are inside each one
+            elif missing:
+                raise Failure("invalid_fields", "Unknown fields " + ", ".join(missing) + ".", "Available fields: " + ", ".join(kept) + ".")
+            else:
+                kept = {f: kept[f] for f in fields}
+        result["data"] = kept
+    return result
+
+
+def settle_empty(result, leaf):
+    """Decide emptiness from what the source gave, before the observation is stored and before any selection narrows it.
+
+    Doing it only after selection left the store saying "ok" for a response that carried nothing, so a later read of
+    that observation reported success. A result the model filtered to nothing is a different thing and stays a
+    property of the printed result, not of the observation.
+    """
+    if result.get("status") != "ok":
+        return result
+    records = records_at(result.get("data"), leaf.records)
+    if is_empty(result.get("data")) or (leaf.records and isinstance(records, (list, dict)) and not records):
+        result["status"] = "empty"
     return result
 
 
@@ -139,14 +192,17 @@ def finalize(result, args, leaf, request):
         result["source"] = {k: v for k, v in result["source"].items() if k != "headers" and v not in (None, [], False)}
     if result["status"] != "error":
         try:
+            if leaf.window and not result.get("selection_applied") and not isinstance(records_at(result.get("data"), leaf.records), list):
+                result["data"] = leaf.window(result["data"], args)  # no record list to order against: open's sections, a mapping's fields
             if not result.pop("selection_applied", False):
                 select(result, args, leaf)
         except Failure as exc:
             result["status"], result["error"] = "error", exc.info()
         else:
             records = records_at(result.get("data"), leaf.records)
-            if (is_empty(result.get("data")) or (leaf.records and isinstance(records, (list, dict)) and not records)) and result["status"] != "partial":
+            if (is_empty(result.get("data")) or (leaf.records and isinstance(records, (list, dict)) and not records)) and result["status"] not in ("partial", "empty"):
                 result["status"] = "empty"
+            if result["status"] == "empty":
                 result.setdefault("warnings", []).append("The source returned no usable items; this is not proof that the data does not exist.")
     if result["status"] == "error" and result.get("error", {}).get("code") not in DIAGNOSTIC_DATA:
         # 성진: 오류 결과가 만들지 못했다고 말한 페이로드를 실으면 그 문서가 예산을 넘어 진단이 too_large에 가려진다. array_alignment만 원본 배열을 진단용으로 남긴다.
@@ -155,15 +211,36 @@ def finalize(result, args, leaf, request):
     return {k: result[k] for k in ordered if k in result and result[k] not in (None, {}, [])} | ({"data": result.get("data")} if result["status"] != "error" else {})
 
 
-def too_large_fix(results, leaf, size, max_chars):
+def raw_fix(selection, size, max_chars):
+    # 성진: 창 크기는 이 문서가 실제로 보인 팽창비(JSON 이스케이프 포함)에서 계산한다; 원자료 문자 수를 그대로 쓰면 다시 넘는다.
+    window = max(int((selection.get("shown") or 1) * max_chars * 0.9 / size), 1)
+    start = selection.get("start", 0)
+    return "Result needs " + str(size) + " characters; limit is " + str(max_chars) + ". The raw text is " + str(selection.get("received")) + " characters: read it in windows with --chars " + str(start) + "-" + str(start + window) + " and follow the continuation each window names."
+
+
+def too_large_fix(results, leaf, size, max_chars, args=None):
     raw = next((r["selection"] for r in results if isinstance(r.get("selection"), dict) and r["selection"].get("pointer") == "/raw"), None)
     if raw and raw.get("shown"):
-        # 성진: 창 크기는 이 문서가 실제로 보인 팽창비(JSON 이스케이프 포함)에서 계산한다; 원자료 문자 수를 그대로 쓰면 다시 넘는다.
-        window = max(int(raw["shown"] * max_chars * 0.9 / size), 1)
-        return "Result needs " + str(size) + " characters; limit is " + str(max_chars) + ". The raw text is " + str(raw["received"]) + " characters: read it in windows with --chars " + str(raw["start"]) + "-" + str(raw["start"] + window) + " and follow the continuation each window names."
+        return raw_fix(raw, size, max_chars)
     narrow = ", ".join(leaf.narrow) if leaf.narrow else "--fields or --limit"
     ids = [r["id"] for r in results if r.get("id")]
     pointer = "/data" + ("/" + leaf.records if leaf.records else "")
+    if leaf.path == "read":
+        # 성진: read의 회복은 지금 읽던 그 포인터의 더 작은 조각이다; 다른 포인터를 권하면 다른 값을 성공적으로 돌려준다.
+        selection = next((r["selection"] for r in results if isinstance(r.get("selection"), dict)), {})
+        here = selection.get("pointer") or "/data"
+        if here == "/raw":
+            return raw_fix(selection, size, max_chars)
+        shown = selection.get("shown") or 1
+        smaller = max(1, int(shown * max_chars * 0.8 / size))
+        head = "Result needs " + str(size) + " characters; limit is " + str(max_chars) + ". "
+        if smaller >= shown:
+            # 성진: 더 줄일 수 없는데 같은 --limit을 다시 권하면 회복이 제자리를 돈다; 한 항목이 예산보다 큰 경우의 길은 원자료 창이다.
+            return head + "One entry at " + here + " is already larger than the budget, so read the response text in windows with read " + str(getattr(args, "id", "")) + " --raw --chars 0-" + str(max(1, int(max_chars * 0.8))) + ", or rerun with --max-chars " + str(size) + "."
+        return head + "Read a smaller slice of the same pointer: read " + str(getattr(args, "id", "")) + " --pointer " + here + " --start " + str(selection.get("start", 0)) + " --limit " + str(smaller) + ". Or rerun with --max-chars " + str(size) + "."
+    if getattr(args, "from_id", None):
+        # 성진: --from은 남의 관측을 읽은 것이라 그 id에는 이 절이 없다; 그 id로 읽으라고 하면 다른 절이 성공적으로 나온다.
+        return "Result needs " + str(size) + " characters; limit is " + str(max_chars) + ". Narrow with " + narrow + ", or rerun without --from so this section is observed and saved under its own id. Or rerun with --max-chars " + str(size) + "."
     shown = next((r["coverage"]["shown"] for r in results if isinstance(r.get("coverage"), dict) and r["coverage"].get("shown")), None)
     # 성진: 절 이름만 주면 그중 하나가 혼자 예산을 넘는 경우 다시 실패한다; 크기를 함께 줘야 모델이 맞는 절을 한 번에 고른다.
     sections = next((r["data"] for r in results if isinstance(r.get("data"), dict) and not leaf.records and not leaf.keyed), None)
@@ -175,8 +252,15 @@ def too_large_fix(results, leaf, size, max_chars):
     else:
         if sections:  # a section-shaped result is not narrowed by counting its sections: point at the biggest one and size the slice from it
             widest = max(sections, key=lambda k: len(json.dumps(sections[k], ensure_ascii=False)))
-            inside, span = sections[widest], len(json.dumps(sections[widest], ensure_ascii=False, separators=(",", ":")))
-            pointer, fits = pointer + "/" + widest, max(1, int(len(inside) * max_chars * 0.8 / span)) if isinstance(inside, (list, dict)) and inside else fits
+            inside = sections[widest]
+            pointer = pointer + "/" + widest
+            if isinstance(inside, dict):
+                # a nested object slices by its own top-level keys, which for a tree is just its name: descend to the list inside it
+                nested = next((k for k, v in inside.items() if isinstance(v, list) and v), None)
+                if nested:
+                    pointer, inside = pointer + "/" + nested, inside[nested]
+            span = len(json.dumps(inside, ensure_ascii=False, separators=(",", ":")))
+            fits = max(1, int(len(inside) * max_chars * 0.8 / span)) if isinstance(inside, (list, dict)) and inside else fits
         saved = " The response is saved: read " + ids[0] + " --pointer " + pointer + " --start 0 --limit " + str(fits) + " reads it in slices without a new request" + (", and one entry may still be too large, in which case read it with --raw --chars" if fits == 1 else "") + "." if ids else ""
     named = " Sections --fields can keep, with their sizes: " + ", ".join(k + " " + str(len(json.dumps(v, ensure_ascii=False, separators=(",", ":")))) for k, v in list(sections.items())[:25]) + "." if sections else ""
     return "Result needs " + str(size) + " characters; limit is " + str(max_chars) + ". Narrow with " + narrow + "." + named + saved + " Or rerun with --max-chars " + str(size) + "."
@@ -193,7 +277,14 @@ def too_large_document(results, error, max_chars):
         text = json.dumps({"status": "error", "results": attempt}, ensure_ascii=False, separators=(",", ":"))
         if attempt and len(text) <= max_chars:
             return text
-    return json.dumps({"status": "error", "results": [rows[0]] if len(results) == 1 else [dropped]}, ensure_ascii=False, separators=(",", ":"))
+    # 성진: 가장 짧은 형태에도 복구에 필요한 둘은 남긴다 — 저장된 id와 통과할 수 있는 크기.
+    size = re.search(r"--max-chars (\d+)", error["fix"])
+    smallest = [{"id": results[0].get("id"), "status": "error", "error": error_info(error["code"], error["message"], "Rerun with --max-chars " + size[1] + ", or read the saved id." if size else "Raise --max-chars.")}]
+    for attempt in ([rows[0]] if len(results) == 1 else [dropped], smallest):
+        text = json.dumps({"status": "error", "results": attempt}, ensure_ascii=False, separators=(",", ":"))
+        if len(text) <= max_chars:
+            return text
+    return text  # below this a document cannot both parse and say what went wrong
 
 
 def emit(results, args, leaf):
@@ -202,7 +293,7 @@ def emit(results, args, leaf):
     doc = {"status": status, "results": results}
     text = json.dumps(doc, ensure_ascii=False, separators=(",", ":"))
     if len(text) > args.max_chars:
-        error = error_info("too_large", "Output exceeds --max-chars.", too_large_fix(results, leaf, len(text), args.max_chars))
+        error = error_info("too_large", "Output exceeds --max-chars.", too_large_fix(results, leaf, len(text), args.max_chars, args))
         print(too_large_document(results, error, args.max_chars))
         return EXIT_CODES["too_large"]
     print(text)

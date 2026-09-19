@@ -62,10 +62,14 @@ def test_selection_filters_fields_and_limits_records_and_rejects_unknown_fields(
 
 def test_oversized_output_becomes_too_large_error_with_saved_observation(client):
     client.add("https://finviz.com/api/suggestions?input=A", [{"ticker": "A", "company": "x" * 300}])
-    doc = client.run("--max-chars", "200", "search", "A", code=9)
+    doc = client.run("--max-chars", "700", "search", "A", code=9)
     error = doc["results"][0]["error"]
     assert error["code"] == "too_large"
     assert "--limit" in error["fix"] and "read " + doc["results"][0]["id"] in error["fix"]
+    tiny = client.raw("--max-chars", "250", "search", "A", code=9)
+    assert len(tiny.stdout.strip()) <= 250  # the replacement document obeys the budget it is reporting on
+    smallest = json.loads(tiny.stdout)["results"][0]
+    assert smallest["id"] and "--max-chars" in smallest["error"]["fix"]  # down to a saved id and the size that fits
     assert client.one("read", doc["results"][0]["id"], "--pointer", "/data/0/ticker")["data"] == "A"
 
 

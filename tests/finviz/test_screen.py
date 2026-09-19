@@ -125,7 +125,7 @@ def test_run_follows_pages_into_a_jsonl_file_and_refuses_to_overwrite_it(client,
     assert len(out.read_text().splitlines()) == 7
     partial = client.one("screen", "run", "--filters", "sec_technology", "--pages", "2")
     assert partial["continuation"] == {"start": 41} and partial["coverage"]["pages"] == 2 and len(partial["data"]) == 4
-    error = client.run("--max-chars", "300", "screen", "run", "--filters", "sec_technology", "--pages", "2", code=9)["results"][0]["error"]
+    error = client.run("--max-chars", "800", "screen", "run", "--filters", "sec_technology", "--pages", "2", code=9)["results"][0]["error"]
     assert "--out" in error["fix"]
 
 
