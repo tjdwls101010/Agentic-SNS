@@ -62,7 +62,7 @@ def ratings(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("news", "Headlines listed on the overview page; each links to its external source.", {"[]": "{time, title, url, source}; time is Finviz's display text and the article body lives at url"}, narrow=["--limit", "--filter"])
+@stock_leaf("news", "Headlines listed on the overview page; each links to its external source.", {"[]": "{time, title, url, source} newest first; time is Finviz's display text and the article body lives at url"}, narrow=["--limit", "--filter"], default_limit=40)
 def news(ctx, args, ticker):
     obs, page = stock_page(ctx, ticker, "c")
     items = []
@@ -104,7 +104,7 @@ def ownership(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("flows", "ETF fund flows and assets under management by day, as published on the overview page.", {"[]": "{date, aum, flow} oldest first; ETFs only"}, narrow=["--limit"])
+@stock_leaf("flows", "ETF fund flows and assets under management by day, as published on the overview page.", {"[]": "{date, aum, flow} oldest first, ending at the most recent day; ETFs only"}, narrow=["--limit"], default_limit=120, recent=True)
 def flows(ctx, args, ticker):
     obs, page = stock_page(ctx, ticker, "c")
     if page.select_one("script#route-init-data-fundflows-0") is None:
@@ -155,24 +155,34 @@ def revenue(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("short-interest", "Short interest history with float and average volume.", {"[]": "{ticker, timestamp (epoch), shortInterest, sharesFloat, averageVolume} as published, oldest first"}, narrow=["--limit"])
+@stock_leaf("short-interest", "Short interest history with float and average volume.", {"[]": "{ticker, timestamp (epoch), shortInterest, sharesFloat, averageVolume} as published, oldest first and ending at the most recent reading"}, narrow=["--limit"], recent=True)
 def short_interest(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "si")
     obs.result["data"] = init if isinstance(init, list) else []
     return obs.result
 
 
-@stock_leaf("options", "Option chain for one expiry with Finviz's implied volatility and greeks.", {"expiries": "expiries the source offers; pass one to --expiry", "current_expiry": "the expiry the chain belongs to", "last_close, last_time": "underlying price context", "contracts": "[{strike, type, openInterest, bidPrice, askPrice, lastClose, iv, delta, gamma, theta, vega, rho, ...}] as published"}, args=[(("--expiry",), dict(default=None, help="Expiry YYYY-MM-DD from a previous result's expiries; the source's nearest expiry when omitted.")), (("--type",), dict(default=None, choices=["call", "put"], help="Keep only calls or only puts (local selection)."))], records="contracts", narrow=["--type", "--fields", "--limit"], context=["current_expiry", "last_close", "last_time"])
+@stock_leaf("options", "Option chain for one expiry with Finviz's implied volatility and greeks.", {"expiries": "expiries the source offers; pass one to --expiry", "current_expiry": "the expiry the chain belongs to", "last_close, last_time": "underlying price context", "contracts": "[{strike, type, openInterest, bidPrice, askPrice, lastClose, iv, delta, gamma, theta, vega, rho, ...}] as published"}, args=[(("--expiry",), dict(default=None, help="Expiry YYYY-MM-DD from a previous result's expiries; the source's nearest expiry when omitted.")), (("--type",), dict(default=None, choices=["call", "put"], help="Keep only calls or only puts (local selection).")), (("--strikes",), dict(type=int, default=20, help="Keep the contracts on the N strikes nearest last_close, calls and puts alike, in source order; 0 keeps the whole expiry, which usually needs a larger --max-chars."))], records="contracts", narrow=["--strikes", "--type", "--fields", "--limit"], context=["current_expiry", "last_close", "last_time"])
 def options(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "oc", e=args.expiry)
     contracts = init.get("options") or []
     obs.result["coverage"] = {"received": len(contracts)}
     if args.type:
         contracts = [c for c in contracts if c.get("type") == args.type]
+    contracts = around_last_close(contracts, init.get("lastClose"), args.strikes)
     if args.expiry:
         obs.result["conditions"] = {"expiry": condition(args.expiry, "confirmed" if init.get("currentExpiry") == args.expiry else "not_applied", init.get("currentExpiry"))}
     obs.result["data"] = {"expiries": init.get("expiries"), "current_expiry": init.get("currentExpiry"), "last_close": init.get("lastClose"), "last_time": init.get("lastTime"), "contracts": contracts}
     return obs.result
+
+
+def around_last_close(contracts, last_close, keep):
+    """The contracts on the `keep` strikes closest to the underlying; a plain prefix would return only the lowest strikes of the chain."""
+    strikes = sorted({c["strike"] for c in contracts if isinstance(c.get("strike"), (int, float))})
+    if not keep or keep >= len(strikes) or last_close is None or len(strikes) != len({c.get("strike") for c in contracts}):
+        return contracts
+    chosen = set(sorted(strikes, key=lambda s: abs(s - last_close))[:keep])
+    return [c for c in contracts if c.get("strike") in chosen]
 
 
 @stock_leaf("filings", "SEC filing list for the company with links to the originals; 30 per page.", {"items": "[{form, filingDate, reportDate, description, filing (index URL), document (primary document URL), accessionNumber}]", "available_forms": "form types present for this company", "form_categories": "Finviz's form groupings"}, args=[(("--page",), dict(type=int, default=1, help="One-based page from a previous continuation.")), (("--sort",), dict(default=None, help="Source sort key, e.g. -filingDate (the default order).")), (("--form",), dict(default=None, help="Keep only this form type, e.g. 10-K (local selection; the source has no form filter)."))], records="items", narrow=["--form", "--limit", "--fields"])

@@ -79,7 +79,7 @@ def select_records(records, args, leaf):
         records = [{f: r.get(f) for f in keep} for r in records]
     limit = leaf.default_limit if args.limit is None else args.limit
     if limit is not None:
-        records = records[:limit]
+        records = records[-limit:] if leaf.recent and limit else records[:limit]
     return records, total
 
 

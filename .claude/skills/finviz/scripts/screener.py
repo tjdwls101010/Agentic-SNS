@@ -30,7 +30,7 @@ def screener_page(ctx, query):
     return obs, markup.soup(obs)
 
 
-@leaf("screen", "filters", help="List the current screener filters: id, label, definition and the value strings --filters accepts.", output={"[]": "{id, label, definition, options: [{value, label}], elite_only: [labels]}; pass option values to screen run --filters"}, narrow=["--filter", "--limit"])
+@leaf("screen", "filters", help="List the current screener filters: id, label, definition and, on request, the value strings --filters accepts.", args=[(("--options",), dict(action="store_true", help="Attach each filter's option values; the whole catalog of options is about fifteen times the size of the filter list, so narrow with --filter when asking for it."))], output={"[]": "{id, label, definition, option_count} and, with --options, options: [{value, label}] whose values go to screen run --filters, plus elite_only labels an anonymous read cannot select"}, narrow=["--filter", "--fields", "--limit"])
 def filters(ctx, args, target):
     obs, page = screener_page(ctx, {"ft": "4"})
     found = []
@@ -39,9 +39,11 @@ def filters(ctx, args, target):
         title = title.find_previous_sibling("td").select_one(".screener-combo-title") if title is not None and title.find_previous_sibling("td") else None
         definition = title.get("data-boxover-html") if title is not None else None
         key = select["id"][3:]
-        record = {"id": key, "label": markup.text(title) if title is not None else key, "definition": markup.text(markup.BeautifulSoup(definition, "html.parser")) if definition else None, "options": [{"value": key + "_" + o["value"], "label": markup.text(o)} for o in select.select("option") if o.get("value")]}
+        options = [{"value": key + "_" + o["value"], "label": markup.text(o)} for o in select.select("option") if o.get("value")]
+        record = {"id": key, "label": markup.text(title) if title is not None else key, "definition": markup.text(markup.BeautifulSoup(definition, "html.parser")) if definition else None}
+        record["options" if args.options else "option_count"] = options if args.options else len(options)
         elite = [markup.text(o) for o in select.select("option[data-elite-only]")]
-        if elite:
+        if elite and args.options:  # nearly every filter repeats the same Elite-only entry; it belongs beside the option values, not in the catalogue
             record["elite_only"] = elite
         found.append(record)
     if not found:

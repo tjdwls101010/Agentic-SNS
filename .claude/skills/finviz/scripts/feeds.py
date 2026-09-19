@@ -19,7 +19,7 @@ CALENDAR_OUTPUT = {"date_from": "the start date the source states it used; null 
 
 
 def calendar_leaf(kind):
-    return leaf("calendar", kind, help=CALENDAR_HELP[kind], args=CALENDAR_ARGS, output=CALENDAR_OUTPUT, records="items", narrow=["--limit", "--fields", "--filter"], context=["date_from"])
+    return leaf("calendar", kind, help=CALENDAR_HELP[kind], args=CALENDAR_ARGS, output=CALENDAR_OUTPUT, records="items", narrow=["--limit", "--fields", "--filter"], context=["date_from"], default_limit=40)
 
 
 def calendar(ctx, args, target):
@@ -113,7 +113,7 @@ def source_of(row):
     return None
 
 
-@leaf("news", "headlines", help="News headlines by time, by source, or the stock, ETF and crypto news lists.", args=[(("--kind",), dict(default="latest", choices=list(NEWS_VIEWS), help="Which news list to read."))], output={"[]": "{time, title, url, source, section, tickers}; url is the external article, tickers are Finviz's tagged symbols"}, narrow=["--filter", "--limit", "--fields"])
+@leaf("news", "headlines", help="News headlines by time, by source, or the stock, ETF and crypto news lists.", args=[(("--kind",), dict(default="latest", choices=list(NEWS_VIEWS), help="Which news list to read."))], output={"[]": "{time, title, url, source, section, tickers} in page order; url is the external article, tickers are Finviz's tagged symbols. Without --limit the newest headlines of every section are kept, so no section disappears from the list."}, narrow=["--filter", "--limit", "--fields"])
 def headlines(ctx, args, target):
     view = NEWS_VIEWS[args.kind]
     obs = ctx.observe("https://finviz.com/news" + ("?" + urlencode({"v": view}) if view else ""))
@@ -132,8 +132,25 @@ def headlines(ctx, args, target):
             items.append({"time": markup.text(time_cell), "title": markup.text(link), "url": urljoin(obs.url, link["href"]), "source": source_of(row) or (markup.text(heading) if heading is not None else None), "section": section, "tickers": [a["data-boxover-ticker"] for a in row.select("[data-boxover-ticker]")]})
     if not items:
         raise obs.fail("structure_changed", "No news rows were found.", "Read the saved raw page with read ID --raw.")
-    obs.result["target"], obs.result["data"] = args.kind, items
+    obs.result["coverage"] = {"received": len(items)}
+    obs.result["target"], obs.result["data"] = args.kind, across_sections(items, args.limit or 40)
     return obs.result
+
+
+def across_sections(items, keep):
+    """Keep `keep` headlines without losing a section: which list a headline came from is part of what it means, and the sections are concatenated, not interleaved."""
+    if len(items) <= keep:
+        return items
+    sections = {}
+    for position, item in enumerate(items):
+        sections.setdefault(item.get("section"), []).append(position)
+    chosen, depth = set(), 0
+    while len(chosen) < keep and any(len(positions) > depth for positions in sections.values()):
+        for positions in sections.values():
+            if depth < len(positions) and len(chosen) < keep:
+                chosen.add(positions[depth])
+        depth += 1
+    return [item for position, item in enumerate(items) if position in chosen]
 
 
 @leaf("news", "pulse", help="Market Pulse: Finviz's generated explanations of why stocks and the market moved; list them or read one by ID.", args=[(("id",), dict(nargs="?", help="Pulse ID from the list; omitted lists the latest entries."))], output={"[] (list)": "{id, age, headline, tickers}", "{} (one ID)": "{id, ticker, dateTime, headline, summary (markdown), source, sentiment, catalyst, bulletPointsList} as published; a source-generated explanation, not independent evidence"}, narrow=["--filter", "--limit"])
@@ -167,7 +184,7 @@ def article(ctx, args, target):
 TRANSACTIONS = {"all": "7", "buy": "1", "sale": "2"}
 
 
-@leaf("insiders", "trades", help="Latest insider trades across the market, with owner pages and SEC Form 4 links.", args=[(("--transaction",), dict(default="all", choices=list(TRANSACTIONS), help="Transaction type.")), (("--owner",), dict(default=None, help="Owner id from a row's owner_url to list one insider's trades.")), (("--sort",), dict(default=None, help="Source sort key from the column header links, e.g. -transactiondate.")), (("--value",), dict(default=None, help="Source transaction-value threshold parameter."))], output={"[]": "rows keyed by the table headers plus ticker, url (stock page), owner_url and filing_url"}, narrow=["--filter", "--fields", "--limit"])
+@leaf("insiders", "trades", help="Latest insider trades across the market, with owner pages and SEC Form 4 links.", args=[(("--transaction",), dict(default="all", choices=list(TRANSACTIONS), help="Transaction type.")), (("--owner",), dict(default=None, help="Owner id from a row's owner_url to list one insider's trades.")), (("--sort",), dict(default=None, help="Source sort key from the column header links, e.g. -transactiondate.")), (("--value",), dict(default=None, help="Source transaction-value threshold parameter."))], output={"[]": "rows keyed by the table headers plus ticker, url (stock page), owner_url and filing_url, newest first"}, narrow=["--filter", "--fields", "--limit"], default_limit=20)
 def trades(ctx, args, target):
     query = {"tc": TRANSACTIONS[args.transaction], "oc": args.owner, "o": args.sort, "tv": args.value}
     obs = ctx.observe("https://finviz.com/insidertrading?" + urlencode({k: v for k, v in query.items() if v is not None}))
@@ -191,7 +208,7 @@ def trades(ctx, args, target):
     return obs.result
 
 
-@leaf("open", None, help="Read any supported finviz.com URL: JSON APIs come back as-is, pages through the generic extractor.", args=[(("url",), dict(help="HTTPS finviz.com URL to a screener, stock, groups, map, news, calendar, insider or market page or API."))], output={"JSON API": "the response as published", "page": "{metrics, tables: [{headers, rows}], initial: {script id: json}, controls: {select id: options}, article, links}"}, narrow=["--fields"])
+@leaf("open", None, help="Read any supported finviz.com URL: JSON APIs come back as-is, pages through the generic extractor.", args=[(("url",), dict(help="HTTPS finviz.com URL to a screener, stock, groups, map, news, calendar, insider or market page or API.")), (("--all-links",), dict(action="store_true", help="Keep every link on the page instead of the first 50; a dense page carries a few hundred, mostly peer and view links that its own command returns as data."))], output={"JSON API": "the response as published", "page": "{metrics, tables: [{headers, rows}], initial: {script id: json}, controls: {select id: options}, article, links}; links_received counts the links before the 50-link default"}, narrow=["--fields"])
 def open_url(ctx, args, target):
     validate_url(args.url)
     obs = ctx.observe(args.url)
@@ -228,7 +245,9 @@ def open_url(ctx, args, target):
             except Exception:
                 initial[script["id"]] = None
     links = [{"text": markup.text(a), "url": urljoin(obs.url, a["href"])} for a in page.select("a[href]") if markup.text(a)]
-    data = {"metrics": markup.metrics(page), "tables": tables, "initial": initial, "controls": markup.selects(page), "article": markup.article(page, obs.url), "links": links}
+    data = {"metrics": markup.metrics(page), "tables": tables, "initial": initial, "controls": markup.selects(page), "article": markup.article(page, obs.url), "links": links if args.all_links else links[:50]}
+    if not args.all_links and len(links) > 50:
+        data["links_received"] = len(links)
     if not any((data["metrics"], tables, initial, data["controls"], data["article"])):
         raise obs.fail("structure_changed", "No supported data structure was found on this page.", "Read the saved raw page with read ID --raw; the page may be visual-only or require an account.")
     obs.result["data"] = data

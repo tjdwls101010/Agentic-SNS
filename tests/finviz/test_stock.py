@@ -43,6 +43,14 @@ def test_snapshot_accepts_several_tickers_and_isolates_a_failing_one(client):
     assert doc["results"][0]["status"] == "ok" and doc["results"][1]["error"]["code"] == "http_error"
 
 
+def test_overview_news_defaults_to_the_most_recent_screenful(client):
+    items = [("Sep-%02d-26 04:30PM" % (day + 1), "Headline %d" % day, "https://example.com/%d" % day, "Source") for day in range(60)]
+    client.add(OVERVIEW, stock_overview(news=items))
+    result = client.one("stock", "news", "A")
+    assert result["coverage"] == {"received": 60, "shown": 40, "exhaustive": False}
+    assert [i["title"] for i in result["data"]][:2] == ["Headline 0", "Headline 1"]
+
+
 def test_profile_ratings_news_insiders_and_ownership_come_from_the_overview_page(client):
     ownership = {"managersOwnership": [{"investorId": "2012383", "name": "BlackRock, Inc.", "slug": "blackrock-inc-2012383", "percOwnership": 9.06}], "fundsOwnership": [{"investorId": "1", "name": "Vanguard 500", "slug": "v", "percOwnership": 3.1}]}
     monthly = [{"date": 1756684800, "saleAggregated": 95972, "saleTransactionCount": 1, "buyAggregated": 0, "buyTransactionCount": 0}]
@@ -62,11 +70,23 @@ def test_profile_ratings_news_insiders_and_ownership_come_from_the_overview_page
     assert held == {"managers": ownership["managersOwnership"], "funds": ownership["fundsOwnership"]}
 
 
+def test_flows_and_short_interest_windows_end_at_the_newest_record_not_the_oldest(client):
+    """Both series are published oldest first, so a prefix cut answers a question about 2023 with a 2026 label."""
+    flows = [{"date": "2023-09-05", "aum": 413148304250, "flow": -936946365.6}, {"date": "2023-09-06", "aum": 413000000000, "flow": 1.5}]
+    client.add("https://finviz.com/stock?t=SPY&ty=c", stock_overview(ticker="SPY", name="SPDR S&P 500 ETF Trust", fundflows=flows, ratings_table=False))
+    result = client.one("stock", "flows", "SPY", "--limit", "1")
+    assert result["data"] == flows[-1:] and result["coverage"] == {"received": 2, "shown": 1, "exhaustive": False}
+    from pages import stock_section
+    short = [{"ticker": "A", "timestamp": 1579064400, "shortInterest": 5.19}, {"ticker": "A", "timestamp": 1789064400, "shortInterest": 7.7}]
+    client.add("https://finviz.com/stock?t=A&ty=si", stock_section(short))
+    assert client.one("stock", "short-interest", "A", "--limit", "1")["data"] == short[-1:]
+
+
 def test_flows_return_etf_fund_flows_and_are_empty_for_a_stock(client):
     flows = [{"date": "2023-09-05", "aum": 413148304250, "flow": -936946365.6}, {"date": "2023-09-06", "aum": 413000000000, "flow": 1.5}]
     client.add("https://finviz.com/stock?t=SPY&ty=c", stock_overview(ticker="SPY", name="SPDR S&P 500 ETF Trust", fundflows=flows, ratings_table=False))
     result = client.one("stock", "flows", "SPY", "--limit", "1")
-    assert result["data"] == flows[:1] and result["coverage"]["received"] == 2
+    assert result["data"] == flows[-1:] and result["coverage"]["received"] == 2
     client.add(OVERVIEW, stock_overview())
     result = client.one("stock", "flows", "A", code=7)
     assert result["status"] == "empty" and "ETF" in result["warnings"][0]
@@ -121,6 +141,20 @@ def test_options_confirm_expiry_and_filter_contract_type_locally(client):
     assert result["coverage"] == {"received": 2, "shown": 1, "exhaustive": False}
     client.add("https://finviz.com/stock?t=A&ty=oc&e=2027-01-01", stock_section(dict(chain, currentExpiry="2026-09-18")))
     assert client.one("stock", "options", "A", "--expiry", "2027-01-01")["conditions"]["expiry"]["status"] == "not_applied"
+
+
+def test_option_chains_default_to_the_strikes_around_the_last_close(client):
+    """A whole expiry exceeds the budget, and cutting by strike order would answer with only the deepest out-of-the-money contracts."""
+    from pages import stock_section
+    contracts = [{"strike": strike, "type": kind, "iv": 1.0} for strike in (20, 60, 150, 155, 900) for kind in ("call", "put")]
+    chain = {"expiries": ["2026-10-16"], "currentExpiry": "2026-10-16", "options": contracts, "lastClose": 152.0, "lastTime": 1789415995}
+    client.add("https://finviz.com/stock?t=A&ty=oc", stock_section(chain))
+    near = client.one("stock", "options", "A", "--strikes", "2")
+    assert [c["strike"] for c in near["data"]["contracts"]] == [150, 150, 155, 155]
+    assert near["coverage"] == {"received": 10, "shown": 4, "exhaustive": False}
+    assert [c["strike"] for c in client.one("stock", "options", "A", "--strikes", "2", "--type", "call")["data"]["contracts"]] == [150, 155]
+    assert client.one("stock", "options", "A", "--strikes", "0")["coverage"]["shown"] == 10
+    assert [c["strike"] for c in client.one("stock", "options", "A")["data"]["contracts"]] == [20, 20, 60, 60, 150, 150, 155, 155, 900, 900]
 
 
 def test_filings_page_through_source_entries_and_filter_forms_locally(client):

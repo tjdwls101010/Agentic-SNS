@@ -8,7 +8,7 @@ from pages import screener_filters, screener_table
 
 def test_filters_list_ids_labels_definitions_and_combined_values_and_filter_narrows(client):
     client.add("https://finviz.com/screener?ft=4", screener_filters())
-    result = client.one("screen", "filters")
+    result = client.one("screen", "filters", "--options")
     assert [f["id"] for f in result["data"]] == ["cap", "sec"]
     cap = result["data"][0]
     assert cap["label"] == "Market Cap."
@@ -18,6 +18,21 @@ def test_filters_list_ids_labels_definitions_and_combined_values_and_filter_narr
     narrowed = client.one("screen", "filters", "--filter", "sector")
     assert [f["id"] for f in narrowed["data"]] == ["sec"]
     assert narrowed["coverage"] == {"received": 2, "shown": 1, "exhaustive": False}
+
+
+def test_filters_default_to_the_catalog_without_option_lists_and_attach_them_on_request(client):
+    """The option lists are 14x the catalog: the first call has to answer "which filters exist" inside the budget."""
+    client.add("https://finviz.com/screener?ft=4", screener_filters())
+    default = client.one("screen", "filters")
+    assert default["data"] == [
+        {"id": "cap", "label": "Market Cap.", "definition": "Market Cap. Total market value of a company's outstanding shares.", "option_count": 2},
+        {"id": "sec", "label": "Sector", "definition": "Sector Company sector.", "option_count": 1},
+    ]
+    assert default["coverage"] == {"received": 2, "shown": 2, "exhaustive": False}
+    attached = client.one("screen", "filters", "--options")
+    assert attached["data"][0]["options"] == [{"value": "cap_mega", "label": "Mega ($200bln and more)"}, {"value": "cap_largeover", "label": "+Large (over $10bln)"}]
+    one = client.one("screen", "filters", "--filter", "sector", "--options")
+    assert [f["id"] for f in one["data"]] == ["sec"] and one["data"][0]["options"] == [{"value": "sec_technology", "label": "Technology"}]
 
 
 def test_signals_list_values_and_labels_without_the_none_choice(client):

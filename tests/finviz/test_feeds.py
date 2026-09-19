@@ -39,8 +39,33 @@ def test_market_quotes_performance_and_bubbles_keep_source_shapes(client):
     client.add("https://finviz.com/api/forex_perf", {"USD": 0.0, "AUD": -0.19})
     assert client.one("market", "performance", "forex")["data"] == {"USD": 0.0, "AUD": -0.19}
     bubbles = [{"ticker": "CF", "company": "CF Industries", "x": 1.0, "y": 1.09, "size": 2.0e10, "color": "Basic Materials", "isETF": False}]
-    client.add("https://finviz.com/api/bubbles?x=sector&y=lastChange&size=marketCap&color=sector&idx=sp500", bubbles)
+    client.add("https://finviz.com/api/bubbles?x=sector&y=lastChange&size=marketCap&color=sector&idx=dji", bubbles)
     assert client.one("market", "bubbles")["data"] == bubbles
+
+
+def test_quotes_leave_out_the_rendering_sparklines_until_they_are_asked_for(client):
+    """Each instrument carries a 300-point sparkline that is 90% of the response; the quote itself is what the screen shows."""
+    quotes = {"ES": {"label": "S&P 500", "last": 6600.0, "sparkline": [1, 2, 3], "sparklineDateChanges": ["a"], "change": 0.1}}
+    client.add("https://finviz.com/api/futures_all?timeframe=d", quotes)
+    assert client.one("market", "quotes", "futures")["data"] == {"ES": {"label": "S&P 500", "last": 6600.0, "change": 0.1}}
+    assert client.one("market", "quotes", "futures", "--sparkline")["data"] == quotes
+
+
+def test_market_map_defaults_to_performance_and_takes_the_classification_tree_on_request(client):
+    """Resolving the tree costs five more requests and is 85% of the response; the map's numbers are the answer to a performance question."""
+    client.add("https://finviz.com/api/map_perf?t=sec&st=d1", {"nodes": {"AAPL": 1.0}, "subtype": "d1", "version": 15})
+    default = client.one("market", "map")
+    assert default["data"]["performance"] == {"AAPL": 1.0} and default["data"]["classification"] is None
+    assert "dependencies" not in default["source"]
+
+
+def test_bubbles_default_to_a_named_index_the_budget_fits(client):
+    """An unknown idx is not refused by the source, it silently returns all 5,906 stocks, so the universe is a closed choice."""
+    rows = [{"ticker": "AAPL", "x": 1.0, "y": 2.0, "size": 3.0, "color": "Technology", "isETF": False}]
+    client.add("https://finviz.com/api/bubbles?x=sector&y=lastChange&size=marketCap&color=sector&idx=dji", rows)
+    result = client.one("market", "bubbles")
+    assert result["data"] == rows and result["request"]["index"] == "dji"
+    assert client.raw("market", "bubbles", "--index", "nasdaq", code=2).stderr.count("invalid choice")
 
 
 def test_market_map_resolves_classification_from_the_page_assets_and_degrades_to_partial(client):
@@ -51,14 +76,14 @@ def test_market_map_resolves_classification_from_the_page_assets_and_degrades_to
     client.add("https://finviz.com/assets/dist-legacy/1378.v1.61170fe2.js", MAP_LOADER)
     client.add("https://finviz.com/assets/dist-legacy/runtime.v1.22f44280.js", MAP_RUNTIME)
     client.add("https://finviz.com/assets/dist-legacy/62.v1.bbb222.js", MAP_CHUNK)
-    result = client.one("market", "map", "--type", "geo")
+    result = client.one("market", "map", "--type", "geo", "--classification")
     assert result["data"]["performance"] == perf["nodes"] and result["data"]["period"] == "d1"
     assert result["data"]["classification"]["children"][0]["children"][0]["children"][0] == {"name": "RY", "description": "Royal Bank Of Canada", "value": 294647}
     assert result["data"]["classification_source"].endswith("62.v1.bbb222.js")
-    only = client.one("market", "map", "--type", "geo", "--performance-only")
+    only = client.one("market", "map", "--type", "geo")
     assert only["data"]["classification"] is None and "source" not in only["data"] or only["data"].get("classification_source") is None
     client.add("https://finviz.com/assets/dist-legacy/62.v1.bbb222.js", "module.exports={name:'Other'}")
-    degraded = client.one("market", "map", "--type", "geo", code=8)
+    degraded = client.one("market", "map", "--type", "geo", "--classification", code=8)
     assert degraded["status"] == "partial" and degraded["data"]["performance"] == perf["nodes"] and degraded["data"]["classification"] is None
     assert degraded["error"]["code"] == "asset_structure"
     failed_asset = client.one("read", degraded["source"]["dependencies"][-1])["data"]
@@ -82,16 +107,16 @@ def test_map_loads_the_requested_universe_from_the_current_entry_script(client, 
     url = f"https://finviz.com/assets/dist-legacy/{chunk}.v1.{suffix}.js"
     tree = {"name": "Root", "children": [{"name": label, "children": [{"name": "TEST", "value": 123, "newField": "kept"}]}]}
     client.add(url, "module.exports=" + json.dumps(tree))
-    result = client.one("market", "map", "--type", map_type)
+    result = client.one("market", "map", "--type", map_type, "--classification")
     assert result["data"]["classification"] == tree and result["data"]["classification_source"] == url
     assert result["data"]["performance"] == {"TEST": 1.2}
     client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", loader + loader.replace(str(chunk), "9999"))
-    ambiguous = client.one("market", "map", "--type", map_type, code=8)
+    ambiguous = client.one("market", "map", "--type", map_type, "--classification", code=8)
     assert ambiguous["error"]["code"] == "asset_structure" and ambiguous["data"]["classification"] is None
     assert ambiguous["data"]["performance"] == {"TEST": 1.2}
     client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", loader)
     client.add(url, "a.exports=" + json.dumps(tree) + ";b.exports=" + json.dumps(tree))
-    roots = client.one("market", "map", "--type", map_type, code=8)
+    roots = client.one("market", "map", "--type", map_type, "--classification", code=8)
     assert roots["error"]["code"] == "asset_structure" and "found 2" in roots["error"]["message"]
     assert roots["data"]["classification"] is None and roots["data"]["performance"] == {"TEST": 1.2}
 
@@ -102,7 +127,7 @@ def test_map_does_not_substitute_the_default_for_a_missing_requested_type(client
     client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", MAP_LOADER)
     for name in ("1378.v1.61170fe2.js", "4740.v1.b05b832c.js"):
         client.add("https://finviz.com/assets/dist-legacy/" + name, "/* no map loader */")
-    result = client.one("market", "map", "--type", "cap", code=8)
+    result = client.one("market", "map", "--type", "cap", "--classification", code=8)
     assert result["error"]["code"] == "asset_structure" and "no case for MarketCap" in result["error"]["message"]
     assert result["data"]["classification"] is None and result["data"]["performance"] == {"A": 2}
 
@@ -169,6 +194,25 @@ def test_news_headlines_by_time_by_source_and_stock_badges(client):
     assert stocks[0]["tickers"] == ["PSKY"] and stocks[0]["section"] is None
 
 
+def test_headline_and_calendar_defaults_are_one_screenful_and_keep_every_section(client):
+    """The page groups headlines into News and Blogs; a prefix cut of the flattened list would silently drop a whole section."""
+    items = [("0%d:00AM" % (i % 10), "Headline %d" % i, "https://example.com/%d" % i, "Source", ()) for i in range(60)]
+    client.add("https://finviz.com/news", news_page(items=tuple(items)))
+    result = client.one("news", "headlines")
+    assert result["coverage"] == {"received": 60, "shown": 40, "exhaustive": False}
+    assert {i["section"] for i in result["data"]} == {"News", "Blogs"}
+    assert len([i for i in result["data"] if i["section"] == "Blogs"]) == 20
+    assert [i["title"] for i in result["data"]][:2] == ["Headline 0", "Headline 1"]
+    events = [{"calendarId": n, "event": "Event %d" % n, "date": "2026-09-11T14:00:00"} for n in range(60)]
+    client.add("https://finviz.com/calendar/economic", calendar_page({"data": {"initialDateFrom": "2026-09-14", "entries": events}}))
+    economic = client.one("calendar", "economic")
+    assert economic["coverage"]["received"] == 60 and economic["coverage"]["shown"] == 40
+    rows = tuple(("T%d" % n, "Owner %d" % n, str(n), "Director", "Sep 12 '26", "Sale", "42.10", "10,000", "421,000", "50,000", "Sep 14 09:55 PM", "http://www.sec.gov/x.xml") for n in range(40))
+    client.add("https://finviz.com/insidertrading?tc=7", insiders_page(rows=rows))
+    trades = client.one("insiders", "trades")
+    assert trades["coverage"]["received"] == 40 and trades["coverage"]["shown"] == 20
+
+
 def test_news_pulse_lists_rows_and_reads_one_explanation(client):
     client.add("https://finviz.com/news?v=6", pulse_page())
     result = client.one("news", "pulse")
@@ -228,7 +272,7 @@ def test_calendar_kinds_are_real_commands_with_their_own_schema_and_the_first_pa
 
 def test_market_and_group_api_parameters_report_conditions(client):
     client.add("https://finviz.com/api/map_perf?t=sec&st=w1", {"nodes": {"AAPL": 1.0}, "subtype": "d1", "version": 15})
-    result = client.one("market", "map", "--period", "w1", "--performance-only")
+    result = client.one("market", "map", "--period", "w1")
     assert result["conditions"]["period"] == {"requested": "w1", "status": "not_applied", "evidence": "d1"}
     client.add("https://finviz.com/api/futures_all?timeframe=w", {"ES": {"ticker": "ES", "last": 1}})
     assert client.one("market", "quotes", "futures", "--timeframe", "w")["conditions"]["timeframe"]["status"] == "unverified"
@@ -256,7 +300,7 @@ def test_economic_calendar_rejects_unsupported_pagination_before_fetching(client
 
 def test_map_and_bubbles_report_selectors_without_inventing_confirmation(client):
     client.add("https://finviz.com/api/map_perf?t=geo&st=d1", {"nodes": {"RY": 1.2}, "subtype": "d1"})
-    result = client.one("market", "map", "--type", "geo", "--performance-only")
+    result = client.one("market", "map", "--type", "geo")
     assert result["conditions"]["type"] == {"requested": "geo", "status": "unverified", "evidence": None}
     rows = [{"ticker": "RY", "x": 1.2, "y": 6, "size": 40, "color": 3, "futureField": "source"}]
     client.add("https://finviz.com/api/bubbles?x=pe&y=volume&size=price&color=change&idx=dji", rows)

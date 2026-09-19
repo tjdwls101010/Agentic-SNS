@@ -41,21 +41,21 @@ COMMON = [
 
 
 class Leaf:
-    def __init__(self, group, name, help, output, fn, args, narrow, records, targets, default_limit, keyed, context):
+    def __init__(self, group, name, help, output, fn, args, narrow, records, targets, default_limit, keyed, context, recent):
         self.group, self.name, self.help, self.output, self.fn = group, name, help, output, fn
         self.args, self.narrow, self.records, self.targets, self.default_limit = args, narrow, records, targets, default_limit
-        self.keyed, self.context = keyed, list(context)
+        self.keyed, self.context, self.recent = keyed, list(context), recent
 
     @property
     def path(self):
         return self.group + (" " + self.name if self.name else "")
 
 
-def leaf(group, name=None, *, help, output, args=(), narrow=(), records=None, targets=None, default_limit=None, keyed=False, context=()):
-    """Register a command. `records` names the collection inside data (None = data itself); `keyed` enables selection of mapping keys; `targets` names a positional list that yields one result per value; `context` names the data fields a slice of this result cannot be interpreted without, which read carries alongside the slice."""
+def leaf(group, name=None, *, help, output, args=(), narrow=(), records=None, targets=None, default_limit=None, keyed=False, context=(), recent=False):
+    """Register a command. `records` names the collection inside data (None = data itself); `keyed` enables selection of mapping keys; `targets` names a positional list that yields one result per value; `context` names the data fields a slice of this result cannot be interpreted without, which read carries alongside the slice; `recent` marks a series published oldest first, where a limit keeps the newest records instead of the first."""
 
     def register(fn):
-        LEAVES.append(Leaf(group, name, help, output, fn, list(args), list(narrow), records, targets, default_limit, keyed, context))
+        LEAVES.append(Leaf(group, name, help, output, fn, list(args), list(narrow), records, targets, default_limit, keyed, context, recent))
         return fn
 
     return register
@@ -220,7 +220,7 @@ def schema(ctx, args, target):
     item = matches[0]
     sub = leaf_parser(parser, item)
     actions = [a for a in sub._actions if a.help is not argparse.SUPPRESS] + [a for a in parser._actions if a.option_strings and a.help is not argparse.SUPPRESS]
-    data = {"command": item.path, "description": item.help, "arguments": describe_actions(actions), "output": item.output, "narrowing": item.narrow, "records": item.records, "default_limit": item.default_limit, "slice_context": item.context, "statuses": output.STATUSES, "exit_codes": output.EXIT_CODES}
+    data = {"command": item.path, "description": item.help, "arguments": describe_actions(actions), "output": item.output, "narrowing": item.narrow, "records": item.records, "default_limit": item.default_limit, "limit_keeps": "the newest records of a series published oldest first" if item.recent else "the first records in source order", "slice_context": item.context, "statuses": output.STATUSES, "exit_codes": output.EXIT_CODES}
     return output.plain(item.path, data)
 
 
