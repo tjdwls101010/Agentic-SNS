@@ -232,3 +232,16 @@ def test_coverage_keeps_the_units_of_the_data_it_counts(client):
     assert rows["coverage"] == {"received": 40, "shown": 1}
     meta = client.one("read", saved, "--pointer", "/source")
     assert "coverage" not in meta and meta["selection"]["received"] == len(meta["data"])
+
+
+def test_reading_metadata_does_not_restate_its_size_as_the_observations_coverage(client):
+    """A list of page ids counted as rows put two units in one coverage object."""
+    from pages import screener_table
+    for start in (1, 21):
+        rows_here = [("T%d%d" % (start, n), ["Company %d" % n, "4T"]) for n in range(3)]
+        client.add("https://finviz.com/screener?v=111&ft=4&r=%d" % start, screener_table(rows_here, total=169, current=start, page_values=(1, 21)))
+    aggregate = client.one("screen", "run", "--pages", "2")
+    rows = aggregate["coverage"]["received"]
+    pages = client.one("read", aggregate["id"], "--pointer", "/source/pages")
+    assert len(pages["data"]) == 2 and pages["selection"]["shown"] == 2
+    assert pages["coverage"]["received"] == rows and pages["coverage"]["shown"] == rows  # rows, not page ids

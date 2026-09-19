@@ -192,7 +192,8 @@ def read(ctx, args, target):
         selection["received"] = len(value)
         value = value[args.start :] if isinstance(value, list) else {k: value[k] for k in list(value)[args.start :]}
         # 성진: 선택은 공유 경로가 한다. read가 따로 자르면 --keys·--filter의 순서와 coverage가 다른 명령과 어긋난다.
-        value = output.select({"data": value, "coverage": result.get("coverage")}, args, item)["data"]
+        # 성진: coverage 사본을 넘긴다. 공유 선택 함수는 받은 객체를 그 자리에서 고치므로, 원본을 주면 봉투·메타데이터의 개수가 관측의 coverage를 덮어쓴다.
+        value = output.select({"data": value, "coverage": dict(result.get("coverage") or {})}, args, item)["data"]
     if isinstance(value, (list, dict)):
         selection["shown"] = len(value)
         if pointer.startswith("/data"):
