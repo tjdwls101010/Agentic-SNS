@@ -257,3 +257,10 @@ def test_profile_links_and_price_bar_field_names_follow_the_contract(client):
     bars = {"date": [1788872400], "open": [1.0], "high": [2.0], "low": [0.5], "close": [1.5], "volume": [10]}
     client.add("https://finviz.com/api/quote?instrument=stock&ticker=A&timeframe=d&barsCount=1", bars)
     assert client.one("stock", "prices", "A", "--bars", "1")["data"]["bars"] == [{"date_epoch": 1788872400, "open": 1.0, "high": 2.0, "low": 0.5, "close": 1.5, "volume": 10}]
+
+
+def test_a_recent_window_of_zero_is_empty_not_everything(client):
+    from pages import stock_overview
+    flows = [{"date": "2023-09-05", "flow": 1.0}, {"date": "2023-09-06", "flow": 2.0}]
+    client.add("https://finviz.com/stock?t=SPY&ty=c", stock_overview(ticker="SPY", fundflows=flows, ratings_table=False))
+    assert client.one("stock", "flows", "SPY", "--limit", "0", code=7)["data"] == []

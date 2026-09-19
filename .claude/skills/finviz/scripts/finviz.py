@@ -210,7 +210,9 @@ def char_range(spec, total):
         raise Failure("invalid_argument", "--chars takes START-END character offsets.", "Write --chars 0-20000 for the first window, or --chars 20000- for everything after it.")
     start = int(match.group(1))
     end = min(int(match.group(2)), total) if match.group(2) else total
-    if start >= total and total:
+    if not total:
+        return 0, 0  # an empty response reads as empty rather than as a bad range
+    if start >= total:
         raise Failure("invalid_argument", "--chars starts at " + str(start) + " but the text is " + str(total) + " characters.", "Start below " + str(total) + "; the selection reports received as the full length.")
     if end <= start:
         raise Failure("invalid_argument", "--chars END must be greater than START.", "Write an exclusive END above START, e.g. --chars " + str(start) + "-" + str(start + 20000) + ".")

@@ -162,3 +162,9 @@ def test_local_storage_failures_stay_inside_the_json_contract(client, tmp_path):
     blocked.write_text("x")
     result = client.one("screen", "run", "--out", str(blocked / "rows.jsonl"), code=6)
     assert result["error"]["code"] == "local_io"
+
+
+def test_reading_an_empty_saved_response_is_empty_not_an_argument_error(client):
+    client.add("https://finviz.com/api/suggestions?input=A", "", status=429, headers={"Retry-After": "5"})
+    failed = client.one("search", "A", code=5)
+    assert client.one("read", failed["id"], "--raw", code=7)["data"] == ""
