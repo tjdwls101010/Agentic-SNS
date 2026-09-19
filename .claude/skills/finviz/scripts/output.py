@@ -141,6 +141,11 @@ def finalize(result, args, leaf, request):
 
 
 def too_large_fix(results, leaf, size, max_chars):
+    raw = next((r["selection"] for r in results if isinstance(r.get("selection"), dict) and r["selection"].get("pointer") == "/raw"), None)
+    if raw and raw.get("shown"):
+        # 성진: 창 크기는 이 문서가 실제로 보인 팽창비(JSON 이스케이프 포함)에서 계산한다; 원자료 문자 수를 그대로 쓰면 다시 넘는다.
+        window = max(int(raw["shown"] * max_chars * 0.9 / size), 1)
+        return "Result needs " + str(size) + " characters; limit is " + str(max_chars) + ". The raw text is " + str(raw["received"]) + " characters: read it in windows with --chars " + str(raw["start"]) + "-" + str(raw["start"] + window) + " and follow the continuation each window names."
     narrow = ", ".join(leaf.narrow) if leaf.narrow else "--fields or --limit"
     ids = [r["id"] for r in results if r.get("id")]
     pointer = "/data" + ("/" + leaf.records if leaf.records else "")

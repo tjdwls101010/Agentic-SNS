@@ -63,6 +63,8 @@ def test_market_map_resolves_classification_from_the_page_assets_and_degrades_to
     assert degraded["error"]["code"] == "asset_structure"
     failed_asset = client.one("read", degraded["source"]["dependencies"][-1])["data"]
     assert failed_asset["status"] == "error" and failed_asset["error"]["code"] == "asset_structure"
+    replayed = client.one("read", degraded["id"], code=8)  # a recovery path must not launder the gap it is recovering from
+    assert replayed["status"] == "partial"
 
 
 @pytest.mark.parametrize("map_type,chunk,label", [("geo", 6207, "World"), ("sec_all", 7791, "All stocks"), ("sec", 8119, "S&P 500")])

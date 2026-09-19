@@ -41,21 +41,21 @@ COMMON = [
 
 
 class Leaf:
-    def __init__(self, group, name, help, output, fn, args, narrow, records, targets, default_limit, keyed):
+    def __init__(self, group, name, help, output, fn, args, narrow, records, targets, default_limit, keyed, context):
         self.group, self.name, self.help, self.output, self.fn = group, name, help, output, fn
         self.args, self.narrow, self.records, self.targets, self.default_limit = args, narrow, records, targets, default_limit
-        self.keyed = keyed
+        self.keyed, self.context = keyed, list(context)
 
     @property
     def path(self):
         return self.group + (" " + self.name if self.name else "")
 
 
-def leaf(group, name=None, *, help, output, args=(), narrow=(), records=None, targets=None, default_limit=None, keyed=False):
-    """Register a command. `records` names the collection inside data (None = data itself); `keyed` enables selection of mapping keys; `targets` names a positional list that yields one result per value."""
+def leaf(group, name=None, *, help, output, args=(), narrow=(), records=None, targets=None, default_limit=None, keyed=False, context=()):
+    """Register a command. `records` names the collection inside data (None = data itself); `keyed` enables selection of mapping keys; `targets` names a positional list that yields one result per value; `context` names the data fields a slice of this result cannot be interpreted without, which read carries alongside the slice."""
 
     def register(fn):
-        LEAVES.append(Leaf(group, name, help, output, fn, list(args), list(narrow), records, targets, default_limit, keyed))
+        LEAVES.append(Leaf(group, name, help, output, fn, list(args), list(narrow), records, targets, default_limit, keyed, context))
         return fn
 
     return register
@@ -68,8 +68,8 @@ def condition(requested, status="unverified", evidence=None):
 class Context:
     """Per-invocation transport and the observations waiting to be saved."""
 
-    def __init__(self, args, store):
-        self.args, self.store, self.pending = args, store, []
+    def __init__(self, args, store, item=None):
+        self.args, self.store, self.pending, self.item = args, store, [], item
 
     def observe(self, url):
         try:
@@ -79,6 +79,8 @@ class Context:
                 self.pending.append(exc.observation)
             raise
         self.pending.append(obs)
+        if self.item is not None:
+            obs.result["command"] = self.item.path  # store-only: finalize never prints it, and read uses it to find this leaf's context fields
         return obs
 
     def flush(self):
@@ -117,20 +119,29 @@ def doctor(ctx, args, target):
     return result
 
 
-@leaf("read", help="Read a saved observation, or a JSON Pointer inside it, without a new request.", args=[(("id",), dict(help="Observation ID from an earlier result.")), (("--pointer",), dict(default="", help="JSON Pointer into the saved envelope, e.g. /data or /data/rows/0; / or empty is the whole envelope, /source/headers the response headers.")), (("--start",), dict(type=int, default=0, help="Zero-based start among list entries or object keys at the selected pointer; nested collections are not sliced.")), (("--raw",), dict(action="store_true", help="Return the received response text instead of the extracted envelope."))], output={"*": "the selected value; source, conditions, coverage and status of the original observation are repeated so a slice keeps its context", "selection": "pointer, start, received (list length or key count), and parent unit when present"})
+@leaf("read", help="Read a saved observation, or a JSON Pointer inside it, without a new request.", args=[(("id",), dict(help="Observation ID from an earlier result.")), (("--pointer",), dict(default="", help="JSON Pointer into the saved envelope, e.g. /data or /data/rows/0; / or empty is the whole envelope, /source/headers the response headers.")), (("--start",), dict(type=int, default=0, help="Zero-based start among list entries or object keys at the selected pointer; nested collections are not sliced.")), (("--raw",), dict(action="store_true", help="Return the received response text instead of the extracted envelope.")), (("--chars",), dict(default=None, help="Character range START-END of the raw text, e.g. 0-20000 or 20000- for the rest; END is exclusive and continuation names the next window. Needs --raw, because --start and --limit cut containers rather than one string."))], output={"*": "the selected value; source, conditions, coverage and the status of the original observation are repeated so a slice keeps what it was observed with", "selection": "pointer, start, received (list length, key count or raw character count), shown, and context: the data fields this leaf declares a slice cannot be read without"}, narrow=["--pointer", "--start", "--limit", "--chars"])
 def read(ctx, args, target):
     if args.pointer and not args.pointer.startswith("/"):
         raise Failure("invalid_pointer", "A JSON Pointer starts with '/'.", "Use a pointer from inspect, e.g. /data.")
+    if args.chars and not args.raw:
+        raise Failure("invalid_argument", "--chars selects characters of the raw response text.", "Add --raw, or select the extracted envelope with --pointer, --start and --limit.")
     pointer = "" if args.pointer == "/" else args.pointer
     saved = ctx.store.get(args.id)
     if not pointer.startswith("/source/headers") and isinstance(saved.get("source"), dict):
         saved["source"] = {k: v for k, v in saved["source"].items() if k != "headers"}
     result = {k: saved[k] for k in ("target", "id", "source", "conditions", "coverage", "continuation", "warnings") if saved.get(k) is not None}
-    result["observed_at"], result["status"] = saved.get("observed_at"), "ok"
+    result["observed_at"], result["status"] = saved.get("observed_at"), saved.get("status", "ok")
     if saved.get("status") == "error":
+        # 성진: error를 그대로 실으면 finalize가 data를 떨어뜨려 실패한 관측을 읽을 수 없게 된다; 상태는 ok로 두고 경고로 알린다.
+        result["status"] = "ok"
         result["warnings"] = result.get("warnings", []) + ["The original observation failed: " + saved["error"]["message"]]
     if args.raw:
-        result["data"] = ctx.store.get(args.id, raw=True).decode("utf-8", errors="replace")
+        text = ctx.store.get(args.id, raw=True).decode("utf-8", errors="replace")
+        start, end = char_range(args.chars, len(text))
+        result["data"] = text[start:end]
+        result["selection"] = {"pointer": "/raw", "start": start, "received": len(text), "shown": end - start}
+        if end < len(text):
+            result["continuation"] = {"chars": str(end) + "-" + str(end + max(end - start, 1))}
         return result
     value = saved
     for token in pointer.split("/")[1:]:
@@ -147,10 +158,29 @@ def read(ctx, args, target):
         selection["received"] = len(value)
         keys = list(value)[args.start :]
         value = {key: value[key] for key in keys[:args.limit]}
-    if pointer.startswith("/data/") and isinstance(saved.get("data"), dict) and "unit" in saved["data"]:
-        selection["unit"] = saved["data"]["unit"]
+    if isinstance(value, (list, dict)):
+        selection["shown"] = len(value)
+    if pointer.startswith("/data/") and isinstance(saved.get("data"), dict):
+        origin = next((item for item in LEAVES if item.path == saved.get("command")), None)
+        carried = {f: saved["data"][f] for f in (origin.context if origin else ()) if f in saved["data"] and pointer != "/data/" + f}
+        if carried:
+            selection["context"] = carried
     result["data"], result["selection"] = value, selection
     return result
+
+
+def char_range(spec, total):
+    """START-END character offsets into one string; END is exclusive and may be left open."""
+    match = re.fullmatch(r"\s*(\d+)\s*-\s*(\d*)\s*", spec or "0-")
+    if not match:
+        raise Failure("invalid_argument", "--chars takes START-END character offsets.", "Write --chars 0-20000 for the first window, or --chars 20000- for everything after it.")
+    start = int(match.group(1))
+    end = min(int(match.group(2)), total) if match.group(2) else total
+    if start >= total and total:
+        raise Failure("invalid_argument", "--chars starts at " + str(start) + " but the text is " + str(total) + " characters.", "Start below " + str(total) + "; the selection reports received as the full length.")
+    if end <= start:
+        raise Failure("invalid_argument", "--chars END must be greater than START.", "Write an exclusive END above START, e.g. --chars " + str(start) + "-" + str(start + 20000) + ".")
+    return start, end
 
 
 @leaf("inspect", help="List pointers, types and sizes inside a saved observation without printing its records.", args=[(("id",), dict(help="Observation ID from an earlier result.")), (("--depth",), dict(type=int, default=4, help="How many levels to descend."))], output={"[]": "{pointer, type, count} for each container; lists show their first item's shape"})
@@ -190,7 +220,7 @@ def schema(ctx, args, target):
     item = matches[0]
     sub = leaf_parser(parser, item)
     actions = [a for a in sub._actions if a.help is not argparse.SUPPRESS] + [a for a in parser._actions if a.option_strings and a.help is not argparse.SUPPRESS]
-    data = {"command": item.path, "description": item.help, "arguments": describe_actions(actions), "output": item.output, "narrowing": item.narrow, "records": item.records, "default_limit": item.default_limit, "statuses": output.STATUSES, "exit_codes": output.EXIT_CODES}
+    data = {"command": item.path, "description": item.help, "arguments": describe_actions(actions), "output": item.output, "narrowing": item.narrow, "records": item.records, "default_limit": item.default_limit, "slice_context": item.context, "statuses": output.STATUSES, "exit_codes": output.EXIT_CODES}
     return output.plain(item.path, data)
 
 
@@ -282,7 +312,7 @@ def main(argv=None):
         result = output.plain(item.path)
         result["status"], result["error"] = "error", output.error_info("local_io", "Cannot open the observation store " + args.store + ": " + str(exc), "Pass a writable file path with --store or FINVIZ_STORE.")
         return output.emit([output.finalize(result, args, item, {})], args, item)
-    ctx = Context(args, store)
+    ctx = Context(args, store, item)
     targets = getattr(args, item.targets) if item.targets else [None]
     results = []
     for target in targets:

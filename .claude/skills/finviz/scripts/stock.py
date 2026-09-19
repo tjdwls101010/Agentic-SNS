@@ -34,7 +34,7 @@ def stock_leaf(name, help, output, **options):
     return leaf("stock", name, help=help, output=output, args=[TICKERS] + options.pop("args", []), targets="tickers", **options)
 
 
-@stock_leaf("snapshot", "Company or ETF header and every snapshot metric with its own definition; repeated labels stay separate.", {"ticker, name, last_close, as_of, change": "header facts as displayed; as_of is Finviz's quote time text", "metrics": "[{label, value, definition, unit}] in page order; the same label can appear twice with different definitions"}, records="metrics", narrow=["--filter", "--fields", "--limit"])
+@stock_leaf("snapshot", "Company or ETF header and every snapshot metric with its own definition; repeated labels stay separate.", {"ticker, name, last_close, as_of, change": "header facts as displayed; as_of is Finviz's quote time text", "metrics": "[{label, value, definition, unit}] in page order; the same label can appear twice with different definitions"}, records="metrics", narrow=["--filter", "--fields", "--limit"], context=["ticker", "name", "last_close", "as_of", "change"])
 def snapshot(ctx, args, ticker):
     obs, page = stock_page(ctx, ticker, "c")
     found = markup.metrics(page)
@@ -122,7 +122,7 @@ def section_data(ctx, ticker, section, **extra):
 DATASETS = {"quarterly": "earningsData", "annual": "earningsAnnualData", "revisions": "earningsRevisionsData", "reaction": "priceReactionData"}
 
 
-@stock_leaf("earnings", "Reported and estimated EPS and sales by fiscal period, annual history, estimate revisions, or price reactions around reports.", {"next_earnings_date": "Finviz's next report date", "dataset": "which dataset the records come from", "records": "source records newest first: quarterly/annual carry epsActual, epsEstimate, salesActual, salesEstimate and analyst counts; revisions carry estimateDate, mean, high, low, up/downRevisions per fiscalPeriod; reaction carries per-day price moves"}, args=[(("--dataset",), dict(default="quarterly", choices=list(DATASETS), help="Which earnings dataset to return.")), (("--fiscal-period",), dict(default=None, help="Keep only records whose fiscalPeriod equals this, e.g. 2026Q3 or 2025FY; revisions have thousands of records."))], records="records", narrow=["--fiscal-period", "--limit", "--fields"], default_limit=40)
+@stock_leaf("earnings", "Reported and estimated EPS and sales by fiscal period, annual history, estimate revisions, or price reactions around reports.", {"next_earnings_date": "Finviz's next report date", "dataset": "which dataset the records come from", "records": "source records newest first: quarterly/annual carry epsActual, epsEstimate, salesActual, salesEstimate and analyst counts; revisions carry estimateDate, mean, high, low, up/downRevisions per fiscalPeriod; reaction carries per-day price moves"}, args=[(("--dataset",), dict(default="quarterly", choices=list(DATASETS), help="Which earnings dataset to return.")), (("--fiscal-period",), dict(default=None, help="Keep only records whose fiscalPeriod equals this, e.g. 2026Q3 or 2025FY; revisions have thousands of records."))], records="records", narrow=["--fiscal-period", "--limit", "--fields"], default_limit=40, context=["next_earnings_date", "dataset"])
 def earnings(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "ea")
     records = init.get(DATASETS[args.dataset]) or []
@@ -133,21 +133,21 @@ def earnings(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("forecast", "Analyst price targets and the history of recommendation counts.", {"target_price, target_price_low, target_price_high, analysts": "current consensus as published", "last_close, last_time": "the price Finviz compares against", "recommendations": "[{recomDate, targetPrice, targetPriceLow, targetPriceHigh, analysts, buy, overweight, hold, underweight, sell, price}] newest first"}, records="recommendations", narrow=["--limit", "--fields"])
+@stock_leaf("forecast", "Analyst price targets and the history of recommendation counts.", {"target_price, target_price_low, target_price_high, analysts": "current consensus as published", "last_close, last_time": "the price Finviz compares against", "recommendations": "[{recomDate, targetPrice, targetPriceLow, targetPriceHigh, analysts, buy, overweight, hold, underweight, sell, price}] newest first"}, records="recommendations", narrow=["--limit", "--fields"], context=["last_close", "last_time", "analysts"])
 def forecast(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "fc")
     obs.result["data"] = {"target_price": init.get("targetPrice"), "target_price_low": init.get("targetPriceLow"), "target_price_high": init.get("targetPriceHigh"), "analysts": init.get("targetPriceAnalysts"), "last_close": init.get("lastClose"), "last_time": init.get("lastTime"), "recommendations": init.get("recommendationsData") or []}
     return obs.result
 
 
-@stock_leaf("dividends", "Dividend payments, annual totals and the current estimate.", {"ex_date, estimate, ttm, last_close": "current dividend facts as published", "payments": "[{Ticker, Exdate, Ordinary, Special}] newest first", "annual": "[{FiscalPeriod, Amount, Yield, Payout, Estimate}]; Estimate true marks a projected year"}, records="payments", narrow=["--limit", "--fields"])
+@stock_leaf("dividends", "Dividend payments, annual totals and the current estimate.", {"ex_date, estimate, ttm, last_close": "current dividend facts as published", "payments": "[{Ticker, Exdate, Ordinary, Special}] newest first", "annual": "[{FiscalPeriod, Amount, Yield, Payout, Estimate}]; Estimate true marks a projected year"}, records="payments", narrow=["--limit", "--fields"], context=["ex_date", "estimate", "ttm", "last_close"])
 def dividends(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "dv")
     obs.result["data"] = {"ex_date": init.get("dividendExDate"), "estimate": init.get("dividendEstimate"), "ttm": init.get("dividendTTM"), "last_close": init.get("lastClose"), "payments": init.get("dividendsData") or [], "annual": init.get("dividendsAnnualData") or []}
     return obs.result
 
 
-@stock_leaf("revenue", "Revenue by product, region or segment per fiscal year, with the SEC filing each value came from.", {"unit": "source currency or scale, preserved alongside selected series", "series": "name -> source records [{fiscal_year, report_end_date, source_filing_url, value, ...}]; --fields selects series names, --filter matches names or values, --limit counts series; unit stays alongside them"}, args=[(("--by",), dict(default="products", choices=["products", "regions", "segment"], help="Breakdown to return."))], records="series", narrow=["--filter", "--limit"])
+@stock_leaf("revenue", "Revenue by product, region or segment per fiscal year, with the SEC filing each value came from.", {"unit": "source currency or scale, preserved alongside selected series", "series": "name -> source records [{fiscal_year, report_end_date, source_filing_url, value, ...}]; --fields selects series names, --filter matches names or values, --limit counts series; unit stays alongside them"}, args=[(("--by",), dict(default="products", choices=["products", "regions", "segment"], help="Breakdown to return."))], records="series", narrow=["--filter", "--limit"], context=["unit"])
 def revenue(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "rv")
     block = init.get({"products": "products_and_services", "regions": "regions", "segment": "segment"}[args.by]) or {}
@@ -162,7 +162,7 @@ def short_interest(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("options", "Option chain for one expiry with Finviz's implied volatility and greeks.", {"expiries": "expiries the source offers; pass one to --expiry", "current_expiry": "the expiry the chain belongs to", "last_close, last_time": "underlying price context", "contracts": "[{strike, type, openInterest, bidPrice, askPrice, lastClose, iv, delta, gamma, theta, vega, rho, ...}] as published"}, args=[(("--expiry",), dict(default=None, help="Expiry YYYY-MM-DD from a previous result's expiries; the source's nearest expiry when omitted.")), (("--type",), dict(default=None, choices=["call", "put"], help="Keep only calls or only puts (local selection)."))], records="contracts", narrow=["--type", "--fields", "--limit"])
+@stock_leaf("options", "Option chain for one expiry with Finviz's implied volatility and greeks.", {"expiries": "expiries the source offers; pass one to --expiry", "current_expiry": "the expiry the chain belongs to", "last_close, last_time": "underlying price context", "contracts": "[{strike, type, openInterest, bidPrice, askPrice, lastClose, iv, delta, gamma, theta, vega, rho, ...}] as published"}, args=[(("--expiry",), dict(default=None, help="Expiry YYYY-MM-DD from a previous result's expiries; the source's nearest expiry when omitted.")), (("--type",), dict(default=None, choices=["call", "put"], help="Keep only calls or only puts (local selection)."))], records="contracts", narrow=["--type", "--fields", "--limit"], context=["current_expiry", "last_close", "last_time"])
 def options(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "oc", e=args.expiry)
     contracts = init.get("options") or []
@@ -196,7 +196,7 @@ def filings(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("statement", "Income statement, balance sheet or cash flow as Finviz publishes it: source strings per period.", {"currency": "currency label from the source; no scale is published", "periods": "column labels, e.g. TTM, 2025FY or 2026Q3", "period_end_dates": "period end date per column", "items": "line item -> values aligned to periods, as source strings"}, args=[(("--kind",), dict(default="income", choices=["income", "balance", "cashflow"], help="Statement to read.")), (("--period",), dict(default="annual", choices=["annual", "quarterly"], help="Annual or quarterly columns."))], narrow=["--fields"])
+@stock_leaf("statement", "Income statement, balance sheet or cash flow as Finviz publishes it: source strings per period.", {"currency": "currency label from the source; no scale is published", "periods": "column labels, e.g. TTM, 2025FY or 2026Q3", "period_end_dates": "period end date per column", "items": "line item -> values aligned to periods, as source strings"}, args=[(("--kind",), dict(default="income", choices=["income", "balance", "cashflow"], help="Statement to read.")), (("--period",), dict(default="annual", choices=["annual", "quarterly"], help="Annual or quarterly columns."))], narrow=["--fields"], context=["currency", "periods", "period_end_dates"])
 def statement(ctx, args, ticker):
     code = {"income": "I", "balance": "B", "cashflow": "C"}[args.kind] + ("A" if args.period == "annual" else "Q")
     obs = ctx.observe("https://finviz.com/api/statement?" + urlencode({"t": ticker, "so": "F", "s": code}))

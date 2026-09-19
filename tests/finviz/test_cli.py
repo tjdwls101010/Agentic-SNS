@@ -72,9 +72,30 @@ def test_invalid_pointer_and_unknown_id_are_input_errors(client):
     assert client.one("read", saved, "--pointer", "/data/9", code=2)["error"]["code"] == "invalid_pointer"
     assert client.one("read", "nope", code=2)["error"]["code"] == "unknown_id"
     sliced = client.one("read", saved, "--pointer", "/data", "--start", "0", "--limit", "1")
-    assert sliced["selection"] == {"pointer": "/data", "start": 0, "received": 1} and sliced["data"] == [{"ticker": "A"}]
+    assert sliced["selection"] == {"pointer": "/data", "start": 0, "received": 1, "shown": 1} and sliced["data"] == [{"ticker": "A"}]
     pointers = {e["pointer"]: e["type"] for e in client.one("inspect", saved)["data"]}
     assert pointers["/data"] == "list" and pointers["/data/0/ticker"] == "str"
+
+
+def test_raw_reading_is_sliceable_by_character_range_and_names_the_next_window(client):
+    """A raw response larger than the budget is one string: --start/--limit cut containers, so only a character range reaches it."""
+    body = json.dumps([{"ticker": "A", "company": "x" * 5000}])
+    client.add("https://finviz.com/api/suggestions?input=A", body)
+    saved = client.one("search", "A")["id"]
+    head = client.one("read", saved, "--raw", "--chars", "0-1000")
+    assert head["data"] == body[:1000]
+    assert head["selection"] == {"pointer": "/raw", "start": 0, "received": len(body), "shown": 1000}
+    assert head["continuation"] == {"chars": "1000-2000"}
+    tail = client.one("read", saved, "--raw", "--chars", str(len(body) - 10) + "-")
+    assert tail["data"] == body[-10:] and "continuation" not in tail
+    windows, start = [], 0
+    while start is not None:
+        window = client.one("--max-chars", "2000", "read", saved, "--raw", "--chars", str(start) + "-" + str(start + 1000))
+        windows.append(window["data"])
+        start = int(window["continuation"]["chars"].split("-")[0]) if "continuation" in window else None
+    assert "".join(windows) == body
+    oversized = client.run("--max-chars", "800", "read", saved, "--raw", code=9)["results"][0]
+    assert "--chars" in oversized["error"]["fix"]
 
 
 def test_doctor_runs_offline(client):

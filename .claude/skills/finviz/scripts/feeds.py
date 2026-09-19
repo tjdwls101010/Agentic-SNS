@@ -19,7 +19,7 @@ CALENDAR_OUTPUT = {"date_from": "the start date the source states it used; null 
 
 
 def calendar_leaf(kind):
-    return leaf("calendar", kind, help=CALENDAR_HELP[kind], args=CALENDAR_ARGS, output=CALENDAR_OUTPUT, records="items", narrow=["--limit", "--fields", "--filter"])
+    return leaf("calendar", kind, help=CALENDAR_HELP[kind], args=CALENDAR_ARGS, output=CALENDAR_OUTPUT, records="items", narrow=["--limit", "--fields", "--filter"], context=["date_from"])
 
 
 def calendar(ctx, args, target):

@@ -198,7 +198,7 @@ def test_caught_later_page_failure_is_saved_with_original_error(client, body, st
     assert saved["data"]["error"] == result["error"]
     raw = client.one("read", failed_id, "--raw")
     assert raw["data"] == body and any("original observation failed" in warning for warning in raw["warnings"])
-    assert client.one("read", result["id"])["data"]["status"] == "partial"
+    assert client.one("read", result["id"], code=8)["data"]["status"] == "partial"  # reading a partial aggregate stays partial
 
 
 def test_aggregate_keeps_unselected_rows_even_when_export_selection_is_empty(client, tmp_path):

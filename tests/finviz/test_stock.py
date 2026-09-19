@@ -18,7 +18,7 @@ def test_revenue_selection_keeps_units_named_series_and_every_source_record_fiel
     assert client.one("stock", "revenue", "A", "--filter", "missing", code=7)["data"] == {"unit": "USD", "series": {}}
     saved_slice = client.one("read", result["id"], "--pointer", "/data/series", "--start", "1", "--limit", "1")
     assert saved_slice["data"] == {"Products B": values}
-    assert saved_slice["selection"]["unit"] == "USD"
+    assert saved_slice["selection"]["context"] == {"unit": "USD"}
 
 
 def test_snapshot_keeps_duplicate_metric_labels_with_their_own_definitions_and_header_facts(client):
@@ -139,6 +139,8 @@ def test_statement_aligns_periods_and_prices_refuse_misaligned_arrays(client):
     client.add("https://finviz.com/api/statement?t=A&so=F&s=IA", statement)
     data = client.one("stock", "statement", "A")["data"]
     assert data == {"currency": "USD", "periods": ["TTM", "2025FY"], "period_end_dates": ["", "10/31/2025"], "items": {"Total Revenue": ["7,372.00", "6,948.00"], "EPS (Diluted)": ["4.91", "4.57"]}}
+    sliced = client.one("read", client.one("stock", "statement", "A")["id"], "--pointer", "/data/items")
+    assert sliced["selection"]["context"] == {"currency": "USD", "periods": ["TTM", "2025FY"], "period_end_dates": ["", "10/31/2025"]}
     client.add("https://finviz.com/api/statement?t=A&so=F&s=BQ", {"currency": "USD", "data": {"Period": ["2026Q3"], "Total Assets": ["13,967.00"]}})
     assert client.one("stock", "statement", "A", "--kind", "balance", "--period", "quarterly")["data"]["items"] == {"Total Assets": ["13,967.00"]}
     bars = {"date": [1788872400, 1788958800], "open": [148.02, 145.23], "high": [149.2, 146.5], "low": [145.9, 143.7], "close": [146.85, 144.75], "volume": [1603236, 1853973], "lastClose": 146.8}
