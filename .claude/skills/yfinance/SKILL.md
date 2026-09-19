@@ -13,26 +13,43 @@ Use the installed skill's locked environment from any working directory:
 uv run --frozen --project "${CLAUDE_SKILL_DIR}/Scripts" python "${CLAUDE_SKILL_DIR}/Scripts/yfinance_cli.py" --help
 ```
 
-If the host does not substitute `${CLAUDE_SKILL_DIR}`, replace it with the absolute directory containing this SKILL.md. Start with the CLI's data groups, then read the selected command's help or scoped `schema`. They own arguments, defaults, output fields, condition syntax and recovery. List available fields and identifiers where the command offers discovery; reuse returned symbols, expirations and sector keys in subsequent calls. The interface supplies the information needed to query without reconstructing Python calls or reading the library's source.
+If the host does not substitute `${CLAUDE_SKILL_DIR}`, replace it with the absolute directory containing this SKILL.md. In zsh, expanding one variable that holds a whole command does not split it into an executable and arguments; invoke the command directly or use a shell function that forwards `"$@"`.
 
-In zsh, expanding one variable containing a whole command does not split it into an executable and arguments. Invoke the command directly or use a shell function that forwards `"$@"`.
+Discover in three steps: `--help` for the groups, `schema GROUP` for its commands, `schema GROUP LEAF` for that command's arguments, default window, units, known limits and gotchas. The interface owns all of that. Nothing here repeats it, because a copy of it here would go on asserting the old contract after the command changed.
 
-## Select the target and data
+Reuse returned symbols, expirations and keys exactly as they came back, in your answer as well as in the next call: adding or removing punctuation in a symbol names a different instrument.
 
-A company-name search returns candidates. Use the exchange, instrument type and identifying fields to choose the intended security; an equity, its depositary receipt and a similarly named fund are different targets. Ask when the remaining ambiguity would change the answer. Screening returns matches to particular conditions, not an independently verified census of a market.
 
-Keep returned symbols unchanged when reporting as well as querying: adding or removing punctuation can identify a different instrument.
+## Numbers arrive without their units
 
-Choose datasets from the question: a statement supplies reported results, analyst estimates describe expectations, and a calendar describes events. Combine the calls the question needs rather than fetching every available dataset. Returned news and filing entries locate sources; use the appropriate reader when the answer requires the article or original filing itself.
+The library has already turned every value into a float, so nothing in a number says what it measures, and a label can be actively wrong about it. Before reporting a figure, read that field's contract in `schema GROUP LEAF` under `units`, which states the scale (a ratio like 0.0452, or a percent like 4.52), the kind, and whether the value is the reciprocal of its own label.
 
-## Interpret periods, units and adjustments
+These are not rare. The same measurement appears on both scales in different commands and occasionally inside one result, and a whole family of fund multiples arrives inverted, so a price-to-earnings figure below 1 is an earnings yield rather than an impossible multiple. Do not settle the question from the magnitude — plausible-looking numbers are exactly where this goes wrong. Where `units` says nothing about a field, say what the source called it rather than converting it.
 
-A financial period end, an announcement date, a price's market timestamp and the time this CLI observed a response answer different questions. Preserve those roles when combining results; an observation time does not make every returned value current. Calendars can match different date fields, and a latest valuation column is not another completed reporting period. The selected command describes its actual date boundaries and coverage.
+The currency a price is quoted in and the currency a company reports its statements in are different fields and often different currencies. A ratio built from one of each is wrong by the exchange rate, which for a Japanese reporter quoted in dollars is about a hundredfold. One statement also mixes measurements: a tax rate sits in the same column as an amount in the trillions.
 
-Interpret prices using the applied adjustment and repair conditions. Adjusted prices and cash distributions can overlap economically, so adding dividends to an already adjusted return can count them twice. Repair is a transformation with its own limitations, not proof that a value equals the original trade. Keep exchange timezones, currencies and source units when comparing instruments. A financial statement can contain monetary amounts, per-share figures and ratios together; one currency label does not make every row a currency amount.
+## Times answer different questions
 
-## Interpret coverage and failure
+A result separates the time the source put on the data, the time this CLI received the response, and — when reading a saved observation — how long ago that was. They are not interchangeable: after a close the source's time can be hours behind the observation, so a value observed a minute ago is not a current price. Receiving something recently never makes it current.
 
-Separate the requested scope, the observed response and the selected output: the document-level request records what was asked, and a result's context reports what was actually applied to that target and rows returned before and after `--limit`. A populated result can coexist with failed or unattempted targets. Empty returns and null values are observations of missing usable data, not proof of no trading, no holdings or no event; do not replace them with zero. Preserve reported upstream information loss instead of inferring the missing distinction.
+A fiscal period end, an announcement date and a market timestamp answer different questions too, and one row can mix them: a holdings row can carry a position filed months ago valued at today's price. A trailing or "current" column is a rolling snapshot, not a completed reporting period. Keep exchange timezones as returned.
 
-Use errors and their recovery instructions to decide whether to correct an argument, narrow the requested output, or stop after a provider restriction. A size error supplies no partial dataset to summarize as complete. A remote offset continues a query, not an immutable snapshot: results can move between calls, and an unknown remaining count is not zero. State the coverage and limitations that affect the user's conclusion.
+## Values arrive already transformed
+
+The adjustment applied decides what a closing price means, so adding dividends to an already adjusted return counts them twice. Repair is a transformation with its own limits, not evidence that a value equals the original trade. Where the source has already collapsed a distinction — a zero turned into a null upstream — that information is gone, and a null there cannot be restored or read as a zero.
+
+## The default answer is a window, not everything
+
+Every command returns one screen by default and `coverage` states what that cost: how many rows arrived, how many were printed, and which end a limit kept. Read it rather than assuming the rows you can see are all there were.
+
+The status distinguishes the two ways a result can be short. `ok` means this command's own default window, which is the contract and is usually enough. `partial` means the range **you** asked for did not fit the budget and was cut — then either read the rest or state the limitation in your answer. Never describe a `partial` window as the whole period.
+
+A successful call is not evidence that a condition was applied. Where the response carries evidence, `conditions` reports each one as confirmed, not applied, or unverified; read that rather than assuming an argument took effect because rows came back. For the same reason, describe a named preset by the query the result carries, not by its name — a preset's name is not a statement of what it screens for.
+
+An empty return and a null are observations of nothing usable, not measurements of zero, and they do not prove the thing does not exist. Between pages the source can change, so an offset continues a query rather than reading a fixed snapshot.
+
+## When you are blocked
+
+Every response is saved before anything is selected from it, so a result that was too large is not lost: the `id` reaches it and `read` returns it in slices without paying for the request again. `too_large` is a size condition, never an empty result, and it never carries a partial table to summarize.
+
+The `fix` on an error names a narrowing that actually works for that command, and where the source stated its own constraint the fix names the argument and value to change. Follow it as written, including every target and store it names — a recovery that quietly drops one target turns a comparison into a single-instrument question. After rate limiting, stop rather than trying the remaining targets. State the coverage and limitations that affect the user's conclusion.

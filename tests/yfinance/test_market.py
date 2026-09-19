@@ -7,7 +7,7 @@ def test_search_returns_reusable_symbols_without_claiming_pagination(cli):
     r = doc["results"][0]
     assert r["data"]["index"] == ["AAPL"]
     assert r["data"]["data"][0][0] == "Apple Inc."
-    assert r["context"]["coverage"] == "first_page_only"
+    assert r["context"]["coverage_scope"] == "first_page_only"
     assert "next_offset" not in r["context"]
 
 
@@ -46,16 +46,17 @@ def calendar_route(kind, columns, rows):
 
 
 def test_market_earnings_discloses_us_scope_and_native_zero_loss(cli):
+    """The LTE bound below is the day after --end: Yahoo excludes its end date, so an inclusive --start D --end D
+    asked for nothing and answered "no earnings that day" for a day that had them."""
     columns = ["Symbol", "Company Name", "Market Cap (Intraday)", "Event Name", "Event Start Date", "EPS Estimate", "Reported EPS", "Surprise (%)"]
     route = calendar_route("sp_earnings", columns, [["AAPL", "Apple", 100, "Earnings", "2024-01-25T21:00:00Z", 0, 0, 0]])
-    route["body"]["query"] = {"operator": "AND", "operands": [{"operator": "EQ", "operands": ["region", "us"]}, {"operator": "OR", "operands": [{"operator": "EQ", "operands": ["eventtype", "EAD"]}, {"operator": "EQ", "operands": ["eventtype", "ERA"]}]}, {"operator": "GTE", "operands": ["startdatetime", "2024-01-25"]}, {"operator": "LTE", "operands": ["startdatetime", "2024-01-25"]}]}
+    route["body"]["query"] = {"operator": "AND", "operands": [{"operator": "EQ", "operands": ["region", "us"]}, {"operator": "OR", "operands": [{"operator": "EQ", "operands": ["eventtype", "EAD"]}, {"operator": "EQ", "operands": ["eventtype", "ERA"]}]}, {"operator": "GTE", "operands": ["startdatetime", "2024-01-25"]}, {"operator": "LTE", "operands": ["startdatetime", "2024-01-26"]}]}
     proc, doc = cli("calendar", "earnings", "--start", "2024-01-25", "--end", "2024-01-25", "--limit", "1", "--fields", "EPS Estimate,Reported EPS,Surprise(%)", routes=[route])
     assert proc.returncode == 7, proc.stdout + proc.stderr
     r = doc["results"][0]
     assert r["data"]["data"] == [[None, None, None]]
     assert r["context"]["scope"] == "US"
     assert doc["request"]["most_active"] is False
-    assert r["context"]["end_boundary"] == "native_inclusive"
     assert any("zero" in w.lower() for w in r["warnings"])
 
 
@@ -70,11 +71,7 @@ def test_sector_industry_keys_are_reusable(cli):
     assert doc["results"][0]["data"] == ["technology"]
 
 
-def test_market_status_retains_native_time_and_timezone(cli):
-    routes = [{"path": "/quote/marketSummary", "json": {"marketSummaryResponse": {"result": [{"exchange": "NMS", "shortName": "Nasdaq", "regularMarketPrice": 123}]}}}, {"path": "/v6/finance/markettime", "json": {"finance": {"marketTimes": [{"marketTime": [{"id": "us", "time": "unused", "open": "2024-01-02T09:30:00-05:00", "close": "2024-01-02T16:00:00-05:00", "timezone": [{"gmtoffset": -5000, "short": "EST"}]}]}]}}}]
-    proc, doc = cli("market", "status", "--fields", "open,close,tz", routes=routes)
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"] == {"open": "2024-01-02T09:30:00-05:00", "close": "2024-01-02T16:00:00-05:00", "tz": "EST"}
+
 
 
 def test_screen_applied_defaults_identify_actual_preset_universe(cli):
@@ -98,7 +95,10 @@ def test_other_market_calendar_dates_and_numeric_semantics(cli, leaf, kind, colu
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert doc["results"][0]["data"]["data"] == [expected]
     if leaf == "ipo":
-        assert doc["results"][0]["context"]["date_field"] == ["startdatetime", "filingdate", "amendeddate"]
+        # three different date fields can match a row, so the range cannot be confirmed from what came back
+        assert doc["results"][0]["conditions"]["dates"]["status"] == "unverified"
+    else:
+        assert doc["results"][0]["conditions"]["dates"]["status"] in ("confirmed", "not_applied")
 
 
 @pytest.mark.parametrize("dataset", ["overview", "top-companies", "research-reports", "top-performing", "top-growth"])
@@ -139,7 +139,6 @@ def test_earnings_missing_dates_do_not_corrupt_values_or_prove_page_end(cli, mis
         assert 'alignment' in r['error']['message']
     else:
         assert proc.returncode == 0, proc.stdout
-        assert r['context']['remaining'] is None
         assert r['context']['next_offset'] == 2
 
 

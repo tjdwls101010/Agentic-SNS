@@ -112,7 +112,7 @@ def test_invalid_empty_targets_and_budgets_are_rejected_before_network(cli, argv
 def test_empty_dataset_does_not_falsely_reject_unverifiable_fields(cli):
     proc, doc = cli("search", "missing", "--fields", "shortName", routes=[{"path": "/v1/finance/lookup", "json": {"finance": {"result": [{"documents": []}], "error": None}}}])
     assert proc.returncode == 7, proc.stdout + proc.stderr
-    assert doc["results"][0]["context"]["unverified_fields"] == ["shortName"]
+    assert doc["results"][0]["coverage"]["unverified_fields"] == ["shortName"]
 
 
 @pytest.mark.parametrize('argv', [
@@ -144,8 +144,8 @@ def test_scoped_schema_states_its_own_defaults_and_the_document_contract(cli):
     proc, doc = cli("schema", "holders", "major")
     assert proc.returncode == 0, proc.stdout + proc.stderr
     data = doc["results"][0]["data"]
-    assert "period" not in data["default_context"] and "preset" not in data["default_context"]
-    assert "request" in data["output"]["document"] and "context" in data["output"]["document"]
+    assert "default_window" in data and "narrowing" in data
+    assert "schema with no scope" in data["output"], "the shared envelope is described once, not on every leaf"
     proc, doc = cli("schema", "screen", "run", "--filter", "ascending")
     assert "--ascending" in doc["results"][0]["data"]["arguments"]
-    assert "preset" in doc["results"][0]["data"]["default_context"]
+    assert list(doc["results"][0]["data"]["arguments"]) == ["--ascending"], "a filtered schema keeps only what matched"

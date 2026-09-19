@@ -1,0 +1,160 @@
+{
+ "prices_history": {
+  "columns": [
+   "Date",
+   "Open",
+   "High",
+   "Low",
+   "Close",
+   "Volume",
+   "Dividends",
+   "Stock Splits"
+  ],
+  "dtypes": [
+   "datetime64[s, America/New_York]",
+   "float64",
+   "float64",
+   "float64",
+   "float64",
+   "int64",
+   "float64",
+   "float64"
+  ],
+  "rows_observed": 5
+ },
+ "analysts_history": {
+  "columns": [
+   "quarter",
+   "epsActual",
+   "epsEstimate",
+   "epsDifference",
+   "surprisePercent"
+  ],
+  "dtypes": [
+   "datetime64[us]",
+   "float64",
+   "float64",
+   "float64",
+   "float64"
+  ],
+  "rows_observed": 4
+ },
+ "analysts_upgrades": {
+  "columns": [
+   "GradeDate",
+   "Firm",
+   "ToGrade",
+   "FromGrade",
+   "Action",
+   "priceTargetAction",
+   "currentPriceTarget",
+   "priorPriceTarget"
+  ],
+  "dtypes": [
+   "datetime64[s]",
+   "str",
+   "str",
+   "str",
+   "str",
+   "str",
+   "float64",
+   "float64"
+  ],
+  "rows_observed": 971
+ },
+ "holders_institutional": {
+  "columns": [
+   "Date Reported",
+   "Holder",
+   "pctHeld",
+   "Shares",
+   "Value",
+   "pctChange"
+  ],
+  "dtypes": [
+   "datetime64[s]",
+   "str",
+   "float64",
+   "int64",
+   "int64",
+   "float64"
+  ],
+  "rows_observed": 10
+ },
+ "holders_insider_transactions": {
+  "columns": [
+   "Shares",
+   "URL",
+   "Text",
+   "Insider",
+   "Position",
+   "Transaction",
+   "Start Date",
+   "Ownership",
+   "Value"
+  ],
+  "dtypes": [
+   "int64",
+   "str",
+   "str",
+   "str",
+   "str",
+   "str",
+   "datetime64[s]",
+   "str",
+   "float64"
+  ],
+  "rows_observed": 81
+ },
+ "calendar_earnings": {
+  "columns": [
+   "Symbol",
+   "Company",
+   "Marketcap",
+   "Event Name",
+   "Event Start Date",
+   "Timing",
+   "EPS Estimate",
+   "Reported EPS",
+   "Surprise(%)"
+  ],
+  "dtypes": [
+   "str",
+   "str",
+   "float64",
+   "str",
+   "datetime64[us, UTC]",
+   "str",
+   "float64",
+   "float64",
+   "float64"
+  ],
+  "rows_observed": 1
+ },
+ "fund_equity": {
+  "columns": [
+   "Average",
+   "SPY",
+   "Category Average"
+  ],
+  "dtypes": [
+   "str",
+   "object",
+   "object"
+  ],
+  "rows_observed": 6
+ },
+ "fund_operations": {
+  "columns": [
+   "Attributes",
+   "SPY",
+   "Category Average"
+  ],
+  "dtypes": [
+   "str",
+   "float64",
+   "float64"
+  ],
+  "rows_observed": 3
+ }
+}

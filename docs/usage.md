@@ -78,7 +78,11 @@ uv run --frozen --project .claude/skills/yfinance/Scripts python .claude/skills/
 
 Ask, for example: “Find Apple's reported revenue for the latest four quarters and identify the reporting periods and currency.” The agent discovers the appropriate command and available fields, selects the query and reads its structured result. For another question it can follow returned tickers, option expirations or screener fields without writing Python integration code. [Skill guidance](../.claude/skills/yfinance/SKILL.md) explains how to interpret the result; command help and scoped `schema` own the interface.
 
-Queries always return JSON. Select periods, fields and record counts to fit the question; an oversized result returns a recovery instruction rather than silently omitted data. The skill does not maintain a result archive. Provider restrictions, incomplete datasets and upstream information loss are reported separately from successful observations. Market data and its observation time are not necessarily the same timestamp.
+Queries always return JSON, and every command answers with one screen by default: the `coverage` field reports how many rows arrived, how many were printed and which end a limit kept. A request that does not fit the budget comes back as `partial` rather than `ok`, so a narrowed window is never mistaken for the whole range.
+
+Each response is saved under an `id` before anything is selected from it, so a result that was too large is still reachable: `read ID` returns it in slices without repeating the request, and each slice names the next. Saved observations live in the user cache, or in `--store DIR`; `--ttl-days` deletes old ones and says nothing about whether newer ones are current.
+
+A field's scale is part of its contract rather than something to infer from its magnitude — `schema GROUP LEAF` reports, per field, whether a value is a ratio or a percent and whether it is the reciprocal of its own label. Provider restrictions, incomplete datasets and upstream information loss are reported separately from successful observations, and market data and its observation time are not necessarily the same timestamp.
 
 ## CLI reference
 
