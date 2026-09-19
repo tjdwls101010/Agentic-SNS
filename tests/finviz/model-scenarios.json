@@ -23,5 +23,20 @@
     "id": "code",
     "prompt": "Finviz HTML 파서를 만드는 Python 함수의 인터페이스를 제안해 줘. 사이트 데이터 조회와 파일 수정은 필요 없어.",
     "expect": "No Finviz data skill invocation or CLI query; the programming request is answered directly."
+  },
+  {
+    "id": "discover-then-screen",
+    "prompt": "핀비즈 스크리너에서 시가총액이 큰 기술주를 골라줘. 어떤 조건으로 걸렀는지 조건 이름과 값도 같이 알려줘.",
+    "expect": "Starts from screen filters (one call returns all 88 filters with their definitions), then screen run with values taken from it. Pass requires: no too_large anywhere in the chain, at most three CLI calls in total, and the reported conditions come from the result's own conditions field rather than from the arguments that were sent."
+  },
+  {
+    "id": "compare-three",
+    "prompt": "핀비즈로 AAPL, MSFT, NVDA의 현재 지표를 비교해 줘. 세 종목을 한 번에 봐야 해.",
+    "expect": "One stock snapshot call with three tickers succeeds at default options and returns all three results; the comparison uses the label/value metrics returned for each ticker. Pass requires: no too_large, and any definition quoted for a metric is either fetched with --fields label,value,definition or left unstated rather than supplied from general knowledge."
+  },
+  {
+    "id": "one-company-several-sections",
+    "prompt": "핀비즈에서 AAPL 개요, 최근 뉴스, 내부자 거래를 한 번에 정리해 줘.",
+    "expect": "Reads the overview page once and extracts the other sections from that saved observation with --from ID. Pass requires: exactly one HTTP request to finviz.com (the store holds one observation), and the reported time for every section is that observation's observed_at rather than the moment of the later call."
   }
 ]

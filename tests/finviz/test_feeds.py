@@ -279,7 +279,10 @@ def test_open_reads_any_supported_finviz_url_generically_and_refuses_others(clie
     data = client.one("open", "https://finviz.com/quote.ashx?t=AAPL&p=d")["data"]
     assert data["metrics"] == [{"label": "Market Cap", "value": "4T", "definition": "Market capitalization", "unit": None}]
     assert data["tables"] == [{"headers": ["Date", "Action"], "rows": [{"Date": "Sep-09-26", "Action": "Resumed"}]}]
-    assert data["initial"] == {"init": {"a": 1}} and data["controls"] == {"x": [{"value": "1", "label": "one", "selected": True, "elite_only": False}]}
+    assert data["initial"] == {"init": 1} and data["controls"] == {"x": 1}  # collections come back as counts and are asked for by name
+    asked = client.one("open", "https://finviz.com/quote.ashx?t=AAPL&p=d", "--initial", "--options")["data"]
+    assert asked["initial"] == {"init": {"a": 1}}
+    assert asked["controls"] == {"x": [{"value": "1", "label": "one", "selected": True, "elite_only": False}]}
     assert data["links"] == [{"text": "MSFT", "url": "https://finviz.com/stock?t=MSFT"}]
     assert client.one("open", "https://www.sec.gov/cgi-bin/browse-edgar", code=2)["error"]["code"] == "unsupported_url"
     assert client.one("open", "https://finviz.com/register", code=2)["error"]["code"] == "unsupported_route"

@@ -211,7 +211,7 @@ def trades(ctx, args, target):
     return obs.result
 
 
-@leaf("open", None, help="Read any supported finviz.com URL: JSON APIs come back as-is, pages through the generic extractor.", args=[(("url",), dict(metavar="URL", help="HTTPS finviz.com URL to a screener, stock, groups, map, news, calendar, insider or market page or API.")), (("--all-links",), dict(action="store_true", help="Keep every link on the page instead of the first 50; a dense page carries a few hundred, mostly peer and view links that its own command returns as data."))], output={"JSON API": "the response as published", "page": "{metrics, tables: [{headers, rows}], initial: {script id: json}, controls: {select id: options}, article, links}; links_received counts the links before the 50-link default"}, narrow=["--fields"])
+@leaf("open", None, help="Read any supported finviz.com URL: JSON APIs come back as-is, pages through the generic extractor.", args=[(("url",), dict(metavar="URL", help="HTTPS finviz.com URL to a screener, stock, groups, map, news, calendar, insider or market page or API.")), (("--rows",), dict(type=int, default=10, help="Rows to keep per table; 0 keeps every row. A table that was cut reports rows_received beside its rows, and the dense pages this reader is pointed at carry several tables at once.")), (("--options",), dict(action="store_true", help="Attach each select control's option list instead of its option count; the screener page's controls alone carry a few hundred thousand characters of options.")), (("--initial",), dict(action="store_true", help="Attach the page's embedded JSON blocks instead of their key counts; these are the payloads the dedicated commands parse.")), (("--all-links",), dict(action="store_true", help="Keep every link on the page instead of the first 50; a dense page carries a few hundred, mostly peer and view links that its own command returns as data."))], output={"JSON API": "the response as published", "page": "{metrics, tables: [{headers, rows, rows_received}], initial: {script id: key count, or the JSON with --initial}, controls: {select id: option count, or the options with --options}, article, links}; a page's collections come back as counts and are asked for by name, and links_received counts the links before the 50-link default"}, narrow=["--fields", "--rows"])
 def open_url(ctx, args, target):
     validate_url(args.url)
     obs = ctx.observe(args.url)
@@ -238,20 +238,25 @@ def open_url(ctx, args, target):
             continue
         headers, rows = markup.table_records(node, obs.url)
         if rows and markup.text(node):
-            tables.append({"headers": headers, "rows": rows})
+            table = {"headers": headers, "rows": rows if not args.rows else rows[: args.rows]}
+            if args.rows and len(rows) > args.rows:
+                table["rows_received"] = len(rows)
+            tables.append(table)
     initial = {}
     for script in page.select("script[id]"):
         text = script.string or script.get_text()
         if text.lstrip().startswith(("{", "[")):
             try:
-                initial[script["id"]] = markup.script_json(page, obs, script["id"])
+                parsed = markup.script_json(page, obs, script["id"])
             except Exception:
-                initial[script["id"]] = None
+                parsed = None
+            initial[script["id"]] = parsed if args.initial else (len(parsed) if isinstance(parsed, (dict, list)) else parsed)
     links = [{"text": markup.text(a), "url": urljoin(obs.url, a["href"])} for a in page.select("a[href]") if markup.text(a)]
-    data = {"metrics": markup.metrics(page), "tables": tables, "initial": initial, "controls": markup.selects(page), "article": markup.article(page, obs.url), "links": links if args.all_links else links[:50]}
+    controls = markup.selects(page)
+    data = {"metrics": markup.metrics(page), "tables": tables, "initial": initial, "controls": controls if args.options else {name: len(options) for name, options in controls.items()}, "article": markup.article(page, obs.url), "links": links if args.all_links else links[:50]}
     if not args.all_links and len(links) > 50:
         data["links_received"] = len(links)
-    if not any((data["metrics"], tables, initial, data["controls"], data["article"])):
+    if not any((data["metrics"], tables, initial, controls, data["article"])):
         raise obs.fail("structure_changed", "No supported data structure was found on this page.", "Read the saved raw page with read ID --raw; the page may be visual-only or require an account.")
     obs.result["data"] = data
     return obs.result
