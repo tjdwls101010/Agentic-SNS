@@ -13,21 +13,23 @@ CALENDAR_PATHS = {"earnings": "/calendar/earnings", "dividends": "/calendar/divi
 DATE_FIELDS = {"earnings": "earningsDate", "dividends": "exdate", "economic": "date", "season": "date"}
 
 
-CALENDAR_ARGS = [(("--date",), dict(default=None, help="Start date YYYY-MM-DD; the page states back the start date it used as date_from, and the date condition is judged from that echo. Not accepted by season.")), (("--page",), dict(type=int, default=1, help="One-based page from a previous continuation; pages after the first come from the calendar API, which states back no date or sort, so those conditions stay unverified. Values other than 1 are rejected by economic and season.")), (("--sort",), dict(default=None, help="Source sort key, e.g. earningsDate or -earningsDate; the page states the applied sort back as evidence."))]
+DATE_ARG = (("--date",), dict(default=None, help="Start date YYYY-MM-DD; the page states back the start date it used as date_from, and the date condition is judged from that echo."))
+PAGE_ARG = (("--page",), dict(type=int, default=1, help="One-based page from a previous continuation; pages after the first come from the calendar API, which states back no date or sort, so those conditions stay unverified."))
+SORT_ARG = (("--sort",), dict(default=None, help="Source sort key, e.g. earningsDate or -earningsDate; the page states the applied sort back as evidence."))
+# 성진: 한 calendar() 함수가 네 리프를 맡는 것은 구현의 편의이고, 그 편의를 모델의 선택지로 청구하지 않는다 — 리프는 자기가 받는 인자만 광고한다.
+CALENDAR_ARGS = {"earnings": [DATE_ARG, PAGE_ARG, SORT_ARG], "dividends": [DATE_ARG, PAGE_ARG, SORT_ARG], "economic": [DATE_ARG, SORT_ARG], "season": []}
 CALENDAR_HELP = {"earnings": "Earnings calendar: report dates with EPS and sales estimates, actuals and surprises.", "dividends": "Dividend calendar: ex-dates with ordinary and special amounts and yields.", "economic": "Economic calendar: events with actual, previous and forecast values.", "season": "Earnings season preview: upcoming report counts per day with estimates."}
 CALENDAR_OUTPUT = {"date_from": "the start date the source states it used; null when the response states none, as the paging API does", "items": "source records: earnings carry epsEstimate/epsActual/salesEstimate and isEarningDateEstimate; dividends carry exdate, ordinary, special, yield; economic carry event, actual, previous, forecast; season carries date and estimates", "totals_per_day": "season only: report counts per day"}
 
 
 def calendar_leaf(kind):
-    return leaf("calendar", kind, help=CALENDAR_HELP[kind], args=CALENDAR_ARGS, output=CALENDAR_OUTPUT, records="items", narrow=["--limit", "--fields", "--filter"], context=["date_from"], default_limit=40)
+    return leaf("calendar", kind, help=CALENDAR_HELP[kind], args=CALENDAR_ARGS[kind], output=CALENDAR_OUTPUT, records="items", narrow=["--limit", "--fields", "--filter"], context=["date_from"], default_limit=40)
 
 
 def calendar(ctx, args, target):
     args.kind = args.leaf
-    if args.kind == "economic" and args.page != 1:
-        raise Failure("invalid_argument", "The economic calendar has no pagination.", "Omit --page; narrow with --date, --filter or --limit.")
-    if args.kind == "season" and (args.date or args.page != 1 or args.sort):
-        raise Failure("invalid_argument", "The season preview has no date, page or sort selectors.", "Run calendar season without them; select locally with --filter or --limit.")
+    for name in ("date", "page", "sort"):
+        setattr(args, name, getattr(args, name, 1 if name == "page" else None))
     # 성진: 페이지가 dateFrom·sort를 적용하고 그 값을 route-init-data에 되비추므로 1페이지는 페이지에서 읽는다. API는 되비추는 값이 없어 페이지를 넘길 때만 쓴다.
     use_api = args.page != 1
     date_from = args.date

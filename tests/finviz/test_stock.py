@@ -78,6 +78,20 @@ def test_overview_news_defaults_to_the_most_recent_screenful(client):
     assert [i["title"] for i in result["data"]][:2] == ["Headline 0", "Headline 1"]
 
 
+def test_the_overview_sections_can_be_extracted_from_one_saved_page(client):
+    """snapshot, profile, ratings, news, insiders and ownership are six views of the same request; reading four of them cost four identical fetches."""
+    client.add(OVERVIEW, stock_overview())
+    first = client.one("stock", "snapshot", "A")
+    client.responses.clear()  # nothing further may reach the network
+    for leaf, check in (("news", lambda d: d[0]["title"]), ("ratings", lambda d: d[0]["Analyst"]), ("insiders", lambda d: d["trades"][0]["Transaction"])):
+        again = client.one("stock", leaf, "A", "--from", first["id"])
+        assert check(again["data"]) and again["id"] == first["id"]
+        assert again["observed_at"] == first["observed_at"]  # the answer is as old as the page it came from
+        assert again["request"]["from_id"] == first["id"]
+    mismatch = client.one("stock", "news", "MSFT", "--from", first["id"], code=2)
+    assert mismatch["error"]["code"] == "invalid_argument" and "t=A" in mismatch["error"]["message"]
+
+
 def test_profile_ratings_news_insiders_and_ownership_come_from_the_overview_page(client):
     ownership = {"managersOwnership": [{"investorId": "2012383", "name": "BlackRock, Inc.", "slug": "blackrock-inc-2012383", "percOwnership": 9.06}], "fundsOwnership": [{"investorId": "1", "name": "Vanguard 500", "slug": "v", "percOwnership": 3.1}]}
     monthly = [{"date": 1756684800, "saleAggregated": 95972, "saleTransactionCount": 1, "buyAggregated": 0, "buyTransactionCount": 0}]

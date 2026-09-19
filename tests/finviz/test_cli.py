@@ -150,7 +150,7 @@ def test_read_hides_headers_unless_pointed_at_and_accepts_the_root_pointer(clien
     headers = client.one("read", saved, "--pointer", "/source/headers")["data"]
     assert headers["retry-after"] == "5"
     pointers = [e["pointer"] for e in client.one("inspect", saved)["data"]]
-    assert pointers[0] == "/" and "/source/headers" in pointers
+    assert pointers[0] == "/data" and "/source/headers" in pointers
 
 
 def test_local_storage_failures_stay_inside_the_json_contract(client, tmp_path):

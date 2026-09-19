@@ -183,6 +183,28 @@ def test_calendar_pages_use_source_entries_and_confirm_date_page_and_sort(client
     assert result["data"]["items"] == [{"date": "2026-09-30", "ticker": "MU"}] and result["data"]["totals_per_day"] == {"2026-09-30": 3} and result["coverage"]["source_total"] == 64
 
 
+def test_each_calendar_takes_only_the_arguments_it_accepts(client):
+    """One shared argument list made season advertise --date, --page and --sort and then refuse all three."""
+    season = client.raw("calendar", "season", "--help", code=0).stdout
+    assert "--date" not in season and "--page" not in season and "--sort" not in season
+    economic = client.raw("calendar", "economic", "--help", code=0).stdout
+    assert "--date" in economic and "--sort" in economic and "--page" not in economic
+    earnings = client.raw("calendar", "earnings", "--help", code=0).stdout
+    assert "--date" in earnings and "--page" in earnings and "--sort" in earnings
+    refused = client.one("calendar", "season", "--date", "2026-09-01", code=2)
+    assert refused["error"]["code"] == "invalid_argument"
+    assert client.one("calendar", "economic", "--page", "2", code=2)["error"]["code"] == "invalid_argument"
+    assert "rejected by" not in " ".join(str(a) for a in client.one("schema", "calendar", "earnings")["data"]["arguments"].values())
+
+
+def test_inspect_lists_the_structure_the_model_cannot_know_in_advance(client):
+    client.add("https://finviz.com/api/suggestions?input=A", [{"ticker": "A", "nested": {"deep": [1]}}])
+    saved = client.one("search", "A")["id"]
+    pointers = [entry["pointer"] for entry in client.one("inspect", saved)["data"]]
+    assert "/data" in pointers and "/data/0/nested" in pointers
+    assert not [p for p in pointers if p in ("/", "/id", "/observed_at", "/status", "/source/url", "/source/http_status")]
+
+
 def test_news_headlines_by_time_by_source_and_stock_badges(client):
     client.add("https://finviz.com/news", news_page())
     result = client.one("news", "headlines")
@@ -304,10 +326,9 @@ def test_open_keeps_headerless_tables_and_drops_site_navigation_links(client):
 def test_economic_calendar_rejects_unsupported_pagination_before_fetching(client, date):
     events = [{"event": "Budget", "date": "2026-09-01", "actual": "-$167B"}]
     client.add("https://finviz.com/calendar/economic", calendar_page({"data": {"initialDateFrom": "2026-09-01", "entries": events}}))
-    client.add("https://finviz.com/api/calendar/economic?dateFrom=2026-09-01", events)
     result = client.one("calendar", "economic", "--page", "2", *date, code=2)
     assert result["error"]["code"] == "invalid_argument"
-    assert "--page" in result["error"]["fix"]
+    assert "--page" in result["error"]["message"] and "calendar economic --help" in result["error"]["fix"]
 
 
 def test_map_and_bubbles_report_selectors_without_inventing_confirmation(client):

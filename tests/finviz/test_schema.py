@@ -42,11 +42,15 @@ def test_shared_options_work_before_the_group_and_after_the_command(client):
 
 
 def test_help_and_schema_disclose_shared_defaults_and_parser_errors_stay_in_the_json_contract(client):
-    assert "--max-bytes" in client.raw("--help", code=0).stdout
+    root_help = client.raw("--help", code=0).stdout
+    assert "--max-chars" in root_help and "--max-bytes" not in root_help  # transport limits are the operator's, not a choice in the model's list
     leaf_help = client.raw("stock", "earnings", "--help", code=0).stdout
-    assert "finviz.py --help" in leaf_help and "--max-bytes" not in leaf_help
+    assert "finviz.py --help" in leaf_help and "Maximum output characters" not in leaf_help  # named in the epilog, explained once at the root
     schema = client.one("schema", "stock", "earnings")["data"]
-    assert schema["arguments"]["--max-bytes"]["default"] == 16777216
+    assert schema["arguments"]["--max-chars"]["default"] == 20000
+    limits = client.one("doctor")["data"]["transport"]
+    assert limits["timeout"] == 60 and limits["connect_timeout"] == 10 and limits["max_bytes"] == 16777216
+    assert limits["set_by"] == "defaults"
     invalid = client.one("stock", "earnings", "A", "--dataset", "bogus", code=2)
     assert invalid["error"]["code"] == "invalid_argument" and "invalid choice" in invalid["error"]["message"]
     assert client.raw("stock", "earnings", "A", "--dataset", "bogus", code=2).stderr == ""

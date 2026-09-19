@@ -11,7 +11,7 @@ import sys
 from urllib.parse import urlencode
 
 import output
-from transport import Failure, Store, fetch
+from transport import Failure, Observation, Store, fetch
 
 LEAVES = []
 GROUPS = {
@@ -30,16 +30,28 @@ GROUPS = {
     "inspect": "List the JSON pointers inside a saved observation",
 }
 COMMON = [
-    (("--max-chars",), dict(type=int, default=20000, help="Maximum output characters; larger results become a too_large error with narrowing advice, never a truncated document. The default is a safety boundary rather than the working limit: each command's own default range is what keeps a result to one screen, and this catches the cases where that range is still too wide. Raise it when you deliberately want a whole catalogue, chain or page in one document, and the too_large message names the exact size to pass.")),
+    (("--max-chars",), dict(type=int, default=20000, help="Maximum output characters; a larger result becomes a too_large error naming how to narrow it, never a truncated document.")),
     (("--filter",), dict(default=None, help="Case-insensitive substring; keeps records whose own values or scalar lists contain it (nested objects such as option lists are not searched).")),
     (("--fields",), dict(default=None, help="Comma-separated record fields to keep; unknown names return the available ones. Where the data is a mapping, these are the fields inside each entry and --keys chooses the entries.")),
     (("--keys",), dict(default=None, help="Comma-separated entries to keep where the data is a mapping, e.g. instruments or series names; unknown names return the available ones.")),
     (("--limit",), dict(type=int, default=None, help="Maximum records to output; the observation keeps everything received.")),
     (("--store",), dict(default=os.environ.get("FINVIZ_STORE", str(Path.home() / ".cache/finviz-skill/observations.sqlite3")), help="SQLite observation store; use the same path to read earlier IDs.")),
-    (("--connect-timeout",), dict(type=float, default=10, help="Connection timeout in seconds.")),
-    (("--timeout",), dict(type=float, default=60, help="Per-request timeout in seconds.")),
-    (("--max-bytes",), dict(type=int, default=16 * 1024 * 1024, help="Maximum response size in bytes.")),
 ]
+# 성진: 전송 손잡이는 운영자의 것이지 Finviz 질문에 답하는 모델의 선택지가 아니다. 환경 변수로 받고 doctor가 실효값을 보고한다.
+TRANSPORT = {"FINVIZ_CONNECT_TIMEOUT": ("connect_timeout", float, 10.0), "FINVIZ_TIMEOUT": ("timeout", float, 60.0), "FINVIZ_MAX_BYTES": ("max_bytes", int, 16 * 1024 * 1024)}
+
+
+def transport_settings():
+    values = {}
+    for variable, (name, kind, fallback) in TRANSPORT.items():
+        raw = os.environ.get(variable)
+        try:
+            values[name] = kind(raw) if raw not in (None, "") else fallback
+        except ValueError:
+            raise Failure("invalid_argument", variable + " is not a number: " + raw, "Set " + variable + " to a positive number or unset it to use " + str(fallback) + ".")
+        if values[name] <= 0:
+            raise Failure("invalid_argument", variable + " must be positive.", "Set " + variable + " above zero or unset it to use " + str(fallback) + ".")
+    return argparse.Namespace(**values)
 
 
 class Leaf:
@@ -63,6 +75,13 @@ def leaf(group, name=None, *, help, output, args=(), narrow=(), records=None, ta
     return register
 
 
+# 성진: 리프 35개가 같은 문장을 다시 싣지 않도록, 값을 바꿀 조건은 무인자 schema에만 붙인다.
+SHARED_NOTES = {
+    "--max-chars": "The default 20,000 is a safety boundary, not the working limit: each command's own default range is what keeps a result to one screen, and this catches the cases where that range is still too wide. Raise it when you deliberately want a whole catalogue, option chain or page in one document; the too_large message names the exact size that would fit.",
+    "--store": "Observations outlive the call that made them, so a later read or inspect needs the same path; the default keeps them in the user cache.",
+}
+
+
 def condition(requested, status="unverified", evidence=None):
     return {"requested": requested, "status": status, "evidence": evidence}
 
@@ -72,10 +91,11 @@ class Context:
 
     def __init__(self, args, store, item=None):
         self.args, self.store, self.pending, self.item = args, store, [], item
+        self.transport = transport_settings()
 
     def observe(self, url):
         try:
-            obs = fetch(url, self.args, keep=self.pending.append)
+            obs = fetch(url, self.transport, keep=self.pending.append)
         except Failure as exc:
             if exc.observation is not None:
                 self.pending.append(exc.observation)
@@ -84,6 +104,16 @@ class Context:
         for pending in self.pending:
             if self.item is not None:
                 pending.result.setdefault("command", self.item.path)  # store-only: finalize never prints it, and read uses it to find this leaf's context fields
+        return obs
+
+    def replay(self, ident, url):
+        """Run this leaf's extractor over a response already in the store. The result keeps the original id and observed_at: it is another reading of that observation, not a new one, so it is not saved again."""
+        saved = self.store.get(ident)
+        seen = (saved.get("source") or {}).get("url")
+        if seen != url:
+            raise Failure("invalid_argument", "Observation " + ident + " is " + str(seen) + ", not " + url + ".", "Pass an id observed from this same page, or drop --from to request it.")
+        obs = Observation(url, (saved.get("source") or {}).get("requested_url") or url, (saved.get("source") or {}).get("http_status"), {}, self.store.get(ident, raw=True), (saved.get("source") or {}).get("redirects") or [], True)
+        obs.id, obs.result["id"], obs.result["observed_at"] = ident, ident, saved.get("observed_at")
         return obs
 
     def flush(self):
@@ -103,7 +133,7 @@ def search(ctx, args, target):
     return obs.result
 
 
-@leaf("doctor", help="Report the local Python, curl and store without contacting Finviz.", output={"python": "interpreter version", "curl": "curl version line", "store": "observation store path", "problems": "what to fix, if anything"})
+@leaf("doctor", help="Report the local Python, curl and store without contacting Finviz.", output={"python": "interpreter version", "curl": "curl version line", "store": "observation store path", "transport": "the connect timeout, request timeout and response size limit in force, and which of FINVIZ_CONNECT_TIMEOUT, FINVIZ_TIMEOUT and FINVIZ_MAX_BYTES set them", "problems": "what to fix, if anything"})
 def doctor(ctx, args, target):
     try:
         proc = subprocess.run(["curl", "--version"], capture_output=True, text=True)
@@ -116,7 +146,8 @@ def doctor(ctx, args, target):
         problems.append("Python 3.11+ is required.")
     if not match or tuple(map(int, match.groups())) < (8, 4):
         problems.append("curl 8.4+ is required; found: " + str(version))
-    result = output.plain("doctor", {"python": sys.version.split()[0], "curl": version, "store": str(ctx.store.path), "problems": problems})
+    limits = {name: getattr(ctx.transport, name) for _, (name, _, _) in sorted(TRANSPORT.items())}
+    result = output.plain("doctor", {"python": sys.version.split()[0], "curl": version, "store": str(ctx.store.path), "transport": dict(limits, set_by=[v for v in TRANSPORT if os.environ.get(v)] or "defaults"), "problems": problems})
     if problems:
         result["status"], result["error"] = "error", output.error_info("runtime", "; ".join(problems), "Install the listed requirements and rerun doctor.")
     return result
@@ -186,7 +217,7 @@ def char_range(spec, total):
     return start, end
 
 
-@leaf("inspect", help="List pointers, types and sizes inside a saved observation without printing its records.", args=[(("id",), dict(metavar="ID", help="Observation ID from an earlier result.")), (("--depth",), dict(type=int, default=4, help="How many levels to descend."))], output={"list of containers": "{pointer, type, count}; lists show their first item's shape"})
+@leaf("inspect", help="List the pointers, types and sizes inside a saved observation's data without printing its records.", args=[(("id",), dict(metavar="ID", help="Observation ID from an earlier result.")), (("--depth",), dict(type=int, default=4, help="How many levels to descend."))], output={"list of containers": "{pointer, type, count} under /data, plus any collection inside /source such as pages or dependencies; lists show their first item's shape. The envelope's own fields are described by schema, not counted here"})
 def inspect(ctx, args, target):
     saved = ctx.store.get(args.id)
 
@@ -200,7 +231,12 @@ def inspect(ctx, args, target):
                 entries += walk(value[0], pointer + "/0", depth + 1)
         return entries
 
-    result = output.plain(args.id, walk(saved, "", 0))
+    # 성진: 봉투 포인터는 schema의 envelope가 이미 소유한 지식이다; inspect는 리프마다 모양이 다른 /data와 /source의 동적 컬렉션만 센다.
+    entries = walk(saved.get("data"), "/data", 0) if saved.get("data") is not None else []
+    for key, value in (saved.get("source") or {}).items():
+        if isinstance(value, (dict, list)):
+            entries += walk(value, "/source/" + key, 0)
+    result = output.plain(args.id, entries)
     result["id"] = args.id
     return result
 
@@ -213,7 +249,10 @@ def schema(ctx, args, target):
         groups = {}
         for item in LEAVES:
             groups.setdefault(item.group, {})[item.name or ""] = item.help
-        data = {"groups": groups, "group_purposes": GROUPS, "shared_options": describe_actions(parser._actions), "envelope": output.ENVELOPE, "statuses": output.STATUSES, "exit_codes": output.EXIT_CODES, "usage": "finviz.py [shared options] GROUP [LEAF] [arguments]; shared options are also accepted after the command."}
+        shared = describe_actions(parser._actions)
+        for name, note in SHARED_NOTES.items():
+            shared[name]["when_to_change"] = note
+        data = {"groups": groups, "group_purposes": GROUPS, "shared_options": shared, "transport_limits": "connect timeout, request timeout and response size come from FINVIZ_CONNECT_TIMEOUT, FINVIZ_TIMEOUT and FINVIZ_MAX_BYTES; doctor reports the values in force", "envelope": output.ENVELOPE, "statuses": output.STATUSES, "exit_codes": output.EXIT_CODES, "usage": "finviz.py [shared options] GROUP [LEAF] [arguments]; shared options are also accepted after the command."}
         return output.plain("schema", data)
     matches = [item for item in LEAVES if item.group == scope[0] and (len(scope) == 1 or item.name == scope[1])]
     if not matches:
@@ -309,16 +348,27 @@ def load_modules():
         __import__(name)
 
 
+def argument_error(failure, words):
+    """Point the fix at the command that refused the argument: the root parser raises for a leaf's unrecognised flags too."""
+    plain = [w for w in words if not w.startswith("-")]
+    path = next((" ".join(plain[:count]) for count in (2, 1) if any(item.path == " ".join(plain[:count]) for item in LEAVES)), None)
+    if path is None:
+        return failure.info()
+    return output.error_info(failure.code, failure.message, "Correct the arguments; finviz.py " + path + " --help lists the ones " + path + " accepts and schema " + path + " gives their defaults and choices.")
+
+
 def main(argv=None):
     load_modules()
     parser = build_parser()
     try:
         args = parser.parse_args(argv)
         item = find_leaf(args)
-        if args.max_chars <= 0 or args.timeout <= 0 or args.connect_timeout <= 0 or args.max_bytes <= 0 or (args.limit is not None and args.limit < 0):
-            parser.error("limits must be positive")
+        transport_settings()
+        if args.max_chars <= 0 or (args.limit is not None and args.limit < 0):
+            parser.error("--max-chars must be positive and --limit may not be negative")
     except Failure as exc:
-        print(json.dumps({"status": "error", "results": [{"target": " ".join(argv if argv is not None else sys.argv[1:]), "status": "error", "error": exc.info()}]}, ensure_ascii=False, separators=(",", ":")))
+        words = argv if argv is not None else sys.argv[1:]
+        print(json.dumps({"status": "error", "results": [{"target": " ".join(words), "status": "error", "error": argument_error(exc, words)}]}, ensure_ascii=False, separators=(",", ":")))
         return output.EXIT_CODES["invalid"]
     try:
         store = Store(args.store)

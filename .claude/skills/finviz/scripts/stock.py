@@ -9,10 +9,14 @@ BASE = "https://finviz.com/stock"
 TICKERS = (("tickers",), dict(nargs="+", metavar="TICKER", help="One or more Finviz tickers; each becomes its own result."))
 
 
-def stock_page(ctx, ticker, section, **extra):
+FROM_ARG = (("--from",), dict(dest="from_id", metavar="ID", default=None, help="Extract this section from a page already observed under this id instead of requesting it again; the six overview sections are six readings of one request. The result keeps that observation's id and observed_at."))
+
+
+def stock_page(ctx, ticker, section, args=None, **extra):
     query = {"t": ticker, "ty": section}
     query.update({k: v for k, v in extra.items() if v is not None})
-    obs = ctx.observe(BASE + "?" + urlencode(query))
+    url = BASE + "?" + urlencode(query)
+    obs = ctx.replay(args.from_id, url) if getattr(args, "from_id", None) else ctx.observe(url)
     page = markup.soup(obs)
     found = page.select_one("h1[data-ticker]")
     if found is None:
@@ -31,12 +35,15 @@ def header(page):
 
 
 def stock_leaf(name, help, output, **options):
-    return leaf("stock", name, help=help, output=output, args=[TICKERS] + options.pop("args", []), targets="tickers", **options)
+    extra = options.pop("args", [])
+    if options.pop("overview", False):  # the sections that all come from stock?t=TICKER&ty=c
+        extra = extra + [FROM_ARG]
+    return leaf("stock", name, help=help, output=output, args=[TICKERS] + extra, targets="tickers", **options)
 
 
-@stock_leaf("snapshot", "Company or ETF header and every snapshot metric with its own definition; repeated labels stay separate.", {"ticker, name, last_close, as_of, change": "header facts as displayed; as_of is Finviz's quote time text", "metrics": "[{label, value, definition, unit}] in page order, where the same label can appear twice with different definitions. Asked for several tickers at once, each metric carries label and value only, because the definitions are the same page's text repeated per ticker; --fields label,value,definition brings them back."}, records="metrics", narrow=["--filter", "--fields", "--limit"], context=["ticker", "name", "last_close", "as_of", "change"])
+@stock_leaf("snapshot", "Company or ETF header and every snapshot metric with its own definition; repeated labels stay separate.", {"ticker, name, last_close, as_of, change": "header facts as displayed; as_of is Finviz's quote time text", "metrics": "[{label, value, definition, unit}] in page order, where the same label can appear twice with different definitions. Asked for several tickers at once, each metric carries label and value only, because the definitions are the same page's text repeated per ticker; --fields label,value,definition brings them back."}, records="metrics", narrow=["--filter", "--fields", "--limit"], context=["ticker", "name", "last_close", "as_of", "change"], overview=True)
 def snapshot(ctx, args, ticker):
-    obs, page = stock_page(ctx, ticker, "c")
+    obs, page = stock_page(ctx, ticker, "c", args)
     found = markup.metrics(page)
     if not found:
         raise obs.fail("structure_changed", "No snapshot metrics were found.", "Read the saved raw page with read ID --raw.")
@@ -46,9 +53,9 @@ def snapshot(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("profile", "Company description and Finviz peer tickers from the overview page.", {"ticker, name": "header facts", "description": "profile paragraph as displayed", "peers": "tickers Finviz lists as peers", "links": "{website} from the company header"})
+@stock_leaf("profile", "Company description and Finviz peer tickers from the overview page.", {"ticker, name": "header facts", "description": "profile paragraph as displayed", "peers": "tickers Finviz lists as peers", "links": "{website} from the company header"}, overview=True)
 def profile(ctx, args, ticker):
-    obs, page = stock_page(ctx, ticker, "c")
+    obs, page = stock_page(ctx, ticker, "c", args)
     peers = [markup.query_param(urljoin(obs.url, a["href"]), "t") for a in page.select(".fullview-links a[href]") if "/stock" in urljoin(obs.url, a["href"])]
     facts = header(page)
     site = page.select_one(".quote-header_ticker-wrapper_company a[href]")
@@ -56,17 +63,17 @@ def profile(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("ratings", "Analyst rating actions from the overview page.", {"list of rating actions": "rows keyed by the table headers: Date, Action, Analyst, Rating Change, Price Target Change"}, narrow=["--limit", "--filter"])
+@stock_leaf("ratings", "Analyst rating actions from the overview page.", {"list of rating actions": "rows keyed by the table headers: Date, Action, Analyst, Rating Change, Price Target Change"}, narrow=["--limit", "--filter"], overview=True)
 def ratings(ctx, args, ticker):
-    obs, page = stock_page(ctx, ticker, "c")
+    obs, page = stock_page(ctx, ticker, "c", args)
     table = page.select_one("table.js-table-ratings")
     obs.result["data"] = markup.table_records(table, obs.url)[1] if table is not None else []
     return obs.result
 
 
-@stock_leaf("news", "Headlines listed on the overview page; each links to its external source.", {"list of headlines": "{time, title, url, source} newest first; time is Finviz's display text and the article body lives at url"}, narrow=["--limit", "--filter"], default_limit=40)
+@stock_leaf("news", "Headlines listed on the overview page; each links to its external source.", {"list of headlines": "{time, title, url, source} newest first; time is Finviz's display text and the article body lives at url"}, narrow=["--limit", "--filter"], default_limit=40, overview=True)
 def news(ctx, args, ticker):
-    obs, page = stock_page(ctx, ticker, "c")
+    obs, page = stock_page(ctx, ticker, "c", args)
     items = []
     for row in page.select("#news-table tr"):
         cells = row.find_all("td", recursive=False)
@@ -79,9 +86,9 @@ def news(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("insiders", "Insider transactions listed on the overview page plus Finviz's monthly buy/sell aggregates.", {"trades": "rows keyed by the table headers plus owner_url (Finviz owner page) and filing_url (SEC Form 4)", "monthly": "Finviz's monthly aggregates as published: date (epoch), saleAggregated, buyAggregated and counts"}, records="trades", narrow=["--limit", "--filter", "--fields"])
+@stock_leaf("insiders", "Insider transactions listed on the overview page plus Finviz's monthly buy/sell aggregates.", {"trades": "rows keyed by the table headers plus owner_url (Finviz owner page) and filing_url (SEC Form 4)", "monthly": "Finviz's monthly aggregates as published: date (epoch), saleAggregated, buyAggregated and counts"}, records="trades", narrow=["--limit", "--filter", "--fields"], overview=True)
 def insiders(ctx, args, ticker):
-    obs, page = stock_page(ctx, ticker, "c")
+    obs, page = stock_page(ctx, ticker, "c", args)
     table = markup.table_with_header(page, "Insider Trading")
     trades = []
     if table is not None:
@@ -95,9 +102,9 @@ def insiders(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("ownership", "Largest institutional managers and funds as Finviz publishes them on the overview page.", {"managers": "[{investorId, name, slug, percOwnership}]", "funds": "[{investorId, name, slug, percOwnership}]"})
+@stock_leaf("ownership", "Largest institutional managers and funds as Finviz publishes them on the overview page.", {"managers": "[{investorId, name, slug, percOwnership}]", "funds": "[{investorId, name, slug, percOwnership}]"}, overview=True)
 def ownership(ctx, args, ticker):
-    obs, page = stock_page(ctx, ticker, "c")
+    obs, page = stock_page(ctx, ticker, "c", args)
     if page.select_one("script#institutional-ownership-init-data-0") is None:
         obs.result["data"] = {}
         return obs.result
@@ -106,9 +113,9 @@ def ownership(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("flows", "ETF fund flows and assets under management by day, as published on the overview page.", {"list of days": "{date, aum, flow} oldest first, ending at the most recent day; ETFs only"}, narrow=["--limit"], default_limit=120, recent=True)
+@stock_leaf("flows", "ETF fund flows and assets under management by day, as published on the overview page.", {"list of days": "{date, aum, flow} oldest first, ending at the most recent day; ETFs only"}, narrow=["--limit"], default_limit=120, recent=True, overview=True)
 def flows(ctx, args, ticker):
-    obs, page = stock_page(ctx, ticker, "c")
+    obs, page = stock_page(ctx, ticker, "c", args)
     if page.select_one("script#route-init-data-fundflows-0") is None:
         obs.result["data"], obs.result["warnings"] = [], ["Fund flows are published for ETFs only; " + ticker + " has none on its overview page."]
         return obs.result
