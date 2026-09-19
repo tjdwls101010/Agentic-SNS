@@ -1,0 +1,6 @@
+{
+ "start": "number",
+ "count": "number",
+ "total": "number",
+ "useRecords": "bool"
+}

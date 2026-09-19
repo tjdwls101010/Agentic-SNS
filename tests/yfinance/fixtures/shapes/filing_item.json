@@ -1,0 +1,11 @@
+{
+ "date": "string",
+ "epochDate": "number",
+ "type": "string",
+ "title": "string",
+ "edgarUrl": "string",
+ "exhibits": {
+  "8-K/A": "string"
+ },
+ "maxAge": "number"
+}

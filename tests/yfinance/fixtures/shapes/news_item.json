@@ -1,0 +1,55 @@
+{
+ "id": "string",
+ "content": {
+  "id": "string",
+  "contentType": "string",
+  "title": "string",
+  "description": "string",
+  "summary": "string",
+  "pubDate": "string",
+  "displayTime": "string",
+  "isHosted": "bool",
+  "bypassModal": "bool",
+  "previewUrl": "null",
+  "thumbnail": {
+   "originalUrl": "string",
+   "originalWidth": "number",
+   "originalHeight": "number",
+   "caption": "string",
+   "resolutions": [
+    "object"
+   ]
+  },
+  "provider": {
+   "displayName": "string",
+   "url": "string",
+   "sourceId": "string"
+  },
+  "canonicalUrl": {
+   "url": "string",
+   "site": "string",
+   "region": "string",
+   "lang": "string"
+  },
+  "clickThroughUrl": {
+   "url": "string",
+   "site": "string",
+   "region": "string",
+   "lang": "string"
+  },
+  "metadata": {
+   "editorsPick": "bool"
+  },
+  "finance": {
+   "premiumFinance": {
+    "isPremiumNews": "bool",
+    "isPremiumFreeNews": "bool"
+   }
+  },
+  "storyline": {
+   "storylineItems": [
+    "object"
+   ]
+  }
+ }
+}

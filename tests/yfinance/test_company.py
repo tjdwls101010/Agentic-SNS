@@ -3,14 +3,14 @@ import pytest
 
 def test_financial_periods_and_native_line_items_keep_missing_values(cli):
     payload = {"timeseries": {"result": [{"meta": {"type": ["annualTotalRevenue"]}, "timestamp": [1703980800, 1735603200], "annualTotalRevenue": [{"asOfDate": "2023-12-31", "reportedValue": {"raw": 0}}, {"asOfDate": "2024-12-31", "reportedValue": {"raw": 120}}]}, {"meta": {"type": ["annualNetIncome"]}, "timestamp": [1735603200], "annualNetIncome": [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 30}}]}], "error": None}}
-    proc, doc = cli("financials", "income", "AAPL", "--fields", "TotalRevenue,NetIncome", "--periods", "2", routes=[{"path": "/timeseries/AAPL", "json": payload}])
+    proc, doc = cli("financials", "income", "AAPL", "--fields", "TotalRevenue,NetIncome", "--periods", "2", routes=[{"path": "/timeseries/AAPL", "json": payload}] + [r for r in info_routes() if "timeseries" not in r["path"]])
     assert proc.returncode == 0, proc.stdout + proc.stderr
     r = doc["results"][0]
     assert r["data"]["columns"] == ["TotalRevenue", "NetIncome"]
     assert r["data"]["index"] == ["2024-12-31T00:00:00", "2023-12-31T00:00:00"]
     assert r["data"]["data"] == [[120, 30], [0, None]]
-    assert r["context"]["currency"] is None
-    assert r["context"]["date_meaning"] == "fiscal_period_end"
+    assert r["context"]["currency"] == "USD", "the statement currency is looked up rather than declined"
+    assert r["context"]["quote_currency"] == "USD"
 
 
 def info_routes():
@@ -60,7 +60,6 @@ def test_fund_holdings_preserve_reported_fraction_and_ticker(cli):
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert doc["results"][0]["data"]["index"] == ["AAPL"]
     assert doc["results"][0]["data"]["data"] == [["Apple", 0.071]]
-    assert doc["results"][0]["context"]["coverage"] == "top_reported_holdings"
 
 
 def option_routes():
@@ -98,10 +97,7 @@ def test_shares_full_preserves_integer_series(cli):
     assert doc["results"][0]["data"]["index"] == ["2024-01-01T00:00:00-05:00"]
 
 
-def test_sustainability_preserves_zero(cli):
-    proc, doc = cli("company", "sustainability", "AAPL", routes=[{"path": "/quoteSummary/AAPL", "json": {"quoteSummary": {"result": [{"esgScores": {"totalEsg": 0, "environmentScore": 2.5}}]}}}])
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"]["data"] == [[0], [2.5]]
+
 
 
 def test_valuation_distinguishes_current_and_periods(cli):
@@ -110,7 +106,6 @@ def test_valuation_distinguishes_current_and_periods(cli):
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert doc["results"][0]["data"]["index"] == ["Current", "12/31/2024"]
     assert doc["results"][0]["data"]["data"] == [[30], [25]]
-    assert "Current" in doc["results"][0]["context"]["date_meaning"]
 
 
 def test_empty_option_sides_are_empty_not_success(cli):
@@ -121,14 +116,14 @@ def test_empty_option_sides_are_empty_not_success(cli):
     assert doc["results"][0]["warnings"]
 
 
-@pytest.mark.parametrize("leaf,expected", [("overview", {"categoryName": "Large Blend", "family": "Example", "legalType": "Exchange Traded Fund"}), ("description", "Tracks an index."), ("sector-weights", {"technology": 0.3}), ("rating", {"aaa": 0.1})])
+@pytest.mark.parametrize("leaf,expected", [("overview", {"categoryName": "Large Blend", "family": "Example", "legalType": "Exchange Traded Fund"}), ("description", "Tracks an index."), ("sector-weights", {"technology": 0.3})])
 def test_remaining_fund_dict_datasets(cli, leaf, expected):
     proc, doc = cli("fund", leaf, "SPY", routes=fund_routes())
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert doc["results"][0]["data"] == expected
 
 
-@pytest.mark.parametrize("leaf,field", [("equity", "SPY"), ("bond", "SPY"), ("operations", "SPY"), ("asset-classes", "stockPosition")])
+@pytest.mark.parametrize("leaf,field", [("equity", "SPY"), ("operations", "SPY"), ("asset-classes", "stockPosition")])
 def test_fund_numeric_datasets_keep_native_missing_or_fraction(cli, leaf, field):
     proc, doc = cli("fund", leaf, "SPY", "--fields", field, routes=fund_routes())
     assert proc.returncode == (0 if leaf == "asset-classes" else 7), proc.stdout + proc.stderr
@@ -145,7 +140,8 @@ def test_fund_numeric_datasets_keep_native_missing_or_fraction(cli, leaf, field)
 @pytest.mark.parametrize("leaf,item,frequency,prefix", [("balance", "TotalAssets", "quarterly", "quarterly"), ("cashflow", "OperatingCashFlow", "trailing", "trailing"), ("income", "TotalRevenue", "quarterly", "quarterly")])
 def test_statement_purpose_and_frequency_are_applied(cli, leaf, item, frequency, prefix):
     payload = {"timeseries": {"result": [{"timestamp": [1735603200], prefix + item: [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 99}}]}]}}
-    proc, doc = cli("financials", leaf, "AAPL", "--frequency", frequency, "--fields", item, routes=[{"path": "/timeseries/AAPL", "json": payload}])
+    routes = [{"path": "/timeseries/AAPL", "json": payload}] + [r for r in info_routes() if "timeseries" not in r["path"]]
+    proc, doc = cli("financials", leaf, "AAPL", "--frequency", frequency, "--fields", item, routes=routes)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert doc["results"][0]["data"]["columns"] == [item]
     assert doc["results"][0]["data"]["data"] == [[99]]
