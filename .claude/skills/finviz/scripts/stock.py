@@ -34,12 +34,14 @@ def stock_leaf(name, help, output, **options):
     return leaf("stock", name, help=help, output=output, args=[TICKERS] + options.pop("args", []), targets="tickers", **options)
 
 
-@stock_leaf("snapshot", "Company or ETF header and every snapshot metric with its own definition; repeated labels stay separate.", {"ticker, name, last_close, as_of, change": "header facts as displayed; as_of is Finviz's quote time text", "metrics": "[{label, value, definition, unit}] in page order; the same label can appear twice with different definitions"}, records="metrics", narrow=["--filter", "--fields", "--limit"], context=["ticker", "name", "last_close", "as_of", "change"])
+@stock_leaf("snapshot", "Company or ETF header and every snapshot metric with its own definition; repeated labels stay separate.", {"ticker, name, last_close, as_of, change": "header facts as displayed; as_of is Finviz's quote time text", "metrics": "[{label, value, definition, unit}] in page order, where the same label can appear twice with different definitions. Asked for several tickers at once, each metric carries label and value only, because the definitions are the same page's text repeated per ticker; --fields label,value,definition brings them back."}, records="metrics", narrow=["--filter", "--fields", "--limit"], context=["ticker", "name", "last_close", "as_of", "change"])
 def snapshot(ctx, args, ticker):
     obs, page = stock_page(ctx, ticker, "c")
     found = markup.metrics(page)
     if not found:
         raise obs.fail("structure_changed", "No snapshot metrics were found.", "Read the saved raw page with read ID --raw.")
+    if len(args.tickers) > 1 and not args.fields:
+        found = [{"label": metric["label"], "value": metric["value"]} for metric in found]
     obs.result["data"] = dict(header(page), metrics=found)
     return obs.result
 

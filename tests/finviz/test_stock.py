@@ -1,3 +1,5 @@
+import json
+
 from pages import stock_overview
 
 OVERVIEW = "https://finviz.com/stock?t=A&ty=c"
@@ -32,6 +34,31 @@ def test_snapshot_keeps_duplicate_metric_labels_with_their_own_definitions_and_h
     assert data["metrics"][4]["definition"] == "Quarterly earnings growth (YoY)"
     narrowed = client.one("stock", "snapshot", "A", "--filter", "eps next y")
     assert len(narrowed["data"]["metrics"]) == 2 and narrowed["coverage"] == {"received": 5, "shown": 2, "exhaustive": False}
+
+
+def test_one_ticker_gets_every_metric_and_several_tickers_get_a_comparable_list(client):
+    """84 metrics with their definitions answer a question about one company; repeated three times they are the same definitions three times."""
+    for ticker in ("A", "MSFT", "NVDA"):
+        client.add("https://finviz.com/stock?t=%s&ty=c" % ticker, stock_overview(ticker=ticker))
+    alone = client.one("stock", "snapshot", "A")
+    assert alone["coverage"]["shown"] == 5 and alone["data"]["metrics"][0]["definition"] == "Market capitalization"
+    doc = client.run("stock", "snapshot", "A", "MSFT", "NVDA")
+    assert doc["status"] == "ok" and [r["target"] for r in doc["results"]] == ["A", "MSFT", "NVDA"]
+    for result in doc["results"]:
+        assert result["data"]["ticker"] and result["data"]["last_close"]
+        assert result["data"]["metrics"][0] == {"label": "Market Cap", "value": "41.39B"}
+    asked = client.run("stock", "snapshot", "A", "MSFT", "--fields", "label,value,definition")["results"][0]
+    assert asked["data"]["metrics"][0]["definition"] == "Market capitalization"
+
+
+def test_a_failed_multi_target_result_names_every_target_it_saved(client):
+    for ticker in ("A", "MSFT", "NVDA"):
+        client.add("https://finviz.com/stock?t=%s&ty=c" % ticker, stock_overview(ticker=ticker, metrics=[("M%d" % n, "1", "d" * 60) for n in range(40)]))
+    doc = client.run("--max-chars", "1200", "stock", "snapshot", "A", "MSFT", "NVDA", code=9)
+    fix = doc["results"][0]["error"]["fix"]
+    assert all(result["id"] in fix for result in doc["results"]), fix
+    assert all(str(result["target"]) in fix for result in doc["results"]), fix
+    assert len(json.dumps(doc, separators=(",", ":"))) <= 1200  # the replacement document is bounded too
 
 
 def test_snapshot_accepts_several_tickers_and_isolates_a_failing_one(client):

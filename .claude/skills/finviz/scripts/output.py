@@ -149,8 +149,26 @@ def too_large_fix(results, leaf, size, max_chars):
     narrow = ", ".join(leaf.narrow) if leaf.narrow else "--fields or --limit"
     ids = [r["id"] for r in results if r.get("id")]
     pointer = "/data" + ("/" + leaf.records if leaf.records else "")
-    saved = " The response is saved: read " + ids[0] + " --pointer " + pointer + " --start 0 --limit 20 reads it in slices without a new request." if ids else ""
+    if len(results) > 1:
+        # 성진: 목표가 여럿이면 첫 id만 주는 회복은 비교를 한 종목으로 바꾼다; 전부 이름 붙이고 목표를 줄이는 길도 함께 말한다.
+        saved = " Each target was saved separately: " + ", ".join(str(r.get("target")) + " " + r["id"] for r in results if r.get("id")) + "; read one with read ID --pointer " + pointer + ", or ask for fewer targets in one call."
+    else:
+        saved = " The response is saved: read " + ids[0] + " --pointer " + pointer + " --start 0 --limit 20 reads it in slices without a new request." if ids else ""
     return "Result needs " + str(size) + " characters; limit is " + str(max_chars) + ". Narrow with " + narrow + "." + saved + " Or rerun with --max-chars " + str(size) + "."
+
+
+def too_large_document(results, error, max_chars):
+    """The replacement for an oversized result is itself bounded: one recovery sentence for the call, and every target still addressable by its saved id."""
+    rest = error_info(error["code"], error["message"], "Recover with the fix on the first result; this target's own response is saved under the id here.")
+    rows = [{"target": r.get("target"), "id": r.get("id"), "status": "error", "error": error if index == 0 else rest} for index, r in enumerate(results)]
+    trimmed = [row if index == 0 else {k: v for k, v in row.items() if k != "error"} for index, row in enumerate(rows)]
+    dropped = dict(rows[0], error=error_info(error["code"], error["message"], error["fix"] + " " + str(len(results) - 1) + " further targets were saved but do not fit this document; ask for them in smaller groups."))
+    # 성진: 예산은 목표마다 반복되는 문장을 묶는 데 쓰고, 회복 문장 자체는 마지막까지 버리지 않는다 — 그것을 버리면 경계는 지켜도 복구가 불가능해진다.
+    for attempt in (rows, trimmed, [dropped] if len(results) > 1 else []):
+        text = json.dumps({"status": "error", "results": attempt}, ensure_ascii=False, separators=(",", ":"))
+        if attempt and len(text) <= max_chars:
+            return text
+    return json.dumps({"status": "error", "results": [rows[0]] if len(results) == 1 else [dropped]}, ensure_ascii=False, separators=(",", ":"))
 
 
 def emit(results, args, leaf):
@@ -160,8 +178,7 @@ def emit(results, args, leaf):
     text = json.dumps(doc, ensure_ascii=False, separators=(",", ":"))
     if len(text) > args.max_chars:
         error = error_info("too_large", "Output exceeds --max-chars.", too_large_fix(results, leaf, len(text), args.max_chars))
-        doc = {"status": "error", "results": [{"target": r.get("target"), "id": r.get("id"), "status": "error", "error": error} for r in results]}
-        print(json.dumps(doc, ensure_ascii=False, separators=(",", ":")))
+        print(too_large_document(results, error, args.max_chars))
         return EXIT_CODES["too_large"]
     print(text)
     if status in ("ok", "empty", "partial"):
