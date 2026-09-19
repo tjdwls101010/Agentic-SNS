@@ -31,7 +31,8 @@ GROUPS = {
 COMMON = [
     (("--max-chars",), dict(type=int, default=20000, help="Maximum output characters; larger results become a too_large error with narrowing advice, never a truncated document.")),
     (("--filter",), dict(default=None, help="Case-insensitive substring; keeps records whose own values or scalar lists contain it (nested objects such as option lists are not searched).")),
-    (("--fields",), dict(default=None, help="Comma-separated record fields to keep; unknown names return the available ones.")),
+    (("--fields",), dict(default=None, help="Comma-separated record fields to keep; unknown names return the available ones. Where the data is a mapping, these are the fields inside each entry and --keys chooses the entries.")),
+    (("--keys",), dict(default=None, help="Comma-separated entries to keep where the data is a mapping, e.g. instruments or series names; unknown names return the available ones.")),
     (("--limit",), dict(type=int, default=None, help="Maximum records to output; the observation keeps everything received.")),
     (("--store",), dict(default=os.environ.get("FINVIZ_STORE", str(Path.home() / ".cache/finviz-skill/observations.sqlite3")), help="SQLite observation store; use the same path to read earlier IDs.")),
     (("--connect-timeout",), dict(type=float, default=10, help="Connection timeout in seconds.")),
@@ -153,7 +154,7 @@ def read(ctx, args, target):
     selection = {"pointer": pointer or "/", "start": args.start}
     if isinstance(value, list):
         selection["received"] = len(value)
-        value = value[args.start :]
+        value = value[args.start :][: args.limit] if args.limit is not None else value[args.start :]
     elif isinstance(value, dict):
         selection["received"] = len(value)
         keys = list(value)[args.start :]

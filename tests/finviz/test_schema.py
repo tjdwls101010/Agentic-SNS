@@ -13,7 +13,8 @@ def test_unscoped_schema_lists_every_group_and_command_with_shared_options(clien
 
 
 def test_every_command_documents_arguments_with_help_and_default_and_matches_its_help_text(client):
-    groups = client.one("schema")["data"]["groups"]
+    unscoped = client.one("schema")["data"]
+    groups, shared = unscoped["groups"], set(unscoped["shared_options"])
     for group, leaves in groups.items():
         for leaf in leaves:
             scope = [group] + ([leaf] if leaf else [])
@@ -23,7 +24,7 @@ def test_every_command_documents_arguments_with_help_and_default_and_matches_its
             for name, spec in data["arguments"].items():
                 assert spec["help"], (scope, name)
                 assert "default" in spec, (scope, name)
-                if name.startswith("--") and name not in ("--max-chars", "--filter", "--fields", "--limit", "--store", "--connect-timeout", "--timeout", "--max-bytes"):
+                if name.startswith("--") and name not in shared:  # shared options are explained by finviz.py --help, not repeated per leaf
                     assert name in help_text, (scope, name)
             assert "schema " + " ".join(scope) in help_text, scope
 

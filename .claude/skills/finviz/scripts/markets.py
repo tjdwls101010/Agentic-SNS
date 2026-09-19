@@ -72,7 +72,7 @@ KIND = (("kind",), dict(choices=["futures", "forex", "crypto"], help="Market sur
 SPARKLINE = ("sparkline", "sparklineDateChanges")
 
 
-@leaf("market", "quotes", help="Current quotes for every futures, forex or crypto instrument Finviz lists.", args=[KIND, (("--timeframe",), dict(default="d", help="Source timeframe for the change fields, e.g. d, w, m.")), (("--sparkline",), dict(action="store_true", help="Keep each instrument's intraday sparkline points, which are about nine tenths of the response; the saved observation keeps them either way."))], output={"{}": "ticker -> quote as published, including extra source fields; the sparkline point arrays are left out unless --sparkline asks for them; --fields selects ticker keys, --filter matches keys or quote values, --limit counts instruments"}, keyed=True, narrow=["--filter", "--fields", "--limit"])
+@leaf("market", "quotes", help="Current quotes for every futures, forex or crypto instrument Finviz lists.", args=[KIND, (("--timeframe",), dict(default="d", help="Source timeframe for the change fields, e.g. d, w, m.")), (("--sparkline",), dict(action="store_true", help="Keep each instrument's intraday sparkline points, which are about nine tenths of the response; the saved observation keeps them either way."))], output={"{}": "ticker -> quote as published, including extra source fields; the sparkline point arrays are left out unless --sparkline asks for them; --fields selects ticker keys, --filter matches keys or quote values, --limit counts instruments"}, keyed=True, narrow=["--filter", "--keys", "--fields", "--limit"])
 def quotes(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/" + args.kind + "_all?" + urlencode({"timeframe": args.timeframe}))
     source = obs.json()
@@ -83,7 +83,7 @@ def quotes(ctx, args, target):
     return obs.result
 
 
-@leaf("market", "performance", help="Period performance per instrument for futures, forex or crypto.", args=[KIND], output={"{}": "instrument -> performance value as published"}, narrow=["--fields"])
+@leaf("market", "performance", help="Period performance per instrument for futures, forex or crypto.", args=[KIND], output={"{}": "instrument -> performance value as published; --keys chooses instruments"}, keyed=True, narrow=["--keys", "--filter"])
 def market_performance(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/" + args.kind + "_perf")
     obs.result["target"], obs.result["data"] = args.kind, obs.json()

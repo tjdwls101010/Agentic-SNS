@@ -1,4 +1,5 @@
 import json
+import re
 
 
 def test_search_returns_candidates_and_saved_observation_can_be_reread(client):
@@ -66,6 +67,25 @@ def test_oversized_output_becomes_too_large_error_with_saved_observation(client)
     assert client.one("read", doc["results"][0]["id"], "--pointer", "/data/0/ticker")["data"] == "A"
 
 
+def test_an_input_error_is_not_hidden_behind_the_size_of_the_payload_it_rejected(client):
+    """finalize kept the unselected payload on an error result, so the real diagnosis lost to too_large at the default budget."""
+    client.add("https://finviz.com/api/suggestions?input=A", [{"ticker": "A" * 40, "company": "x" * 900} for _ in range(30)])
+    result = client.one("search", "A", "--fields", "bogus", code=2)
+    assert result["error"]["code"] == "invalid_fields"
+    assert "ticker" in result["error"]["fix"] and "company" in result["error"]["fix"]
+    assert "data" not in result
+
+
+def test_a_too_large_fix_sizes_its_own_slice_from_the_document_it_could_not_send(client):
+    """A constant --limit 20 is not a recovery when twenty records are what overflowed."""
+    client.add("https://finviz.com/api/suggestions?input=A", [{"ticker": "T%d" % n, "company": "x" * 1500} for n in range(40)])
+    error = client.run("search", "A", code=9)["results"][0]  # twenty of these records are themselves over the budget
+    slice_command = re.search(r"read (\w+) --pointer (\S+) --start (\d+) --limit (\d+)", error["error"]["fix"])
+    assert slice_command, error["error"]["fix"]
+    recovered = client.one("read", slice_command[1], "--pointer", slice_command[2], "--start", slice_command[3], "--limit", slice_command[4])
+    assert recovered["status"] == "ok" and recovered["data"]
+
+
 def test_invalid_pointer_and_unknown_id_are_input_errors(client):
     client.add("https://finviz.com/api/suggestions?input=A", [{"ticker": "A"}])
     saved = client.one("search", "A")["id"]
@@ -73,6 +93,7 @@ def test_invalid_pointer_and_unknown_id_are_input_errors(client):
     assert client.one("read", "nope", code=2)["error"]["code"] == "unknown_id"
     sliced = client.one("read", saved, "--pointer", "/data", "--start", "0", "--limit", "1")
     assert sliced["selection"] == {"pointer": "/data", "start": 0, "received": 1, "shown": 1} and sliced["data"] == [{"ticker": "A"}]
+    assert client.one("read", saved, "--pointer", "/data", "--limit", "0", code=7)["selection"]["shown"] == 0
     pointers = {e["pointer"]: e["type"] for e in client.one("inspect", saved)["data"]}
     assert pointers["/data"] == "list" and pointers["/data/0/ticker"] == "str"
 

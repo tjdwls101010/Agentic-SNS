@@ -149,7 +149,7 @@ def dividends(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("revenue", "Revenue by product, region or segment per fiscal year, with the SEC filing each value came from.", {"unit": "source currency or scale, preserved alongside selected series", "series": "name -> source records [{fiscal_year, report_end_date, source_filing_url, value, ...}]; --fields selects series names, --filter matches names or values, --limit counts series; unit stays alongside them"}, args=[(("--by",), dict(default="products", choices=["products", "regions", "segment"], help="Breakdown to return."))], records="series", narrow=["--filter", "--limit"], context=["unit"])
+@stock_leaf("revenue", "Revenue by product, region or segment per fiscal year, with the SEC filing each value came from.", {"unit": "source currency or scale, preserved alongside selected series", "series": "name -> source records [{fiscal_year, report_end_date, source_filing_url, value, ...}]; --keys selects series names, --filter matches names or values, --limit counts series; unit stays alongside them"}, args=[(("--by",), dict(default="products", choices=["products", "regions", "segment"], help="Breakdown to return."))], records="series", narrow=["--filter", "--keys", "--limit"], context=["unit"])
 def revenue(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "rv")
     block = init.get({"products": "products_and_services", "regions": "regions", "segment": "segment"}[args.by]) or {}

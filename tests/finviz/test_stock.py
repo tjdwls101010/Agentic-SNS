@@ -15,8 +15,8 @@ def test_revenue_selection_keeps_units_named_series_and_every_source_record_fiel
     assert result["data"] == {"unit": "USD", "series": {"Products / A": values}}
     assert result["coverage"] == {"received": 3, "shown": 1, "exhaustive": False}
     assert client.one("read", result["id"], "--pointer", "/data")["data"] == {"unit": "USD", "series": series}
-    assert client.one("stock", "revenue", "A", "--fields", "Services")["data"] == {"unit": "USD", "series": {"Services": []}}
-    assert client.one("stock", "revenue", "A", "--fields", "unknown", code=2)["error"]["code"] == "invalid_fields"
+    assert client.one("stock", "revenue", "A", "--keys", "Services")["data"] == {"unit": "USD", "series": {"Services": []}}
+    assert client.one("stock", "revenue", "A", "--keys", "unknown", code=2)["error"]["code"] == "invalid_keys"
     assert client.one("stock", "revenue", "A", "--filter", "missing", code=7)["data"] == {"unit": "USD", "series": {}}
     saved_slice = client.one("read", result["id"], "--pointer", "/data/series", "--start", "1", "--limit", "1")
     assert saved_slice["data"] == {"Products B": values}

@@ -6,6 +6,7 @@ import sys
 from transport import Failure, now
 
 INPUT_CODES = {"export_exists", "missing_curl", "redirect_limit"}
+DIAGNOSTIC_DATA = {"array_alignment"}  # the refused payload is the diagnosis here: the arrays that did not line up
 EXIT_CODES = {"ok": 0, "invalid": 2, "access_restricted": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}
 STATUSES = {
     "ok": "usable data was extracted",
@@ -83,6 +84,16 @@ def select_records(records, args, leaf):
     return records, total
 
 
+def project(value, fields, key):
+    """--fields inside one mapping value; a value that is not a record has no fields to keep."""
+    if not isinstance(value, dict):
+        raise Failure("invalid_fields", "The entry " + key + " is not a record, so it has no fields.", "Select entries with --keys, or drop --fields.")
+    missing = [f for f in fields if f not in value]
+    if missing:
+        raise Failure("invalid_fields", "Unknown fields " + ", ".join(missing) + " in " + key + ".", "Available fields: " + ", ".join(value) + ".")
+    return {f: value[f] for f in fields}
+
+
 def select(result, args, leaf):
     """Apply selection to the leaf's record list (or --fields to a dict's keys) and record shown counts."""
     data = result.get("data")
@@ -99,16 +110,16 @@ def select(result, args, leaf):
         coverage["shown"] = len(records)
         coverage.setdefault("exhaustive", False)
     elif (leaf.keyed or leaf.records) and isinstance(records, dict):
-        keys = list(records)
-        if fields:
-            missing = [f for f in fields if f not in records]
-            if missing:
-                raise Failure("invalid_fields", "Unknown fields " + ", ".join(missing) + ".", "Available fields: " + ", ".join(records) + ".")
-            keys = fields
+        keys = [k.strip() for k in args.keys.split(",")] if getattr(args, "keys", None) else list(records)
+        missing = [k for k in keys if k not in records]
+        if missing:
+            raise Failure("invalid_keys", "Unknown keys " + ", ".join(missing) + ".", "Available keys: " + ", ".join(list(records)[:60]) + ("..." if len(records) > 60 else "") + ".")
         if args.filter:
             keys = [k for k in keys if args.filter.lower() in k.lower() or args.filter.lower() in searchable(records[k])]
         limit = leaf.default_limit if args.limit is None else args.limit
         selected = {k: records[k] for k in keys[:limit]}
+        if fields:
+            selected = {k: project(value, fields, k) for k, value in selected.items()}
         result["data"] = dict(data, **{leaf.records: selected}) if leaf.records else selected
         result["coverage"] = dict(result.get("coverage") or {}, received=len(records), shown=len(selected), exhaustive=False)
     elif isinstance(data, dict) and fields:
@@ -136,6 +147,9 @@ def finalize(result, args, leaf, request):
             if (is_empty(result.get("data")) or (leaf.records and isinstance(records, (list, dict)) and not records)) and result["status"] != "partial":
                 result["status"] = "empty"
                 result.setdefault("warnings", []).append("The source returned no usable items; this is not proof that the data does not exist.")
+    if result["status"] == "error" and result.get("error", {}).get("code") not in DIAGNOSTIC_DATA:
+        # 성진: 오류 결과가 만들지 못했다고 말한 페이로드를 실으면 그 문서가 예산을 넘어 진단이 too_large에 가려진다. array_alignment만 원본 배열을 진단용으로 남긴다.
+        result.pop("data", None)
     ordered = ["target", "request", "id", "observed_at", "source", "conditions", "coverage", "continuation", "selection", "status", "data", "warnings", "error"]
     return {k: result[k] for k in ordered if k in result and result[k] not in (None, {}, [])} | ({"data": result.get("data")} if result["status"] != "error" else {})
 
@@ -149,12 +163,22 @@ def too_large_fix(results, leaf, size, max_chars):
     narrow = ", ".join(leaf.narrow) if leaf.narrow else "--fields or --limit"
     ids = [r["id"] for r in results if r.get("id")]
     pointer = "/data" + ("/" + leaf.records if leaf.records else "")
+    shown = next((r["coverage"]["shown"] for r in results if isinstance(r.get("coverage"), dict) and r["coverage"].get("shown")), None)
+    # 성진: 절 이름만 주면 그중 하나가 혼자 예산을 넘는 경우 다시 실패한다; 크기를 함께 줘야 모델이 맞는 절을 한 번에 고른다.
+    sections = next((r["data"] for r in results if isinstance(r.get("data"), dict) and not leaf.records and not leaf.keyed), None)
+    # 성진: 한 슬라이스에 몇 개가 들어가는지는 이 문서가 실제로 낸 크기에서 계산한다; 상수 20은 스무 개가 넘친 경우에 회복이 아니다.
+    fits = max(1, int(shown * max_chars * 0.8 / size)) if shown else 20
     if len(results) > 1:
         # 성진: 목표가 여럿이면 첫 id만 주는 회복은 비교를 한 종목으로 바꾼다; 전부 이름 붙이고 목표를 줄이는 길도 함께 말한다.
         saved = " Each target was saved separately: " + ", ".join(str(r.get("target")) + " " + r["id"] for r in results if r.get("id")) + "; read one with read ID --pointer " + pointer + ", or ask for fewer targets in one call."
     else:
-        saved = " The response is saved: read " + ids[0] + " --pointer " + pointer + " --start 0 --limit 20 reads it in slices without a new request." if ids else ""
-    return "Result needs " + str(size) + " characters; limit is " + str(max_chars) + ". Narrow with " + narrow + "." + saved + " Or rerun with --max-chars " + str(size) + "."
+        if sections:  # a section-shaped result is not narrowed by counting its sections: point at the biggest one and size the slice from it
+            widest = max(sections, key=lambda k: len(json.dumps(sections[k], ensure_ascii=False)))
+            inside, span = sections[widest], len(json.dumps(sections[widest], ensure_ascii=False, separators=(",", ":")))
+            pointer, fits = pointer + "/" + widest, max(1, int(len(inside) * max_chars * 0.8 / span)) if isinstance(inside, (list, dict)) and inside else fits
+        saved = " The response is saved: read " + ids[0] + " --pointer " + pointer + " --start 0 --limit " + str(fits) + " reads it in slices without a new request" + (", and one entry may still be too large, in which case read it with --raw --chars" if fits == 1 else "") + "." if ids else ""
+    named = " Sections --fields can keep, with their sizes: " + ", ".join(k + " " + str(len(json.dumps(v, ensure_ascii=False, separators=(",", ":")))) for k, v in list(sections.items())[:25]) + "." if sections else ""
+    return "Result needs " + str(size) + " characters; limit is " + str(max_chars) + ". Narrow with " + narrow + "." + named + saved + " Or rerun with --max-chars " + str(size) + "."
 
 
 def too_large_document(results, error, max_chars):

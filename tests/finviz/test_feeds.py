@@ -310,6 +310,17 @@ def test_map_and_bubbles_report_selectors_without_inventing_confirmation(client)
     assert saved["conditions"] == result["conditions"] and saved["data"] == rows
 
 
+def test_a_mapping_is_narrowed_by_key_while_fields_reach_inside_each_value(client):
+    """--fields promised "record fields to keep" but silently chose instruments, so naming quote fields returned everything."""
+    quotes = {"6A": {"label": "AUD", "last": 0.71, "sparkline": [1, 2]}, "ES": {"label": "S&P 500", "last": 6600.0, "sparkline": [3]}}
+    client.add("https://finviz.com/api/futures_all?timeframe=d", quotes)
+    assert client.one("market", "quotes", "futures", "--keys", "ES")["data"] == {"ES": {"label": "S&P 500", "last": 6600.0}}
+    inside = client.one("market", "quotes", "futures", "--fields", "label", "--sparkline")
+    assert inside["data"] == {"6A": {"label": "AUD"}, "ES": {"label": "S&P 500"}}
+    assert client.one("market", "quotes", "futures", "--keys", "NOPE", code=2)["error"]["code"] == "invalid_keys"
+    assert client.one("market", "quotes", "futures", "--fields", "nope", code=2)["error"]["code"] == "invalid_fields"
+
+
 def test_quotes_selection_preserves_source_keys_without_requiring_ticker_fields(client):
     quotes = {"6A": {"label": "AUD", "last": 0.71, "newField": {"scale": 1}}, "ES": {"label": "S&P 500", "last": 6600.0}, "ALIAS": {"ticker": "ES", "label": "Alias", "last": None}}
     client.add("https://finviz.com/api/futures_all?timeframe=d", quotes)
@@ -318,8 +329,8 @@ def test_quotes_selection_preserves_source_keys_without_requiring_ticker_fields(
     assert result["data"] == {"6A": quotes["6A"]}
     assert result["coverage"] == {"received": 3, "shown": 1, "exhaustive": False}
     assert client.one("read", result["id"], "--pointer", "/data")["data"] == quotes
-    assert client.one("market", "quotes", "futures", "--fields", "ES,ALIAS", "--limit", "1")["data"] == {"ES": quotes["ES"]}
-    assert client.one("market", "quotes", "futures", "--fields", "unknown", code=2)["error"]["code"] == "invalid_fields"
+    assert client.one("market", "quotes", "futures", "--keys", "ES,ALIAS", "--limit", "1")["data"] == {"ES": quotes["ES"]}
+    assert client.one("market", "quotes", "futures", "--keys", "unknown", code=2)["error"]["code"] == "invalid_keys"
     assert client.one("market", "quotes", "futures", "--limit", "0", code=7)["data"] == {}
 
 
