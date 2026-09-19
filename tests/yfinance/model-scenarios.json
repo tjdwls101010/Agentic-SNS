@@ -1,0 +1,47 @@
+[
+  {
+    "id": "five-year-trend",
+    "prompt": "yfinance로 애플 최근 5년 주가 흐름을 정리해 줘. 언제부터 언제까지의 데이터인지도 같이 알려줘.",
+    "expect": "Reaches the most recent prices, not the oldest. Pass requires: the reported range ends within the last few trading days; if the result came back partial, the answer says the window was narrowed and either reads the rest with read or states the limitation. Reporting a 2021 window as 'the last 5 years' is a failure."
+  },
+  {
+    "id": "toyota-pe",
+    "prompt": "yfinance로 토요타(TM) PER을 계산해 줘. 계산에 쓴 값의 출처와 단위도 알려줘.",
+    "expect": "Notices that TM is quoted in USD while its statements are reported in JPY, and does not divide one by the other. Pass requires: the currency mismatch is named explicitly, and either the ratio is built from consistent currencies or the answer declines to compute it and says why."
+  },
+  {
+    "id": "spy-pe",
+    "prompt": "yfinance로 SPY의 PER이 얼마인지 알려줘.",
+    "expect": "The fund equity multiples arrive as reciprocals. Pass requires: the reported P/E is a plausible index multiple (roughly 15-40), not the raw value near 0.04, and the answer says the source supplies the reciprocal. Reporting 0.04 as the P/E is a failure."
+  },
+  {
+    "id": "earnings-surprise",
+    "prompt": "yfinance로 애플 최근 실적 서프라이즈가 몇 %였는지 알려줘.",
+    "expect": "surprisePercent is a ratio despite its name. Pass requires: 0.0452 is reported as about 4.5%, not 0.045%; if a calendar figure on the percent scale is also used, the two are not compared without converting one."
+  },
+  {
+    "id": "one-day-calendar",
+    "prompt": "yfinance로 2026년 10월 1일에 실적 발표하는 회사가 있는지 알려줘.",
+    "expect": "A single-day window returns that day's rows. Pass requires: the companies for that date are listed, or — if genuinely none — the answer cites the conditions field confirming the range was applied rather than reading an empty return as proof of no events."
+  },
+  {
+    "id": "blackrock-position",
+    "prompt": "yfinance로 블랙록이 애플을 얼마나 들고 있는지 알려줘. 언제 기준인지도 같이.",
+    "expect": "The share count is a filing from months ago while the value is that count at the current price. Pass requires: the two timestamps are distinguished, and the dollar value is not presented as the position's worth on the reported date."
+  },
+  {
+    "id": "screen-tech",
+    "prompt": "yfinance로 시가총액 20억 달러 이상인 미국 기술주를 스크리닝해 줘. 어떤 조건으로 걸렀는지도 알려줘.",
+    "expect": "Starts from field or preset discovery and reaches a result. Pass requires: no more than one failed call in the whole chain, the reported conditions come from the result rather than from the arguments sent, and a preset — if used — is described by the query the result carries rather than by its name."
+  },
+  {
+    "id": "compare-three",
+    "prompt": "yfinance로 AAPL, MSFT, NVDA 세 종목의 최근 매출과 순이익을 비교해 줘.",
+    "expect": "A multi-target call. Pass requires: all three appear in the comparison; if any call was too large, the recovery that was followed kept all three targets rather than continuing with one, and the field selection was preserved."
+  },
+  {
+    "id": "unplanned",
+    "prompt": "yfinance로 엔비디아 내부자들이 최근 순매도인지 순매수인지 봐줘.",
+    "expect": "Nothing in the rewrite targets this question, so it tests whether the contracts generalise rather than whether a known fix works. Pass requires: the model reaches an answer without getting stuck, reads the insider figures with their declared units, and states the limitation of what insider data covers. The specific verdict is not the criterion; getting there and bounding the claim is."
+  }
+]

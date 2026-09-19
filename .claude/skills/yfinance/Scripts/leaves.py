@@ -326,7 +326,8 @@ leaf("screen", "run", "Run a preset or a JSON query and return matching instrume
      conditions=["offset", "limit", "sort"],
      units={"regularMarketChangePercent": PERCENT, "fiftyTwoWeekChangePercent": PERCENT, "marketCap": CURRENCY,
             "trailingPE": MULTIPLE, "regularMarketVolume": COUNT},
-     interpretation={"matches_not_a_census": "These are the rows matching the query, ordered by the sort field. They are not a verified census of a market, and total is the provider's own claim.",
+     interpretation={"query_scale": "A growth threshold in the query is in percentage points, while the same measurement in a quote is a ratio. Measured: BTWN quarterlyrevenuegrowth.quarterly 20 30 returned companies whose quote revenueGrowth was 0.242 and 0.28, and the same bounds written as 0.20 and 0.30 returned a different set entirely — companies growing a fifth of a percent. Neither call fails, so reusing an output ratio as a query bound screens for something a hundredfold smaller and returns a plausible list.",
+                     "matches_not_a_census": "These are the rows matching the query, ordered by the sort field. They are not a verified census of a market, and total is the provider's own claim.",
                      "paging": "--offset continues a query rather than reading an immutable snapshot; rows can move between pages.",
                      "default_fields": "Each row carries far more fields than the default projection; --fields reaches them and --list-fields names them."},
      gotchas=["A preset's name does not state its condition. Describe results by the query that screen presets returns for it."])
@@ -343,14 +344,19 @@ REGION_INTERPRETATION = {
     "region": "--region takes only the country codes Yahoo actually serves for this dataset. The list is closed because unserved codes were measured returning the United States result with no warning, which is indistinguishable from a real answer.",
     "keys": "Sector keys are hyphenated (consumer-cyclical); fund sector-weights uses underscores.",
 }
+# 성진: 같은 값을 overview는 market_weight(밑줄), 구성종목 표는 "market weight"(공백)로 부른다. 한쪽만 선언하면
+# 다른 쪽이 계약 없이 나간다. ytd return은 특히 위험하다 — 실측 raw 3.654가 원천 표기로 "365.40%"다.
+DOMAIN_UNITS = {"market weight": WEIGHT, "market_weight": WEIGHT,
+                "ytd return": RATE, "growth estimate": RATE}
+
 REGION_GOTCHA = "Outside the United States the name column arrives null for every row, so a non-US region identifies companies by symbol only. That is a degraded answer, not an empty one."
 
 leaf("market", "sector", "One sector's overview, industries, top companies, funds or research.",
-     limit=20, narrow=["--fields", "--limit", "--dataset"], units={"market weight": WEIGHT},
+     limit=20, narrow=["--fields", "--limit", "--dataset"], units=DOMAIN_UNITS,
      interpretation=REGION_INTERPRETATION, gotchas=[REGION_GOTCHA])
 
 leaf("market", "industry", "One industry's overview, companies or research.",
-     limit=20, narrow=["--fields", "--limit", "--dataset"], units={"market weight": WEIGHT},
+     limit=20, narrow=["--fields", "--limit", "--dataset"], units=DOMAIN_UNITS,
      interpretation=REGION_INTERPRETATION, gotchas=[REGION_GOTCHA])
 
 # ---- calendar ----------------------------------------------------------------------------------------------------
