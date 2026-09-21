@@ -54,8 +54,10 @@ def attachment_rows(root, base_url):
             cells = _children(row, 'td', 'th')
             if not cells:
                 continue
-            if len(cells) < len(names):
-                _fail('A SEC attachment row has fewer cells than the table has columns.')
+            if len(cells) != len(names):
+                # An extra cell shifts every field after it, so the row comes back with another
+                # column's value under the wrong name rather than failing.
+                _fail('A SEC attachment row does not have one cell per column of its table.')
             rows.append(_row(cells, places, base_url, validate_url))
     return rows
 
