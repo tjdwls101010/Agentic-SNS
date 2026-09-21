@@ -18,16 +18,25 @@ class SecError(Exception):
 HEADER = ('source_url', 'snapshot_id', 'status', 'format', 'known_extraction_limits',
           'scope_complete', 'has_more', 'remaining_items', 'total_matches', 'next_position',
           'next_cursor', 'returned_chars')
+# A listing's own coverage: how many came back, how many are held, and whether the remote side
+# was finished. Without these a text-mode listing looks like the whole answer.
+LISTING = ('returned', 'remaining_saved', 'remote_complete', 'selection_required', 'filing_hits',
+           'total', 'unreturned_reason', 'timed_out', 'shards_failed', 'limit_reached',
+           'next_cursor')
 
 
 def _scalar(value):
+    if isinstance(value, dict):
+        # A nested record reads as its own fields, not as a Python repr of a dictionary.
+        return '{' + _row_line(value) + '}'
     if isinstance(value, list):
-        return ', '.join(str(item) for item in value) if value else '(none)'
+        return ' ; '.join(_scalar(item) for item in value) if value else '(none)'
     return str(value)
 
 
 def _header(value):
-    return [f'{key}: {_scalar(value[key])}' for key in HEADER if value.get(key) is not None]
+    keys = LISTING if value.get('operation') in ('company', 'filings', 'search', 'index') else HEADER
+    return [f'{key}: {_scalar(value[key])}' for key in keys if value.get(key) is not None]
 
 
 def _grid_lines(segment):
@@ -155,10 +164,16 @@ def render(value, as_json):
         return '\n'.join(f'{key}: {json.dumps(item, ensure_ascii=False)}' for key, item in value.items())
     header = _header(value)
     body = passage(value)
+    if not header:
+        return body + ('\n\n' + _error_lines(value) if value.get('error') else '')
     if value.get('error'):
-        error = value['error']
-        body += f"\n\nError [{error['code']}]: {error['message']}\nFix: {error['fix']}"
+        body += '\n\n' + _error_lines(value)
     return '\n'.join(header) + ('\n\n' + body if body else '')
+
+
+def _error_lines(value):
+    error = value['error']
+    return f"Error [{error['code']}]: {error['message']}\nFix: {error['fix']}"
 
 
 def measure(value, as_json):

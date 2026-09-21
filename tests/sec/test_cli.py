@@ -270,3 +270,22 @@ def test_an_outage_is_reported_as_a_connection_failure_with_a_recovery_line(cli)
     assert code == 2
     assert result['error']['code'] == 'connection_failed'
     assert 'connection_failed' in RECOVERY
+
+
+def test_a_listing_says_how_much_of_the_answer_it_is(cli):
+    # Without these a text-mode listing reads as the whole result set.
+    cli.replies.append(('search-index', 200, json.loads(fixture('efts-live.json')), {}))
+    _, text = cli.text('search', 'competition', '--company', '320193', '--limit', '1')
+    assert 'returned: 1' in text
+    assert 'remaining_saved: ' in text
+    assert 'remote_complete: ' in text
+    assert 'unreturned_reason: more_results' in text
+
+
+def test_a_nested_record_renders_as_its_own_fields(cli):
+    # filers is the projection that replaced a bare list of URLs; printing it as a Python repr
+    # would put the contract back where it started.
+    cli.replies.append(('search-index', 200, json.loads(fixture('efts-live.json')), {}))
+    _, text = cli.text('search', 'competition', '--company', '320193', '--limit', '1')
+    assert "{'cik'" not in text
+    assert 'filers: {cik: ' in text and 'document_url: https://' in text
