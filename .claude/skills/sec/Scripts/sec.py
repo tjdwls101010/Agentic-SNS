@@ -115,6 +115,8 @@ RECOVERY = {
     'unsupported_snapshot_version': 'Run open on the original URL again; a snapshot saved by an older reader is refused rather than reinterpreted.',
     'filing_mismatch': 'Verify the exact accession and a declared filer CIK with open on the filing index; no other filing is substituted.',
     'access_denied': 'Check the configured identity with doctor and pause before retrying; 403 is never retried automatically.',
+    'connection_failed': 'Check that this machine can reach www.sec.gov, then run the command again; three attempts were already made. A reader command on a saved snapshot needs no network at all.',
+    'not_found': 'Verify the exact accession and filename with open on the filing index; no other filing is substituted for one that is missing.',
     'rate_limited': 'Pause, then run the command again; 429 is never retried automatically. Run doctor if it keeps happening.',
     'parse_failed': 'Open the original source URL and read it directly; a parse failure is an error rather than an empty document.',
     'budget_too_small': 'Raise --max-chars up to 24000, or select less with --rows, --kind, --position/--end or a more specific query.',
@@ -249,8 +251,9 @@ def _codes(command):
     if command == 'schema':
         return shared
     if command == 'doctor':
-        return shared | {'identity_required', 'access_denied', 'rate_limited'}
-    codes = shared | {'identity_required', 'cursor_mismatch', 'access_denied', 'rate_limited', 'unsafe_url'}
+        return shared | {'identity_required', 'access_denied', 'rate_limited', 'connection_failed'}
+    codes = shared | {'identity_required', 'cursor_mismatch', 'access_denied', 'rate_limited',
+                      'unsafe_url', 'connection_failed', 'not_found'}
     if command == 'open':
         return codes | {'filing_mismatch', 'parse_failed', 'budget_too_small', 'company_required'}
     return codes | {'ambiguous_company'}

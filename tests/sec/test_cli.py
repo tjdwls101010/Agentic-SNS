@@ -257,3 +257,16 @@ def test_schema_needs_neither_identity_nor_network(capsys):
 
     assert main(['schema', 'read', '--json']) == 0
     assert json.loads(capsys.readouterr().out)['commands']['read']
+
+
+def test_an_outage_is_reported_as_a_connection_failure_with_a_recovery_line(cli):
+    import httpx
+    from sec import RECOVERY
+
+    cli.replies.append(('CIK0000320193', 200, httpx.ConnectError('no route'), {}))
+    cli.replies.append(('CIK0000320193', 200, httpx.ConnectError('no route'), {}))
+    cli.replies.append(('CIK0000320193', 200, httpx.ConnectError('no route'), {}))
+    code, result = cli('filings', '320193')
+    assert code == 2
+    assert result['error']['code'] == 'connection_failed'
+    assert 'connection_failed' in RECOVERY

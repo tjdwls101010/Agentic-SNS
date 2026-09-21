@@ -36,4 +36,6 @@ A read that returns `Common Stock` three times without the index, or that report
 - Transaction 2's `transactionShares` references `F2`.
 - Transaction 3's `securityTitle` references `F3`.
 
+**Correction, made when the seal was lifted on 2026-09-22.** The table above enumerates only the non-derivative transactions. The filing also has a `derivativeTable` holding one entry, whose `sharesOwnedFollowingTransaction/value` is **180624** — restricted stock units, a different security from the common stock above. Any check that gathers every path containing `sharesOwnedFollowingTransaction` finds four values, not three, and that is correct. The statement that the common-stock holding after the last reported transaction is 46,790 stands.
+
 `<issuerForeignTradingSymbol></issuerForeignTradingSymbol>` and `<rptOwnerStreet2></rptOwnerStreet2>` are present and empty. Empty is a reported fact here; the element must remain addressable rather than be dropped as blank.

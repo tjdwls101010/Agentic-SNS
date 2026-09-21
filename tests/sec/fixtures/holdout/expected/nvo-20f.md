@@ -6,12 +6,14 @@ Property under test: a foreign private issuer's annual report, whose practice di
 
 ## The decisive fact
 
-**Every `ITEM n` section heading in this document sits inside a table cell.** There is no `ITEM` heading in body prose anywhere in the file. Most of them are repeated page headers: `ITEM 4 INFORMATION ON THE COMPANY` occurs 7 times, `ITEM 6 DIRECTORS, EXECUTIVE MANAGEMENT AND EMPLOYEES` 6 times, `ITEM 5 OPERATING AND FINANCIAL REVIEW AND PROSPECTS` 5 times, `ITEM 10 ADDITIONAL INFORMATION` 3 times.
+**Correction, made when the seal was lifted on 2026-09-22.** This section originally claimed that every `ITEM n` heading in this document sits inside a table cell and that the navigation layer would therefore return none of them. That claim was wrong, and the error was mine rather than the reader's: the scan I wrote it from was sorted by occurrence count and cut off with `head -30`, which dropped every heading that occurs once — that is, every real section boundary. Re-reading the original directly gives **31 `ITEM` headings in block-level elements outside any table, and 30 inside tables**. The corrected expectation is below; the run against it is recorded in the pull request.
 
-So the navigation layer, which is defined as emphasis outside tables, returns **no `ITEM` heading at all** for this document. That is the expected result, not a failure. What must hold instead:
+`ITEM 1` through `ITEM 19` each appear once as a body heading outside any table, and again inside tables as repeated running page headers: `ITEM 4 INFORMATION ON THE COMPANY` 7 times, `ITEM 6 DIRECTORS, EXECUTIVE MANAGEMENT AND EMPLOYEES` 6 times, `ITEM 5 OPERATING AND FINANCIAL REVIEW AND PROSPECTS` 5 times, `ITEM 10 ADDITIONAL INFORMATION` 3 times.
 
-1. `outline --kind emphasis` returning no section heading is itself reportable — the response says the navigation layer is empty rather than implying the document has no sections.
-2. `outline --kind emphasis --all --in-tables only` reaches those headings, and each occurrence carries its own `table_id` and row so the repeated ones stay distinguishable. Grouping the 7 occurrences of `ITEM 4 INFORMATION ON THE COMPANY` into one item is correct; collapsing them to a single position is not.
+What must hold:
+
+1. `outline --kind emphasis` reaches each `ITEM n` section boundary once, from the body heading outside the tables.
+2. `outline --kind emphasis --all --in-tables only` reaches the running page headers as well, and each occurrence carries its own `table_id` and row so the repeated ones stay distinguishable. Grouping the 7 occurrences of `ITEM 4 INFORMATION ON THE COMPANY` into one item is correct; collapsing them to a single position is not.
 3. `outline --kind emphasis --in-tables only` is rejected with `invalid_argument`, because the navigation layer is defined as outside tables and an empty result there would read as "no emphasis inside tables".
 
 ## Reachability
