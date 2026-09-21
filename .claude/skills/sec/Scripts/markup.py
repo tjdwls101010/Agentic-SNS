@@ -11,7 +11,7 @@ from urllib.parse import quote, unquote, urljoin
 
 from emphasis import BASE, Signals, body_size, restyle
 from grid import build_table
-from snapshot import cell_text, collapse
+from snapshot import LAYOUT, cell_text, collapse
 
 BOUNDARY_TAGS = frozenset(
     {'p', 'div', 'br', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'section'}
@@ -22,6 +22,17 @@ SKIP_TAGS = frozenset({'script', 'style', 'head'})
 INLINE_XBRL = {'http://www.xbrl.org/2008/inlineXBRL', 'http://www.xbrl.org/2013/inlineXBRL'}
 # 성진: 표 주변 문맥은 앞뒤 두 블록이다, 더 먼 제목·단위가 필요한 문서가 나오면 반환 위치로 범위를 넓힌다.
 FRAMING_BLOCKS = 2
+
+
+def _runs(characters, owners):
+    """Group the collapsed characters by the style they were written in."""
+    groups = []
+    for character, owner in zip(characters, owners, strict=True):
+        if groups and groups[-1][0] is owner[0] and groups[-1][1] == owner[1]:
+            groups[-1][2].append(character)
+        else:
+            groups.append((owner[0], owner[1], [character]))
+    return [((style, link), ''.join(chunk)) for style, link, chunk in groups]
 
 
 def tag_of(node):
@@ -75,13 +86,13 @@ class _Document:
 
         self.blocks, self.outline, self.links, self.tables = [], [], [], []
         self.excluded = False
-        self.pending, self.marks = [], []
+        self.out, self.owners, self.marks = [], [], []
+        self.space = True
         self.link_items, self.anchor_items, self.cell_of = {}, {}, {}
         self.block_of_node = {}
         self.active_anchor = None
         self.styles = [BASE]
         self.link_depth = 0
-        self.signals = Signals()
         self.observations = []
 
     # --- walking ---------------------------------------------------------------------------
@@ -99,21 +110,31 @@ class _Document:
         return self.blocks, self.outline, self.links, self.tables, self.excluded
 
     def flush(self):
-        raw = ''.join(self.pending)
-        value = cell_text(raw)
-        for item, raw_offset in self.marks:
+        # The block's characters and its emphasis evidence come out of one collapse, so the
+        # fraction is measured against the text the reader is shown. Collapsing each fragment on
+        # its own loses the space between two of them, which turned four bold characters out of
+        # six into 80% and crossed the all-caps threshold.
+        while self.out and self.out[-1] == ' ':
+            self.out.pop()
+            self.owners.pop()
+        value = ''.join(self.out)
+        for item, offset in self.marks:
             item['block'] = len(self.blocks)
-            # lstrip only: the leading space the flush drops shifts every offset, the
-            # trailing one is still ahead of the mark.
-            item['offset'] = min(len(value), len(re.sub(r'\s+', ' ', raw[:raw_offset]).lstrip()))
+            item['offset'] = min(len(value), offset)
         self.marks.clear()
-        self.pending.clear()
-        signals, self.signals = self.signals, Signals()
+        if not value.strip(LAYOUT + ' '):
+            value = ''
         if value:
+            signals = Signals()
+            for (style, link), group in _runs(self.out, self.owners):
+                signals.add(group, style, link)
             url = self.url + '#' + quote(self.active_anchor) if self.active_anchor else self.url
             self.observations.append({'signals': signals, 'text': value, 'block': len(self.blocks),
                                       'offset': 0, 'in_table': False})
             self.blocks.append({'kind': 'text', 'text': value, 'url': url})
+        self.out.clear()
+        self.owners.clear()
+        self.space = True
 
     def walk(self, node):
         tag = tag_of(node)
@@ -146,10 +167,20 @@ class _Document:
         self.active_anchor = previous
 
     def emit(self, text):
+        """Append one fragment, collapsing whitespace across fragment boundaries as we go."""
         if not text:
             return
-        self.signals.add(collapse(text), self.styles[-1], self.link_depth > 0)
-        self.pending.append(text)
+        owner = (self.styles[-1], self.link_depth > 0)
+        for character in text:
+            if character.isspace():
+                if not self.space:
+                    self.out.append(' ')
+                    self.owners.append(owner)
+                    self.space = True
+            else:
+                self.out.append(character)
+                self.owners.append(owner)
+                self.space = False
 
     def mark_anchor(self, node, tag):
         key = node.get('id') or (node.get('name') if tag == 'a' else None)
@@ -160,7 +191,7 @@ class _Document:
                 'url': self.url + '#' + quote(key)}
         self.outline.append(item)
         self.anchor_items[node] = item
-        self.marks.append((item, len(''.join(self.pending))))
+        self.marks.append((item, len(self.out)))
 
     def mark_link(self, node, tag):
         target = node.get('src') if tag == 'img' else node.get('href') if tag == 'a' else None
@@ -169,7 +200,7 @@ class _Document:
         item = self.link_record(node, tag, target)
         self.links.append(item)
         self.link_items[node] = item
-        self.marks.append((item, len(''.join(self.pending))))
+        self.marks.append((item, len(self.out)))
 
     def link_record(self, node, tag, target):
         label = node.get('alt', '') if tag == 'img' else collapse(''.join(node.itertext()))
@@ -189,7 +220,9 @@ class _Document:
         child interrupted a cell, so that difference stays visible instead of the child reading
         as free-standing prose.
         """
-        for element in [node, *node.xpath('.//table')]:
+        nested = [child for child in node.xpath('.//table')
+                  if not self.inside_metadata(child, node)]
+        for element in [node, *nested]:
             coords = {}
             table = build_table(element, self.table_ids[element], table_ids=self.table_ids,
                                 link_ids=self.link_ids, parent=self.parent_of(element),
@@ -200,9 +233,18 @@ class _Document:
                                 'table_id': table['table_id'], 'url': self.url})
             self.tables.append(table)
             self.mark_inside(element, table, coords)
-            self.observe_rows(table, coords)
+            self.observe_rows(element, table, coords)
 
-    def observe_rows(self, table, coords):
+    def inside_metadata(self, element, root):
+        """Whether a hidden inline-XBRL section stands between this element and the table."""
+        for ancestor in element.iterancestors():
+            if ancestor is root:
+                return False
+            if tag_of(ancestor) in self.nonbody:
+                return True
+        return False
+
+    def observe_rows(self, node, table, coords):
         """Emphasis inside a table belongs to the table, by row.
 
         One observation per cell would put thousands of entries in front of a reader for a
@@ -210,9 +252,28 @@ class _Document:
         smallest unit that still says where to look.
         """
         rows = {}
-        for cell, (row, _) in coords.items():
-            signals = rows.setdefault(row, Signals())
-            self.collect(cell, self.styles[-1], signals)
+
+        def collect(element, inherited, row, link):
+            tag = tag_of(element)
+            if tag in SKIP_TAGS or tag in self.nonbody or not isinstance(element.tag, str):
+                return
+            if element is not node and tag == 'table':
+                return
+            # The style starts at the table, not outside it: a table that declares bold once at
+            # the top used to produce no observation at all.
+            style = restyle(element, tag, inherited)
+            link = link or (tag == 'a' and bool(element.get('href')))
+            if tag in CELL_TAGS and element in coords:
+                row = coords[element][0]
+            signals = rows.setdefault(row, Signals()) if row is not None else None
+            if signals is not None:
+                signals.add(collapse(element.text or ''), style, link)
+            for child in element:
+                collect(child, style, row, link)
+                if signals is not None:
+                    signals.add(collapse(child.tail or ''), style, link)
+
+        collect(node, self.styles[-1], None, False)
         for row, start, end in table['row_ranges']:
             signals = rows.get(row)
             text = table['text'][start:end].replace('\t', ' ').strip()
@@ -221,18 +282,6 @@ class _Document:
             self.observations.append({'signals': signals, 'text': collapse(text), 'block': table['block'],
                                       'offset': start, 'in_table': True,
                                       'table_id': table['table_id'], 'row': row})
-
-    def collect(self, node, inherited, signals):
-        """Accumulate one cell's emphasis evidence without descending into a nested table."""
-        tag = tag_of(node)
-        if tag in SKIP_TAGS or tag in self.nonbody or tag == 'table' or not isinstance(node.tag, str):
-            return
-        style = restyle(node, tag, inherited)
-        link = tag == 'a' and bool(node.get('href'))
-        signals.add(collapse(node.text or ''), style, link)
-        for child in node:
-            self.collect(child, style, signals)
-            signals.add(collapse(child.tail or ''), style, link)
 
     def judge_emphasis(self):
         """Decide the two layers once, after the whole document has been measured."""

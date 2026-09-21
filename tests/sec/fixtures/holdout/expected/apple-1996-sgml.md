@@ -8,15 +8,17 @@ Property under test: a pre-HTML complete submission, where document boundaries a
 
 `open` reports `format: sgml`, `status: parsed`, and **exactly 7 documents** in submission order. **No document has a `<FILENAME>`**; a parser that requires one fails this filing, which is precisely the regression this holdout exists to catch.
 
-| sequence | type | description | body bytes | first words of `<TEXT>` |
+| sequence | type | description | body characters | first words of `<TEXT>` |
 |---|---|---|---|---|
-| 1 | `10-K` | *(none)* | 196,637 | `______… UNITED STATES SECURIT…` |
-| 2 | `EX-10` | *(none)* | 36,771 | `EXHIBIT 10.A.5 APPLE COMPUTER, INC. 1990 STOCK OPTION PLAN` |
-| 3 | `EX-10` | *(none)* | 22,680 | `EXHIBIT 10.A.6 APPLE COMPUTER, INC. EMPLOYEE STOCK PURCHASE PLAN` |
-| 4 | `EX-10` | *(none)* | 10,302 | `EXHIBIT 10.A.40 August 19, 1996 Mr. Gerald F. Forsyth` |
-| 5 | `EX-11` | *(none)* | 1,601 | `<TABLE> <CAPTION> EXHIBIT 11 … COMPUTATION OF EARNINGS (LOSS) PER COMMON SHARE` |
-| 6 | `EX-21` | *(none)* | 547 | `EXHIBIT 21 SUBSIDIARIES OF APPLE COMPUTER, INC*` |
-| 7 | `EX-27` | `ART. 5 FDS FOR FY95 FORM 10-K` | 1,044 | `<TABLE> <S> <C> <ARTICLE> 5 <MULTIPLIER> 1,000,000` |
+| 1 | `10-K` | *(none)* | 196,626 | `______… UNITED STATES SECURIT…` |
+| 2 | `EX-10` | *(none)* | 36,753 | `EXHIBIT 10.A.5 APPLE COMPUTER, INC. 1990 STOCK OPTION PLAN` |
+| 3 | `EX-10` | *(none)* | 22,670 | `EXHIBIT 10.A.6 APPLE COMPUTER, INC. EMPLOYEE STOCK PURCHASE PLAN` |
+| 4 | `EX-10` | *(none)* | 10,282 | `EXHIBIT 10.A.40 August 19, 1996 Mr. Gerald F. Forsyth` |
+| 5 | `EX-11` | *(none)* | 1,592 | `<TABLE> <CAPTION> EXHIBIT 11 … COMPUTATION OF EARNINGS (LOSS) PER COMMON SHARE` |
+| 6 | `EX-21` | *(none)* | 536 | `EXHIBIT 21 SUBSIDIARIES OF APPLE COMPUTER, INC*` |
+| 7 | `EX-27` | `ART. 5 FDS FOR FY95 FORM 10-K` | 1,034 | `<TABLE> <S> <C> <ARTICLE> 5 <MULTIPLIER> 1,000,000` |
+
+The body is the text between the `<TEXT>` line and the `</TEXT>` line, both excluded. When these counts were first recorded the span measured also included the closing tag and the blank lines after it, which made each one 10 to 18 characters longer; the numbers above are the same documents under the stated definition.
 
 `description` is absent on six of seven documents and present on the last. A missing `<DESCRIPTION>` must be `null`, not an empty document or a dropped row.
 

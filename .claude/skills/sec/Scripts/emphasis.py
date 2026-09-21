@@ -8,6 +8,8 @@ section boundaries. Nothing here becomes a heading level: the measured filings d
 
 import re
 
+from snapshot import LAYOUT
+
 # A browser's default text size, used only to resolve a relative unit when nothing above it
 # declared an absolute one.
 DEFAULT_POINTS = 12.0
@@ -23,7 +25,10 @@ COVERAGE = 0.8
 # A body paragraph, long enough that its size is the document's running text rather than a label.
 BODY_CHARS = 200
 
-BASE = {'weight': 400, 'size': None, 'align': None, 'italic': False, 'underline': False, 'heading': False}
+BASE = {'weight': 400, 'size': None, 'align': None, 'italic': False, 'underline': False,
+        'heading': False, 'root': None}
+# The <font size> scale, which is relative rather than absolute: 3 is the default size.
+FONT_SIZES = {1: 0.63, 2: 0.82, 3: 1.0, 4: 1.13, 5: 1.5, 6: 2.0, 7: 3.0}
 SECTION = re.compile(r'^\s*(item|part|note)\s+(\d+\s*[a-c]?|[ivx]+)\b', re.IGNORECASE)
 WEIGHTS = {'bold': 700, 'bolder': 700, 'normal': 400, 'lighter': 400}
 HEADING_TAGS = frozenset({'h1', 'h2', 'h3', 'h4', 'h5', 'h6'})
@@ -31,7 +36,7 @@ BOLD_TAGS = frozenset({'b', 'strong'})
 ITALIC_TAGS = frozenset({'i', 'em'})
 
 
-def _points(value, inherited):
+def _points(value, inherited, root=None):
     match = re.fullmatch(r'\s*(\d*\.?\d+)\s*(pt|px|em|rem|%)\s*', value or '', re.IGNORECASE)
     if not match:
         return inherited
@@ -40,8 +45,11 @@ def _points(value, inherited):
         return amount
     if unit == 'px':
         return amount * 0.75
+    if unit == 'rem':
+        # rem is the root's size, not the parent's: inside a 20pt block, 1rem is still body size.
+        return amount * (root or DEFAULT_POINTS)
     base = inherited if inherited else DEFAULT_POINTS
-    return amount * base if unit in ('em', 'rem') else amount / 100 * base
+    return amount * base if unit == 'em' else amount / 100 * base
 
 
 def restyle(node, tag, inherited):
@@ -56,6 +64,13 @@ def restyle(node, tag, inherited):
     if tag in HEADING_TAGS:
         style['weight'] = max(style['weight'], 700)
         style['heading'] = True
+    if tag == 'font' and node.get('size'):
+        # Unexercised by the measured filings, which declare no size attribute at all. The scale
+        # is relative, so with nothing declared above it the base is the browser's own default,
+        # which is what the reader would see.
+        step = FONT_SIZES.get(_number(node.get('size').lstrip('+'), 3))
+        if step is not None:
+            style['size'] = (style['size'] or style['root'] or DEFAULT_POINTS) * step
     for declaration in (node.get('style') or '').split(';'):
         name, separator, value = declaration.partition(':')
         if not separator:
@@ -64,7 +79,9 @@ def restyle(node, tag, inherited):
         if name == 'font-weight':
             style['weight'] = WEIGHTS.get(value.lower(), _number(value, style['weight']))
         elif name == 'font-size':
-            style['size'] = _points(value, style['size'])
+            style['size'] = _points(value, style['size'], style['root'])
+            if tag == 'html':
+                style['root'] = style['size']
         elif name == 'text-align':
             style['align'] = value.lower() or None
         elif name == 'font-style':
@@ -97,6 +114,10 @@ class Signals:
         self.emphasized = []
 
     def add(self, text, style, in_link):
+        # A layout character is not a character the reader sees. Counting it made a row of
+        # ordinary weight read as partly bold, and a fully bold row as half bold, wherever a
+        # filing pads its layout with U+200B.
+        text = text.replace(LAYOUT, '')
         count = len(text)
         if not count:
             return
@@ -139,6 +160,11 @@ class Signals:
         """Whether these signals are strong enough to read as a section boundary."""
         if self.chars and self.link / self.chars >= LINK_LIMIT:
             return False
+        size = self.median()
+        if body_size and size is not None and size < body_size:
+            # Set smaller than the document's own running text: a page mark, not a section. One
+            # filing prints PART I and PART II this way 88 times between them.
+            return False
         if self.heading:
             return True
         if SECTION.match(' '.join(self.emphasized)):
@@ -176,6 +202,10 @@ def body_size(blocks):
     """
     pairs = []
     for signals in blocks:
-        if signals.chars >= BODY_CHARS:
+        sized = sum(count for _, count in signals.sizes)
+        # A block whose size is mostly undeclared does not speak for the document: one 20pt
+        # character at the end of a 220-character unsized paragraph would otherwise make 20pt
+        # the body size and every real heading smaller than it.
+        if signals.chars >= BODY_CHARS and sized >= signals.chars * COVERAGE:
             pairs.extend(signals.sizes)
     return weighted_median(pairs)

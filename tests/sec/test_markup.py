@@ -300,3 +300,84 @@ def test_a_repeated_page_header_keeps_every_place_it_occurs():
 def test_a_financial_statement_exhibit_honestly_has_no_section_layer():
     # NBIS is an exhibit with no Item structure at all; an empty navigation layer is the fact.
     assert expected_sections('nbis.html') == {}
+
+
+# --- what the independent review of this rule found ---------------------------------------------
+
+
+def test_a_line_set_smaller_than_the_body_is_not_a_section_boundary():
+    # Microsoft prints PART I and PART II as 7.5pt underlined page marks against a 10pt body.
+    # They are page locations; promoting them made 98 occurrences read as section boundaries.
+    body = '<p style="font-size:10pt">' + 'Ordinary sentence. ' * 20 + '</p>'
+    result = parse(body * 5 + '<p style="font-size:7.5pt;text-decoration:underline">PART I</p>')
+    mark = next(item for item in emphasis(result) if item['text'] == 'PART I')
+    assert mark['signals']['font_size_ratio'] < 1
+    assert mark['navigation'] is False
+
+
+def test_the_measured_page_marks_stay_observations_without_becoming_boundaries():
+    result = parse(fixture_text('microsoft.html'))
+    marks = [item for item in emphasis(result) if item['text'] in ('PART I', 'PART II')]
+    assert len(marks) > 50
+    assert 0 < len([item for item in marks if item['navigation']]) <= 4
+    missing = [text for text in expected_sections('microsoft.html')
+               if text not in {item['text'] for item in emphasis(result, navigation=True)}]
+    assert missing == []
+
+
+def test_a_layout_cell_contributes_no_emphasis_to_its_row():
+    # The grid reads a U+200B-only cell as empty, but the row's signals counted its styling, so
+    # a row of ordinary weight was reported bold and a fully bold row was reported half bold.
+    result = parse('<table><tr><td style="font-weight:bold">\u200b</td>'
+                   '<td>Translation adjustment</td></tr></table>')
+    assert [item for item in emphasis(result) if item['signals']['bold_fraction']] == []
+
+
+def test_the_space_between_two_runs_is_part_of_the_block_it_is_measured_against():
+    # Stripping each fragment dropped the separating space from the count, so four bold
+    # characters out of six read as 80% and crossed the all-caps threshold.
+    item = emphasis(parse('<p><b>ABCD</b> <span>E</span></p>'))[0]
+    assert item['text'] == 'ABCD E'
+    assert item['signals']['bold_fraction'] == pytest.approx(4 / 6, rel=0.01)
+
+
+def test_a_cell_inherits_the_style_its_table_declares():
+    # The starting style was the one in force outside the table, so a table that declares bold
+    # once at the top produced no observation at all.
+    result = parse('<table style="font-weight:bold"><tr><td>Heading Row</td></tr></table>')
+    assert emphasis(result)[0]['signals']['bold_fraction'] == 1.0
+
+
+def test_a_hidden_nested_table_is_not_read_through_the_table_path():
+    markup = ('<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL"><body><table><tr><td>Visible'
+              '<ix:hidden><table><tr><td><b>Hidden</b></td></tr></table></ix:hidden></td></tr>'
+              '</table></body></html>')
+    result = parse(markup)
+    assert canonical(result) == 'Visible'
+    assert all('Hidden' not in item['text'] for item in emphasis(result))
+
+
+def test_a_rem_size_is_measured_against_the_root_not_the_parent():
+    result = parse('<html style="font-size:10pt"><body>'
+                   '<p style="font-size:10pt">' + 'Ordinary sentence. ' * 20 + '</p>'
+                   '<div style="font-size:20pt"><p style="font-size:1rem">Same as body</p></div>'
+                   '</body></html>')
+    assert [item for item in emphasis(result) if item['text'] == 'Same as body'] == []
+
+
+def test_a_block_whose_size_is_mostly_undeclared_does_not_set_the_body_size():
+    # One 20pt character at the end of a 220-character unsized paragraph would otherwise make
+    # 20pt the document's body size and every real 12pt heading smaller than it.
+    body = '<p style="font-size:12pt">' + 'Ordinary sentence. ' * 20 + '</p>'
+    odd = '<p>' + 'x' * 220 + '<span style="font-size:20pt">!</span></p>'
+    result = parse(body * 3 + odd + '<p style="font-size:16pt;font-weight:bold">Real Heading</p>')
+    item = next(x for x in emphasis(result) if x['text'] == 'Real Heading')
+    assert item['signals']['font_size_ratio'] == pytest.approx(16 / 12, rel=0.01)
+    assert item['navigation'] is True
+
+
+def test_a_font_size_attribute_is_a_size_signal():
+    body = '<p style="font-size:10pt">' + 'Ordinary sentence. ' * 20 + '</p>'
+    result = parse(body * 3 + '<p><font size="6">Large Title</font></p>')
+    item = next(x for x in emphasis(result) if x['text'] == 'Large Title')
+    assert item['signals']['font_size_ratio'] > 1.15
