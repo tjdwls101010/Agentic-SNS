@@ -67,7 +67,7 @@ def parser():
             sub.add_argument('--cursor', help='Opaque continuation for this operation; repeat the same snapshot, options and output mode.')
         if name in ('open', 'outline', 'find', 'read', 'table', 'links'):
             sub.add_argument('--max-chars', dest='budget', type=int, default=12000,
-                             help='Response budget measured on what is actually printed, 1024-24000 characters '
+                             help='Response budget measured on what is actually printed, 2000-24000 characters '
                                   "(default 12000); the only page boundary, kept below the host's ~30,000-character "
                                   'tool-output truncation.')
         if name == 'outline':
@@ -149,7 +149,7 @@ def schema(command=None):
         'global_options': [_describe(action) for action in p._actions if action.option_strings],
         'global_options_note': GLOBAL_OPTIONS,
         'exit_codes': EXIT_CODES,
-        'defaults': {'limit': 20, 'max_chars': 12000, 'max_chars_ceiling': 24000,
+        'defaults': {'limit': 20, 'max_chars': 12000, 'max_chars_floor': 2000, 'max_chars_ceiling': 24000,
                      'max_chars_measure': 'the characters this command actually prints, in whichever output mode was chosen',
                      'requests_per_second': 2, 'search_from': '2001-01-01', 'sort': 'date'},
         'commands': {name: {'description': sub.description,
@@ -218,7 +218,7 @@ def schema(command=None):
             'scope_complete': 'the selected range or output was returned completely; this says nothing about known_extraction_limits',
             'remaining_items': 'unreturned items, counting one whose text was only partly returned',
             'total_matches': 'find: how many matches exist in the whole snapshot, not only on this page',
-            'returned_chars': 'the characters actually printed, including the envelope and the trailing newline; --max-chars 1024..24000 is the only page boundary',
+            'returned_chars': 'the characters actually printed, including the envelope and the trailing newline; --max-chars 2000..24000 is the only page boundary',
             'xml': 'an XML snapshot is read as path, parent and attributes rather than prose, so repeated records with the same tag names stay distinct',
             'sgml': 'a submission text file keeps its document boundaries with sequence, type, filename and description; a historical filing may declare none of them but the boundary still holds',
         },

@@ -47,8 +47,8 @@ def query_options(args):
 
 
 def validate_options(args):
-    if hasattr(args, 'budget') and not 1024 <= args.budget <= 24000:
-        raise SecError('invalid_budget', 'max-chars must be 1024..24000.', 'Use a budget within this range.')
+    if hasattr(args, 'budget') and not 2000 <= args.budget <= 24000:
+        raise SecError('invalid_budget', 'max-chars must be 2000..24000.', 'Use a budget within this range.')
     if hasattr(args, 'limit') and not 1 <= args.limit <= 100:
         raise SecError('invalid_argument', 'limit must be between 1 and 100.', 'Choose a limit from 1 to 100.')
     if hasattr(args, 'query') and not args.query.strip():
