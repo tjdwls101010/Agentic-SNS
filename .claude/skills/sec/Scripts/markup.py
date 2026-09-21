@@ -9,6 +9,7 @@ measure.
 import re
 from urllib.parse import quote, unquote, urljoin
 
+from emphasis import BASE, Signals, body_size, restyle
 from grid import build_table
 from snapshot import cell_text, collapse
 
@@ -78,17 +79,22 @@ class _Document:
         self.link_items, self.anchor_items, self.cell_of = {}, {}, {}
         self.block_of_node = {}
         self.active_anchor = None
+        self.styles = [BASE]
+        self.link_depth = 0
+        self.signals = Signals()
+        self.observations = []
 
     # --- walking ---------------------------------------------------------------------------
 
     def build(self):
         self.walk(self.root)
         self.flush()
+        self.judge_emphasis()
         for table in self.tables:
             self.frame(table)
         self.resolve_links()
         self.list_tables()
-        rank = {'toc': 0, 'heading': 1, 'table': 2, 'anchor': 3, 'internal_link': 4}
+        rank = {'toc': 0, 'emphasis': 1, 'table': 2, 'anchor': 3, 'internal_link': 4}
         self.outline.sort(key=lambda item: (item['block'], item['offset'], rank[item['kind']]))
         return self.blocks, self.outline, self.links, self.tables, self.excluded
 
@@ -102,8 +108,11 @@ class _Document:
             item['offset'] = min(len(value), len(re.sub(r'\s+', ' ', raw[:raw_offset]).lstrip()))
         self.marks.clear()
         self.pending.clear()
+        signals, self.signals = self.signals, Signals()
         if value:
             url = self.url + '#' + quote(self.active_anchor) if self.active_anchor else self.url
+            self.observations.append({'signals': signals, 'text': value, 'block': len(self.blocks),
+                                      'offset': 0, 'in_table': False})
             self.blocks.append({'kind': 'text', 'text': value, 'url': url})
 
     def walk(self, node):
@@ -123,15 +132,24 @@ class _Document:
         previous = self.active_anchor
         self.mark_anchor(node, tag)
         self.mark_link(node, tag)
-        if node.text:
-            self.pending.append(node.text)
+        self.styles.append(restyle(node, tag, self.styles[-1]))
+        self.link_depth += tag == 'a' and bool(node.get('href'))
+        self.emit(node.text)
         for child in node:
             self.walk(child)
-            if child.tail:
-                self.pending.append(child.tail)
+            # A tail is this element's own flow, so it carries this element's style.
+            self.emit(child.tail)
+        self.link_depth -= tag == 'a' and bool(node.get('href'))
+        self.styles.pop()
         if tag in BOUNDARY_TAGS:
             self.flush()
         self.active_anchor = previous
+
+    def emit(self, text):
+        if not text:
+            return
+        self.signals.add(collapse(text), self.styles[-1], self.link_depth > 0)
+        self.pending.append(text)
 
     def mark_anchor(self, node, tag):
         key = node.get('id') or (node.get('name') if tag == 'a' else None)
@@ -182,6 +200,55 @@ class _Document:
                                 'table_id': table['table_id'], 'url': self.url})
             self.tables.append(table)
             self.mark_inside(element, table, coords)
+            self.observe_rows(table, coords)
+
+    def observe_rows(self, table, coords):
+        """Emphasis inside a table belongs to the table, by row.
+
+        One observation per cell would put thousands of entries in front of a reader for a
+        document whose section headings all happen to live in header cells; the row is the
+        smallest unit that still says where to look.
+        """
+        rows = {}
+        for cell, (row, _) in coords.items():
+            signals = rows.setdefault(row, Signals())
+            self.collect(cell, self.styles[-1], signals)
+        for row, start, end in table['row_ranges']:
+            signals = rows.get(row)
+            text = table['text'][start:end].replace('\t', ' ').strip()
+            if signals is None or not text:
+                continue
+            self.observations.append({'signals': signals, 'text': collapse(text), 'block': table['block'],
+                                      'offset': start, 'in_table': True,
+                                      'table_id': table['table_id'], 'row': row})
+
+    def collect(self, node, inherited, signals):
+        """Accumulate one cell's emphasis evidence without descending into a nested table."""
+        tag = tag_of(node)
+        if tag in SKIP_TAGS or tag in self.nonbody or tag == 'table' or not isinstance(node.tag, str):
+            return
+        style = restyle(node, tag, inherited)
+        link = tag == 'a' and bool(node.get('href'))
+        signals.add(collapse(node.text or ''), style, link)
+        for child in node:
+            self.collect(child, style, signals)
+            signals.add(collapse(child.tail or ''), style, link)
+
+    def judge_emphasis(self):
+        """Decide the two layers once, after the whole document has been measured."""
+        prose = [item['signals'] for item in self.observations if not item['in_table']]
+        size = body_size(prose)
+        for item in self.observations:
+            signals = item['signals']
+            if not signals.observed(size):
+                continue
+            entry = {'kind': 'emphasis', 'text': item['text'], 'block': item['block'],
+                     'offset': item['offset'], 'signals': signals.report(size, item['text']),
+                     'navigation': not item['in_table'] and signals.navigation(size, item['text'])}
+            for key in ('table_id', 'row'):
+                if key in item:
+                    entry[key] = item[key]
+            self.outline.append(entry)
 
     def parent_of(self, element):
         parent_table = next(element.iterancestors('table'), None)
