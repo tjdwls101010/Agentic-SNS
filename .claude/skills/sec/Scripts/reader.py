@@ -10,9 +10,13 @@ from output import SecError, measure
 from snapshot import SNAPSHOT_VERSION
 from store import digest
 
-# Budget bounds: the host tool truncates Bash results around 30,000 characters, so the ceiling
-# stays below that.
-MIN_BUDGET, DEFAULT_BUDGET, MAX_BUDGET = 1024, 12000, 24000
+# The ceiling stays below the host tool's ~30,000-character truncation of Bash results.
+# The floor is what one page has to be able to hold: the envelope, plus a grid segment naming
+# its table and the columns that survived folding, plus one row. Measured across the tuning
+# documents in JSON, the widest such page is 1,057 characters, so a floor of 1,024 could page
+# some documents to the end and not others — it failed part way through a 43-column table in a
+# 10-Q. 2,000 clears the widest measured page with room for a longer source URL.
+MIN_BUDGET, DEFAULT_BUDGET, MAX_BUDGET = 2000, 12000, 24000
 CURSOR_VERSION = 4
 NARROWING = {'outline': '--kind', 'find': 'a more specific query', 'read': '--position and --end',
              'table': '--rows', 'links': '--kind'}
@@ -88,21 +92,19 @@ def _verify(snapshot, store):
 
 
 def _envelope(snapshot, operation):
-    """Every field the finished page will carry, at its widest.
+    """The fields every page of this operation carries, whatever it ends up holding.
 
-    The envelope is measured while the page is being filled, so a field added only at the end
-    would let a page pass the check and then overflow when it is printed.
+    The caller fills in the ones that depend on where the page stops, and measures after that: a
+    document-wide worst case padded every page by a few characters, which is enough to refuse a
+    page that does fit, and the refusal then arrived on a continuation rather than on the first
+    call.
     """
-    blocks = snapshot.data['blocks']
     envelope = {'operation': operation, 'snapshot_id': snapshot.id,
                 'source_url': snapshot.data['source']['url'], 'status': snapshot.data['status'],
                 'format': snapshot.data['format'],
                 'known_extraction_limits': snapshot.data['known_extraction_limits'],
-                'has_more': True, 'scope_complete': False, 'remaining_items': 99999999,
+                'has_more': True, 'scope_complete': False, 'remaining_items': 0,
                 'returned_chars': MAX_BUDGET, 'next_cursor': '0' * 64}
-    if operation == 'read':
-        envelope['next_position'] = (f'{fingerprint(snapshot)}:{max(len(blocks) - 1, 0)}:'
-                                     f"{max((len(b['text']) for b in blocks), default=0)}")
     if operation == 'find':
         envelope['total_matches'] = 0
     return envelope
@@ -137,21 +139,31 @@ def _paginate(snapshot, store, operation, options, items, cursor, budget, as_jso
     query = _query(snapshot, operation, options, budget, as_json)
     state = store.resume(cursor, query) if cursor else {'index': 0, 'offset': 0}
     index, offset = state['index'], state['offset']
+
+    def trial(pieces, at):
+        """The page exactly as it would print if it stopped here, so the check is not padded."""
+        more = at < len(items)
+        result = assemble(pieces, not more)
+        result['has_more'] = more
+        result['scope_complete'] = not more
+        result['remaining_items'] = len(items) - at
+        result['next_cursor'] = '0' * 64 if more else None
+        return result
+
     taken = []
     while index < len(items):
-        piece, length = items[index].take(offset)
-        taken.append(piece)
-        if measure(assemble(taken, index + 1 == len(items) and length is None), as_json) <= budget:
+        piece, _ = items[index].take(offset)
+        if measure(trial([*taken, piece], index + 1), as_json) <= budget:
+            taken.append(piece)
             index, offset = index + 1, 0
             continue
-        taken.pop()
         if taken:
             break
         low, high = 0, items[index].size(offset)
         while low < high:
             middle = (low + high + 1) // 2
             piece, _ = items[index].take(offset, middle)
-            if measure(assemble([piece], False), as_json) <= budget:
+            if measure(trial([piece], index), as_json) <= budget:
                 low = middle
             else:
                 high = middle - 1
@@ -161,13 +173,10 @@ def _paginate(snapshot, store, operation, options, items, cursor, budget, as_jso
         offset += low
         break
     more = index < len(items)
-    result = assemble(taken, not more)
-    result['has_more'] = more
-    result['scope_complete'] = not more
-    result['remaining_items'] = len(items) - index
-    result['next_cursor'] = store.save({'query': query, 'state': {'index': index, 'offset': offset}}) if more else None
+    result = trial(taken, index)
     if enrich is not None:
         enrich(result, budget, as_json)
+    result['next_cursor'] = store.save({'query': query, 'state': {'index': index, 'offset': offset}}) if more else None
     result['returned_chars'] = measure(result, as_json)
     if result['returned_chars'] > budget:
         raise _too_small(operation)
@@ -359,20 +368,43 @@ def read(snapshot, store, *, position=None, end=None, cursor=None, budget=DEFAUL
     query = _query(snapshot, 'read', options, budget, as_json)
     state = store.resume(cursor, query) if cursor else {'index': 0, 'offset': 0}
     index, offset = state['index'], state['offset']
-    taken = []
+    def trial(pieces, at, into):
+        """The page exactly as it would print if it stopped here.
+
+        Measuring against a document-wide worst case instead padded every page by a few
+        characters, which is enough to refuse a page that does fit — and that refusal arrived on
+        a continuation rather than on the first call, which the budget contract forbids.
+        """
+        result = _read_result(snapshot, pieces)
+        more = at < len(units)
+        result['has_more'] = more
+        result['scope_complete'] = not more
+        result['remaining_items'] = len(units) - at
+        result['next_position'] = position_of(snapshot, units[at].start + into) if more else None
+        result['next_cursor'] = '0' * 64 if more else None
+        return result
+
+    taken, shown = [], 0
     while index < len(units):
         unit = units[index]
-        taken.append(unit.take(offset))
-        if measure(_read_result(snapshot, taken, {}), as_json) <= budget:
+        piece = unit.take(offset)
+        length = unit.size(offset)
+        if measure(trial([*taken, piece], index + 1, 0), as_json) <= budget:
+            taken.append(piece)
+            shown += _renders(piece)
             index, offset = index + 1, 0
             continue
-        taken.pop()
-        if taken:
+        # Only a piece that prints something holds the page open. Counting an empty one as
+        # content left a page whose body was blank next to has_more; counting characters instead
+        # of printed lines refused an empty grid row, which prints its number and its shape.
+        if shown:
             break
-        low, high = 0, unit.size(offset)
+        if not length:
+            raise _too_small('read')
+        low, high = 0, length
         while low < high:
             middle = (low + high + 1) // 2
-            if measure(_read_result(snapshot, [unit.take(offset, middle)], {}), as_json) <= budget:
+            if measure(trial([unit.take(offset, middle)], index, offset + middle), as_json) <= budget:
                 low = middle
             else:
                 high = middle - 1
@@ -382,13 +414,15 @@ def read(snapshot, store, *, position=None, end=None, cursor=None, budget=DEFAUL
         offset += low
         break
     more = index < len(units)
-    result = _read_result(snapshot, taken, _context(snapshot, taken, budget, as_json))
-    _detail(snapshot, result, budget, as_json)
+    result = _read_result(snapshot, taken)
     result['has_more'] = more
     result['scope_complete'] = not more
     result['remaining_items'] = len(units) - index
     # next_position is always unread body: repeating a table's opening rows never moves it back.
     result['next_position'] = position_of(snapshot, units[index].start + offset) if more else None
+    result['next_cursor'] = '0' * 64 if more else None
+    _context(snapshot, result, taken, budget, as_json)
+    _detail(snapshot, result, budget, as_json)
     result['next_cursor'] = store.save({'query': query, 'state': {'index': index, 'offset': offset}}) if more else None
     result['returned_chars'] = measure(result, as_json)
     if result['returned_chars'] > budget:
@@ -396,7 +430,13 @@ def read(snapshot, store, *, position=None, end=None, cursor=None, budget=DEFAUL
     return result
 
 
+def _renders(piece):
+    """Whether this piece puts anything on the page."""
+    return 1 if piece['kind'] == 'row' else bool(piece['text'])
+
+
 def position_of(snapshot, offset):
+    # read() takes an argument named position, so the module function needs another name inside it.
     return position(snapshot, offset)
 
 
@@ -417,9 +457,13 @@ class _Prose:
 
 
 class _Row:
-    def __init__(self, snapshot, table, row, start, end):
+    def __init__(self, snapshot, table, row, start, end, row_start):
         self.snapshot, self.table, self.row = snapshot, table, row
         self.start, self.end = start, end
+        # Where this unit begins within the row itself. The renderer cuts the row from its own
+        # start, so handing it an offset measured from the selected range instead returned the
+        # row's opening characters for a match anywhere else in it.
+        self.within = start - row_start
 
     def size(self, offset):
         return max(0, (self.end - self.start) - offset)
@@ -427,27 +471,46 @@ class _Row:
     def take(self, offset, limit=None):
         span = self.end - self.start
         length = span - offset if limit is None else min(limit, span - offset)
+        whole = self.table['row_ranges'][self.row]
         return {'kind': 'row', 'table': self.table, 'row': self.row,
                 'position': position(self.snapshot, self.start + offset),
-                'offset': offset, 'length': length, 'complete': offset == 0 and length == span}
+                'offset': self.within + offset, 'length': length,
+                'complete': self.within + offset == 0 and length == whole[2] - whole[1]}
 
 
 def _units(snapshot, start_offset, stop_offset):
+    """Split the selected range into the pieces a page is built from, in reading order.
+
+    The canonical text joins blocks with a newline, so that separator is a character of the
+    document like any other; leaving it in no unit made a range covering only it return nothing
+    while reporting the range complete.
+    """
     starts = _starts(snapshot)
+    blocks = snapshot.data['blocks']
     units = []
-    for index, block in enumerate(snapshot.data['blocks']):
-        low, high = max(starts[index], start_offset), min(starts[index] + len(block['text']), stop_offset)
-        if high <= low and not (low == high == start_offset and start_offset < stop_offset):
-            continue
+    for index, block in enumerate(blocks):
+        begin = starts[index]
+        end = begin + len(block['text'])
+        separator = end if index + 1 < len(blocks) else None
+        low, high = max(begin, start_offset), min(end, stop_offset)
+        empty = low == high == start_offset and start_offset < stop_offset
         if block['kind'] != 'grid':
-            units.append(_Prose(snapshot, index, block['text'][low - starts[index]:high - starts[index]], low))
+            reach = min(end if separator is None else separator + 1, stop_offset)
+            if reach > low or empty:
+                text = block['text'][low - begin:high - begin]
+                if separator is not None and reach > end:
+                    text += '\n'
+                units.append(_Prose(snapshot, index, text, low))
             continue
-        table = next(t for t in snapshot.data['tables'] if t['table_id'] == block['table_id'])
-        for row, begin, finish in table['row_ranges']:
-            first, last = max(starts[index] + begin, low), min(starts[index] + finish, high)
-            if last < first:
-                continue
-            units.append(_Row(snapshot, table, row, first, last))
+        if high > low or empty:
+            table = next(t for t in snapshot.data['tables'] if t['table_id'] == block['table_id'])
+            for row, first, last in table['row_ranges']:
+                lo, hi = max(begin + first, low), min(begin + last, high)
+                if hi < lo:
+                    continue
+                units.append(_Row(snapshot, table, row, lo, hi, begin + first))
+        if separator is not None and start_offset <= end < stop_offset:
+            units.append(_Prose(snapshot, index, '\n', end))
     return units
 
 
@@ -473,8 +536,7 @@ def _render_row(table, row, offset, length):
     return row_text(table, row, fields) + '  …'
 
 
-def _read_result(snapshot, taken, context):
-    context = context or {}
+def _read_result(snapshot, taken):
     segments, current = [], None
     for piece in taken:
         if piece['kind'] == 'text':
@@ -499,14 +561,6 @@ def _read_result(snapshot, taken, context):
         segment['context_truncated'] = True
         segment['context_next_position'] = position(
             snapshot, _starts(snapshot)[table['block']] + table['row_ranges'][0][1])
-        opening = context.get(segment['table_id'])
-        if opening is None:
-            continue
-        segment['context_rows'], segment['context_truncated'], following = opening
-        if following is None:
-            segment.pop('context_next_position', None)
-        else:
-            segment['context_next_position'] = following
     return dict(_envelope(snapshot, 'read'), segments=segments)
 
 
@@ -546,43 +600,56 @@ def _detail(snapshot, result, budget, as_json):
                 segment.pop(key)
 
 
-def _context(snapshot, taken, budget, as_json):
+def _context(snapshot, result, taken, budget, as_json):
     """Carry a table's opening rows when the page starts partway into it.
 
     Never a reason to fail: the body is the work and the opening rows are a convenience, so
     whatever fits goes in and the rest is reported as truncated with a position to continue from.
     """
-    added = {}
+    starts = _starts(snapshot)
+    segments = {s['table_id']: s for s in result['segments']
+                if s['kind'] == 'grid' and s.get('context_truncated')}
+    done = set()
     for piece in taken:
         if piece['kind'] != 'row' or piece['row'] == 0:
             continue
         table = piece['table']
-        if table['table_id'] in added:
+        segment = segments.get(table['table_id'])
+        if segment is None or table['table_id'] in done:
             continue
-        if any(other['kind'] == 'row' and other['table'] is table and other['row'] < piece['row']
-               for other in taken):
-            continue
+        done.add(table['table_id'])
         # Sequential, not shared out: reading order is document order, so the table met first
         # takes its share and a later one on the same page may get none.
-        floor = measure(_read_result(snapshot, taken, added), as_json)
+        floor = measure(result, as_json)
         ceiling = floor + int(max(0, budget - floor) * CONTEXT_SHARE)
-        chosen = None
-        for count in range(piece['row'] + 1):
-            rows = [{'row': row, 'text': row_text(table, row)} for row in range(count)]
-            truncated = count < piece['row']
-            following = (position(snapshot,
-                                  _starts(snapshot)[table['block']] + table['row_ranges'][count][1])
-                         if truncated else None)
-            trial = dict(added)
-            trial[table['table_id']] = (rows, truncated, following)
-            # Even saying that the opening rows were left out costs output, so that statement
-            # has to fit too. Where it does not, the page carries body alone.
-            if measure(_read_result(snapshot, taken, trial), as_json) > ceiling:
+        rows, count = [], 0
+        for row in range(piece['row']):
+            candidate = [*rows, {'row': row, 'text': row_text(table, row)}]
+            segment['context_rows'] = candidate
+            if measure(result, as_json) > ceiling:
                 break
-            chosen = (rows, truncated, following)
-        if chosen is not None:
-            added[table['table_id']] = chosen
-    return added
+            rows, count = candidate, row + 1
+        segment['context_rows'] = rows
+        if count < piece['row']:
+            # The first row that does not fit whole can still contribute what does: a table whose
+            # opening row is long would otherwise carry nothing at all.
+            whole = row_text(table, count)
+            low, high = 0, len(whole)
+            while low < high:
+                middle = (low + high + 1) // 2
+                segment['context_rows'] = [*rows, {'row': count, 'text': whole[:middle] + '  \u2026'}]
+                if measure(result, as_json) <= ceiling:
+                    low = middle
+                else:
+                    high = middle - 1
+            segment['context_rows'] = ([*rows, {'row': count, 'text': whole[:low] + '  \u2026'}]
+                                       if low else rows)
+        segment['context_truncated'] = count < piece['row']
+        if count >= piece['row']:
+            segment.pop('context_next_position', None)
+        else:
+            segment['context_next_position'] = position(
+                snapshot, starts[table['block']] + table['row_ranges'][count][1])
 
 
 # --- table ----------------------------------------------------------------------------------

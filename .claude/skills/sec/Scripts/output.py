@@ -58,6 +58,10 @@ def _grid_lines(segment):
         lines.extend(row['text'] for row in segment['context_rows'])
     elif segment.get('context_truncated'):
         lines.append('context_rows: none fitted this budget')
+    if segment.get('context_next_position'):
+        # Saying the opening rows were cut without saying where to read the rest leaves the
+        # reader knowing something is missing and unable to fetch it.
+        lines.append(f"context_next_position: {segment['context_next_position']}")
     lines.extend(row['text'] for row in segment.get('rows', []))
     for note in segment.get('footnotes', []):
         lines.append(f"footnote: {note['text']}")

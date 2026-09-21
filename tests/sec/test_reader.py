@@ -12,7 +12,7 @@ from store import Store
 
 FIXTURES = Path(__file__).parent / 'fixtures' / 'documents'
 NBIS = 'https://www.sec.gov/Archives/edgar/data/1513845/000110465926094844/nbis-20260812xex99d2.htm'
-BUDGETS = (1024, 12000, 24000)
+BUDGETS = (2000, 12000, 24000)
 
 
 def build(tmp_path, body, url=NBIS, headers=None):
@@ -126,7 +126,7 @@ def test_a_page_that_cannot_hold_one_row_splits_inside_the_row(tmp_path):
             '<tr><td>Total</td><td>43</td></tr></table>').encode()
     snapshot, store = build(tmp_path, body)
     collected = pages(lambda cursor: reader.table(snapshot, store, table_id='table-0',
-                                                  cursor=cursor, budget=1024))
+                                                  cursor=cursor, budget=reader.MIN_BUDGET))
     assert len(collected) > 1
     joined = ''.join(row['text'] for page in collected for row in page['table']['rows'])
     assert 'X' * 3000 in joined
@@ -144,7 +144,7 @@ def test_a_match_position_reads_back_the_match_it_named(nbis):
 
 def test_find_reports_how_many_matches_there_are_not_only_this_page(nbis):
     snapshot, store = nbis
-    result = reader.find(snapshot, store, query='Net income', budget=1024)
+    result = reader.find(snapshot, store, query='Net income', budget=reader.MIN_BUDGET)
     assert result['total_matches'] > len(result['items'])
     assert result['has_more'] is True
 
@@ -185,11 +185,11 @@ def test_opening_rows_are_never_the_reason_a_page_fails(nbis):
     # body still succeeds, reporting that no opening row fitted.
     snapshot, store = nbis
     match = reader.find(snapshot, store, query='Issuance of pre-funded warrants')['items'][0]
-    result = reader.read(snapshot, store, position=match['position'], budget=1024)
+    result = reader.read(snapshot, store, position=match['position'], budget=reader.MIN_BUDGET)
     segment = next(s for s in result['segments'] if s['kind'] == 'grid')
     assert segment['rows']
     assert segment['context_truncated'] is True
-    assert result['returned_chars'] <= 1024
+    assert result['returned_chars'] <= reader.MIN_BUDGET
 
 
 def test_the_next_position_never_goes_back_to_a_repeated_opening_row(nbis):
@@ -251,3 +251,106 @@ def test_provenance_survives_being_reloaded_in_another_process(tmp_path, nbis_by
     reloaded = load_snapshot(Store(tmp_path / 'cache'), snapshot.id)
     assert reloaded.data['source']['fetched_at'] == '2026-09-21T15:32:05.719290+00:00'
     assert reloaded.data['source']['content_type'] == 'text/html'
+
+
+# --- what the independent review of the pager found -----------------------------------------
+
+
+def test_a_position_inside_a_row_reads_from_there_not_from_the_row_start(nbis):
+    # The unit's offset was relative to the selected range while the renderer read it as relative
+    # to the row, so a match in a later column came back as the row's opening characters.
+    snapshot, store = nbis
+    match = next(item for item in reader.find(snapshot, store, query='2,000.0')['items']
+                 if item.get('table_id') == 'table-7')
+    excerpt = reader.read(snapshot, store, position=match['position'], end=match['match_end'])
+    assert '2,000.0' in render(excerpt, False)
+
+
+def test_every_cell_of_a_row_reads_back_the_text_its_position_named(tmp_path):
+    snapshot, store = build(tmp_path, b'<table><tr><td>alpha</td><td>beta</td><td>gamma</td></tr></table>')
+    for query in ('alpha', 'beta', 'gamma'):
+        match = reader.find(snapshot, store, query=query)['items'][0]
+        excerpt = reader.read(snapshot, store, position=match['position'], end=match['match_end'])
+        assert query in render(excerpt, False), query
+
+
+def test_the_separator_between_two_blocks_is_part_of_the_document(tmp_path):
+    # The canonical text joins blocks with a newline. A range covering only that newline used to
+    # return nothing at all while reporting the range complete.
+    snapshot, store = build(tmp_path, b'<p>first</p><p>second</p>')
+    match = reader.find(snapshot, store, query='\n')['items'][0]
+    excerpt = reader.read(snapshot, store, position=match['position'], end=match['match_end'])
+    assert excerpt['scope_complete'] is True
+    assert sum(len(s.get('text', '')) for s in excerpt['segments'] if s['kind'] == 'text') == 1
+
+
+@pytest.mark.parametrize('as_json', [False, True])
+def test_a_page_that_reports_more_to_come_returns_something(nbis, as_json):
+    # A zero-length unit could fill the page on its own, so the body was empty while has_more
+    # said to keep going.
+    snapshot, store = nbis
+    total = reader._starts(snapshot)[-1]
+    for offset in range(0, total, max(1, total // 120)):
+        page = reader.read(snapshot, store, position=reader.position(snapshot, offset),
+                           budget=reader.MIN_BUDGET, as_json=as_json)
+        if not page['has_more']:
+            continue
+        body = sum(len(s.get('text', '')) for s in page['segments'] if s['kind'] == 'text')
+        body += sum(len(row['text']) for s in page['segments'] if s['kind'] == 'grid' for row in s['rows'])
+        assert body > 0, f'empty page at {offset}'
+
+
+@pytest.mark.parametrize('name', ['nbis.html', 'apple.html', 'mrvl.html'])
+@pytest.mark.parametrize('as_json', [False, True])
+def test_a_whole_document_pages_to_the_end_without_failing_part_way(tmp_path, name, as_json):
+    # Failing on a continuation is the one thing the budget contract forbids: a selection that
+    # cannot make progress has to say so on the first call.
+    metadata = json.loads((FIXTURES / 'provenance.json').read_text())[name]
+    body = gzip.decompress((FIXTURES / metadata['storage']).read_bytes())
+    snapshot, store = build(tmp_path, body, url=metadata['url'])
+    cursor, seen = None, 0
+    while True:
+        page = reader.read(snapshot, store, cursor=cursor, budget=reader.MIN_BUDGET, as_json=as_json)
+        seen += 1
+        cursor = page['next_cursor']
+        if not cursor:
+            break
+        assert seen < 4000, 'pagination did not finish'
+    assert page['scope_complete'] is True
+
+
+def test_an_outline_pages_to_the_end_at_the_smallest_budget(tmp_path):
+    metadata = json.loads((FIXTURES / 'provenance.json').read_text())['mrvl.html']
+    body = gzip.decompress((FIXTURES / metadata['storage']).read_bytes())
+    snapshot, store = build(tmp_path, body, url=metadata['url'])
+    cursor = None
+    for _ in range(4000):
+        page = reader.outline(snapshot, store, kinds=('emphasis',), cursor=cursor,
+                              budget=reader.MIN_BUDGET)
+        cursor = page['next_cursor']
+        if not cursor:
+            return
+    raise AssertionError('pagination did not finish')
+
+
+def test_the_text_output_says_where_the_rest_of_the_opening_rows_are(nbis):
+    # Reporting that the opening rows were cut, without the address to continue from, leaves the
+    # reader knowing something is missing and unable to fetch it.
+    snapshot, store = nbis
+    match = reader.find(snapshot, store, query='Issuance of pre-funded warrants')['items'][0]
+    result = reader.read(snapshot, store, position=match['position'], budget=reader.MIN_BUDGET)
+    segment = next(s for s in result['segments'] if s['kind'] == 'grid')
+    assert segment['context_truncated'] is True
+    assert segment['context_next_position'] in render(result, False)
+
+
+def test_an_opening_row_too_long_to_fit_whole_contributes_what_it_can(tmp_path):
+    body = ('<table><tr><td>' + 'H' * 2000 + '</td></tr><tr><td>body</td></tr></table>').encode()
+    snapshot, store = build(tmp_path, body)
+    table = snapshot.data['tables'][0]
+    start = reader.position(snapshot, reader._starts(snapshot)[table['block']] + table['row_ranges'][1][1])
+    result = reader.read(snapshot, store, position=start, budget=2400)
+    segment = next(s for s in result['segments'] if s['kind'] == 'grid')
+    assert segment['context_rows'], 'no part of the opening row was carried'
+    assert segment['context_truncated'] is True
+    assert result['returned_chars'] <= 2400
