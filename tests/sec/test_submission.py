@@ -65,7 +65,7 @@ def test_every_document_of_a_seven_document_submission_is_recovered():
         'EXHIBIT 21 SUBSIDIARIES OF APPLE COMPUTE',
         '<TABLE> <S> <C> <ARTICLE> 5 <MULTIPLIER>',
     ]
-    assert [len(d['text']) for d in documents] == [196626, 36753, 22670, 10282, 1592, 536, 1034]
+    assert [len(d['text']) for d in documents] == [196627, 36762, 22671, 10293, 1592, 538, 1034]
 
 
 def test_the_wrapper_around_the_documents_is_kept_rather_than_discarded():
@@ -136,3 +136,34 @@ def test_offsets_are_character_offsets_into_the_decoded_text():
     document, = split_documents(body)
     assert body[document['text_start']:document['text_end']] == document['text']
     assert '€8.8 billion' in document['text']
+
+
+# --- what the independent review of these parsers found -------------------------------------
+
+
+def test_the_body_keeps_the_blank_lines_it_opens_with():
+    # The <TEXT> matcher's \s* ran past the end of its own line and ate the indentation the
+    # document opens with. In Apple's 1996 filing every exhibit begins with blank lines and tabs.
+    text = original('holdout', 'apple-1996.txt')
+    documents = split_documents(text)
+    assert documents[1]['text'].startswith('\n\t\t\t\t\t\t\t\t\n\t\tEXHIBIT 10.A.5')
+    for document in documents:
+        assert text[document['text_start']:document['text_end']] == document['text']
+
+
+def test_a_closing_pair_inside_one_document_is_reported_rather_than_split_on():
+    # The check only looked after the last document, so an ambiguous body followed by a real
+    # second document was accepted and the first document lost everything after the false end.
+    body = ('<DOCUMENT>\n<TYPE>EX-1\n<TEXT>\nbefore\n</TEXT>\n</DOCUMENT>\n'
+            'still the first document\n</TEXT>\n</DOCUMENT>\n'
+            '<DOCUMENT>\n<TYPE>EX-2\n<TEXT>\nsecond\n</TEXT>\n</DOCUMENT>\n')
+    with pytest.raises(SecError) as error:
+        split_documents(body)
+    assert error.value.code == 'parse_failed'
+
+
+def test_carriage_returns_do_not_hide_a_boundary():
+    body = '<DOCUMENT>\r\n<TYPE>EX-1\r\n<TEXT>\r\nbody\r\n</TEXT>\r\n</DOCUMENT>\r\n'
+    document, = split_documents(body)
+    assert document['document_type'] == 'EX-1'
+    assert 'body' in document['text']

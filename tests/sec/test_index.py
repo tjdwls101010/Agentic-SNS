@@ -123,3 +123,17 @@ def test_a_page_with_no_attachment_table_is_an_error():
     with pytest.raises(SecError) as error:
         table('<p>Not an index page.</p>')
     assert error.value.code == 'parse_failed'
+
+
+def test_a_row_longer_than_its_header_is_an_error_rather_than_a_guess():
+    # Only short rows were refused, so an extra cell shifted every field after it and the row
+    # came back with another column's value under the wrong name.
+    with pytest.raises(SecError) as error:
+        table("""
+            <table class="tableFile">
+              <tr><th>Seq</th><th>Description</th><th>Document</th><th>Type</th><th>Size</th></tr>
+              <tr><td>1</td><td>Report</td><td><a href="a.htm">a.htm</a></td><td>EXTRA</td>
+                  <td>10</td><td>5</td></tr>
+            </table>
+        """)
+    assert error.value.code == 'parse_failed'

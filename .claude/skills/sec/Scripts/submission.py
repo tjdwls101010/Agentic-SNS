@@ -15,6 +15,11 @@ from output import SecError
 FIELDS = {'TYPE': 'document_type', 'SEQUENCE': 'sequence', 'FILENAME': 'filename',
           'DESCRIPTION': 'description'}
 FIELD = re.compile(r'^<([A-Z][A-Z0-9-]*)>(.*)$')
+# A tag that stands alone on its line, and nothing past the end of that line. Matching trailing
+# whitespace with \s* runs on through blank lines, which ate the indentation every exhibit in a
+# 1996 filing opens with.
+ALONE = {name: re.compile(rf'^<{name}>[^\S\r\n]*\r?$', re.MULTILINE)
+         for name in ('DOCUMENT', '/DOCUMENT', 'TEXT', '/TEXT')}
 
 
 def _fail(message, fix='Read the original submission text file; no document was reconstructed by guessing.'):
@@ -29,7 +34,7 @@ def split_documents(text):
     """
     documents = []
     position = 0
-    starts = [match.start() for match in re.finditer(r'^<DOCUMENT>\s*$', text, re.MULTILINE)]
+    starts = [match.start() for match in ALONE['DOCUMENT'].finditer(text)]
     if not starts:
         _fail('No <DOCUMENT> boundary was found in this submission text file.')
     for start in starts:
@@ -37,25 +42,34 @@ def split_documents(text):
             _fail('A <DOCUMENT> boundary was found inside another document.')
         document, position = _one(text, start)
         documents.append(document)
-    trailing = re.search(r'^</(?:DOCUMENT|TEXT)>\s*$', text[position:], re.MULTILINE)
-    if trailing:
-        # A body that itself contains the closing sequence cannot be told from a real end by a
-        # line-oriented reader. Saying so is honest; picking one reading is not.
-        _fail('A closing document tag appears outside any open document.')
+    # Every gap between documents, not only the tail: a body that repeats the closing sequence
+    # and is then followed by a real document used to pass, with the first document truncated at
+    # the false end. A line-oriented reader cannot tell the two apart, so it says so rather than
+    # choosing one reading.
+    edges = [(0, documents[0]['start'])] if documents else []
+    edges += [(documents[i]['end'], documents[i + 1]['start']) for i in range(len(documents) - 1)]
+    edges.append((documents[-1]['end'], len(text)) if documents else (0, len(text)))
+    for low, high in edges:
+        gap = text[low:high]
+        if ALONE['/DOCUMENT'].search(gap) or ALONE['/TEXT'].search(gap):
+            _fail('A closing document tag appears outside any open document.')
     return documents
 
 
 def _one(text, start):
-    header_end = re.compile(r'^<TEXT>\s*$', re.MULTILINE).search(text, start)
-    close = re.compile(r'^</DOCUMENT>\s*$', re.MULTILINE).search(text, start)
+    header_end = ALONE['TEXT'].search(text, start)
+    close = ALONE['/DOCUMENT'].search(text, start)
     if header_end is None or close is None or header_end.start() > close.start():
         _fail('A <DOCUMENT> in this submission is not closed, or has no <TEXT> body.')
-    body_end = re.compile(r'^</TEXT>\s*$', re.MULTILINE).search(text, header_end.end())
+    body_end = ALONE['/TEXT'].search(text, header_end.end())
     if body_end is None or body_end.start() > close.start():
         _fail('A document body is not closed by </TEXT> before its </DOCUMENT>.')
 
+    # The body begins after the newline that ends the <TEXT> line, and ends before the newline
+    # that begins the </TEXT> line.
+    opening = header_end.end() + 1 if text[header_end.end():header_end.end() + 1] == '\n' else header_end.end()
     record = {'start': start, 'end': close.end(),
-              'text_start': header_end.end(), 'text_end': body_end.start()}
+              'text_start': opening, 'text_end': body_end.start()}
     record['text'] = text[record['text_start']:record['text_end']]
     for name in FIELDS.values():
         record[name] = None
