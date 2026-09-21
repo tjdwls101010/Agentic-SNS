@@ -34,5 +34,32 @@
     "sha256": "2ebb18195e6b3d2c390bb0f0222ad6aaf61a4f72aebb6cdc7e2633f0798ab960",
     "copied_verbatim_from": ".tmp/edgartools/data/sgml/0000950129-95-001652.txt",
     "note": "Complete SEC submission, EDGAR accession/CIK verified in SEC-HEADER. Local edgartools fixture; not fetched in this turn."
+  },
+  "nbis.html": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1513845/000110465926094844/nbis-20260812xex99d2.htm",
+    "sha256": "1966054bd1f444b57072af8a27675d1471742faea517ff9e727a3b8119497b4b",
+    "fetched_at": "2026-09-21T15:32:05.719290+00:00",
+    "content_type": "text/html",
+    "accession": "0001104659-26-094844",
+    "form": "6-K",
+    "exhibit": "EX-99.2",
+    "storage": "nbis.html.gz",
+    "compression": "gzip",
+    "stored_sha256": "dc5970f0f10a631b9b3a13629e07c8ed7d586bbea62a250e0bfa57a180ddbb58",
+    "original_bytes": 1602539,
+    "stored_bytes": 73255
+  },
+  "mrvl.html": {
+    "url": "https://www.sec.gov/Archives/edgar/data/1835632/000183563226000025/mrvl-20260801.htm",
+    "sha256": "7e787eb1c598de9572d166ed160fa6155528af322968900b9de3bfad9f9d69cd",
+    "fetched_at": "2026-09-21T15:32:06.778677+00:00",
+    "content_type": "text/html",
+    "accession": "0001835632-26-000025",
+    "form": "10-Q",
+    "storage": "mrvl.html.gz",
+    "compression": "gzip",
+    "stored_sha256": "d313bc9b96be655f0bf4fb71b9602d2ce7fc4c14172c6045c0b4ce007f3aff4a",
+    "original_bytes": 2026559,
+    "stored_bytes": 148758
   }
 }
