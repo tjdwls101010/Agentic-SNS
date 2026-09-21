@@ -259,3 +259,52 @@ def test_a_pipe_or_newline_inside_a_cell_is_escaped_only_in_the_text_rendering()
     table = table_of('<table><tr><td>a|b</td><td>c\\d</td></tr></table>')
     assert 'a|b' in table['text'] and 'c\\d' in table['text']
     assert render_rows(table, [0]) == '0|a\\|b|c\\\\d'
+
+
+# --- the row-group boundaries a browser applies and this once did not -------------------------
+
+
+def test_a_positive_rowspan_stops_at_the_end_of_its_row_group():
+    # Its occupancy used to survive into the next tbody, pushing that group's first cell into
+    # column 1 and so under the wrong label.
+    table = table_of("""
+        <table>
+          <tbody><tr><td rowspan="2">A</td><td>a</td></tr></tbody>
+          <tbody><tr><td>B</td></tr></tbody>
+        </table>
+    """)
+    cells = {(c['row'], c['column']): table['text'][c['text_start']:c['text_end']] for c in table['cells']}
+    assert cells[(1, 0)] == 'B'
+    assert table['text'] == 'A\ta\nB'
+    assert next(s for s in table['spans'] if s['row'] == 0)['effective_rows'] == 1
+
+
+def test_a_footer_group_declared_early_is_still_read_last():
+    # The HTML table model defers tfoot, so source order is not the order a reader sees.
+    table = table_of('<table><tfoot><tr><td>F</td></tr></tfoot><tbody><tr><td>B</td></tr></tbody></table>')
+    assert table['text'] == 'B\nF'
+
+
+def test_an_empty_row_group_still_ends_the_run_of_rows_before_it():
+    table = table_of('<table><tr><td rowspan="0">A</td></tr><tbody></tbody><tr><td>B</td></tr></table>')
+    cells = {(c['row'], c['column']): table['text'][c['text_start']:c['text_end']] for c in table['cells']}
+    assert cells[(1, 0)] == 'B'
+    assert next(s for s in table['spans'] if s['row'] == 0)['effective_rows'] == 1
+
+
+def test_an_image_keeps_its_column_even_when_no_link_identity_was_supplied():
+    # Emptiness was inferred from a resolved link id, so a caller without that mapping lost a
+    # whole column of charts with nothing recording that it had been there.
+    table = table_of('<table><tr><td>a</td><td><img src="c.jpg"/></td></tr></table>')
+    assert table['kept_columns'] == [0, 1]
+    assert next(c for c in table['cells'] if c['column'] == 1)['nonempty_reason'] == 'image'
+    assert 'links' not in next(c for c in table['cells'] if c['column'] == 1)
+
+
+def test_a_grid_too_large_to_assemble_fails_instead_of_expanding():
+    # 4,096 columns of tab padding times an unbounded row count turns a small document into
+    # millions of characters; the largest table in the tuning set has 65 rows.
+    with pytest.raises(SecError) as error:
+        table_of('<table>' + '<tr>' + ''.join(f'<td>{i}</td>' for i in range(600)) + '</tr>'
+                 + '<tr><td>x</td></tr>' * 600 + '</table>')
+    assert error.value.code == 'parse_failed'

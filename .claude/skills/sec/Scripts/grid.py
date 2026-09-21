@@ -13,6 +13,10 @@ from snapshot import cell_text
 # Wider than any table a filing lays out; past this a span value is a typo rather than a layout,
 # and expanding it would allocate a row of nothing per column.
 MAX_COLUMNS = 4096
+# Every row emits one field per kept column, so width and row count multiply. The largest table
+# in the tuning set is 65 rows by 19 columns; this stops a malformed span from turning a small
+# document into millions of characters of padding.
+MAX_GRID_CELLS = 200_000
 
 CELL_TAGS = ('td', 'th')
 ROW_GROUP_TAGS = ('thead', 'tbody', 'tfoot')
@@ -37,7 +41,7 @@ def _span(cell, name, lowest):
     return value
 
 
-def _parts_of(cell, table_ids, link_ids):
+def _parts_of(cell, table_ids, link_ids, skip):
     """Split a cell into its own text and the child tables that interrupt it.
 
     A child table's strings stay in the child. Copying them up would make the parent report
@@ -60,14 +64,15 @@ def _parts_of(cell, table_ids, link_ids):
                 if child.tail:
                     pending.append(child.tail)
                 continue
-            if tag in SKIP_TAGS or not isinstance(child.tag, str):
+            if tag in SKIP_TAGS or tag in skip or not isinstance(child.tag, str):
                 if child.tail:
                     pending.append(child.tail)
                 continue
             if tag == 'img':
-                identifier = link_ids.get(child)
-                if identifier is not None:
-                    images.append(identifier)
+                # The image itself decides that this cell is not blank. Deciding it from a
+                # resolved link identity instead deletes a column of charts whenever the caller
+                # has no link mapping, and leaves nothing recording that the column existed.
+                images.append(link_ids.get(child))
             if tag in SPACING_TAGS:
                 pending.append(' ')
             if child.text:
@@ -85,27 +90,36 @@ def _parts_of(cell, table_ids, link_ids):
     return parts, images
 
 
-def _place(node):
-    """Walk the table's own rows and place each cell, honouring spans already in the way."""
-    rows, groups = [], []
+def _row_groups(node):
+    """Return this table's row groups in reading order, each as its list of rows.
+
+    A run of <tr> written straight under <table> is one implicit group, and any explicit group
+    ends that run even when the group itself is empty. Footer groups come last however early
+    they are declared, because that is the order the document is read in.
+    """
+    groups, implicit = [], None
     for element in node.iterchildren():
         tag = str(element.tag).lower() if isinstance(element.tag, str) else ''
         if tag == 'tr':
-            rows.append(element)
-            groups.append(None)
+            if implicit is None:
+                implicit = {'rows': [], 'footer': False}
+                groups.append(implicit)
+            implicit['rows'].append(element)
         elif tag in ROW_GROUP_TAGS:
-            for row in element.iterchildren():
-                if isinstance(row.tag, str) and str(row.tag).lower() == 'tr':
-                    rows.append(row)
-                    groups.append(element)
-    # A row outside any thead/tbody/tfoot belongs to one implicit group, so rowspan=0 stops
-    # where that run of rows stops rather than at the end of the table.
-    group_end = {}
-    for index, group in enumerate(groups):
-        group_end[index] = index
-    for index in range(len(rows) - 1, -1, -1):
-        if index + 1 < len(rows) and groups[index + 1] is groups[index]:
-            group_end[index] = group_end[index + 1]
+            implicit = None
+            rows = [row for row in element.iterchildren()
+                    if isinstance(row.tag, str) and str(row.tag).lower() == 'tr']
+            groups.append({'rows': rows, 'footer': tag == 'tfoot'})
+    return [g for g in groups if not g['footer']] + [g for g in groups if g['footer']]
+
+
+def _place(node):
+    """Walk the table's own rows and place each cell, honouring spans already in the way."""
+    rows, group_end = [], []
+    for group in _row_groups(node):
+        last = len(rows) + len(group['rows']) - 1
+        rows.extend(group['rows'])
+        group_end.extend([last] * len(group['rows']))
 
     occupied = {}
     placed = []
@@ -118,8 +132,10 @@ def _place(node):
             colspan = _span(cell, 'colspan', 1)
             while occupied.get(column, -1) >= r:
                 column += 1
-            height = (group_end[r] - r + 1) if rowspan == 0 else rowspan
-            last = r + height - 1
+            # A span ends where its row group ends, whether it asked for the rest of the group
+            # or for more rows than the group has. Letting it run on holds ground in the next
+            # group and pushes that group's first cell under the wrong label.
+            last = group_end[r] if rowspan == 0 else min(r + rowspan - 1, group_end[r])
             if column + colspan > MAX_COLUMNS:
                 _fail('A table row reaches beyond the supported column count.',
                       'Read the original table; no column was dropped to make it fit.')
@@ -129,20 +145,26 @@ def _place(node):
                           'Read the original table; neither cell was moved aside or overwritten.')
                 occupied[c] = last
             placed.append({'node': cell, 'row': r, 'column': column, 'rowspan': rowspan,
-                           'colspan': colspan, 'effective_rows': height})
+                           'colspan': colspan, 'effective_rows': last - r + 1})
             column += colspan
     return rows, placed
 
 
-def build_table(node, table_id, *, table_ids=None, link_ids=None, parent=None):
-    """Return the stored record for one table: placement, folding, canonical text and spans."""
+def build_table(node, table_id, *, table_ids=None, link_ids=None, parent=None, coords=None, skip_tags=None):
+    """Return the stored record for one table: placement, folding, canonical text and spans.
+
+    `coords`, when given, is filled with cell element -> (row, column) so a caller can place
+    an anchor or a nested table at the cell it actually sits in.
+    """
     table_ids = table_ids or {}
     link_ids = link_ids or {}
     rows, placed = _place(node)
+    if coords is not None:
+        coords.update({cell['node']: (cell['row'], cell['column']) for cell in placed})
     columns = max((c['column'] + c['colspan'] for c in placed), default=0)
 
     for cell in placed:
-        parts, images = _parts_of(cell['node'], table_ids, link_ids)
+        parts, images = _parts_of(cell['node'], table_ids, link_ids, skip_tags or frozenset())
         cell['parts'] = parts
         cell['images'] = images
         cell['has_text'] = any(part['kind'] == 'text' for part in parts)
@@ -153,6 +175,9 @@ def build_table(node, table_id, *, table_ids=None, link_ids=None, parent=None):
     # whole table must not keep alive the columns its own row leaves empty.
     kept = sorted({c['column'] for c in placed if c['has_text'] or c['reason']})
     position = {column: index for index, column in enumerate(kept)}
+    if len(rows) * max(len(kept), 1) > MAX_GRID_CELLS:
+        _fail('This table is too large to assemble as a grid.',
+              'Read the original table; no rows or columns were dropped to make it fit.')
 
     origin = {(c['row'], c['column']): c for c in placed}
     pieces, ranges, cells, spans = [], [], [], []
@@ -202,8 +227,9 @@ def build_table(node, table_id, *, table_ids=None, link_ids=None, parent=None):
                 record[attribute] = cell['node'].get(attribute)
         if cell['reason']:
             record['nonempty_reason'] = cell['reason']
-        if cell['images']:
-            record['links'] = cell['images']
+        known = [identifier for identifier in cell['images'] if identifier is not None]
+        if known:
+            record['links'] = known
         if any(part['kind'] == 'child_table' for part in cell['parts']):
             detail, cursor = [], record['text_start']
             for part in cell['parts']:
@@ -241,7 +267,10 @@ def row_text(table, row, fragments=None):
     The escapes and the row number are display only: they are not in the canonical text and so
     never move a position.
     """
-    start, end = next(((s, e) for r, s, e in table['row_ranges'] if r == row), (0, 0))
+    # row_ranges is built in row order, so the row number indexes it; scanning for it made
+    # rendering a long table quadratic in its row count.
+    entry = table['row_ranges'][row] if 0 <= row < len(table['row_ranges']) else None
+    start, end = (entry[1], entry[2]) if entry and entry[0] == row else (0, 0)
     fields = table['text'][start:end].split('\t') if end > start else []
     fields += [''] * (len(table['kept_columns']) - len(fields))
     if fragments:

@@ -1,7 +1,6 @@
 """Format detection, encoding, normalization and provenance of a saved reading snapshot."""
 
 import pytest
-
 from snapshot import cell_text, collapse
 
 
