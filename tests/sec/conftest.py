@@ -7,7 +7,6 @@ import json
 
 import httpx
 import pytest
-
 from sec import main
 
 

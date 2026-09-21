@@ -14,16 +14,32 @@ from output import SecError
 TICKERS = "https://www.sec.gov/files/company_tickers_exchange.json"
 
 
+VALID_IDENTITY = re.compile(r"(?:[^\r\n]+\s+)?[^\s@]+@[^\s@]+\.[^\s@]+")
+
+
+def identity_state(env_file=None):
+    """Whether a usable requester identity is configured, and which file was consulted.
+
+    Never the value itself. An unreadable or absent file and a malformed value are different
+    problems with different fixes, so the source is reported when a file was actually read.
+    """
+    path = Path(env_file) if env_file else Path(__file__).with_name(".env")
+    value = (dotenv_values(path).get("EDGAR_IDENTITY", "") or "").strip()
+    if VALID_IDENTITY.fullmatch(value):
+        return {"configured": True, "source": str(path), "value": value}
+    return {"configured": False, "source": str(path) if path.exists() else None, "value": None}
+
+
 def identity(env_file=None):
-    value = dotenv_values(env_file or Path(__file__).with_name(".env")).get("EDGAR_IDENTITY", "") or ""
-    if not re.fullmatch(r"(?:[^\r\n]+\s+)?[^\s@]+@[^\s@]+\.[^\s@]+", value.strip()):
+    state = identity_state(env_file)
+    if not state["configured"]:
         raise SecError(
             "identity_required",
             "A valid requester email is required.",
             'Set EDGAR_IDENTITY="your-email@your-domain" in Scripts/.env or --env-file.',
         )
-    os.environ["EDGAR_IDENTITY"] = value.strip()
-    return value.strip()
+    os.environ["EDGAR_IDENTITY"] = state["value"]
+    return state["value"]
 
 
 def validate_url(url):
