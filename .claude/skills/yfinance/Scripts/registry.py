@@ -128,7 +128,12 @@ def effective_limit(args, item):
     return explicit if explicit is not None else (item.limit if item else None)
 
 
-OUT_HELP = "Write every row this observation received to a new CSV file (one target column, every digit and timestamp as saved) and print only a summary. The command's default window does not apply; an explicit --limit does. An existing file is never overwritten."
+OUT_HELP = ("Write this observation's rows to a new CSV file and print only a summary: every digit and timestamp as saved, one target column, "
+            "table indices as columns, option sides as side, mapping keys as key, lists of values as value, nested records as dotted columns, "
+            "other objects and lists as JSON cells, nulls as blank cells, and a name that would collide prefixed source. — read the returned columns. "
+            "The screen's default window and projection do not apply; an explicit --fields or --limit does. Commands that ask the source for a set number of rows "
+            "(news, screen, calendars) still ask for their default unless --limit raises it, and no further pages are fetched. "
+            "Targets with nothing selected add no rows and no file is made when none do, so check each target's status before comparing. An existing file is never overwritten.")
 
 
 def add_common(parser, selection=True, root=False):

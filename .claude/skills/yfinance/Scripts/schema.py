@@ -12,8 +12,8 @@ ENVELOPE = {
     "source_time": "the time the source itself put on this data, where it supplies one; after a close it can be hours before observed_at",
     "status": "see statuses",
     "conditions": "only the arguments this response carries evidence for: {requested, status: confirmed|not_applied|unverified, evidence}. A successful call is not evidence that a condition was applied",
-    "coverage": "received = rows the adapter returned, shown = rows printed, kept = which end a limit kept, truncated_by = leaf_default (this leaf's own window, status ok) or budget (your range did not fit, status partial), fields = how many of the available fields the projection kept",
-    "data": "the selected value; tables are {index, columns, data, index_names, column_names}",
+    "coverage": "received = rows the adapter returned, shown = rows printed (or written with --out), kept = which end a limit kept, truncated_by = leaf_default (this leaf's own window, status ok) or budget (your range did not fit, status partial), fields = how many of the available fields the projection kept",
+    "data": "the selected value; tables are {index, columns, data, index_names, column_names}. With --out: {out, rows, columns, first, last}, where rows is this target's share of the file and columns may become a count when the summary would not fit",
     "warnings": "limitations that affect how this data can be used",
     "error": "{code, message, fix}",
 }

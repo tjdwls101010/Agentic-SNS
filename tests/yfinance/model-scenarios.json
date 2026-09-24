@@ -43,5 +43,40 @@
     "id": "unplanned",
     "prompt": "yfinance로 엔비디아 내부자들이 최근 순매도인지 순매수인지 봐줘.",
     "expect": "Nothing in the rewrite targets this question, so it tests whether the contracts generalise rather than whether a known fix works. Pass requires: the model reaches an answer without getting stuck, reads the insider figures with their declared units, and states the limitation of what insider data covers. The specific verdict is not the criterion; getting there and bounding the claim is."
+  },
+  {
+    "id": "mdd",
+    "prompt": "yfinance로 애플(AAPL)과 SPY의 최근 5년 최대낙폭(MDD)과 연환산 변동성을 일간 데이터 기준으로 비교해줘. 계산 기간도 명시해.",
+    "expect": "Pass requires: both instruments, a five-year daily window ending within the last few trading days, MDD and annualised volatility computed from every daily row (about 1,250 per instrument), and the period stated."
+  },
+  {
+    "id": "growth-screen",
+    "prompt": "yfinance로 최근 분기 매출 성장률이 20% 이상인 시가총액 100억 달러 이상 미국 기술주를 스크리닝해줘. 적용된 조건도 알려줘.",
+    "expect": "The query growth bound is in percentage points. Pass requires: the growth threshold is written as 20 (not 0.2), the market-cap bound is 10,000,000,000, results are returned, and the conditions reported come from the result."
+  },
+  {
+    "id": "ko-dividend",
+    "prompt": "yfinance로 코카콜라(KO)의 배당수익률과 배당성향을 알려줘. 각 수치의 출처 필드도.",
+    "expect": "dividendYield is on a percent scale and payoutRatio on a ratio scale. Pass requires: both reported on the correct scale (yield about 2-4%, payout ratio as a percent near 60-80%), with source fields named."
+  },
+  {
+    "id": "msft-pe-trend",
+    "prompt": "yfinance로 마이크로소프트 PER이 지난 몇 년 동안 어떻게 변했는지 알려줘.",
+    "expect": "Pass requires: a multi-year P/E series from period data with dates, and the Current value described as a trailing snapshot rather than a completed period."
+  },
+  {
+    "id": "qqq-top10",
+    "prompt": "yfinance로 QQQ 상위 10개 보유종목의 비중과 각 종목의 최근 1년 주가 수익률을 표로 정리해줘.",
+    "expect": "Pass requires: ten holdings with weights on a sensible percent scale, one-year returns for each with the period and price basis stated, and symbols reused exactly as returned."
+  },
+  {
+    "id": "correlation",
+    "prompt": "yfinance로 애플(AAPL), 마이크로소프트(MSFT), SPY의 최근 3년 일간 수익률 상관계수를 계산해 줘. 계산에 쓴 기간과 표본 수도 알려줘.",
+    "expect": "Computes pairwise correlations from roughly three years of daily returns for all three. Pass requires: all three pairs reported, the period ends within the last few trading days and spans about three years, the sample count is stated and plausible (~750 returns), and the computation used every row (a file from --out or complete reads), not a screen-sized window."
+  },
+  {
+    "id": "date-close",
+    "prompt": "yfinance로 엔비디아(NVDA)의 최근 20거래일 날짜별 종가만 표로 보여줘.",
+    "expect": "A table of 20 recent trading dates with closing prices. Pass requires: 20 rows ending within the last few trading days, dates and closes paired correctly, and no more than one failed call."
   }
 ]

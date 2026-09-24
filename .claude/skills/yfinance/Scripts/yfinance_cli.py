@@ -43,6 +43,7 @@ def build_parser():
     reader.add_argument("id", help="Observation id from an earlier result.")
     reader.add_argument("--start", dest="row_start", type=int, default=0, help="Zero-based first row to return; each slice names the start of the next one.")
     registry.add_common(reader)
+    reader._option_string_actions["--limit"].help = "Maximum rows, counted forward from --start in saved order; unlike the first call, read does not keep the newest end. The same slice goes to --out."
     reader.add_argument("--out", help=registry.OUT_HELP)
     reader.set_defaults(leaf="")
 
@@ -108,6 +109,8 @@ def validate(args, item):
         if args.period and not re.fullmatch(r"([1-9][0-9]*(d|wk|mo|y)|ytd|max)", args.period):
             raise InputError("--period expects a positive range such as 5d, 1mo, 1y, ytd or max")
     if getattr(args, "out", None):
+        if args.list_fields:
+            raise InputError("--list-fields names columns and --out writes rows; use one of them.")
         export.check_path(args.out)
     if item.check:
         item.check(args)
@@ -274,6 +277,8 @@ def read(args, saved):
     envelope["_full"] = record["data"]
     results = [ordered(envelope)]
     if getattr(args, "out", None):
+        if args.list_fields:
+            raise InputError("--list-fields names columns and --out writes rows; use one of them.")
         export.check_path(args.out)
         write_out(results, {0: (args.id, *exported(record["data"], args, item))}, args)
         results[0].pop("continuation", None)

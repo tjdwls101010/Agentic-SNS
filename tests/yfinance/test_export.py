@@ -188,3 +188,10 @@ def test_a_stray_file_beside_the_destination_is_left_alone(cli, tmp_path):
     proc, doc = cli("prices", "history", "AAPL", "--period", "1mo", "--out", str(tmp_path / "p.csv"), routes=[chart("AAPL", [1.0, 2.0])])
     assert proc.returncode == 0, proc.stdout[:400]
     assert stray.read_text() == "not ours\n"
+
+
+def test_listing_fields_into_a_file_is_refused(cli, tmp_path):
+    """--list-fields names columns; a file of names would read as data."""
+    proc, doc = cli("prices", "history", "AAPL", "--list-fields", "--out", str(tmp_path / "f.csv"), routes=[])
+    assert proc.returncode == 2 and "--list-fields" in doc["results"][0]["error"]["message"]
+    assert not (tmp_path / "f.csv").exists()

@@ -21,7 +21,7 @@ Reuse returned symbols, expirations and keys exactly as they came back, in your 
 
 ## Screens are for reading; files are for computing
 
-A printed result is a window sized for reading, not the series. A question that needs every row — a drawdown, a volatility, a correlation, a total over a period — is computed from the file `--out FILE` writes, not from the rows on screen or from pages read one after another. The file holds every row the observation received, with every digit, one `target` column across targets; it does not fetch more than the command did, so set the range with the command's own arguments first. The skill's locked environment has pandas: `uv run --frozen --project "${CLAUDE_SKILL_DIR}/Scripts" python -c '…'`.
+A printed result is a window sized for reading, not the series: rows may be cut to fit and prices are printed to the precision Yahoo serves. A calculation over a period — a drawdown, a volatility, a correlation, a total — needs every row at full precision, which `--out FILE` writes: every row the observation received, one `target` column across targets. It fetches nothing more than the command did, so set the range with the command's own arguments first, and check that the file covers the period you are reporting. The skill's locked environment has pandas: `uv run --frozen --project "${CLAUDE_SKILL_DIR}/Scripts" python -c '…'`.
 
 ## Numbers arrive without their units
 
@@ -45,7 +45,7 @@ The adjustment applied decides what a closing price means, so adding dividends t
 
 Every command returns one screen by default and `coverage` states what that cost: how many rows arrived, how many were printed, and which end a limit kept. Read it rather than assuming the rows you can see are all there were.
 
-`partial` means the range you asked for was cut to fit the budget. Read the rest, compute from `--out`, or state the limitation in your answer; never describe a partial window as the whole period.
+`partial` means part of what you asked for is missing: rows cut to fit the budget, or targets that failed while others succeeded. Rows that were cut are saved and reachable; a failed target is not. Either complete it or state the limitation in your answer — never describe a partial result as the whole.
 
 A successful call is not evidence that a condition was applied. Where the response carries evidence, `conditions` reports each one as confirmed, not applied, or unverified; read that rather than assuming an argument took effect because rows came back. For the same reason, describe a named preset by the query the result carries, not by its name — a preset's name is not a statement of what it screens for.
 
@@ -55,4 +55,4 @@ An empty return and a null are observations of nothing usable, not measurements 
 
 `too_large` is a size condition, not an empty result, and it carries no partial table to summarize; the response is already saved under its `id`, so recovering it costs no new request.
 
-Follow an error's `fix` as written, including every target and store it names — dropping one turns a comparison into a single-instrument question. After rate limiting, stop rather than trying the remaining targets. State the coverage and limitations that affect the user's conclusion.
+Recover in a way that keeps the question: the same targets, fields and range, read from the store the `fix` names. A recovery that drops a target turns a comparison into a single-instrument question, and a narrower request answers a different question — say so if you take one. After rate limiting, stop rather than trying the remaining targets. State the coverage and limitations that affect the user's conclusion.
