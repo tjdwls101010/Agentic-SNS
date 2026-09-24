@@ -1,10 +1,11 @@
-"""curl transport, the Finviz read-URL boundary and the SQLite observation store; no page interpretation here."""
+"""curl transport and the Finviz read-URL boundary; no page interpretation and no storage here."""
 
+import argparse
 import json
 from datetime import datetime, timezone
+import os
 from pathlib import Path
 import re
-import sqlite3
 import subprocess
 import tempfile
 from urllib.parse import urljoin, urlsplit
@@ -53,8 +54,30 @@ ROUTES = (
     r"/news/\d+/[\w-]+",
     r"/(?:api/)?calendar/(?:earnings(?:/season-preview)?|dividends|economic)",
     r"/api/stocks-why-moving/by-id/\d+",
+    r"/api/(?:futures|forex|crypto)/performance",
     r"/assets/dist(?:-legacy)?/[\w.-]+\.js",
 )
+
+
+SETTINGS = {"FINVIZ_CONNECT_TIMEOUT": ("connect_timeout", float, 10.0), "FINVIZ_TIMEOUT": ("timeout", float, 60.0), "FINVIZ_MAX_BYTES": ("max_bytes", int, 16 * 1024 * 1024)}
+
+
+def settings():
+    """Transport limits belong to whoever runs the CLI, not to the question: they come from the environment and doctor reports them."""
+    values = {}
+    for variable, (name, kind, fallback) in SETTINGS.items():
+        raw = os.environ.get(variable)
+        try:
+            values[name] = kind(raw) if raw not in (None, "") else fallback
+        except ValueError:
+            raise Failure("invalid_argument", variable + " is not a number: " + raw, "Set " + variable + " to a positive number or unset it to use " + str(fallback) + ".")
+        if values[name] <= 0:
+            raise Failure("invalid_argument", variable + " must be positive.", "Set " + variable + " above zero or unset it to use " + str(fallback) + ".")
+    return argparse.Namespace(**values)
+
+
+def limits_in_force(options):
+    return ", ".join(variable + "=" + format(getattr(options, name), "g") for variable, (name, _, _) in SETTINGS.items())
 
 
 def validate_url(url):
@@ -66,24 +89,6 @@ def validate_url(url):
     if not allowed:
         raise Failure("unsupported_route", "This Finviz route is outside the read interface.", "Use a command from --help or a URL to a screener, stock, groups, map, news, calendar, insider or market page.")
     return url
-
-
-class Store:
-    def __init__(self, path):
-        self.path = Path(path).expanduser().resolve()
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(self.path)
-        self.db.execute("CREATE TABLE IF NOT EXISTS observations (id TEXT PRIMARY KEY, envelope TEXT NOT NULL, raw BLOB NOT NULL)")
-
-    def save(self, envelope, raw):
-        with self.db:
-            self.db.execute("INSERT OR REPLACE INTO observations VALUES (?,?,?)", (envelope["id"], json.dumps(envelope, ensure_ascii=False), raw))
-
-    def get(self, key, raw=False):
-        row = self.db.execute("SELECT envelope, raw FROM observations WHERE id=?", (key,)).fetchone()
-        if not row:
-            raise Failure("unknown_id", "No saved observation with this ID.", "Use an id from an earlier result and the same --store.")
-        return row[1] if raw else json.loads(row[0])
 
 
 class Observation:
@@ -98,7 +103,8 @@ class Observation:
             "observed_at": now(),
             "source": {"url": url, "requested_url": requested_url, "http_status": http_status, "redirects": redirects, "received_complete": complete, "headers": headers},
             "status": "ok",
-            "data": None,
+            "context": {},
+            "collections": {},
         }
 
     @property
@@ -146,13 +152,13 @@ def fetch(url, options, keep=None):
             except FileNotFoundError:
                 raise Failure("missing_curl", "curl is not installed.", "Install curl 8.4 or newer; doctor reports the detected version.")
             except subprocess.TimeoutExpired:
-                proc = subprocess.CompletedProcess(command, 28, b"000", b"the request exceeded --timeout")
+                proc = subprocess.CompletedProcess(command, 28, b"000", b"the request exceeded FINVIZ_TIMEOUT")
             raw = body.read_bytes() if body.exists() else b""
             headers = parse_headers(header_file.read_text(errors="replace")) if header_file.exists() else {}
             status = int(proc.stdout[-3:]) if proc.stdout[-3:].isdigit() else 0
             obs = Observation(url, origin, status, headers, raw, list(redirects), proc.returncode == 0)
         if proc.returncode:
-            raise obs.fail("transport", "curl exited " + str(proc.returncode) + ": " + proc.stderr.decode(errors="replace").strip()[:300], "Retry after checking connectivity, --timeout and --max-bytes; a partial body, if any, is saved.")
+            raise obs.fail("transport", "curl exited " + str(proc.returncode) + ": " + proc.stderr.decode(errors="replace").strip()[:300], "Retry after checking connectivity. This request ran with " + limits_in_force(options) + "; raise the one that stopped it in the environment. A partial body, if any, is saved.")
         if status in (301, 302, 303, 307, 308):
             location = urljoin(url, headers.get("location", ""))
             try:
