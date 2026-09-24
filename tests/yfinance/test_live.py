@@ -18,9 +18,6 @@ import pytest
 
 CLI = Path(__file__).resolve().parents[2] / ".claude/skills/yfinance/Scripts/yfinance_cli.py"
 PROJECT = CLI.parent
-sys.path.insert(0, str(PROJECT))
-
-import leaves  # noqa: E402
 
 SYMBOL = {"fund": "SPY"}
 POSITIONAL = {("market", "sector"): ["technology"], ("market", "industry"): ["software-infrastructure"],
@@ -42,7 +39,27 @@ def run(arguments, store, timeout=180):
     return proc, (json.loads(proc.stdout) if proc.stdout.strip().startswith("{") else None)
 
 
-EVERY_LEAF = sorted(leaves.LEAVES)
+def schema(*scope):
+    """Offline, and the only catalogue a reader has; the live checks enumerate from it rather than from the source."""
+    proc = subprocess.run([sys.executable, str(CLI), "schema", *scope], capture_output=True, text=True, timeout=60,
+                          env=dict(os.environ, YF_STORE=os.environ.get("YF_STORE", "/tmp/yf-live-schema")))
+    return json.loads(proc.stdout)["results"][0]["data"]
+
+
+EVERY_LEAF = sorted((group, leaf) for group, leaves in schema()["commands"].items() for leaf in leaves)
+
+# The column each leaf's rows are dated by. The order a source publishes in is the one fact a fixture cannot confirm,
+# so this table is the test's own expectation, checked against what the source actually sends.
+DATED_BY = {("prices", "history"): "index", ("prices", "actions"): "index", ("company", "shares"): "index",
+            ("company", "filings"): "date", ("analysts", "upgrades"): "index", ("analysts", "history"): "index",
+            ("holders", "institutional"): "Date Reported", ("holders", "fund"): "Date Reported",
+            ("holders", "insider-transactions"): "Start Date", ("holders", "insider-roster"): "Latest Transaction Date",
+            ("calendar", "earnings"): "Event Start Date", ("calendar", "economic"): "Event Time",
+            ("calendar", "ipo"): "Date", ("calendar", "splits"): "Payable On"}
+
+
+def keeps_newest(group, name):
+    return "newest" in schema(group, *([name] if name else []))["default_window"]["limit_keeps"]
 
 
 @pytest.mark.live
@@ -65,19 +82,20 @@ def test_every_leaf_answers_at_its_own_defaults(key, tmp_path):
 
 
 @pytest.mark.live
-@pytest.mark.parametrize("key,date_column", [(k, leaves.LEAVES[k].date_field) for k in EVERY_LEAF if leaves.LEAVES[k].date_field],
+@pytest.mark.parametrize("key,date_column", sorted(DATED_BY.items()),
                          ids=lambda v: v if isinstance(v, str) else "")
 def test_the_declared_order_matches_the_order_the_source_publishes(key, date_column, tmp_path):
     """Proposition 3: `recent` decides which end a limit keeps, and it is the one declaration a fixture cannot check.
     Measured, the direction differs within `analysts` and within `calendar`, so each leaf is pinned to reality here."""
     group, name = key
-    item = leaves.LEAVES[key]
+    path = f"{group} {name}".strip()
+    recent = keeps_newest(group, name)
     arguments = [group] + ([name] if name else []) + defaults_for(group, name) + ["--limit", "40"]
     if group == "prices":
         arguments += ["--period", "1y"]
     proc, doc = run(arguments, tmp_path / "store")
     if proc.returncode not in (0, 8):
-        pytest.skip(f"{item.path} did not return rows: {proc.stdout[:200]}")
+        pytest.skip(f"{path} did not return rows: {proc.stdout[:200]}")
     data = doc["results"][0]["data"]
     if isinstance(data, list):  # a record list, such as the filing entries
         values = [row.get(date_column) for row in data if isinstance(row, dict)]
@@ -89,16 +107,16 @@ def test_the_declared_order_matches_the_order_the_source_publishes(key, date_col
         values = []
     dates = [str(v)[:10] for v in values if v]
     if len(dates) < 2:
-        pytest.skip(f"{item.path} returned too few dated rows to judge an order")
+        pytest.skip(f"{path} returned too few dated rows to judge an order")
     ascending = dates == sorted(dates)
     descending = dates == sorted(dates, reverse=True)
     if ascending and descending:
         # every row carries the same date, so there is no direction here to contradict the declaration
-        pytest.skip(f"{item.path} returned one date across every row ({dates[0]})")
+        pytest.skip(f"{path} returned one date across every row ({dates[0]})")
     if not (ascending or descending):
-        pytest.skip(f"{item.path} is not published in date order at all")
-    assert item.recent is ascending, (
-        f"{item.path} declares recent={item.recent} but the source published {'oldest' if ascending else 'newest'} first; "
+        pytest.skip(f"{path} is not published in date order at all")
+    assert recent is ascending, (
+        f"{path} declares newest-kept={recent} but the source published {'oldest' if ascending else 'newest'} first; "
         f"a limit would keep the wrong end of {dates[0]}..{dates[-1]}")
 
 
@@ -167,7 +185,7 @@ def test_a_statement_reports_the_currency_it_is_reported_in(tmp_path):
 def test_every_declared_interval_limit_has_a_probe_behind_it(interval, days, tmp_path):
     """Each value in `limits` comes from the source's own refusal, and the fix names the argument to change rather
     than telling the reader to doubt the symbol."""
-    declared = leaves.get("prices", "history").limits
+    declared = schema("prices", "history")["limits"]
     assert any(interval in key for key in declared), f"{interval} is probed here but not declared"
     proc, doc = run(["prices", "history", "AAPL", "--period", "1y", "--interval", interval], tmp_path / "store")
     assert proc.returncode == 6, proc.stdout[:400]
@@ -249,4 +267,4 @@ def test_a_growth_threshold_in_a_query_is_on_a_different_scale_from_the_same_fie
     assert growth is None or 0.15 < growth < 0.40, (
         f"the query bound 20..30 selected {symbols[0]}, whose quote reports {growth}; the two scales are 100x apart "
         "and the leaf's query_scale contract states it")
-    assert "percentage points" in leaves.get("screen", "run").interpretation["query_scale"]
+    assert "percentage points" in schema("screen", "run")["interpretation"]["query_scale"]
