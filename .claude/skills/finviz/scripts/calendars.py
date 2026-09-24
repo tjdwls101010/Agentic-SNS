@@ -4,14 +4,26 @@ from urllib.parse import urlencode
 
 import markup
 from contract import Collection, condition, leaf
+from transport import Failure
 
 CALENDAR_PATHS = {"earnings": "/calendar/earnings", "dividends": "/calendar/dividends", "economic": "/calendar/economic", "season": "/calendar/earnings/season-preview"}
+SORTS = {"earnings": ["ticker", "company", "earningsDate", "marketCap", "epsEstimate", "epsActual", "epsSurprise", "epsReportedEstimate", "epsReportedActual", "epsReportedSurprise", "salesEstimate", "salesActual", "salesSurprise", "oneDayPriceReaction"], "dividends": ["ticker", "company", "exdate", "ordinary", "special", "yield"]}
 DATE_ARG = (("--date",), dict(default=None, help="Start date YYYY-MM-DD; the page states back the start date it used as date_from, and the date condition is judged from that statement."))
 PAGE_ARG = (("--page",), dict(type=int, default=1, help="One-based source page; a next command sets it. Pages after the first come from the calendar API, which states back no date or sort, so those conditions stay unverified."))
-SORT_ARG = (("--sort",), dict(default=None, help="Source sort key, e.g. earningsDate or -earningsDate. The page repeats any key it is given, so an agreeing echo leaves the sort unverified; a disagreeing one reports not_applied."))
-CALENDAR_ARGS = {"earnings": [DATE_ARG, PAGE_ARG, SORT_ARG], "dividends": [DATE_ARG, PAGE_ARG, SORT_ARG], "economic": [DATE_ARG, SORT_ARG], "season": []}
+SORT_HELP = "Source sort key, and a leading - for descending. The page repeats any key it is given, so an agreeing echo leaves the sort unverified; a disagreeing one reports not_applied."
+
+
+def sort_arg(kind):
+    keys = SORTS.get(kind)
+    if not keys:
+        return (("--sort",), dict(default=None, help=SORT_HELP))
+    return (("--sort",), dict(default=None, choices=keys + ["-" + k for k in keys], metavar="KEY", help="Sort key: " + ", ".join(keys) + ". " + SORT_HELP))
+
+
+DAY_ARG = (("--day",), dict(default=None, help="Read every report on one date YYYY-MM-DD instead of the preview's per-day sample."))
+CALENDAR_ARGS = {"earnings": [DATE_ARG, PAGE_ARG, sort_arg("earnings")], "dividends": [DATE_ARG, PAGE_ARG, sort_arg("dividends")], "economic": [DATE_ARG, sort_arg("economic")], "season": [DATE_ARG, DAY_ARG]}
 CALENDAR_HELP = {"earnings": "Earnings calendar: report dates with EPS and sales estimates, actuals and surprises.", "dividends": "Dividend calendar: ex-dates with ordinary and special amounts and yields.", "economic": "Economic calendar: events with actual, previous and forecast values.", "season": "Earnings season preview: upcoming reports per day with estimates."}
-CALENDAR_RECORDS = {"earnings": "source records: ticker, earningsDate, isEarningDateEstimate, epsEstimate, epsActual, salesEstimate, salesActual and more", "dividends": "source records: ticker, exdate, ordinary, special, yield and more", "economic": "source records: event, date, actual, previous, forecast and more", "season": "source records: date, ticker, company, earningsDate, epsEstimate, salesEstimate and more"}
+CALENDAR_RECORDS = {"earnings": "source records: ticker, earningsDate, isEarningDateEstimate, epsEstimate, epsActual, salesEstimate, salesActual and more", "dividends": "source records: ticker, exdate, ordinary, special, yield and more", "economic": "source records: event, ticker (the series calendar event reads), date, importance, actual, previous, forecast and more", "season": "source records: date, ticker, company, earningsDate, epsEstimate, salesEstimate and more"}
 
 
 def calendar_leaf(kind):
@@ -25,6 +37,8 @@ def calendar_leaf(kind):
 def calendar(ctx, args, target):
     kind = args.leaf
     date, page, sort = getattr(args, "date", None), getattr(args, "page", 1), getattr(args, "sort", None)
+    if getattr(args, "day", None):
+        return season_day(ctx, args)
     # The page applies dateFrom and sort and states them back in route-init-data, so page 1 is read from it; the API states nothing back and is used only past page 1.
     use_api = page != 1
     date_from = date
@@ -100,3 +114,43 @@ def calendar_page_data(ctx, kind, query=None):
     if not isinstance(data, dict):
         raise obs.fail("structure_changed", "The calendar page has no data block.", "Read the saved raw page with read ID --raw.")
     return obs, data
+
+
+@leaf(
+    "calendar",
+    "event",
+    help="One economic series: its history of actual and estimated values and its recent and upcoming releases, by the ticker an economic calendar row carries.",
+    args=[(("ticker",), dict(metavar="TICKER", help="Economic series ticker from a calendar economic row, e.g. FDTR.")), DATE_ARG],
+    collections={"history": Collection("{refDate, actual, estimate, reference} per release", order="newest release first", reverse=True, default=24), "releases": Collection("event rows for this series as on the economic calendar: event, date, actual, previous, forecast, importance and more")},
+    sections=["history"],
+    context={"category, description, frequency, unit, source, source_url": "the series as the source describes it; unit is the chart unit of the history values"},
+)
+def event(ctx, args, target):
+    query = {"ticker": args.ticker, "dateFrom": args.date}
+    obs = ctx.observe("https://finviz.com/api/calendar/economic/detail?" + urlencode({k: v for k, v in query.items() if v is not None}))
+    source = obs.json()
+    if not isinstance(source, dict) or not isinstance(source.get("chartData", []), list):
+        raise obs.fail("structure_changed", "The economic detail API has no chart data.", "Read the saved raw response with read ID --raw.")
+    stated = source.get("ticker")
+    obs.result["target"] = args.ticker
+    obs.result["conditions"] = {"ticker": condition(args.ticker, ("confirmed" if str(stated).upper() == args.ticker.upper() else "not_applied") if stated else "unverified", stated)}
+    if args.date:
+        obs.result["conditions"]["date"] = condition(args.date, "unverified", None)
+    obs.result["context"] = {"category": source.get("category"), "description": source.get("description"), "frequency": source.get("frequency"), "unit": source.get("chartUnit"), "source": source.get("chartSource"), "source_url": source.get("chartSourceUrl")}
+    obs.result["collections"] = {"history": source.get("chartData") or [], "releases": source.get("table") or []}
+    return obs.result
+
+
+def season_day(ctx, args):
+    if args.date:
+        raise Failure("invalid_argument", "--day reads one date's reports and --date the preview weeks from a start date; they do not combine.", "Drop one of them.")
+    obs = ctx.observe("https://finviz.com/api/calendar/earnings/season-preview/day?" + urlencode({"date": args.day}))
+    items = obs.json()
+    if not isinstance(items, list):
+        raise obs.fail("structure_changed", "The season-preview day API did not return a list.", "Read the saved raw response with read ID --raw.")
+    days = sorted({str(i.get("date")) for i in items})
+    obs.result["target"] = args.day
+    obs.result["conditions"] = {"day": condition(args.day, ("confirmed" if days == [args.day] else "not_applied") if items else "unverified", days or None)}
+    obs.result["context"] = {"date_from": None, "totals_per_day": None}
+    obs.result["collections"] = {"items": items}
+    return obs.result

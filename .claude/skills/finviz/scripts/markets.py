@@ -1,6 +1,5 @@
 """Groups, market quotes and performance, the market map with its classification tree, and bubbles."""
 
-import argparse
 import re
 from urllib.parse import urlencode, urljoin
 
@@ -18,12 +17,6 @@ GROUP_ARG = (("--group",), dict(dest="group_key", default="sector", choices=GROU
 GROUP_SORTS = {"name": "Name", "marketcap": "Market Capitalization", "pe": "Price/Earnings", "forwardpe": "Forward Price/Earnings", "peg": "PEG", "ps": "Price/Sales", "pb": "Price/Book", "pc": "Price/Cash", "pfcf": "Price/Free Cash Flow", "enterprisevalue": "Enterprise Value", "evebitda": "EV/EBITDA", "evsales": "EV/Sales", "dividendyield": "Dividend Yield", "eps3years": "EPS growth past 3 years", "eps5years": "EPS growth past 5 years", "estltgrowth": "EPS growth next 5 years", "sales3years": "Sales growth past 3 years", "sales5years": "Sales growth past 5 years", "shortinterestshare": "Short Interest Share", "roa": "Return on Assets", "roe": "Return on Equity", "roi": "Return on Invested Capital", "curratio": "Current Ratio", "quickratio": "Quick Ratio", "ltdebteq": "LT Debt/Equity", "debteq": "Total Debt/Equity", "grossmargin": "Gross Margin", "opermargin": "Operating Margin", "netmargin": "Net Profit Margin", "recom": "Analyst Recommendation", "perf1w": "Performance (Week)", "perf4w": "Performance (Month)", "perf13w": "Performance (Quarter)", "perf26w": "Performance (Half Year)", "perf52w": "Performance (Year)", "perfytd": "Performance (Year To Date)", "averagevolume": "Average Volume (3 Month)", "relativevolume": "Relative Volume", "change": "Change %", "volume": "Volume", "count": "Number of Stocks", "employees": "Employees"}
 
 
-def sort_key(value, keys=GROUP_SORTS):
-    if value.lstrip("-") not in keys:
-        raise argparse.ArgumentTypeError("invalid sort key " + repr(value) + "; choose from " + ", ".join(keys) + ", with a leading - for descending")
-    return value
-
-
 def group_query(group):
     head, _, sub = group.partition("/")
     return {"g": head, "sg": sub or None}
@@ -37,7 +30,7 @@ def group_id(url):
     "groups",
     "table",
     help="Group table for a view: overview, valuation, performance, financial or custom; rows keep source strings.",
-    args=[GROUP_ARG, (("--view",), dict(default="overview", choices=list(GROUP_VIEWS), help="Table view.")), (("--sort",), dict(default=None, type=sort_key, metavar="KEY", help="Sort key: " + ", ".join(k + " (" + v + ")" for k, v in GROUP_SORTS.items()) + "; write --sort=-marketcap for descending."))],
+    args=[GROUP_ARG, (("--view",), dict(default="overview", choices=list(GROUP_VIEWS), help="Table view.")), (("--sort",), dict(default=None, choices=list(GROUP_SORTS) + ["-" + k for k in GROUP_SORTS], metavar="KEY", help="Sort key: " + ", ".join(k + " (" + v + ")" for k, v in GROUP_SORTS.items()) + "; write --sort=-marketcap for descending."))],
     collections={"groups": Collection("rows keyed by the table headers plus filter, the screener filter value that selects the group's stocks")},
     context={"sort_keys": "column label -> the key --sort accepts for it, from this page's header links"},
 )
@@ -144,7 +137,11 @@ def market_performance(ctx, args, target):
 TYPES = {"sec": "Sector", "geo": "World", "sec_all": "SectorFull", "cap": "MarketCap", "etf": "ETF", "crypto": "CryptoUSD", "crypto_usdt": "CryptoUSDT", "crypto_eur": "CryptoEUR", "crypto_btc": "CryptoBTC", "futures": "Futures", "sec_dji": "Dow", "sec_rut": "Russell", "sec_ndx": "Nasdaq", "sec_comp": "NasdaqComposite", "themes": "Themes"}
 
 
-def classified(performance, tree):
+MAP_PERIODS = {"d1": "day", "w1": "week", "w4": "month", "w13": "quarter", "w26": "half year", "w52": "year", "mtd": "month to date", "ytd": "year to date", "3y": "3 years", "5y": "5 years", "10y": "10 years", "h52wrel": "distance from the 52-week high", "l52wrel": "distance from the 52-week low", "relvol": "relative volume"}
+MAP_METRICS = ["pe", "fpe", "peg", "ps", "pb", "pfcf", "div", "eps5y", "eps3y", "epsthisyear", "epsnextyear", "epsqoq", "epsnext5y", "epsttm", "salesqoq", "salesttm", "insidertrans", "roa", "roe", "roic", "quickratio", "currentratio", "ltdebteq", "debteq", "grossmargin", "operatingmargin", "netmargin", "sales3y", "sales5y", "epssurprise", "salessurprise", "short", "rec", "earnperf", "earndate", "div1y", "div3y", "div5y", "evebitda", "evsales"]
+
+
+def classified(performance, tree, field):
     """Performance records, joined to the tree's group path, description and size weight where the tree lists the ticker."""
     found = {}
 
@@ -157,15 +154,15 @@ def classified(performance, tree):
 
     if tree:
         walk(tree, [])
-    return [dict({"ticker": ticker, "performance": value}, **found.get(ticker, {})) for ticker, value in performance.items()]
+    return [dict({"ticker": ticker, field: value}, **found.get(ticker, {})) for ticker, value in performance.items()]
 
 
 @leaf(
     "market",
     "map",
     help="Market map performance per ticker, optionally joined to the map's classification tree with its size weights.",
-    args=[(("--type",), dict(default="sec", choices=list(TYPES), help="Map universe: sec S&P 500 sectors, sec_all the full market, geo world, cap, etf, crypto variants, futures, sec_dji, sec_rut, sec_ndx and sec_comp index maps, themes.")), (("--period",), dict(default="d1", help="Performance period: d1, w1, w4, w13, w26, w52, ytd.")), (("--classification",), dict(action="store_true", help="Join each ticker to the map's group path, description and size weight; resolving the tree takes several more asset requests."))],
-    collections={"tickers": Collection("{ticker, performance} per map tile; with --classification also groups (the path of group names from the top), description and weight, the tile's size weight rather than a market cap")},
+    args=[(("--type",), dict(default="sec", choices=list(TYPES), help="Map universe: sec S&P 500 sectors, sec_all the full market, geo world, cap, etf, crypto variants, futures, sec_dji, sec_rut, sec_ndx and sec_comp index maps, themes.")), (("--period",), dict(default="d1", choices=list(MAP_PERIODS) + MAP_METRICS, metavar="PERIOD", help="What each tile shows: a performance period (" + ", ".join(k + " " + v for k, v in MAP_PERIODS.items()) + ") or a fundamental metric such as pe, fpe, ps, div, roe, netmargin, short or rec; schema market map lists every choice.")), (("--classification",), dict(action="store_true", help="Join each ticker to the map's group path, description and size weight; resolving the tree takes several more asset requests."))],
+    collections={"tickers": Collection("{ticker, <period>: value} per map tile, the field named after the --period the source applied (a percent change for a performance period, the metric's value for a fundamental); with --classification also groups (the path of group names from the top), description and weight, the tile's size weight rather than a market cap")},
     context={"period, version": "as published by the performance API", "classification_source": "URL of the asset the tree came from, with --classification"},
 )
 def market_map(ctx, args, target):
@@ -177,13 +174,14 @@ def market_map(ctx, args, target):
     obs.result["target"] = args.type
     obs.result["conditions"] = {"type": condition(args.type), "period": condition(args.period, ("confirmed" if perf.get("subtype") == args.period else "not_applied") if perf.get("subtype") else "unverified", perf.get("subtype"))}
     obs.result["context"] = {"period": perf.get("subtype"), "version": perf.get("version")}
-    obs.result["collections"] = {"tickers": classified(nodes, None)}
+    field = perf.get("subtype") or args.period
+    obs.result["collections"] = {"tickers": classified(nodes, None, field)}
     if not args.classification:
         return obs.result
     dependencies = []
     try:
         tree, source = classification(ctx, args.type, dependencies)
-        obs.result["collections"] = {"tickers": classified(nodes, tree)}
+        obs.result["collections"] = {"tickers": classified(nodes, tree, field)}
         obs.result["context"]["classification_source"] = source
     except Failure as exc:
         exc.record()
@@ -245,22 +243,50 @@ def classification(ctx, map_type, dependencies):
     return roots[0], chunk_obs.url
 
 
-AXES = ["PB", "PC", "PE", "PEG", "PFCF", "PS", "averageVolume", "beta", "curRatio", "debtEq", "dividendYield", "employees", "eps5Years", "epsQoQ", "epsYoY", "epsYoY1", "estLTGrowth", "forwardPE", "gap", "grossMargin", "high52w", "income", "insiderOwn", "insiderTrans", "instOwn", "instTrans", "lastChange", "low52w", "ltdebtEq", "marketCap", "netMargin", "operMargin", "payoutRatio", "perf13w", "perf1w", "perf26w", "perf4w", "perf52w", "perfYtd", "quickRatio", "relativeVolume", "roa", "roe", "roi", "rsi", "sales", "sales5Years", "salesQoQ", "sector", "shortInterestRatio", "shortInterestShare", "sma20", "sma200", "sma50", "targetPrice", "ticker", "volatility1w", "volatility4w"]
-AXIS_HELP = " axis field; schema market bubbles lists the accepted ones under choices."
+AXES = ["sector", "ticker", "order", "marketCap", "dividendYield", "payoutRatio", "employees", "income", "sales", "epsQoQ", "epsYoY", "epsYoY1", "eps5Years", "estLTGrowth", "salesQoQ", "sales5Years", "PE", "forwardPE", "PEG", "PS", "PB", "PC", "PFCF", "roi", "roe", "roa", "grossMargin", "operMargin", "netMargin", "curRatio", "quickRatio", "ltdebtEq", "debtEq", "lastChange", "changeOpen", "gap", "lastVolume", "lastVolumeUsd", "averageVolume", "averageVolumeUsd", "relativeVolume", "perf1w", "perf4w", "perf13w", "perf26w", "perf52w", "perfYtd", "volatility1w", "volatility4w", "beta", "low52w", "high52w", "sma20", "sma50", "sma200", "rsi", "insiderOwn", "insiderTrans", "instOwn", "instTrans", "shortInterestShare", "shortInterestRatio", "consRecom", "targetPrice"]
+SIZES = ["const", "marketCap", "lastVolume", "lastVolumeUsd", "averageVolume", "averageVolumeUsd", "relativeVolume"]
+COLORS = ["const", "sector", "industry", "country", "marketCap", "lastChange", "perf1w", "perf4w", "perf13w", "perf26w", "perf52w", "perfYtd", "lastVolume", "lastVolumeUsd", "averageVolume", "averageVolumeUsd", "relativeVolume", "consRecom"]
+CAPS = ["mega", "large", "mid", "small", "micro", "nano", "largeover", "midover", "smallover", "microover", "largeunder", "midunder", "smallunder", "microunder"]
+AVERAGE_VOLUMES = ["u50", "u100", "u500", "u750", "u1000", "o50", "o100", "o200", "o300", "o400", "o500", "o750", "o1000", "o2000", "100to500", "100to1000", "500to1000", "500to10000"]
+BUBBLE_ARGS = [
+    (("--x",), dict(default="sector", choices=AXES, metavar="FIELD", help="X axis field; schema market bubbles lists the choices.")),
+    (("--y",), dict(default="lastChange", choices=AXES, metavar="FIELD", help="Y axis field, from the same choices as --x.")),
+    (("--size",), dict(default="marketCap", choices=SIZES, help="Bubble size field.")),
+    (("--color",), dict(default="sector", choices=COLORS, metavar="FIELD", help="Colour field: " + ", ".join(COLORS) + ".")),
+    (("--index",), dict(default="dji", choices=["any", "sp500", "ndx", "dji", "rut"], help="Stock universe: dji 30 names, ndx 100, sp500 500, rut 2000, any every listed stock.")),
+    (("--sector",), dict(default=None, choices=SECTORS, help="Keep one sector's stocks (source filter).")),
+    (("--cap",), dict(default=None, choices=CAPS, help="Keep one market-cap bucket, e.g. mega ($200bln and more), largeover (over $10bln) or midunder (under $10bln) (source filter).")),
+    (("--avg-volume",), dict(default=None, choices=AVERAGE_VOLUMES, help="Keep an average-volume bucket in thousands of shares: u500 under 500K, o1000 over 1M, 500to10000 between 500K and 10M (source filter).")),
+    (("--tickers",), dict(default=None, help="Comma-separated tickers to plot instead of the whole universe (source filter).")),
+    (("--exclude",), dict(default=None, help="Comma-separated tickers to leave out (source filter).")),
+]
 
 
 @leaf(
     "market",
     "bubbles",
     help="Bubble chart data: one record per stock with the chosen x, y, size and color fields.",
-    args=[(("--x",), dict(default="sector", choices=AXES, metavar="FIELD", help="X" + AXIS_HELP)), (("--y",), dict(default="lastChange", choices=AXES, metavar="FIELD", help="Y" + AXIS_HELP)), (("--size",), dict(default="marketCap", choices=AXES, metavar="FIELD", help="Size" + AXIS_HELP)), (("--color",), dict(default="sector", choices=AXES, metavar="FIELD", help="Colour" + AXIS_HELP)), (("--index",), dict(default="dji", choices=["any", "sp500", "ndx", "dji", "rut"], help="Stock universe: dji 30 names, ndx 100, sp500 500, rut 2000, any every listed stock."))],
+    args=BUBBLE_ARGS,
     collections={"stocks": Collection("{ticker, company, x, y, size, color, isETF} as published; size is the field chosen with --size, not necessarily market cap")},
 )
 def bubbles(ctx, args, target):
-    obs = ctx.observe("https://finviz.com/api/bubbles?" + urlencode({"x": args.x, "y": args.y, "size": args.size, "color": args.color, "idx": args.index}))
+    query = {"x": args.x, "y": args.y, "size": args.size, "color": args.color, "idx": args.index, "sec": args.sector, "cap": args.cap, "sh_avgvol": args.avg_volume, "tickers": args.tickers, "excludeTickers": args.exclude}
+    obs = ctx.observe("https://finviz.com/api/bubbles?" + urlencode({k: v for k, v in query.items() if v is not None}, safe=","))
     records = obs.json()
     if not isinstance(records, list):
         raise obs.fail("structure_changed", "The bubbles API did not return a list.", "Read the saved raw response with read ID --raw.")
-    obs.result["conditions"] = {key: condition(getattr(args, key)) for key in ("x", "y", "size", "color", "index")}
+    conditions = {key: condition(getattr(args, key)) for key in ("x", "y", "size", "color", "index", "cap", "avg_volume") if getattr(args, key)}
+    returned = {str(r.get("ticker")).upper() for r in records}
+    if args.tickers:
+        outside = sorted(returned - {t.strip().upper() for t in args.tickers.split(",")})
+        conditions["tickers"] = condition(args.tickers, ("not_applied" if outside else "confirmed") if records else "unverified", {"returned_outside_the_list": outside})
+    if args.exclude:
+        present = sorted(returned & {t.strip().upper() for t in args.exclude.split(",")})
+        conditions["exclude"] = condition(args.exclude, ("not_applied" if present else "confirmed") if records else "unverified", {"excluded_but_returned": present})
+    if args.sector:
+        colours = sorted({str(r.get("color")) for r in records})
+        judged = args.color == "sector" and records
+        conditions["sector"] = condition(args.sector, (("confirmed" if [c.lower().replace(" ", "") for c in colours] == [args.sector] else "not_applied") if judged else "unverified"), {"sectors_returned": colours} if judged else None)
+    obs.result["conditions"] = conditions
     obs.result["target"], obs.result["collections"] = args.index, {"stocks": records}
     return obs.result

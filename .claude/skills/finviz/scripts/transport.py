@@ -55,6 +55,11 @@ ROUTES = (
     r"/(?:api/)?calendar/(?:earnings(?:/season-preview)?|dividends|economic)",
     r"/api/stocks-why-moving/by-id/\d+",
     r"/api/(?:futures|forex|crypto)/performance",
+    r"/api/options/[\w.-]+",
+    r"/api/symbol/[\w.-]+/holdings",
+    r"/api/stocks-why-moving/[\w.$@-]+",
+    r"/api/calendar/economic/detail",
+    r"/api/calendar/earnings/season-preview/day",
     r"/assets/dist(?:-legacy)?/[\w.-]+\.js",
 )
 

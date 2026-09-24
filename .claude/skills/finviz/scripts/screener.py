@@ -24,6 +24,23 @@ VIEWS = {
     "custom": ("152", "the columns named with --columns, from screen columns"),
 }
 
+# The screener's own order control: every key it offers, in its order.
+SORT_KEYS = [
+    "ticker", "tickersfilter", "company", "sector", "industry", "country", "index", "exchange", "marketcap", "pe", "forwardpe", "peg", "ps", "pb", "pc",
+    "pfcf", "dividendyield", "payoutratio", "eps", "estq1", "epsyoy", "epsyoy1", "eps3years", "eps5years", "estltgrowth", "epsqoq", "epsyoyttm",
+    "sales3years", "sales5years", "salesqoq", "salesyoyttm", "epssurprise", "revenuesurprise", "sharesoutstanding2", "sharesfloat",
+    "floatoutstandingpct", "insiderown", "insidertrans", "instown", "insttrans", "shortinterestshare", "shortinterestratio", "shortinterest",
+    "earningsdate", "news_date", "roa", "roe", "roi", "curratio", "quickratio", "ltdebteq", "debteq", "grossmargin", "opermargin", "netmargin", "recom",
+    "perf1w", "perf4w", "perf13w", "perf26w", "perfytd", "perf52w", "perf3y", "perf5y", "perf10y", "beta", "averagetruerange", "volatility1w",
+    "volatility4w", "sma20", "sma50", "sma200", "high50d", "low50d", "high52w", "low52w", "52wrange", "highat", "lowat", "rsi", "averagevolume",
+    "relativevolume", "change", "changeopen", "gap", "volume", "open", "high", "low", "price", "prevclose", "targetprice", "ipodate", "book",
+    "cashpershare", "dividend", "dividendexdate", "dividendttm", "dividend1y", "dividend3y", "dividend5y", "employees", "income", "sales",
+    "enterpriseValue", "evebitda", "evsales", "optionable", "shortable", "newsurl", "newstitle", "newstime", "wiimdailydigest", "e.category", "e.tags",
+    "e.totalholdings", "e.assetsundermanagement", "e.netflows1month", "e.netflows1monthpct", "e.netflows3month", "e.netflows3monthpct", "e.netflowsytd",
+    "e.netflowsytdpct", "e.return1year", "e.return3year", "e.return5year", "e.netexpenseratio", "e.activepassive", "e.assettype", "e.etftype",
+    "e.sectortheme", "e.linkedindexname",
+]
+
 
 def screener_page(ctx, query):
     url = BASE + "?" + urlencode({k: v for k, v in query.items() if v is not None}, safe=",")
@@ -94,10 +111,11 @@ def column_catalog(page, obs):
 
 RUN_ARGS = [
     (("--filters",), dict(default=None, help="Comma-separated filter values from screen filters --options, e.g. sec_technology,cap_largeover.")),
+    (("--tickers",), dict(default=None, help="Comma-separated tickers to screen by name, e.g. AAPL,MSFT,NVDA: one request returns each as a row of the chosen view, filters still apply.")),
     (("--signal",), dict(default=None, help="Signal value from screen signals, e.g. ta_topgainers.")),
     (("--view",), dict(default="overview", choices=list(VIEWS), help="Table view: " + "; ".join(name + " (" + text + ")" for name, (_, text) in VIEWS.items()) + ". custom is implied by --columns.")),
     (("--columns",), dict(default=None, help="Comma-separated column ids or indices from screen columns for the custom view.")),
-    (("--sort",), dict(default=None, help="Sort key from a result's sort_keys, e.g. marketcap; write --sort=-marketcap for descending.")),
+    (("--sort",), dict(default=None, choices=SORT_KEYS + ["-" + k for k in SORT_KEYS], metavar="KEY", help="Sort key from the screener's order control, e.g. marketcap, pe, perf1w or change, and -marketcap for descending; schema screen run lists every choice.")),
     (("--row",), dict(type=int, default=1, help="One-based source row the first page starts at (20 rows per page); a next command sets it.")),
     (("--pages",), dict(type=int, default=1, help="Source pages to fetch in this run, following each page's next row.")),
     (("--out",), dict(default=None, help="Write the selected rows as JSON Lines to this path; the result then reports the file instead of the rows.")),
@@ -119,7 +137,7 @@ def run(ctx, args, target):
         raise Failure("invalid_argument", "--pages and --row start at 1.", "Use --pages 1 --row 1 for the first page.")
     requested_columns = resolve_columns(ctx, args.columns)
     view = "152" if requested_columns else VIEWS[args.view][0]
-    query = {"v": view, "ft": "4", "f": args.filters, "s": args.signal, "c": ",".join(map(str, requested_columns)) if requested_columns else None, "o": args.sort, "r": args.row}
+    query = {"v": view, "ft": "4", "f": args.filters, "t": args.tickers, "s": args.signal, "c": ",".join(map(str, requested_columns)) if requested_columns else None, "o": args.sort, "r": args.row}
     writer = Exporter(args) if args.out else None
     pages, failure, row = [], None, args.row
     for index in range(args.pages):
@@ -133,8 +151,8 @@ def run(ctx, args, target):
                 raise
             failure = exc
             break
-        evidence(obs, page, args, requested_columns, row)
         obs.result["collections"] = {"rows": records}
+        evidence(obs, page, args, requested_columns, row)
         obs.result["totals"] = {"rows": {"source_total": markup.total_count(page)}}
         nxt = next_row(page, row)
         if nxt is not None:
@@ -217,6 +235,12 @@ def evidence(obs, page, args, requested_columns, row):
             echoed = [markup.query_param(o["value"], "f") for o in controls.get("signalSelect", []) if o["selected"]]
             conditions["filters"] = condition(args.filters, "unverified", {"echoed_by_server": echoed[0]} if echoed and echoed[0] else None)
             obs.result.setdefault("warnings", []).append("This view has no filter controls, so the filters are unverified; the server echoes an unknown filter too. Run the same filters with --view overview to confirm them.")
+    if args.tickers:
+        asked = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+        box = page.select_one("input#tickersInput")
+        shown = [r.get("ticker") for r in obs.result["collections"]["rows"] if r.get("ticker")] if obs.result.get("collections") else []
+        outside = [t for t in shown if t.upper() not in asked]
+        conditions["tickers"] = condition(args.tickers, "not_applied" if outside else "confirmed" if shown else "unverified", {"ticker_input": box.get("value") if box is not None else None, "rows_outside_the_list": outside})
     if args.signal:
         chosen = [markup.query_param(o["value"], "s") for o in controls.get("signalSelect", []) if o["selected"]]
         conditions["signal"] = condition(args.signal, ("confirmed" if chosen == [args.signal] else "not_applied") if "signalSelect" in controls else "unverified", chosen[0] if chosen else None)

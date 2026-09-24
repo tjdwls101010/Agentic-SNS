@@ -4,6 +4,7 @@ from urllib.parse import urlencode, urljoin
 
 import markup
 from contract import Collection, Selector, condition, leaf
+from transport import Failure
 
 BASE = "https://finviz.com/stock"
 TICKERS = (("tickers",), dict(nargs="+", metavar="TICKER", help="One or more Finviz tickers; each becomes its own result and observation."))
@@ -222,13 +223,32 @@ def around_last_close(records, keep, context):
 
 @stock_leaf(
     "options",
-    "Option chain for one expiry with Finviz's implied volatility and greeks.",
-    args=[(("--expiry",), dict(default=None, help="Expiry YYYY-MM-DD from a previous result's expiries; the source's nearest expiry when omitted."))],
-    collections={"contracts": Collection("{strike, type, openInterest, bidPrice, askPrice, lastClose, iv, delta, gamma, theta, vega, rho, ...} as published, by strike with puts and calls interleaved", local=[Selector(("--type",), dict(default=None, choices=["call", "put"], help="Keep only calls or only puts."), one_side), Selector(("--strikes",), dict(type=int, default=20, help="Keep the contracts on the N strikes nearest last_close, calls and puts alike; 0 keeps the whole expiry."), around_last_close)])},
-    context={"expiries": "expiries the source offers; pass one to --expiry", "current_expiry": "the expiry the chain belongs to", "last_close, last_time": "underlying price context"},
+    "Option chain for one expiry, or one strike across every expiry, with Finviz's implied volatility and greeks.",
+    args=[(("--expiry",), dict(default=None, help="Expiry YYYY-MM-DD from a previous result's expiries; the source's nearest expiry when omitted.")), (("--strike",), dict(type=float, default=None, help="Read this strike across every expiry instead of one expiry's chain; each contract's exDate (YYMMDD) names its expiry.")), (("--all-expiries",), dict(action="store_true", help="Read every contract of every expiry at once (the source's plot view); --strikes still keeps the strikes nearest last_close."))],
+    collections={"contracts": Collection("{strike, type, exDate, openInterest, bidPrice, askPrice, lastClose, iv, delta, gamma, theta, vega, rho, ...} as published, by strike (or by expiry with --strike) with puts and calls interleaved", local=[Selector(("--type",), dict(default=None, choices=["call", "put"], help="Keep only calls or only puts."), one_side), Selector(("--strikes",), dict(type=int, default=20, help="Keep the contracts on the N strikes nearest last_close, calls and puts alike; 0 keeps the whole expiry."), around_last_close)])},
+    context={"expiries": "expiries the source offers; pass one to --expiry", "current_expiry": "the expiry the chain belongs to; null with --strike", "last_close, last_time": "underlying price context"},
 )
 def options(ctx, args, ticker):
-    obs, page, init = section_data(ctx, ticker, "oc", e=args.expiry)
+    if args.strike is not None:
+        if args.expiry or args.all_expiries:
+            raise Failure("invalid_argument", "--strike reads one strike across every expiry; --expiry and --all-expiries read chains; they do not combine.", "Drop one of them; filter the other dimension with --filter afterwards.")
+        strike = format(args.strike, "g")
+        obs = ctx.observe("https://finviz.com/api/options/" + ticker + "?" + urlencode({"strike": strike}))
+        source = obs.json()
+        contracts = source.get("options") if isinstance(source, dict) else None
+        if not isinstance(contracts, list):
+            raise obs.fail("structure_changed", "The options API has no contract list.", "Read the saved raw response with read ID --raw.")
+        strikes = sorted({c.get("strike") for c in contracts if c.get("strike") is not None})
+        obs.result["target"] = source.get("ticker") or ticker
+        obs.result["conditions"] = {"strike": condition(args.strike, ("confirmed" if strikes == [args.strike] else "not_applied") if contracts else "unverified", strikes[:5] or None)}
+        obs.result["context"] = {"expiries": None, "current_expiry": None, "last_close": source.get("lastClose"), "last_time": source.get("lastTime")}
+        obs.result["collections"] = {"contracts": contracts}
+        return obs.result
+    if args.all_expiries and args.expiry:
+        raise Failure("invalid_argument", "--all-expiries reads every expiry and --expiry one; they do not combine.", "Drop one of them.")
+    obs, page, init = section_data(ctx, ticker, "oc", e=args.expiry, ov="plot" if args.all_expiries else None)
+    if args.all_expiries:
+        obs.result["conditions"] = {"all_expiries": condition(True, "confirmed" if init.get("view") == "plot" else "not_applied", {"source_view": init.get("view")})}
     if args.expiry:
         obs.result["conditions"] = {"expiry": condition(args.expiry, "confirmed" if init.get("currentExpiry") == args.expiry else "not_applied", init.get("currentExpiry"))}
     obs.result["context"] = {"expiries": init.get("expiries"), "current_expiry": init.get("currentExpiry"), "last_close": init.get("lastClose"), "last_time": init.get("lastTime")}
@@ -240,27 +260,43 @@ def one_form(records, form, context):
     return [r for r in records if r.get("form") == form] if form else records
 
 
+FILING_SORTS = ["filingDate", "reportDate", "form"]
+FILING_CATEGORIES = ["annual-quarterly-current", "insider-equity", "beneficial-ownership", "exempt-offerings", "registration-statements", "filing-review-correspondence", "sec-orders-notices", "proxy-materials", "tender-offers", "trust-indentures"]
+
+
+def in_order(items, key):
+    """Whether the received items are ordered by the sort key: the page states back any key, so the order itself is the evidence."""
+    field, descending = key.lstrip("-"), key.startswith("-")
+    values = [str(i.get(field) or "") for i in items]
+    return values == sorted(values, reverse=descending)
+
+
 @stock_leaf(
     "filings",
     "SEC filing list for the company with links to the originals; 30 per source page.",
-    args=[(("--page",), dict(type=int, default=1, help="One-based source page; a next command sets it.")), (("--sort",), dict(default=None, help="Source sort key, e.g. -filingDate (the default order)."))],
-    collections={"filings": Collection("{form, filingDate, reportDate, description, filing (index URL), document (primary document URL), accessionNumber} newest filing first", local=[Selector(("--form",), dict(default=None, help="Keep only this form type, e.g. 10-K; it narrows the received page, so page through with next commands to reach older filings."), one_form)])},
-    context={"available_forms": "form types present for this company", "form_categories": "Finviz's form groupings"},
+    args=[(("--page",), dict(type=int, default=1, help="One-based source page; a next command sets it.")), (("--sort",), dict(default=None, choices=FILING_SORTS + ["-" + k for k in FILING_SORTS], help="Source order: filingDate, reportDate or form, and -filingDate (the default) for descending.")), (("--category",), dict(default=None, choices=FILING_CATEGORIES, help="Source filter by Finviz's form category; form_categories lists each one's forms, and a category the company has no forms in returns nothing."))],
+    collections={"filings": Collection("{form, filingDate, reportDate, description, filing (index URL), document (primary document URL), accessionNumber} newest filing first unless --sort", local=[Selector(("--form",), dict(default=None, help="Keep only this form type, e.g. 10-K; it narrows the received page, so page through with next commands (or use --category) to reach older filings."), one_form)])},
+    context={"available_forms": "form types present for this company", "form_categories": "Finviz's form groupings: {id, label, forms}; an id goes to --category"},
     paging="page",
 )
 def filings(ctx, args, ticker):
-    obs, page, init = section_data(ctx, ticker, "lf", page=args.page if args.page != 1 else None, sort=args.sort)
+    obs, page, init = section_data(ctx, ticker, "lf", page=args.page if args.page != 1 else None, o=args.sort, f=args.category)
     entries = init.get("entries") or {}
+    items = entries.get("items") or []
     conditions = {"page": condition(args.page, "confirmed" if entries.get("page") == args.page else "not_applied", entries.get("page"))}
     if args.sort:
-        conditions["sort"] = condition(args.sort, "confirmed" if init.get("initialSort") == args.sort else "not_applied", init.get("initialSort"))
+        conditions["sort"] = condition(args.sort, ("confirmed" if in_order(items, args.sort) else "not_applied") if len(items) > 1 else "unverified", {"source_sort": init.get("initialSort")})
+    if args.category:
+        forms = next((c.get("forms") for c in init.get("formCategories") or [] if c.get("id") == args.category), None)
+        outside = sorted({i.get("form") for i in items if forms is not None and i.get("form") not in forms})
+        conditions["category"] = condition(args.category, ("not_applied" if outside else "confirmed") if items and forms is not None else "unverified", {"source_filter": init.get("initialFilter"), "forms_outside_the_category": outside})
     obs.result["conditions"] = conditions
     obs.result["totals"] = {"filings": {"source_total": entries.get("totalItemsCount")}}
     total_pages = entries.get("totalPages")
     if total_pages and (entries.get("page") or 0) < total_pages:
         obs.result["next_page"] = entries["page"] + 1
     obs.result["context"] = {"available_forms": init.get("availableForms"), "form_categories": init.get("formCategories")}
-    obs.result["collections"] = {"filings": entries.get("items") or []}
+    obs.result["collections"] = {"filings": items}
     return obs.result
 
 
@@ -312,4 +348,24 @@ def prices(ctx, args, ticker):
     bars = [dict(zip(["date_epoch" if k == "date" else k for k in lengths], values)) for values in zip(*(source[k] for k in lengths))]
     obs.result["context"] = {"last": {k: v for k, v in source.items() if k not in lengths and not isinstance(v, list)}}
     obs.result["collections"] = {"bars": bars}
+    return obs.result
+
+
+@stock_leaf(
+    "holdings",
+    "An ETF's ten largest holdings, how many it holds in total, and its weight by instrument type and sector; the full holdings list is Elite-only.",
+    collections={"holdings": Collection("{ticker, name, instrument, sector, country, industry, weight, marketCap} for the ten largest holdings; weight is the holding's share of the fund, and every holding's weights sum to total_weight"), "breakdown": Collection("{instrument, sector, absoluteWeight}: the fund's weight per instrument type and sector")},
+    sections=["holdings"],
+    context={"total_holdings": "how many holdings the fund has; only the ten largest are listed", "total_weight": "the sum of every holding's weight as published"},
+    units={"marketCap": "millions USD"},
+)
+def holdings(ctx, args, ticker):
+    obs = ctx.observe("https://finviz.com/api/symbol/" + ticker + "/holdings")
+    source = obs.json()
+    if not isinstance(source, dict) or not isinstance(source.get("holdings", []), list):
+        raise obs.fail("structure_changed", "The holdings API did not return a holdings list.", "Read the saved raw response with read ID --raw.")
+    obs.result["target"] = ticker
+    obs.result["context"] = {"total_holdings": source.get("etfHoldingsTotal"), "total_weight": source.get("etfTotalWeight")}
+    breakdown = [dict({"instrument": block.get("instrument")}, **row) for block in source.get("breakdown") or [] for row in block.get("data") or []]
+    obs.result["collections"] = {"holdings": source.get("holdings") or [], "breakdown": breakdown}
     return obs.result

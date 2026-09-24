@@ -4,7 +4,7 @@ import re
 from urllib.parse import urlencode, urljoin
 
 import markup
-from contract import Collection, Selector, leaf
+from contract import Collection, Selector, condition, leaf
 from transport import Failure, validate_url
 
 NEWS_VIEWS = {"latest": None, "by-source": "2", "stocks": "3", "etfs": "4", "crypto": "5"}
@@ -67,10 +67,20 @@ def headlines(ctx, args, target):
     "news",
     "pulse",
     help="Market Pulse: Finviz's generated explanations of why stocks and the market moved; list the latest or read one by ID.",
-    args=[(("id",), dict(nargs="?", metavar="ID", help="Pulse ID from the list; omitted lists the latest entries."))],
-    collections={"entries": Collection("listed: {id, age, headline, tickers}; one ID: {id, ticker, dateTime, headline, summary (markdown), source, sentiment, catalyst, bulletPointsList} as published, a source-generated explanation rather than independent evidence")},
+    args=[(("id",), dict(nargs="?", metavar="ID", help="Pulse ID from the list; omitted lists the latest entries.")), (("--ticker",), dict(default=None, help="Read the newest explanation Finviz published for this ticker; empty when it has none."))],
+    collections={"entries": Collection("listed: {id, age, headline, tickers}; one ID or --ticker: {id, ticker, dateTime, headline, summary (markdown), source, sentiment, catalyst, bulletPointsList} as published, a source-generated explanation rather than independent evidence")},
 )
 def pulse(ctx, args, target):
+    if args.ticker:
+        if args.id:
+            raise Failure("invalid_argument", "An ID names one entry and --ticker asks for a ticker's newest; they do not combine.", "Drop one of them.")
+        obs = ctx.observe("https://finviz.com/api/stocks-why-moving/" + args.ticker)
+        entry = obs.json() if obs.raw.strip() else None  # the source answers 204 with no body when the ticker has no entry
+        stated = entry.get("ticker") if isinstance(entry, dict) else None
+        obs.result["target"] = args.ticker
+        obs.result["conditions"] = {"ticker": condition(args.ticker, ("confirmed" if str(stated).upper() == args.ticker.upper() else "not_applied") if stated else "unverified", stated)}
+        obs.result["collections"] = {"entries": [entry] if isinstance(entry, dict) else []}
+        return obs.result
     if args.id:
         if not args.id.isdigit():
             raise Failure("invalid_argument", "A pulse ID is numeric.", "Use an id from news pulse.")

@@ -24,6 +24,7 @@ EVIDENCE = {
     ("stock earnings", "low", "E"): (1.91, "1.98", 0.05, "AAPL 2026-09-24: 2026Q4 low E vs EPS next Q, scale"),
     ("stock earnings", "low", "R"): (1.91, "1.98", 0.05, "AAPL 2026-09-24: 2026Q4 low R vs EPS next Q, scale"),
     ("stock earnings", "low", "S"): (109410.3, "109.42B", 0.05, "AAPL 2026-09-24: 2026Q4 low S vs the 2026Q3 actual, scale"),
+    ("stock holdings", "marketCap", None): (4918530.28, "4918.53B", 0.001, "SPY holdings 2026-09-24: AAPL vs AAPL overview Market Cap the same day"),
     ("calendar earnings", "marketCap", None): (401348.32823115773, "401.35B", 0.001, "COST 2026-09-24: calendar item vs overview Market Cap"),
 }
 

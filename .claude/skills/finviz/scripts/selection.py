@@ -169,7 +169,7 @@ def ordered(out):
 def request_of(view):
     found = {k: v for k, v in (view.result.get("request") or {}).items() if v is not None}
     if view.item.collections:
-        found |= {k: v for k, v in selector_values(view.item, view.sel).items()}
+        found |= {k.lstrip("-").replace("-", "_"): v for k, v in selector_values(view.item, view.sel).items()}
     return found
 
 

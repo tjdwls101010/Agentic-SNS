@@ -55,7 +55,7 @@ def too_large(view, size, max_chars, base):
     result = {"target": view.result.get("target"), "id": view.result.get("id"), "status": "error"}
     ident = view.result.get("id")
     head = "The result needs " + str(size) + " characters even at its smallest; --max-chars is " + str(max_chars) + "."
-    section = next((name for name, p in view.picked.items() if p.records), None)
+    section = next((name for name, p in view.picked.items() if p.records), None) if base <= max_chars else None
     if ident and section and view.picked[section].records and isinstance(view.picked[section].records[0], dict):
         record = view.picked[section].records[0]
         smallest, room = [], max_chars - base - 300  # 300: the continuation line and separators a shown record brings
@@ -67,7 +67,7 @@ def too_large(view, size, max_chars, base):
         projected = read_command([ident], view.item, sel, section, view.picked[section].start, view.picked[section].bound, view.ops)
         fix = ("One " + section + " record alone does not fit. Project it: " + projected + " (fields: " + ", ".join(list(record)[:40]) + "), or read the raw response in windows: read " + ident + " --raw.") if smallest else ("One " + section + " record alone does not fit, and no field of it fits either. Read the raw response in windows: read " + ident + " --raw.")
     elif ident:
-        fix = "The context alone does not fit. Read the raw response in windows: read " + ident + " --raw."
+        fix = "The context and envelope alone, before any record, do not fit. Raise --max-chars or read the raw response in windows: read " + ident + " --raw."
     else:
         fix = "Raise --max-chars; this result has no saved observation to read in parts."
     result["error"] = {"code": "too_large", "message": head, "fix": fix}

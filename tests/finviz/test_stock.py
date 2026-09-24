@@ -165,3 +165,50 @@ def test_price_bars_are_newest_first_and_misaligned_arrays_are_refused(client):
     broken = client.one("stock", "prices", "A", "--bars", "3", code=6)
     assert broken["error"]["code"] == "array_alignment" and "close" in broken["error"]["message"]
     assert '"close": [146.85]' in client.one("read", broken["id"], "--raw")["data"]
+
+
+def test_one_strike_across_every_expiry_comes_from_the_options_api(client):
+    contracts = [{"ticker": "AAPL", "exDate": 260921, "strike": 250, "type": "put"}, {"ticker": "AAPL", "exDate": 261016, "strike": 250, "type": "call"}]
+    client.add("https://finviz.com/api/options/AAPL?strike=250", {"ticker": "AAPL", "options": contracts, "lastClose": 337.0, "lastTime": "2026-09-24T16:00:00"})
+    result = client.one("stock", "options", "AAPL", "--strike", "250")
+    assert result["data"]["contracts"] == contracts and result["data"]["last_close"] == 337.0 and result["data"]["current_expiry"] is None
+    assert result["conditions"]["strike"] == {"requested": 250.0, "status": "confirmed", "evidence": [250]}
+    client.add("https://finviz.com/api/options/AAPL?strike=255", {"ticker": "AAPL", "options": contracts, "lastClose": 337.0})
+    assert client.one("stock", "options", "AAPL", "--strike", "255")["conditions"]["strike"]["status"] == "not_applied"
+    assert client.one("stock", "options", "AAPL", "--strike", "250", "--expiry", "2026-10-16", code=2)["error"]["code"] == "invalid_argument"
+
+
+def test_filings_sort_and_category_are_judged_by_what_came_back(client):
+    categories = [{"id": "insider-equity", "label": "Insider equity", "forms": ["3", "4", "5"]}, {"id": "annual-quarterly-current", "label": "Reports", "forms": ["10-K", "10-Q", "8-K"]}]
+    oldest = {"formCategories": categories, "initialSort": "filingDate", "entries": {"items": [{"form": "10-K", "filingDate": "2014-12-01T00:00:00"}, {"form": "4", "filingDate": "2015-01-05T00:00:00"}], "page": 1, "totalPages": 40}}
+    client.add("https://finviz.com/stock?t=A&ty=lf&o=filingDate", stock_section(oldest))
+    result = client.one("stock", "filings", "A", "--sort", "filingDate")
+    assert result["conditions"]["sort"] == {"requested": "filingDate", "status": "confirmed", "evidence": {"source_sort": "filingDate"}}
+    assert result["next"] == "stock filings A --page 2 --sort filingDate"
+    client.add("https://finviz.com/stock?t=A&ty=lf&o=reportDate", stock_section(dict(oldest, initialSort="reportDate", entries=dict(oldest["entries"], items=[{"reportDate": "2020-01-01"}, {"reportDate": "2019-01-01"}]))))
+    assert client.one("stock", "filings", "A", "--sort", "reportDate")["conditions"]["sort"]["status"] == "not_applied"
+    insider = dict(oldest, initialFilter="insider-equity", entries=dict(oldest["entries"], items=[{"form": "4"}, {"form": "3"}]))
+    client.add("https://finviz.com/stock?t=A&ty=lf&f=insider-equity", stock_section(insider))
+    assert client.one("stock", "filings", "A", "--category", "insider-equity")["conditions"]["category"] == {"requested": "insider-equity", "status": "confirmed", "evidence": {"source_filter": "insider-equity", "forms_outside_the_category": []}}
+    client.add("https://finviz.com/stock?t=A&ty=lf&f=annual-quarterly-current", stock_section(dict(insider, initialFilter="annual-quarterly-current")))
+    assert client.one("stock", "filings", "A", "--category", "annual-quarterly-current")["conditions"]["category"]["status"] == "not_applied"
+    assert client.one("stock", "filings", "A", "--category", "bogus", code=2)["error"]["code"] == "invalid_argument"
+
+
+def test_etf_holdings_are_the_ten_largest_with_the_total_count_and_the_breakdown(client):
+    source = {"breakdown": [{"instrument": "Stocks", "data": [{"sector": "ElectronicTechnology", "absoluteWeight": 0.307}, {"sector": "Finance", "absoluteWeight": 0.128}]}], "holdings": [{"ticker": "NVDA", "name": "NVIDIA Corp", "weight": 0.0828, "marketCap": 5434790.87}, {"ticker": "AAPL", "name": "Apple Inc", "weight": 0.0741, "marketCap": 4918530.28}], "etfTotalWeight": 1.0019, "etfHoldingsTotal": 505, "version": 4}
+    client.add("https://finviz.com/api/symbol/SPY/holdings", source)
+    result = client.one("stock", "holdings", "SPY")
+    assert result["data"]["holdings"] == source["holdings"] and result["data"]["total_holdings"] == 505 and result["data"]["total_weight"] == 1.0019
+    assert result["data"]["other_sections"] == {"breakdown": 2}
+    breakdown = client.one("read", result["id"], "--section", "breakdown")["data"]["breakdown"]
+    assert breakdown == [{"instrument": "Stocks", "sector": "ElectronicTechnology", "absoluteWeight": 0.307}, {"instrument": "Stocks", "sector": "Finance", "absoluteWeight": 0.128}]
+
+
+def test_every_expiry_at_once_is_the_sources_plot_view(client):
+    contracts = [{"strike": 150, "type": "call", "exDate": 261016}, {"strike": 150, "type": "call", "exDate": 261120}]
+    client.add("https://finviz.com/stock?t=A&ty=oc&ov=plot", stock_section({"view": "plot", "options": contracts, "lastClose": 150.0}))
+    result = client.one("stock", "options", "A", "--all-expiries")
+    assert result["data"]["contracts"] == contracts and result["conditions"]["all_expiries"]["status"] == "confirmed"
+    client.add("https://finviz.com/stock?t=A&ty=oc&ov=plot", stock_section({"view": "chain_date", "options": contracts, "lastClose": 150.0}))
+    assert client.one("stock", "options", "A", "--all-expiries")["conditions"]["all_expiries"]["status"] == "not_applied"

@@ -55,11 +55,15 @@ def test_market_performance_lists_every_period_per_instrument_and_confirms_the_c
 def test_market_map_is_performance_records_and_joins_the_classification_on_request(client):
     client.add("https://finviz.com/api/map_perf?t=sec&st=d1", {"nodes": {"AAPL": 1.0, "MSFT": -0.5}, "subtype": "d1", "version": 15})
     default = client.one("market", "map")
-    assert default["data"]["tickers"] == [{"ticker": "AAPL", "performance": 1.0}, {"ticker": "MSFT", "performance": -0.5}]
+    assert default["data"]["tickers"] == [{"ticker": "AAPL", "d1": 1.0}, {"ticker": "MSFT", "d1": -0.5}]
     assert default["data"]["period"] == "d1" and "dependencies" not in default["source"]
     client.add("https://finviz.com/api/map_perf?t=sec&st=w1", {"nodes": {"AAPL": 1.0}, "subtype": "d1", "version": 15})
     assert client.one("market", "map", "--period", "w1")["conditions"]["period"] == {"requested": "w1", "status": "not_applied", "evidence": "d1"}
     assert client.one("market", "map", "--type", "sec_ixic", code=2)["error"]["code"] == "invalid_argument"
+    client.add("https://finviz.com/api/map_perf?t=sec&st=pe", {"nodes": {"AAPL": 35.2}, "subtype": "pe", "version": 15})
+    fundamental = client.one("market", "map", "--period", "pe")
+    assert fundamental["data"]["tickers"] == [{"ticker": "AAPL", "pe": 35.2}] and fundamental["conditions"]["period"]["status"] == "confirmed"
+    assert client.one("market", "map", "--period", "i5", code=2)["error"]["code"] == "invalid_argument"
 
 
 def test_market_map_resolves_classification_from_the_page_assets_and_degrades_to_partial(client):
@@ -71,12 +75,12 @@ def test_market_map_resolves_classification_from_the_page_assets_and_degrades_to
     client.add("https://finviz.com/assets/dist-legacy/runtime.v1.22f44280.js", MAP_RUNTIME)
     client.add("https://finviz.com/assets/dist-legacy/62.v1.bbb222.js", MAP_CHUNK)
     result = client.one("market", "map", "--type", "geo", "--classification")
-    assert result["data"]["tickers"] == [{"ticker": "RY", "performance": 1.2, "groups": ["World", "Canada"], "description": "Royal Bank Of Canada", "weight": 294647}, {"ticker": "TD", "performance": -0.4}]
+    assert result["data"]["tickers"] == [{"ticker": "RY", "d1": 1.2, "groups": ["World", "Canada"], "description": "Royal Bank Of Canada", "weight": 294647}, {"ticker": "TD", "d1": -0.4}]
     assert result["data"]["classification_source"].endswith("62.v1.bbb222.js")
     client.add("https://finviz.com/assets/dist-legacy/62.v1.bbb222.js", "module.exports={name:'Other'}")
     degraded = client.one("market", "map", "--type", "geo", "--classification", code=8)
     assert degraded["status"] == "partial" and degraded["error"]["code"] == "asset_structure"
-    assert degraded["data"]["tickers"] == [{"ticker": "RY", "performance": 1.2}, {"ticker": "TD", "performance": -0.4}]
+    assert degraded["data"]["tickers"] == [{"ticker": "RY", "d1": 1.2}, {"ticker": "TD", "d1": -0.4}]
     assert any("asset_structure" in w for w in client.one("read", degraded["source"]["dependencies"][-1])["warnings"])
     assert client.one("read", degraded["id"], code=8)["status"] == "partial"  # a replay does not launder the gap
 
@@ -96,10 +100,10 @@ def test_map_loads_the_requested_universe_from_the_current_entry_script(client, 
     tree = {"name": "Root", "children": [{"name": label, "children": [{"name": "TEST", "value": 123, "newField": "kept"}]}]}
     client.add(url, "module.exports=" + json.dumps(tree))
     result = client.one("market", "map", "--type", map_type, "--classification")
-    assert result["data"]["tickers"] == [{"ticker": "TEST", "performance": 1.2, "groups": [label], "description": None, "weight": 123}] and result["data"]["classification_source"] == url
+    assert result["data"]["tickers"] == [{"ticker": "TEST", "d1": 1.2, "groups": [label], "description": None, "weight": 123}] and result["data"]["classification_source"] == url
     client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", loader + loader.replace(str(chunk), "9999"))
     ambiguous = client.one("market", "map", "--type", map_type, "--classification", code=8)
-    assert ambiguous["error"]["code"] == "asset_structure" and ambiguous["data"]["tickers"] == [{"ticker": "TEST", "performance": 1.2}]
+    assert ambiguous["error"]["code"] == "asset_structure" and ambiguous["data"]["tickers"] == [{"ticker": "TEST", "d1": 1.2}]
     client.add("https://finviz.com/assets/dist-legacy/map.v1.aaaa1111.js", loader)
     client.add(url, "a.exports=" + json.dumps(tree) + ";b.exports=" + json.dumps(tree))
     roots = client.one("market", "map", "--type", map_type, "--classification", code=8)
@@ -125,5 +129,18 @@ def test_bubbles_default_to_a_named_index_and_refuse_an_axis_the_source_rejects(
     assert client.one("market", "bubbles", "--index", "sec_all", code=2)["error"]["code"] == "invalid_argument"
     refused = client.one("market", "bubbles", "--x", "industry", code=2)
     assert "marketCap" in refused["error"]["message"] and "--help" in refused["error"]["fix"]
-    client.add("https://finviz.com/api/bubbles?x=PE&y=perfYtd&size=marketCap&color=sector&idx=any", rows)
-    assert client.one("market", "bubbles", "--x", "PE", "--y", "perfYtd", "--index", "any")["data"]["stocks"] == rows
+    assert client.one("market", "bubbles", "--size", "sales", code=2)["error"]["code"] == "invalid_argument"
+    client.add("https://finviz.com/api/bubbles?x=PE&y=perfYtd&size=averageVolume&color=industry&idx=any", rows)
+    assert client.one("market", "bubbles", "--x", "PE", "--y", "perfYtd", "--size", "averageVolume", "--color", "industry", "--index", "any")["data"]["stocks"] == rows
+
+
+def test_bubble_filters_are_judged_by_the_stocks_that_came_back(client):
+    tech = [{"ticker": "AAPL", "color": "Technology"}, {"ticker": "MSFT", "color": "Technology"}]
+    client.add("https://finviz.com/api/bubbles?x=sector&y=lastChange&size=marketCap&color=sector&idx=sp500&sec=technology&tickers=AAPL,MSFT", tech)
+    result = client.one("market", "bubbles", "--index", "sp500", "--sector", "technology", "--tickers", "AAPL,MSFT")
+    assert result["conditions"]["sector"] == {"requested": "technology", "status": "confirmed", "evidence": {"sectors_returned": ["Technology"]}}
+    assert result["conditions"]["tickers"]["status"] == "confirmed"
+    client.add("https://finviz.com/api/bubbles?x=sector&y=lastChange&size=marketCap&color=sector&idx=dji&excludeTickers=AAPL", tech)
+    assert client.one("market", "bubbles", "--exclude", "AAPL")["conditions"]["exclude"] == {"requested": "AAPL", "status": "not_applied", "evidence": {"excluded_but_returned": ["AAPL"]}}
+    client.add("https://finviz.com/api/bubbles?x=sector&y=lastChange&size=marketCap&color=sector&idx=dji&cap=mega&sh_avgvol=o1000", tech)
+    assert client.one("market", "bubbles", "--cap", "mega", "--avg-volume", "o1000")["conditions"]["cap"]["status"] == "unverified"

@@ -39,3 +39,12 @@ def test_an_article_is_paragraph_records_and_other_hosts_are_refused(client):
     assert data == {"title": "Fed Decision Preview", "links": [{"text": "SEC filing", "url": "https://www.sec.gov/x"}], "images": ["https://finviz.com/img/chart.png"], "paragraphs": [{"text": "First paragraph."}, {"text": "Second paragraph."}]}
     assert client.one("news", "article", "https://www.marketwatch.com/story/x", code=2)["error"]["code"] == "unsupported_url"
     assert client.one("news", "article", "https://finviz.com/screener", code=2)["error"]["code"] == "unsupported_url"
+
+
+def test_a_tickers_newest_pulse_is_one_entry_or_empty(client):
+    entry = {"id": 292108, "ticker": "NVDA", "dateTime": "2026-09-23T08:30:20.06", "headline": "Nvidia director sold stock", "summary": None, "source": "news_summary", "sentiment": "neutral", "catalyst": False, "instrument": 0, "bulletPointsList": None}
+    client.add("https://finviz.com/api/stocks-why-moving/NVDA", entry)
+    result = client.one("news", "pulse", "--ticker", "NVDA")
+    assert result["data"]["entries"] == [entry] and result["conditions"]["ticker"]["status"] == "confirmed"
+    client.add("https://finviz.com/api/stocks-why-moving/AAPL", "", status=204)
+    assert client.one("news", "pulse", "--ticker", "AAPL", code=7)["data"]["entries"] == []

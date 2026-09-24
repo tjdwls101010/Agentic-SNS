@@ -211,3 +211,19 @@ def test_a_single_page_screen_that_returned_nothing_is_stored_as_empty(client):
     client.add("https://finviz.com/screener?v=111&ft=4&r=1", screener_table([], total=0, page_values=(1,)))
     assert client.one("screen", "run", code=7)["status"] == "empty"
     assert client.one("read", client.one("screen", "run", code=7)["id"], code=7)["status"] == "empty"
+
+
+def test_tickers_screen_named_stocks_in_one_request_and_rows_outside_the_list_are_not_applied(client):
+    three = [("AAPL", ["Apple Inc", "35.1"]), ("MSFT", ["Microsoft", "31.0"]), ("NVDA", ["NVIDIA", "40.2"])]
+    page = screener_table(three, headers=("No.", "Ticker", "Company", "P/E"), total=3, page_values=(1,)).replace("<body>", '<body><input id="tickersInput" value="AAPL,MSFT,NVDA"/>')
+    client.add("https://finviz.com/screener?v=121&ft=4&t=AAPL,MSFT,NVDA&r=1", page)
+    result = client.one("screen", "run", "--tickers", "AAPL,MSFT,NVDA", "--view", "valuation")
+    assert [r["ticker"] for r in result["data"]["rows"]] == ["AAPL", "MSFT", "NVDA"]
+    assert result["conditions"]["tickers"] == {"requested": "AAPL,MSFT,NVDA", "status": "confirmed", "evidence": {"ticker_input": "AAPL,MSFT,NVDA", "rows_outside_the_list": []}}
+    client.add("https://finviz.com/screener?v=111&ft=4&t=AAPL&r=1", screener_table(ROWS, page_values=(1,)))
+    assert client.one("screen", "run", "--tickers", "AAPL")["conditions"]["tickers"]["status"] == "not_applied"
+
+
+def test_screener_sort_keys_are_the_order_controls_own(client):
+    assert "-marketcap" in client.one("schema", "screen", "run")["data"]["arguments"]["--sort"]["choices"]
+    assert client.one("screen", "run", "--sort", "bogus", code=2)["error"]["code"] == "invalid_argument"
