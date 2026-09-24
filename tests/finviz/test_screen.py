@@ -1,5 +1,6 @@
 import json
 import re
+import shlex
 
 import pytest
 
@@ -229,3 +230,11 @@ def test_tickers_screen_named_stocks_in_one_request_and_rows_outside_the_list_ar
 def test_screener_sort_keys_are_the_order_controls_own(client):
     assert "-marketcap" in client.one("schema", "screen", "run")["data"]["arguments"]["--sort"]["choices"]
     assert client.one("screen", "run", "--sort", "bogus", code=2)["error"]["code"] == "invalid_argument"
+
+
+def test_a_next_command_for_a_descending_sort_runs_as_written(client):
+    client.add("https://finviz.com/screener?v=111&ft=4&o=-marketcap&r=1", screener_table(ROWS, sort=("marketcap", "descending")))
+    client.add("https://finviz.com/screener?v=111&ft=4&o=-marketcap&r=21", screener_table(ROWS, current=21, sort=("marketcap", "descending")))
+    first = client.one("screen", "run", "--sort=-marketcap")
+    assert first["next"] == "screen run --sort=-marketcap --row 21"
+    assert client.one(*shlex.split(first["next"]))["conditions"]["row"]["status"] == "confirmed"

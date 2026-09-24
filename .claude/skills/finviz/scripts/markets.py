@@ -108,7 +108,7 @@ CURRENCY = (("--currency",), dict(default=None, choices=["USD", "USDT", "EUR", "
     "quotes",
     help="Current quotes for every futures, forex or crypto instrument Finviz lists.",
     args=[KIND, (("--timeframe",), dict(default="d", choices=["d", "w"], help="Timeframe of the sparkline points: d daily, w weekly; the change fields stay daily either way, and market performance has every period.")), CURRENCY],
-    collections={"quotes": Collection("the quote as published with its instrument key as ticker, extra source fields included; the sparkline point arrays only with --sparkline", local=[Selector(("--sparkline",), dict(action="store_true", help="Keep each instrument's intraday sparkline points, most of the response's size."), keep_sparklines)])},
+    collections={"quotes": Collection("the quote as published with its instrument key as ticker, extra source fields included; the sparkline point arrays only with --sparkline", local=[Selector(("--sparkline",), dict(action="store_true", help="Keep each instrument's sparkline points (daily, or weekly with --timeframe w), most of the response's size."), keep_sparklines)])},
 )
 def quotes(ctx, args, target):
     if args.currency and args.kind != "crypto":

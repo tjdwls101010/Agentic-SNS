@@ -1,5 +1,6 @@
 """Read-only Finviz CLI: one JSON document on stdout, silence on stderr. Parse, run the leaf per target, save, select, fit the budget, print."""
 
+import re
 import sqlite3
 import sys
 
@@ -67,6 +68,9 @@ def check_numbers(args):
 def argument_error(exc, words):
     path = contract.path_in(words)
     error = exc.info()
+    flag = re.search(r"argument (--[\w-]+).*expected one argument", error["message"])
+    if flag and flag[1] in words and words.index(flag[1]) + 1 < len(words) and words[words.index(flag[1]) + 1].startswith("-"):
+        error["fix"] = error["fix"].replace(flag[1] + "=-VALUE", flag[1] + "=" + words[words.index(flag[1]) + 1])
     if path and "finviz.py --help" in error["fix"] and path != "finviz.py":
         error["fix"] = "Correct the arguments; finviz.py " + path + " --help lists them and schema " + path + " gives their defaults and choices."
     return {"status": "error", "results": [{"target": path or "finviz.py", "status": "error", "error": error}]}

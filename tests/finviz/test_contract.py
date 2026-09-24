@@ -126,7 +126,8 @@ def test_a_collection_selector_for_a_section_not_shown_is_refused(client):
     assert "--sections snapshot" in several["error"]["fix"]
 
 
-def test_a_value_starting_with_a_dash_gets_a_fix_that_works(client):
+def test_a_value_starting_with_a_dash_gets_a_fix_that_keeps_that_value(client):
     refused = client.one("screen", "run", "--sort", "-marketcap", code=2)
     assert "--sort=-marketcap" in refused["error"]["fix"]
+    assert "--sort=-filingDate" in client.one("stock", "filings", "A", "--sort", "-filingDate", code=2)["error"]["fix"]
     assert "--sort=-" in " ".join(client.raw("screen", "run", "--help", code=0).stdout.split())

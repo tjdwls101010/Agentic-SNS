@@ -135,7 +135,7 @@ class Parser(argparse.ArgumentParser):
         fix = "Correct the arguments; " + self.prog + " --help lists them and schema " + self.prog.removeprefix("finviz.py").strip() + " gives their defaults and choices."
         flag = re.search(r"argument (--[\w-]+).*expected one argument", message)
         if flag:  # a value such as -marketcap reads as an option unless it is attached with =
-            fix = "Attach a value that starts with - using =, e.g. " + flag[1] + "=-marketcap. " + fix
+            fix = "Attach a value that starts with - using =, as in " + flag[1] + "=-VALUE. " + fix
         raise Failure("invalid_argument", message, fix)
 
 

@@ -189,13 +189,19 @@ def selector_values(item, sel):
     return values
 
 
+def pair(flag, value):
+    """One option and its value as argv words; a value starting with - is attached with =, or argparse reads it as an option."""
+    value = str(value)
+    return [flag + "=" + value] if value.startswith("-") else [flag, value]
+
+
 def tokens(values):
     found = []
     for flag, value in values.items():
         if value is True:
             found.append(flag)
         elif value is not False:
-            found += [flag, str(value)]
+            found += pair(flag, value)
     return found
 
 
@@ -269,7 +275,7 @@ def source_command(view, page):
         elif value is True:
             words.append(flags[0])
         elif value not in (None, False) and value != options.get("default"):
-            words += [flags[0], str(value)]
+            words += pair(flags[0], value)
     values = {k: v for k, v in selector_values(item, view.sel).items() if k not in ("--start", "--limit")}
     if item.multi and view.sections != item.sections:
         values["--sections"] = ",".join(view.sections)
