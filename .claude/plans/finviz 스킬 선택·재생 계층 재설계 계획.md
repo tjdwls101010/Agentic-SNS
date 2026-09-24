@@ -293,4 +293,93 @@ tests/finviz/             (CI 경로 불변: .github/workflows/finviz.yml)
 
 ## 구현 완료 기록
 
-(구현 세션이 채운다: 계획과 달라진 결정, 단계별 실측, 제거 시험 결과표, 코덱스 리뷰 회차, 남긴 한계.)
+작업 트리: `../Agentic SNS-finviz`(worktree, 브랜치 `refactor/finviz-selection-contract`). 같은 작업 트리에서 yfinance 작업이 진행 중이어서 브랜치를 바꾸지 않았다.
+
+### 계획과 달라진 결정
+
+| 계획 | 실제 | 이유 |
+|---|---|---|
+| 단계마다 커밋 | 1~5단계를 한 커밋(`363aca4`) | 리프 선언 하나가 파서·선택·예산·재생을 동시에 바꿔 중간 상태가 테스트를 통과할 수 없다 |
+| 33리프 | 34리프: `calendar economic --event` 대신 `calendar event TICKER` | 이벤트 상세는 레코드 모양(이력·릴리스)이 달라 한 리프 한 모양 원칙을 깬다. 릴리스 표를 문맥에 넣자 문맥만 43,019자가 됐다(라이브 실측) |
+| `earnings --dataset`, `revenue --by` | 한 페이지의 컬렉션으로 선언해 `--sections`(재생은 `read ID --section`) | 같은 응답을 다시 요청하지 않는다. `dividends`(지급·연간)·`holdings`(보유·구성)도 같은 규칙 |
+| "short-interest 기본의 마지막 행이 최신" | 오래된 순으로 싣는 원천(공매도·펀드 흐름·가격 봉·연간 실적·추천 이력·연간 배당)은 뒤집어 최신순으로 낸다 | `--start`·`--limit`·continuation이 한 방향으로만 움직인다. schema의 `order`가 뒤집었음을 밝힌다 |
+| 뉴스 섹션 균형 기본 창 | 로컬 선택자 `--per-section N`(기본 20) | 기본 창이 선택의 일부가 되어야 continuation이 같은 목록을 잇는다 |
+| 맵 레코드 `{ticker, performance}` | `{ticker, <period>: 값}` — 필드 이름이 원천이 적용한 `subtype` | `--period pe`면 값이 성과가 아니라 P/E다 |
+| coverage `exhaustive` | 제거 | 부재는 완전성의 증명이 아니라는 문장이 schema·SKILL.md에 있다 |
+| continuation "실행 가능한 명령 한 줄" | `finviz.py` 뒤에 붙일 인자 한 줄(`read ID … --start N --limit M`) | 호출 접두사는 환경마다 다르다. schema `envelope`가 그렇게 설명한다 |
+| 옵션 `ov=chain_date\|chain_strike\|plot` | `--strike`(API, 전 만기)와 `--all-expiries`(`ov=plot`) | chain/list는 같은 데이터의 배치다. plot은 26만기×130행사가 전체라 다른 데이터여서 올렸다 |
+| 스크리너 다중값 `f=a\|b`(B) | 올리지 않음 | 익명 요청 `f=sec_technology\|healthcare`가 전 섹터 11,673건을 돌려줬다(미적용) |
+
+### 원천 실측으로 드러난 것
+- 공시 정렬: 현행 코드가 페이지에 `sort=`를 보내 무시되고 있었다(`initialSort` 불변). 페이지 인자는 `o=`. 카테고리 `f=`는 모르는 값도 되비추므로 반환 폼이 원천의 `formCategories[].forms` 안에 드는지로 판정한다.
+- 추정 수정 `R`: SNX에서 `R.mean 3.798 = epsReportedEstimate`, `E.mean 4.7019 = epsEstimate` — R은 보고 기준 EPS 추정치. 단위 확정.
+- 맵 `st` 54개(기간 14 + 지표 40)는 모두 `subtype`으로 되비추고, 모르는 값은 `d1`로 되돌아간다 → 에코가 적용 신호다. 장중 `i*`·포트폴리오 값은 제외.
+- 버블: x/y 64개·size 7개·color 18개 모두 원천이 받는다(모르는 축은 400). 필터 `sec` 11·`cap` 14·`sh_avgvol` 18값 각각 범위대로 적용(개별 요청으로 확인). `tickers`·`excludeTickers` 적용.
+- 내부자 프리셋은 페이지의 `is-active` 버튼이 에코다. 암호 `c=BTC`의 BTC 자신은 `BTCUSD`로 남는다.
+- ETF `weight`는 페이지가 JS로 그려 정적 표시 문자열이 없어 단위로 올리지 않았다(`marketCap`만 AAPL 표시값과 대조).
+
+### 단계별 실측
+- 0단계: 기준선 오프라인 107 통과·라이브 49 제외. 재현 테스트 13개가 현행 코드에서 전부 실패(`xfail strict`).
+- 1~6단계: 재현 13개 통과. 예산 스위트는 레코드 있는 24리프 전부에서 "작은 예산 → partial → continuation 합 = 예산 없는 답". 긴 선언 줄(500자 초과) 24개 → 9개(최장은 그룹 정렬 키 표 상수).
+- 7~8단계: 오프라인 140 통과, 라이브 48 통과·1 건너뜀(목록에 Finviz 호스팅 기사가 없을 때). 라이브는 인자마다 반환 레코드로 효과를 단언한다.
+
+### SKILL.md 제거 시험 (9단계)
+
+Claude Opus 5.5, `claude -p --safe-mode --restricted --tools Bash,Read --append-system-prompt-file <본문>`, 과제마다 2회(FULL T1은 6회, LEAN T1은 4회). 과제 T1~T4는 이전 대조 실험 원문, T5 추정 수정 이력, T6 뉴스 건수·최다 언급 종목(창과 근거), T7 URL을 준 스크리너(H1의 URL 문장 시험용, FULL·minus-H1만). 판정은 Claude가 과제별 기준으로 했다(도구 출력은 900자로 잘려 들어가 T5 `no_fabrication`에는 잘림 때문의 오판이 섞였다). LEAN은 근거 있는 부분만 남긴 후보(H1의 zsh·schema 문장 + Meaning + 버킷 문장)다.
+
+| criterion | FULL | LEAN | minus-H1 | minus-view | minus-meaning | minus-scope | minus-time | minus-evidence | minus-window |
+|---|---|---|---|---|---|---|---|---|---|
+| T1:definitions | 5/6 | 3/4 | 1/2 | 0/2 | 0/2 | 0/2 | 0/2 | 1/2 | 2/2 |
+| T1:shell | 6/6 | 4/4 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T1:time_roles | 6/6 | 4/4 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T2:one_request | 2/2 | 1/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T2:peg | 2/2 | 2/2 | 2/2 | 2/2 | 0/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T2:shell | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T2:time_roles | 2/2 | 2/2 | 2/2 | 2/2 | 1/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T3:bucket | 2/2 | 2/2 | 2/2 | 1/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T3:conditions | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T3:shell | 2/2 | 2/2 | 0/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T4:coverage | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T4:shell | 2/2 | 2/2 | 1/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T4:window_scope | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T5:estimate_dates | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T5:no_fabrication | 1/2 | 1/2 | 1/2 | 0/2 | 1/2 | 2/2 | 2/2 | 1/2 | 2/2 |
+| T5:partial_handled | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T5:shell | 2/2 | 2/2 | 1/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T6:evidence_reason | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T6:shell | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T6:window_count | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| T7:shell | 2/2 | - | 2/2 | - | - | - | - | - | - |
+| T7:url_to_command | 2/2 | - | 2/2 | - | - | - | - | - | - |
+
+판정과 남긴 것:
+- **H1 zsh 문장**: 빼면 T3 0/2·T4 1/2·T5 1/2 셸 실패 → 유지. **URL 문장**은 빼도 T7 2/2 → 삭제.
+- **Meaning**: 빼면 T2 PEG 0/2, T1 정의 0/2 → 유지. 버킷 문장(Which view에서 옮김)은 빼면 T3 1/2 → Meaning에 합쳐 유지.
+- **다종목 한 요청 문장**: 이 문장이 있는 팔은 T2 14/14, 없는 팔(minus-view·LEAN)은 3/4 → 유지. 개요 절 문장은 과제로 시험되지 않아 삭제(시나리오 `one-company-several-sections`가 확인).
+- **Scope·Time·Evidence·Window**: 목표 항목(T3 조건, T4 창, T1·T2 시각, T6 근거·건수, T5 partial)에서 손실 없음 → 삭제. 이 판단들은 CLI 출력(`conditions`·`coverage`·`continuation`, schema의 봉투 설명, 컬렉션 설명의 "source-generated explanation")이 이미 싣는다.
+- T1 정의는 어느 문단을 빼도 0~1/2로 흔들렸다. FULL을 6회로 늘리니 5/6, LEAN 3/4 — 잡음 범위로 보고 Meaning 외 문단의 근거로 쓰지 않았다.
+
+### 모델 시나리오 (10단계)
+
+스킬이 발견되는 환경(스크래치 프로젝트 디렉터리에 작업 트리의 `.claude/skills` 전체를 링크)에서 `claude -p --model claude-opus-5-5 --permission-mode acceptEdits --allowedTools Bash Read Skill Glob Grep`, 시나리오마다 자기 관측 저장소. 판정은 Claude가 `expect`와 저장소 관측 수(받은 HTTP 응답 수)로 했다.
+
+1차(제거 시험으로 줄인 본문): 통과 6 — `followup`·`large`·`unspecified`·`compare-five`·`budget-partial`·`insider-window`. 실패 5와 그 대응:
+- `code`: 코드 설계 요청에 스킬을 호출 → description 경계를 "writing or designing code that parses or calls Finviz"로.
+- `compare-three`: "세 종목의 현재 지표"에 스크리너 뷰 5개를 돌려 5요청 → 다종목 문장에 뒤집히는 조건 추가: 많은 지표×적은 종목은 종목별 개요(정의 포함 스냅샷)가 더 싸다.
+- `discover-then-screen`: `--sort -marketcap`이 argparse에서 거절(help가 `=` 형태를 빠뜨림 — CLI 결함, fix가 `=` 형태를 알려 주게 고침). 필터 목록을 `--filter`만 바꿔 4번 다시 받음 → "저장된 결과를 `read ID`와 그 명령의 선택자로 다시 고른다" 문장 추가(제거 시험 때 뺀 개요 절 문장이 싣던 판단).
+- `explicit`: 정의가 말하지 않는 회계연도를 일반 지식으로 덧붙임(제거 시험 T1 실패 사유와 같은 행동) → Meaning에 정의의 빈칸 세 가지(회계연도 여부, EPS 기준, 성장률의 기준)를 이름 붙임.
+- `one-company-several-sections`: 요청은 1회였으나 `observed_at`과 시세 시각을 구분하지 않고 `last_close`를 "현재가"로 부름 → 제거 시험에서 손실이 없어 뺀 시각 문단을 짧게 되살림(과제 T1·T2는 시각을 한 번만 말해 이 행동을 드러내지 못했다).
+
+2차(위 대응 반영 본문): 통과 9/11. `compare-three`·`compare-five`의 기대 문구를 조정했다 — `compare-three`는 1차가 반증한 원칙("넓은 지표도 스크리너 1요청")을 담고 있어 "뷰 루프 금지, 넓은 지표면 종목별 개요 가능"으로, `compare-five`는 "정의를 읽는 개요 1회 추가 허용, 종목마다 요청 불가"로 계획의 의도(종목별 요청 금지)를 명시했다. 이후 `compare-three`가 스크리너 결과에 없는 "EPS Q/Q는 전년 동기 대비"를 단정해 실패 — SKILL.md의 예시 사실을 결과 없이 옮긴 것이어서 EPS 예시 두 개를 뺐고(계획의 "기본 모델이 이미 안다"와도 맞음), "덧붙인 원인·사실은 자기 것으로 표시한다"에 이유(독자는 표시 없는 것을 Finviz의 보고로 읽는다)를 붙인 뒤 2/2 통과.
+
+최종 본문(마지막 사실 정정 두 문장 — `id`가 없는 오프라인 결과, `last_close`의 시각이 `as_of`·`last_time`이거나 없음 — 직전 판): 통과 8/11. 실패는 `unspecified`(Finviz 미지정 요청에 finviz 선택, 23요청)·`code`(코드 설계 요청에 스킬 호출, 조회 0)·`compare-three`(스크리너 행에 없는 정의를 표시 없이 씀). 같은 설명 문구로 2차에서는 `unspecified`·`code`가 통과했다. 시나리오별 누적(1차 이후 같은 계열 본문): `unspecified` 2/3, `code` 1/3, `compare-three` 3/6(요청 방식은 3차부터 매번 맞음), 나머지는 마지막 두 회차 모두 통과. 회차 간 분산이 커서 문구 반복 조정을 멈췄다 — 라우팅과 "표시 없는 외부 지식"은 남은 위험이다.
+
+### 코덱스 리뷰 (11단계)
+- 네 성질 검토: 초안(`20260924-174719-finviz-skill-review-2027`) — 사실 오류 4건 반영, "필드 이름을 빼고 추상 원칙으로"는 대조 실험 근거와 어긋나 따르지 않음. 최종본(`…183001-finviz-skill-review-final-bcd2`) — 네 성질 전부 ok, 사실 오류 2건 반영.
+- CLI 리뷰(`gpt-6-astra` high, `danger-full-access`, 같은 스레드 5회차): 1회차 D1~D13 재현 안 됨·컨트롤 표 전 행 노출·효과 확인, 새 결함 3(시세 timeframe 설명, 다중 절 공통 상한 too_large, 실패 관측 재생의 partial→ok)+D14 잔존. 2회차 새 결함 2(다른 절을 보인 id들의 continuation 누락, 스파크라인 설명). 3회차 2(내림차순 next가 실행 불가, `-`값 오류 fix가 예시값 제안). 4회차 1(`--limit` 내보내기의 next가 받은 행 건너뜀). 5회차 **none**. 모두 재현 테스트 후 수정.
+- `claude plugin validate --strict .claude/skills` exit 0. `contents: []`는 "검사 안 함"이 아니라 "문제 없음"이다 — 같은 디렉터리에 깨진 스킬을 넣으면 거기서 잡는 것을 확인했다.
+- 최종 실측: 오프라인 147 통과, 라이브 48 통과·1 건너뜀, ruff 통과, 500자 넘는 줄 0.
+
+### 남긴 한계 (`grep -rn "성진:"`)
+- 로컬 선택자가 명시됐는지를 argv 문자열로 판정한다.
+- 맵 로더는 진입 파일과 그 앞 번들 10개, 중첩 없는 switch만 해석한다(기존).
