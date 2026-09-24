@@ -65,11 +65,13 @@ def test_following_the_read_recovery_returns_the_same_observation(cli, tmp_path)
 
 
 def test_the_budget_the_fix_names_is_the_budget_that_works(cli, tmp_path):
-    args = ("prices", "history", "AAPL", "--period", "1y", "--fields", "Close,Volume")
-    proc, doc = cli(*args, "--max-chars", "1000", routes=chart_routes(), store=tmp_path / "s")
+    symbols = [f"S{i:02d}" for i in range(6)]
+    routes = [r for s in symbols for r in chart_routes(s)]
+    args = ("prices", "history", *symbols, "--period", "1y", "--fields", "Close,Volume")
+    proc, doc = cli(*args, "--max-chars", "1000", routes=routes, store=tmp_path / "s")
     assert proc.returncode == 9
     raised = parse(doc["results"][0]["error"]["fix"], "max-chars")
-    proc, doc = cli(*args, *raised, routes=chart_routes(), store=tmp_path / "s")
+    proc, doc = cli(*args, *raised, routes=routes, store=tmp_path / "s")
     assert proc.returncode in (0, 8), proc.stdout[:400]
     assert len(proc.stdout.strip()) <= int(raised[1])
 
@@ -248,10 +250,10 @@ def earnings_page_routes(count=25):
 
 def test_a_single_symbol_earnings_recovery_never_names_a_date_range(cli, tmp_path):
     """--start/--end is a real narrowing for market-wide calendar earnings and rejected outright for the
-    single-symbol form. An explicit store lengthens the continuation enough that even one row refuses, so the
+    single-symbol form. A long explicit store lengthens the continuation enough that even one row refuses, so the
     recovery sentence lists this leaf's narrowings."""
-    store = tmp_path / "an-explicitly-chosen-store"
-    proc, doc = cli("calendar", "earnings", "AAPL", "--max-chars", "1000", "--store", str(store), routes=earnings_page_routes(), store=tmp_path / "s")
+    store = tmp_path / ("an-explicitly-chosen-store-" + "x" * 200) / ("y" * 200)
+    proc, doc = cli("calendar", "earnings", "AAPL", "--limit", "25", "--max-chars", "1000", "--store", str(store), routes=earnings_page_routes(), store=tmp_path / "s")
     assert proc.returncode == 9, proc.stdout[:300]
     fix = doc["results"][0]["error"]["fix"]
     assert "Narrow with" in fix and "--start" not in fix and "--end" not in fix, fix

@@ -10,7 +10,7 @@ the whole answer.
 import re
 import shlex
 
-from encode import dump, is_empty, row_count
+from encode import display, dump, is_empty, row_count
 from envelope import EXIT_CODES, error_info
 from selection import select
 
@@ -162,7 +162,7 @@ def too_large_document(results, error, max_chars, request):
 def emit(results, args, item, request=None, scoped=False):
     """Print one document, narrowing an oversized window before refusing and refusing before truncating silently."""
     max_chars = getattr(args, "max_chars", 20000)
-    text = dump(document([strip(r) for r in results], overall(results), request))
+    text = dump(document([strip(r, item) for r in results], overall(results), request))
     if len(text) <= max_chars:
         print(text)
         return code(results, overall(results))
@@ -178,20 +178,25 @@ def emit(results, args, item, request=None, scoped=False):
                        if envelope["status"] in ("ok", "partial") and not is_empty(envelope.get("data"))):
                 break
             status = overall(results)
-            text = dump(document([strip(r) for r in results], status, request))
+            text = dump(document([strip(r, item) for r in results], status, request))
             if len(text) <= max_chars:
                 print(text)
                 return code(results, status)
 
-    clean = [strip(r) for r in results]
+    clean = [strip(r, item) for r in results]
     fix = schema_fix(needed, max_chars, scoped, bool(getattr(args, "filter", ""))) if item is None else too_large_fix(clean, item, len(text), max_chars, args, needed)
     error = error_info("too_large", f"Result requires {needed} characters; limit is {max_chars}.", fix)
     print(too_large_document(clean, error, max_chars, request))
     return EXIT_CODES["too_large"]
 
 
-def strip(envelope):
-    return {k: v for k, v in envelope.items() if not k.startswith("_")}
+def strip(envelope, item=None):
+    """The printed copy: private keys dropped, and the data shown at the precision the source had."""
+    shown = {k: v for k, v in envelope.items() if not k.startswith("_")}
+    if item is not None and shown.get("data") is not None:
+        zoned = bool((shown.get("context") or {}).get("timezone"))
+        shown["data"] = display(shown["data"], envelope.get("_full"), item.precise, zoned)
+    return shown
 
 
 def code(results, status):

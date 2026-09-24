@@ -56,7 +56,7 @@ def test_market_earnings_discloses_us_scope_and_native_zero_loss(cli):
     r = doc["results"][0]
     assert r["data"]["data"] == [[None, None, None]]
     assert r["context"]["scope"] == "US"
-    assert doc["request"]["most_active"] is False
+    assert "most_active" not in doc["request"], "a default left as it was is not echoed back"
     assert any("zero" in w.lower() for w in r["warnings"])
 
 

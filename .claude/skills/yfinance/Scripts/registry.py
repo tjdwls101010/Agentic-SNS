@@ -69,14 +69,14 @@ class Leaf:
     def __init__(self, group, name, purpose, fetch, *, args=(), ticker=False, limit=None, fields=(), recent=False, narrow=(),
                  units=None, interpretation=None, limits=None, gotchas=(), conditions=None, defaults=None, check=None,
                  forbidden=None, sliceable=True, shares_info=False, source_time=None, end_exclusive=False, epilog=None,
-                 exportable=True):
+                 exportable=True, precise=()):
         self.group, self.name, self.purpose, self.fetch = group, name, purpose, fetch
         self.args, self.ticker, self.limit, self.fields, self.recent = tuple(args), ticker, limit, tuple(fields), recent
         self.narrow, self.gotchas = tuple(narrow), tuple(gotchas)
         self.units, self.interpretation, self.limits = units or {}, interpretation or {}, limits or {}
         self.conditions, self.defaults, self.check, self.forbidden = conditions, defaults, check, forbidden
         self.sliceable, self.shares_info, self.source_time = sliceable, shares_info, source_time
-        self.end_exclusive, self.epilog, self.exportable = end_exclusive, epilog, exportable
+        self.end_exclusive, self.epilog, self.exportable, self.precise = end_exclusive, epilog, exportable, tuple(precise)
 
     @property
     def path(self):

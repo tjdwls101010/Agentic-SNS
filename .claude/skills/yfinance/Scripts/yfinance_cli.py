@@ -208,6 +208,15 @@ def read(args, saved):
     return [ordered(envelope)], item
 
 
+def chosen(request, given, parser):
+    """The printed request: what the caller chose and what a default filled in, not every parser default echoed back.
+
+    The saved observation keeps the whole request, since reproducing it needs every value.
+    """
+    defaults = {a.dest: registry.GLOBAL_DEFAULTS.get(a.dest) if a.default == argparse.SUPPRESS else a.default for a in parser._actions}
+    return {k: v for k, v in request.items() if k not in ("group", "leaf") and (v != given.get(k) or v != defaults.get(k, v))}
+
+
 def main():
     args = None
     try:
@@ -223,10 +232,11 @@ def main():
             results, item = read(args, saved)
             return budget.emit(results, args, item, {"read": args.id})
         item = registry.get(args.group, args.leaf)
+        given = dict(vars(args))
         validate(args, item)
         yf.config.debug.hide_exceptions = False
         request = {k: v for k, v in vars(args).items() if k not in ("symbols", "store", "ttl_days", "max_chars", "list_fields")}
-        return budget.emit(run(args, item, saved, request), args, item, request)
+        return budget.emit(run(args, item, saved, request), args, item, chosen(request, given, parsers[args.group, args.leaf]))
     except InputError as exc:
         fix = "Use --help for this command's arguments, or schema GROUP LEAF for its defaults, units and limits."
         results = [ordered(result("request", error=error_info("invalid", exc, fix)))]

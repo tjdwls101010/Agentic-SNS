@@ -7,7 +7,7 @@ def test_financial_periods_and_native_line_items_keep_missing_values(cli):
     assert proc.returncode == 0, proc.stdout + proc.stderr
     r = doc["results"][0]
     assert r["data"]["columns"] == ["TotalRevenue", "NetIncome"]
-    assert r["data"]["index"] == ["2024-12-31T00:00:00", "2023-12-31T00:00:00"]
+    assert r["data"]["index"] == ["2024-12-31", "2023-12-31"]
     assert r["data"]["data"] == [[120, 30], [0, None]]
     assert r["context"]["currency"] == "USD", "the statement currency is looked up rather than declined"
     assert r["context"]["quote_currency"] == "USD"
@@ -28,12 +28,12 @@ def test_profile_and_quote_query_real_info_and_select_fields(cli, group, leaf, f
 @pytest.mark.parametrize("leaf,module,payload,index,column,value", [
     ("recommendations", "recommendationTrend", {"trend": [{"period": "0m", "strongBuy": 7}]}, 0, "strongBuy", 7),
     ("summary", "recommendationTrend", {"trend": [{"period": "0m", "strongBuy": 7}]}, 0, "strongBuy", 7),
-    ("upgrades", "upgradeDowngradeHistory", {"history": [{"epochGradeDate": 1704067200, "firm": "Example", "toGrade": "Buy", "fromGrade": "Hold", "action": "up"}]}, "2024-01-01T00:00:00", "ToGrade", "Buy"),
+    ("upgrades", "upgradeDowngradeHistory", {"history": [{"epochGradeDate": 1704067200, "firm": "Example", "toGrade": "Buy", "fromGrade": "Hold", "action": "up"}]}, "2024-01-01", "ToGrade", "Buy"),
     ("earnings-estimate", "earningsTrend", {"trend": [{"period": "0q", "earningsEstimate": {"avg": {"raw": 2.5}, "earningsCurrency": "USD"}}]}, "0q", "avg", 2.5),
     ("revenue-estimate", "earningsTrend", {"trend": [{"period": "0q", "revenueEstimate": {"avg": {"raw": 200}, "revenueCurrency": "USD"}}]}, "0q", "avg", 200),
     ("trend", "earningsTrend", {"trend": [{"period": "0q", "epsTrend": {"current": {"raw": 2.5}}}]}, "0q", "current", 2.5),
     ("revisions", "earningsTrend", {"trend": [{"period": "0q", "epsRevisions": {"upLast7days": {"raw": 0}}}]}, "0q", "upLast7days", 0),
-    ("history", "earningsHistory", {"history": [{"quarter": {"fmt": "2024-03-31"}, "epsActual": {"raw": 3}}]}, "2024-03-31T00:00:00", "epsActual", 3),
+    ("history", "earningsHistory", {"history": [{"quarter": {"fmt": "2024-03-31"}, "epsActual": {"raw": 3}}]}, "2024-03-31", "epsActual", 3),
 ])
 def test_analyst_datasets_parse_yahoo_modules(cli, leaf, module, payload, index, column, value):
     proc, doc = cli("analysts", leaf, "AAPL", "--fields", column, routes=[{"path": "/quoteSummary/AAPL", "params": {"modules": module}, "json": {"quoteSummary": {"result": [{module: payload}]}}}])

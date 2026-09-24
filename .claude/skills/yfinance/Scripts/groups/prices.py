@@ -77,6 +77,10 @@ def dates_applied(encoded, args, context):
     return {"dates": found} if found else {}
 
 
+# 성진: 원천 정밀도가 실측된 열만 7자리로 표기한다 — 비조정 OHLC 6,270값 전부 float32 정확값(2026-09-24 AAPL 5y).
+# 옵션 체인은 52%만 float32라 선언하지 않는다; 새 열을 여기 넣으려면 같은 측정이 먼저다.
+PRICE_COLUMNS = ("Open", "High", "Low", "Close", "Adj Close")
+
 BAR_ARGS = [SYMBOLS, *dates("ISO date YYYY-MM-DD; inclusive.", "ISO date YYYY-MM-DD; exclusive, so the last bar returned is the day before."),
             Arg("--period", help="Relative range such as 5d, 1mo, 1y, ytd or max; default 1mo only when start/end are absent."),
             Arg("--interval", choices=["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"], default="1d", help="Bar size. Intraday intervals carry range limits the source enforces; schema prices history reports the measured values."),
@@ -107,7 +111,7 @@ def bars(ticker, args, context, warnings):
 
 
 @leaf("prices", "history", "OHLCV bars, dividends and splits over a date range or relative period.",
-      args=BAR_ARGS, ticker=True, end_exclusive=True, defaults=period_unless_dates, conditions=dates_applied,
+      args=BAR_ARGS, ticker=True, end_exclusive=True, defaults=period_unless_dates, conditions=dates_applied, precise=PRICE_COLUMNS,
       recent=True, narrow=["--fields", "--limit", "--period", "--start/--end", "--interval"],
       interpretation={"dates": "start is inclusive and end is exclusive. A naive date is read in the exchange's timezone.",
                       "adjustment": "--adjust decides what Close means: none leaves OHLC as supplied and adds Adj Close, auto scales OHLC for splits and dividends, back keeps Close raw and scales OHL. Adding dividends to an already adjusted return counts them twice.",
@@ -121,7 +125,7 @@ def history(ticker, args, context, warnings):
 
 
 @leaf("prices", "actions", "Dividends, splits and capital gains within a date range or relative period.",
-      args=BAR_ARGS, ticker=True, end_exclusive=True, defaults=period_unless_dates, conditions=dates_applied,
+      args=BAR_ARGS, ticker=True, end_exclusive=True, defaults=period_unless_dates, conditions=dates_applied, precise=PRICE_COLUMNS,
       recent=True, narrow=["--limit", "--period", "--start/--end"],
       interpretation={"dates": "start is inclusive and end is exclusive; rows appear only on dates carrying an action.",
                       "empty": "The default period is one month, in which most instruments have no action at all. An empty return here is normal and is not evidence that the instrument pays nothing."})
