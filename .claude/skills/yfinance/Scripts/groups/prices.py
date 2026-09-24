@@ -114,7 +114,7 @@ def bars(ticker, args, context, warnings):
       args=BAR_ARGS, ticker=True, end_exclusive=True, defaults=period_unless_dates, conditions=dates_applied, precise=PRICE_COLUMNS,
       recent=True, narrow=["--fields", "--limit", "--period", "--start/--end", "--interval"],
       interpretation={"dates": "start is inclusive and end is exclusive. A naive date is read in the exchange's timezone.",
-                      "adjustment": "--adjust decides what Close means: none leaves OHLC as supplied and adds Adj Close, auto scales OHLC for splits and dividends, back keeps Close raw and scales OHL. Adding dividends to an already adjusted return counts them twice.",
+                      "adjustment": "--adjust decides what Close means; adding dividends to an already adjusted return counts them twice.",
                       "repair": "--repair is a transformation with its own limits, not proof that a value equals the original trade."},
       limits={"1m": "8 days per request", "2m/5m/15m/30m/90m": "the range must fall within the last 60 days",
               "60m/1h": "no range limit measured; a year of 1h bars is far above the default budget",

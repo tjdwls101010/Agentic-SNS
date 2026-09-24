@@ -141,3 +141,38 @@ def test_five_years_of_daily_bars_show_about_twice_the_rows_in_one_screen(cli):
     proc, doc = cli("prices", "history", "AAPL", "--period", "5y", routes=[{"path": "/v8/finance/chart/AAPL", "json": payload}])
     assert proc.returncode == 8, proc.stdout[:300]
     assert doc["results"][0]["coverage"]["shown"] >= 240
+
+
+# ---- schema density -----------------------------------------------------------------------------------------------
+
+COMMON = {"--max-chars", "--filter", "--store", "--fields", "--list-fields", "--limit", "--timeout"}
+
+
+def test_a_leaf_schema_carries_its_own_arguments_and_points_at_the_shared_ones(cli):
+    proc = cli("schema", "prices", "history", raw=True)
+    assert len(proc.stdout.strip()) <= 2600, len(proc.stdout.strip())
+    described = json.loads(proc.stdout)["results"][0]["data"]
+    assert set(described["arguments"]) == {"symbols", "--start", "--end", "--period", "--interval", "--adjust", "--repair", "--prepost"}
+    assert "schema" in described["common"] and "--fields" in described["common"]
+    assert described["default_window"]["rows"] is None
+
+
+def test_the_root_schema_describes_each_shared_argument_once_with_where_it_applies(cli):
+    proc, doc = cli("schema")
+    shared = doc["results"][0]["data"]["common_arguments"]
+    assert COMMON | {"--ttl-days"} <= set(shared)
+    for name, spec in shared.items():
+        assert spec["help"] and spec["applies_to"], name
+    assert shared["--limit"]["default"] == "the command's default_window.rows"
+
+
+def test_every_leaf_schema_lists_exactly_the_options_its_help_offers_beyond_the_shared_ones(cli):
+    import re
+    proc, doc = cli("schema")
+    for group, leaves in doc["results"][0]["data"]["commands"].items():
+        for leaf in leaves:
+            scope = [group] + ([leaf] if leaf else [])
+            helped = set(re.findall(r"^  (--[a-z-]+)", cli(*scope, "--help", raw=True).stdout, re.M)) - COMMON - {"--help"}
+            proc, described = cli("schema", *scope)
+            options = {k for k in described["results"][0]["data"]["arguments"] if k.startswith("--")}
+            assert options == helped, scope

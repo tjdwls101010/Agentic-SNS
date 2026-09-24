@@ -96,10 +96,11 @@ def test_empty_search_is_not_proof_of_absence(cli):
 
 
 def test_schema_preserves_effective_global_defaults(cli):
-    proc, doc = cli("schema", "prices", "history")
+    proc, doc = cli("schema")
     assert proc.returncode == 0
-    assert doc["results"][0]["data"]["arguments"]["--max-chars"]["default"] == 20000
-    assert doc["results"][0]["data"]["arguments"]["--filter"]["default"] == ""
+    shared = doc["results"][0]["data"]["common_arguments"]
+    assert shared["--max-chars"]["default"] == 20000
+    assert shared["--filter"]["default"] == ""
 
 
 @pytest.mark.parametrize("argv", [["schema", "--max-chars", "0"], ["prices", "quote", ""], ["search", "   "]])
@@ -130,12 +131,12 @@ def test_schema_and_requests_share_omitted_option_defaults(cli):
     from datetime import date, timedelta
     proc, doc = cli('schema', 'calendar', 'economic')
     schema = doc['results'][0]['data']['arguments']
-    assert schema['--limit']['default'] == 12
+    assert doc['results'][0]['data']['default_window']['rows'] == 12
     assert schema['--start']['default'] == date.today().isoformat()
     assert schema['--end']['default'] == (date.today() + timedelta(days=7)).isoformat()
     for scope, limit in [(('search',), 10), (('screen', 'run'), 25)]:
         proc, doc = cli('schema', *scope)
-        assert doc['results'][0]['data']['arguments']['--limit']['default'] == limit
+        assert doc['results'][0]['data']['default_window']['rows'] == limit
     proc, doc = cli('schema', 'prices', 'history')
     assert doc['results'][0]['data']['arguments']['--period']['default'] == '1mo'
 
@@ -145,7 +146,7 @@ def test_scoped_schema_states_its_own_defaults_and_the_document_contract(cli):
     assert proc.returncode == 0, proc.stdout + proc.stderr
     data = doc["results"][0]["data"]
     assert "default_window" in data and "narrowing" in data
-    assert "schema with no scope" in data["output"], "the shared envelope is described once, not on every leaf"
+    assert "schema (no scope)" in data["common"], "the shared envelope is described once, not on every leaf"
     proc, doc = cli("schema", "screen", "run", "--filter", "ascending")
     assert "--ascending" in doc["results"][0]["data"]["arguments"]
     assert list(doc["results"][0]["data"]["arguments"]) == ["--ascending"], "a filtered schema keeps only what matched"

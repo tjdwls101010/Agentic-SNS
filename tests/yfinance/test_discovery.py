@@ -68,7 +68,7 @@ def test_each_leaf_declares_a_purpose_and_a_reachable_narrowing(cli, key):
     for named in described.get("narrowing") or []:
         for flag in named.split("/"):
             flag = flag if flag.startswith("--") else "--" + flag
-            assert flag in described["arguments"], f"{described['command']} declares {named} but has no {flag}"
+            assert flag in described["arguments"] or flag in schema()["common_arguments"], f"{described['command']} declares {named} but has no {flag}"
 
 
 @pytest.mark.parametrize("key", EVERY_LEAF, ids=IDS)
@@ -144,5 +144,5 @@ def test_schema_reports_a_leaf_without_repeating_the_shared_envelope(cli):
     proc = cli("schema", "prices", "history", raw=True)
     assert proc.returncode == 0, proc.stderr
     assert '"envelope"' not in proc.stdout
-    assert "schema with no scope" in proc.stdout
-    assert len(proc.stdout.strip()) <= 6320, "a leaf's schema has become prose rather than structure"
+    assert "schema (no scope)" in proc.stdout
+    assert len(proc.stdout.strip()) <= 4000, "a leaf's schema has become prose rather than structure"

@@ -227,7 +227,7 @@ def main():
         saved = store.Store(args.store)
         saved.prune(args.ttl_days)
         if args.group == "schema":
-            return budget.emit([ordered(result("schema", schema_data(args, parsers)))], args, None, {"scope": args.scope}, scoped=bool(args.scope))
+            return budget.emit([ordered(result("schema", schema_data(args, parsers, parser)))], args, None, {"scope": args.scope}, scoped=bool(args.scope))
         if args.group == "read":
             results, item = read(args, saved)
             return budget.emit(results, args, item, {"read": args.id})
