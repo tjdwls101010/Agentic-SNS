@@ -21,7 +21,7 @@ ENVELOPE = {
 
 # 성진: 공통 인자는 49개 리프 schema마다 반복되면 리프 고유 계약을 묻는다(prices history 4,094자 중 약 1.5k). 루트에 한 번.
 SHARED = {
-    "max_chars": "every command, before or after the group",
+    "max_chars": "every command, before the group or after the whole command",
     "filter": "schema, catalog commands (screen presets/fields/values, market sectors) and --list-fields",
     "store": "every command; read needs the store an id was saved in",
     "fields": "every data command and read",

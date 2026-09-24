@@ -9,6 +9,7 @@ import io
 import json
 import os
 from pathlib import Path
+import tempfile
 
 from encode import is_sided, is_table
 from envelope import InputError
@@ -54,7 +55,17 @@ def flatten(record, prefix="", depth=0):
 
 
 def label(column):
-    return ".".join(map(str, column)) if isinstance(column, list) else str(column)
+    return " | ".join(map(str, column)) if isinstance(column, list) else str(column)
+
+
+def claim(name, taken):
+    """A name no other column of this row has: a clash becomes source.<name>, then source.<name>.2, never a lost value."""
+    found, n = name, 1
+    while found in taken:
+        found = f"source.{name}" if n == 1 else f"source.{name}.{n}"
+        n += 1
+    taken.add(found)
+    return found
 
 
 def table_rows(table, fixed):
@@ -62,11 +73,11 @@ def table_rows(table, fixed):
     index_columns = [n if n is not None else ("index" if len(names) == 1 else f"index_{i}") for i, n in enumerate(names)]
     for position, row in zip(table["index"], table["data"]):
         levels = position if len(index_columns) > 1 and isinstance(position, list) else [position]
-        yield {**fixed, **dict(zip(index_columns, levels))}, dict(zip((label(c) for c in table["columns"]), row)), list(fixed) + index_columns
+        yield [*fixed.items(), *zip(index_columns, levels)], list(zip((label(c) for c in table["columns"]), row)), list(fixed) + index_columns
 
 
-def shaped(data):
-    """(identifying columns, [(identifying values, fields)]) for every shape that is rows; None for a single record."""
+def shaped(data, keyed=False):
+    """(identifying columns, [(identifying pairs, field pairs)]) for every shape that is rows; None for a single record."""
     if is_table(data) or is_sided(data):
         tables = [({}, data)] if is_table(data) else [({"side": side}, table) for side, table in data.items()]
         pairs, keys = [], []
@@ -74,23 +85,27 @@ def shaped(data):
             for ident, fields, keys in table_rows(table, fixed):
                 pairs.append((ident, fields))
         return keys, pairs
+    if keyed:
+        return ["key"], [([("key", r.get("key"))], list(flatten({k: v for k, v in r.items() if k != "key"}).items())) for r in data]
     if isinstance(data, list) and all(isinstance(r, dict) for r in data):
-        return [], [({}, flatten(r)) for r in data]
+        return [], [([], list(flatten(r).items())) for r in data]
     if isinstance(data, list):
-        return [], [({"value": v}, {}) for v in data]
-    if isinstance(data, dict) and data and all(isinstance(v, dict) for v in data.values()):
-        return ["key"], [({"key": k}, flatten(v)) for k, v in data.items()]
+        return [], [([("value", v)], []) for v in data]
     return None
 
 
-def rows_of(data):
-    """Rows with names made safe: a source field called `target`, or one sharing an index column's name, becomes
-    `source.<name>` rather than overwriting the column that identifies the row."""
-    found = shaped(data)
+def rows_of(data, keyed=False):
+    """Rows whose every name is unique: a source field or index level that shares a name with `target`, a side, a
+    key or another column is written as source.<name> rather than overwriting the value that identifies the row."""
+    found = shaped(data, keyed)
     if found is None:
         raise InputError("--out writes rows; this result is a single record — read it on screen instead.")
     keys, pairs = found
-    return keys, [(ident, {(f"source.{k}" if k in RESERVED or k in ident else k): v for k, v in fields.items()}) for ident, fields in pairs]
+    rows = []
+    for ident, fields in pairs:
+        taken = {"target"}
+        rows.append(({claim(k, taken): v for k, v in ident}, {claim(k, taken): v for k, v in fields}))
+    return keys, rows
 
 
 def publish(path, parts):
@@ -113,9 +128,11 @@ def publish(path, parts):
     writer.writeheader()
     writer.writerows({k: cell(v) for k, v in line.items()} for line in lines)
     destination = Path(path)
-    temporary = destination.with_name(f".{destination.name}.{os.getpid()}.part")
+    handle, name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".part", dir=destination.parent)  # ours alone
+    temporary = Path(name)
     try:
-        temporary.write_text(buffer.getvalue(), encoding="utf-8")
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            stream.write(buffer.getvalue())
         os.link(temporary, destination)
     except FileExistsError:
         raise Unpublished("invalid", f"--out {path} appeared before the file could be published and was left untouched.") from None
@@ -129,7 +146,6 @@ def publish(path, parts):
 def summary(path, columns, keys, records):
     """What the screen gets instead of the rows: where they went and which span they cover."""
     found = {"out": str(path), "rows": len(records), "columns": columns}
-    index = [k for k in keys if k not in ("side",)]
-    if index and records:
-        found["first"], found["last"] = records[0][0].get(index[-1]), records[-1][0].get(index[-1])
+    if [k for k in keys if k != "side"] and records:
+        found["first"], found["last"] = list(records[0][0].values())[-1], list(records[-1][0].values())[-1]
     return found

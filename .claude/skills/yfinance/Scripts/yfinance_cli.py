@@ -14,7 +14,7 @@ import export
 import groups  # noqa: F401  registers every leaf
 import registry
 import store
-from encode import encode, is_empty, is_sided
+from encode import encode, is_empty, is_sided, is_table
 from envelope import InputError, error_info, now, ordered, result
 from schema import schema_data
 from selection import select, select_sides
@@ -190,13 +190,32 @@ def exported(encoded, args, item):
     whole = copy.copy(item)
     whole.limit, whole.fields = None, ()  # the leaf's default window and projection are for the screen; a computation needs what arrived
     coverage = {}
+    keyed = isinstance(encoded, dict) and not is_table(encoded) and not is_sided(encoded) and all(isinstance(v, dict) for v in encoded.values())
+    if keyed:  # a mapping of records windows like the rows it becomes, and keeps its key through --fields
+        encoded = [{"key": k, **{("source.key" if f == "key" else f): x for f, x in v.items()}} for k, v in encoded.items()]
+        if getattr(args, "fields", None) and "key" not in args.fields:
+            args = copy.copy(args)
+            args.fields = ["key", *args.fields]
     if is_sided(encoded):
         data = select_sides(encoded, args, whole, coverage)
         sides = [v for v in coverage.values() if isinstance(v, dict) and "received" in v]
         coverage = {"received": sum(s["received"] for s in sides), "shown": sum(s.get("shown", 0) for s in sides)}
     else:
         data, coverage = select(encoded, args, whole, coverage)
-    return export.rows_of(data), coverage
+    if is_empty(data):
+        return ([], []), coverage  # nothing usable was selected; this target contributes no rows, as its empty status says
+    return export.rows_of(data, keyed), coverage
+
+
+def retry(ident, args, coverage):
+    """The read that writes the same rows again: same store, same projection, same slice."""
+    start = coverage.get("start", 0)
+    if coverage.get("kept") == "newest":
+        start = coverage["received"] - coverage["shown"]
+    explicit = getattr(args, "limit", None)
+    names = [("--store", getattr(args, "store", None)), ("--fields", ",".join(args.fields) if getattr(args, "fields", None) else None),
+             ("--start", start or None), ("--limit", explicit)]
+    return f"read {ident}" + budget.quoted(args, names) + " --out NEWPATH"
 
 
 def write_out(results, pending, args):
@@ -214,8 +233,7 @@ def write_out(results, pending, args):
         if not records:
             continue
         if failure:
-            again = f"read {ident}" + budget.quoted(args, [("--store", getattr(args, "store", None))]) + " --out NEWPATH"
-            fix = f"Choose a new path; the rows are saved, so {again} writes them without a new request."
+            fix = f"Choose a new path; the rows are saved, so {retry(ident, args, coverage)} writes them without a new request."
             results[i] = ordered(result(envelope["target"], error=error_info(failure.code, failure, fix), ident=ident))
             continue
         envelope["data"] = export.summary(args.out, columns, keys, records)

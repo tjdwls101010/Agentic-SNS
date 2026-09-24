@@ -138,7 +138,8 @@ def display_table(table, full, precise, zoned):
     out = dict(table)
     if dated(full["index"], zoned):
         out["index"] = [day(v) for v in table["index"]]
-    whole = {str(c): column(full, str(c)) for c in full["columns"]}
+    position = {str(c): i for i, c in enumerate(full["columns"])}  # by position: a column may itself be named "index"
+    whole = {name: [row[i] for row in full["data"]] for name, i in position.items()}
     shortened = {str(c) for c in table["columns"] if dated(whole.get(str(c), []), zoned)}
     exact = {str(c) for c in table["columns"]} & set(precise)
     out["data"] = [[day(v) if str(c) in shortened else number(v, str(c) in exact) for c, v in zip(table["columns"], row)] for row in table["data"]]

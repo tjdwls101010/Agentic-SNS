@@ -334,3 +334,21 @@ def test_a_single_record_refusal_never_offers_a_file(cli, tmp_path):
     proc, doc = cli("fund", "description", "SPY", routes=routes, store=tmp_path / "s")
     assert proc.returncode == 9, proc.stdout[:300]
     assert "--out" not in doc["results"][0]["error"]["fix"]
+
+
+def test_reading_a_long_saved_series_under_a_small_budget_narrows_rather_than_crashing(cli, tmp_path):
+    """read has no --interval, so a recovery built for the original command must not be built from read's arguments."""
+    store = tmp_path / "s"
+    proc, doc = cli("prices", "history", "AAPL", "--period", "1y", "--limit", "1", routes=chart_routes(), store=store)
+    proc, back = cli("read", doc["results"][0]["id"], "--max-chars", "1500", routes=[], store=store)
+    assert proc.returncode == 8, proc.stdout[:400] + proc.stderr[-400:]
+    assert back["results"][0]["continuation"]
+
+
+def test_a_multi_target_recovery_keeps_the_store_it_saved_to(cli, tmp_path):
+    store = tmp_path / "custom"
+    symbols = [f"S{i:02d}" for i in range(10)]
+    routes = [r for s in symbols for r in chart_routes(s)]
+    proc, doc = cli("prices", "history", *symbols, "--period", "1y", "--store", str(store), "--max-chars", "4000", routes=routes, store=tmp_path / "unused")
+    assert proc.returncode == 9, proc.stdout[:300]
+    assert f"--store {store}" in doc["results"][0]["error"]["fix"]

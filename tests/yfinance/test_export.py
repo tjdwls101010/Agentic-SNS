@@ -143,3 +143,48 @@ def test_the_root_schema_names_the_export_failure(cli, code):
     data = doc["results"][0]["data"]
     assert data["output"]["exit_codes"][code] == 4
     assert "--out" in data["common_arguments"]
+
+
+# ---- defects found by an independent review of this feature --------------------------------------------------------
+
+
+def test_a_colliding_field_name_never_drops_a_value(cli, tmp_path):
+    quotes = [{"symbol": "A", "target": "ORIGINAL", "source.target": "SECOND"}]
+    routes = [{"path": "/v1/finance/screener", "json": {"finance": {"result": [{"quotes": quotes, "total": 1}], "error": None}}}]
+    proc, doc = cli("screen", "run", "--query", '{"operator":"EQ","operands":["region","us"]}', "--out", str(tmp_path / "s.csv"), routes=routes)
+    assert proc.returncode == 0, proc.stdout[:400]
+    row = rows(tmp_path / "s.csv")[0]
+    assert "ORIGINAL" in row.values() and "SECOND" in row.values() and row["target"] != "ORIGINAL"
+
+
+def test_an_all_null_target_is_empty_and_writes_no_file(cli, tmp_path):
+    columns = ["Symbol", "Company Name", "Market Cap (Intraday)", "Event Name", "Event Start Date", "EPS Estimate", "Reported EPS", "Surprise (%)"]
+    route = {"path": "/v1/finance/visualization", "body": {"entityIdType": "sp_earnings"},
+             "json": {"finance": {"result": [{"documents": [{"columns": [{"label": c, "type": "TIMESTAMP" if c == "Event Start Date" else "STRING"} for c in columns], "rows": [["AAPL", "Apple", 0, "Earnings", "2024-01-25T21:00:00Z", 0, 0, 0]]}]}], "error": None}}}
+    proc, doc = cli("calendar", "earnings", "--start", "2024-01-25", "--end", "2024-01-25", "--fields", "EPS Estimate,Reported EPS,Surprise(%)", "--out", str(tmp_path / "e.csv"), routes=[route])
+    assert proc.returncode == 7, proc.stdout[:400]
+    assert not (tmp_path / "e.csv").exists()
+
+
+def test_a_mapping_of_records_honours_an_explicit_limit(cli, tmp_path):
+    summary = {"marketSummaryResponse": {"result": [{"exchange": "SNP", "shortName": "S&P 500"}, {"exchange": "DJI", "shortName": "Dow"}], "error": None}}
+    status = {"finance": {"marketTimes": [{"marketTime": [{"open": "2024-01-02T09:30:00-05:00", "close": "2024-01-02T16:00:00-05:00", "time": "2024-01-02T16:00:00-05:00", "timezone": [{"short": "EST", "gmtoffset": "-5000"}]}]}]}}
+    routes = [{"path": "/v6/finance/quote/marketSummary", "json": summary}, {"path": "/v6/finance/markettime", "json": status}]
+    proc, doc = cli("market", "summary", "--limit", "1", "--out", str(tmp_path / "m.csv"), routes=routes)
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert [r["key"] for r in rows(tmp_path / "m.csv")] == ["SNP"]
+    assert doc["results"][0]["coverage"]["received"] == 2 and doc["results"][0]["coverage"]["shown"] == 1
+
+
+def test_a_failed_publication_names_a_retry_that_keeps_the_selection(cli, tmp_path):
+    out = tmp_path / "race.csv"
+    proc, doc = cli("prices", "history", "AAPL", "--period", "1mo", "--fields", "Close", "--out", str(out), routes=[chart("AAPL", [1.0, 2.0]) | {"touch": str(out)}])
+    assert "--fields Close" in doc["results"][0]["error"]["fix"]
+
+
+def test_a_stray_file_beside_the_destination_is_left_alone(cli, tmp_path):
+    stray = tmp_path / ".p.csv.1.part"
+    stray.write_text("not ours\n")
+    proc, doc = cli("prices", "history", "AAPL", "--period", "1mo", "--out", str(tmp_path / "p.csv"), routes=[chart("AAPL", [1.0, 2.0])])
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert stray.read_text() == "not ours\n"

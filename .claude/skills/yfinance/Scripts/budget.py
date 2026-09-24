@@ -64,7 +64,8 @@ def shrink(envelope, item, args, size, max_chars):
 
 def export_command(ident, args):
     """Writing the saved rows to a file costs no request and has no budget, so it is the way out for a computation."""
-    return f"read {ident}" + quoted(args, [("--store", getattr(args, "store", None))]) + " --out FILE"
+    fields = ",".join(args.fields) if getattr(args, "fields", None) else None
+    return f"read {ident}" + quoted(args, [("--store", getattr(args, "store", None)), ("--fields", fields)]) + " --out FILE"
 
 
 def coarser(item, args):
@@ -122,7 +123,8 @@ def too_large_fix(results, item, size, max_chars, args, needed=None):
         # 성진: 다종목에서 첫 id만 주면 비교 요청이 단일 종목 질문으로 바뀐다; 전부 이름 붙이고 목표를 줄이는 길도 함께 준다.
         listed = "; ".join(f"{t} {i}" for t, i in saved)
         # 성진: 목표만 보존하고 투영을 빠뜨리면 회복이 기본 필드집합으로 돌아가 다른 값을 성공적으로 낸다 — 질문이 바뀐 것은 같다.
-        kept = quoted(args, [("--fields", ",".join(args.fields) if getattr(args, "fields", None) else None)])
+        # 성진: 저장소도 함께 — 명시한 --store를 빠뜨리면 이름 붙인 id가 기본 캐시에 없다.
+        kept = quoted(args, [("--store", getattr(args, "store", None)), ("--fields", ",".join(args.fields) if getattr(args, "fields", None) else None)])
         filed = ", rerun with --out FILE to write every target's rows to one file (a new request)" if item.exportable else ""
         each = f" Each target was observed and saved separately: {listed}. Read one with read ID{kept}" + (f" --limit {keep}" if keep else "") + f", ask for fewer targets in one call{filed}, or rerun with --max-chars {needed}."
         return head + (f"Narrow with {narrow}." if narrow else "Ask for fewer targets.") + each
@@ -186,6 +188,16 @@ def emit(results, args, item, request=None, scoped=False):
     # 성진: fix가 이름 붙이는 --max-chars는 축소 전 문서가 필요로 한 크기다. 축소 후 크기를 실으면 그 값으로 다시 돌려도
     # 같은 결과가 다시 넘친다 — "이름 붙인 크기가 통과하는 크기"라는 계약이 바로 그 자리에서 깨진다.
     needed = len(text)
+
+    filed = [r for r in results if isinstance(r.get("data"), dict) and "out" in r["data"]]
+    if filed:
+        # 성진: 파일은 이미 쓰였다. 예산을 넘는 건 열 목록뿐이니 그걸 줄이고 경로·행 수는 남긴다 — 거절하면 쓴 사실이 사라진다.
+        for envelope in filed:
+            envelope["data"]["columns"] = len(envelope["data"]["columns"])
+        text = dump(document([strip(r, item) for r in results], overall(results), request))
+        if len(text) <= max_chars:
+            print(text)
+            return code(results, overall(results))
 
     if item is not None:
         # 성진: 한 번의 축소는 봉투 고정비 때문에 자주 모자란다; 매번 방금 측정한 크기에서 다시 계산하면 몇 번 안에 수렴하고,
