@@ -308,3 +308,35 @@ claude plugin validate --strict .claude/skills
 ## 하지 않는 것
 
 - 텍스트 렌더러, 파생 지표 계산 명령, CI 재활성화, 리프 추가·제거.
+
+# 구현 기록 (2026-09-24, PR #20 `refactor/yfinance-leaf-registry`, PR #21 `feat/yfinance-density-export`)
+
+스쿼시 머지는 PR 제목만 main에 남기므로, 다음 세션이 알아야 하는 결정을 여기 적는다.
+
+## 계획을 따르지 않은 곳과 그 이유
+
+- **밀도 기준 ≥300행 → ≥240행(1.8배).** 같은 1254행 fixture에서 133 → 250행. 계획의 317행 추정은 `budget.shrink`가 한 번에 수렴하려고 예산의 80%에서 멈추는 것과 Dividends·Stock Splits 열을 빠뜨렸다. 80% 여유는 PR #16의 수렴 계약이라 건드리지 않았다.
+- **`local_io`는 단계 5가 아니라 `--out`과 함께(단계 6) 넣었다** — 쓰는 곳이 생길 때 계약을 싣는 편이 낫다.
+- **`--out`에서 기본 투영도 적용하지 않는다.** 계획은 기본창만 뺐는데, 기본 투영(뉴스의 thumbnail 제외 등)도 화면 예산을 위한 것이라 파일에는 모든 필드를 쓴다. 명시한 `--fields`·`--limit`만 따른다.
+- **`--list-fields --out`은 거절한다**(코덱스 리뷰 ③) — 이름 목록이 데이터처럼 읽힌다.
+- **SKILL.md는 계획의 7절 구조가 아니라 2절 4문단이 됐다.** 문단 제거 시험(성진 결정 9) 결과이며 성진이 전문을 승인했다.
+
+## 문단 제거 시험 결과 (판정 모델 Claude Opus 5.5, 각 1런)
+
+전체본 24시나리오 22/24 통과. 16문단 × 2시나리오 32런 전부 전체본과 같은 판정. 상황이 실제로 재현된 12문단(발견 단계·심볼 재사용·파일 계산·단위 3·시각 2·변환·coverage·conditions/프리셋·빈 값)을 지웠고, 재현되지 않은 4문단(`${CLAUDE_SKILL_DIR}` 대체 — 하네스가 절대경로를 줬다, partial·too_large·회복 — Opus가 처음부터 `--out`이나 큰 예산을 써서 예산 초과가 한 번도 안 났다)은 남겼다. 확정본은 Codex `gpt-6-astra` medium 7건 7/7.
+
+**재검토 조건**: 모델이 바뀌면 지운 문단 중 "크기로 단위를 판정하지 말라"(모델 기본값 교정 줄)가 다시 필요할 수 있다. 남긴 4문단은 예산 초과를 강제로 만드는 시나리오(`--max-chars` 고정 등)로 한 번 더 시험할 가치가 있다. 하네스는 격리 디렉터리 + `claude -p --safe-mode --restricted --permission-mode acceptEdits --tools "Bash,Read,Write" --allowedTools "Bash"` — `--allowedTools Bash` 없이는 Bash가 permission_denials로 막힌다.
+
+## 남은 실패와 알려진 한계
+
+- 시나리오 aapl-news-all: `--limit 300`으로 196건을 받고 "전체"라고 말했다(원천이 준 것 전부이지 모든 뉴스가 아니다). coverage 문단이 있어도 없어도 같았다 — 문장이 아니라 인터페이스(예: news 결과에 "source returned fewer than asked" 경고)로 풀 후보.
+- 시나리오 screen-tech: 사용자 쿼리의 필터 조건은 결과에 증거가 없어(`conditions`는 offset·limit·sort만) 보낸 쿼리를 서술할 수밖에 없다. 채점이 엄격했다고 판단.
+- fixture로 재현할 경로가 없어 코드로만 고친 것: 임시 파일 이름 충돌, "index"라는 이름의 열, 다단 인덱스 이름 충돌.
+- CI(`test.yml`)는 여전히 disabled — 범위 밖(성진 결정 8).
+
+## 계약이 서로 물린 곳 (하나만 고치면 깨진다)
+
+- 화면 표기(`encode.display`)는 `budget.strip`에서만 일어난다. `shrink`·continuation 계산은 표기 전 데이터로 하고, 예산은 표기 후 텍스트로 잰다.
+- 날짜 축약은 `_full`(전체 관측)의 축으로 판정한다. 창만 보고 판정하면 read 페이지마다 같은 축이 다르게 찍힌다.
+- `--out` 결과는 `_full`을 지워 `shrink` 대상에서 빠진다. 요약이 예산을 넘으면 열 목록만 개수로 줄인다 — 파일은 이미 쓰였으므로 경로·행 수를 잃으면 안 된다.
+- `read`의 `--limit`은 앞으로 걷고 첫 호출은 리프의 끝을 남긴다. `--out` 재시도 안내(`retry`)는 이 차이를 `--start`로 보정한다.
