@@ -10,15 +10,10 @@ the whole answer.
 import re
 import shlex
 
-from output import dump, error_info, is_empty, row_count, select
+from encode import dump, is_empty, row_count
+from envelope import EXIT_CODES, error_info
+from selection import select
 
-EXIT_CODES = {"ok": 0, "invalid": 2, "rate_limited": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}
-STATUSES = {
-    "ok": "usable data within this leaf's own default window",
-    "empty": "the source answered with nothing usable; not proof the data does not exist",
-    "partial": "usable data with a stated gap: a budget-narrowed window, or a mix of succeeded and failed targets",
-    "error": "no usable result; error.code and error.fix say what to do",
-}
 MIN_CHARS = 1000
 
 
@@ -86,14 +81,10 @@ def narrowings(item, args):
 
     Some arguments are valid for a leaf but rejected for the way it was invoked — single-symbol calendar earnings
     takes no date range, and a non-quotes search takes no --type. Naming them in a recovery sends the reader into an
-    invalid-argument error. The exclusions mirror the rules in yfinance_cli.validate.
+    invalid-argument error, so the leaf that rejects them also declares them here.
     """
-    named = list(item.narrow)
-    if item.path == "calendar earnings" and getattr(args, "symbol", None):
-        named = [n for n in named if "--start" not in n]
-    if item.group == "search" and getattr(args, "dataset", "quotes") != "quotes":
-        named = [n for n in named if n != "--type"]
-    return named
+    forbidden = set(item.forbidden(args)) if item.forbidden else set()
+    return [n for n in item.narrow if n not in forbidden]
 
 
 def too_large_fix(results, item, size, max_chars, args, needed=None):
