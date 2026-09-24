@@ -10,7 +10,7 @@ CALENDAR_PATHS = {"earnings": "/calendar/earnings", "dividends": "/calendar/divi
 SORTS = {"earnings": ["ticker", "company", "earningsDate", "marketCap", "epsEstimate", "epsActual", "epsSurprise", "epsReportedEstimate", "epsReportedActual", "epsReportedSurprise", "salesEstimate", "salesActual", "salesSurprise", "oneDayPriceReaction"], "dividends": ["ticker", "company", "exdate", "ordinary", "special", "yield"]}
 DATE_ARG = (("--date",), dict(default=None, help="Start date YYYY-MM-DD; the page states back the start date it used as date_from, and the date condition is judged from that statement."))
 PAGE_ARG = (("--page",), dict(type=int, default=1, help="One-based source page; a next command sets it. Pages after the first come from the calendar API, which states back no date or sort, so those conditions stay unverified."))
-SORT_HELP = "Source sort key, and a leading - for descending. The page repeats any key it is given, so an agreeing echo leaves the sort unverified; a disagreeing one reports not_applied."
+SORT_HELP = "Source sort key; write --sort=-KEY for descending. The page repeats any key it is given, so an agreeing echo leaves the sort unverified; a disagreeing one reports not_applied."
 
 
 def sort_arg(kind):

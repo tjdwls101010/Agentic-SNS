@@ -150,4 +150,5 @@ def test_a_quote_timeframe_changes_only_the_sparkline_and_says_so_without_it(cli
     client.add("https://finviz.com/api/futures_all?timeframe=w", {"ES": {"label": "S&P 500", "last": 6600.0, "change": 0.1, "sparkline": [1, 2]}})
     plain = client.one("market", "quotes", "futures", "--timeframe", "w")
     assert any("--sparkline" in w for w in plain["warnings"])
+    assert "d daily" in " ".join(client.raw("market", "quotes", "--help", code=0).stdout.split())
     assert not client.one("market", "quotes", "futures", "--timeframe", "w", "--sparkline").get("warnings")

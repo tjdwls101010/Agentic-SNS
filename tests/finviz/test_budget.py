@@ -181,3 +181,26 @@ def test_a_section_that_fits_is_shown_even_when_another_sections_first_record_do
     first = client.run(*arguments, "--max-chars", str(alone + 450), code=8)
     assert first["results"][0]["data"]["news"] and first["results"][0]["coverage"]["insiders"]["cut"] == "budget"
     assert any("--section insiders" in c for c in ([first["continuation"]] if isinstance(first["continuation"], str) else first["continuation"]))
+
+
+def test_several_ids_that_showed_different_sections_each_get_a_continuation(client):
+    news = tuple(("Sep-%02d-26 04:30PM" % (n + 1), "Headline %d %s" % (n, NOTE), "https://example.com/%d" % n, "S") for n in range(10))
+    client.add("https://finviz.com/stock?t=A&ty=c", stock_overview(metrics=[("M%d" % n, "1", NOTE) for n in range(10)]))
+    client.add("https://finviz.com/stock?t=B&ty=c", stock_overview(ticker="B", news=news))
+    first_id = client.one("stock", "overview", "A", "--sections", "snapshot")["id"]
+    second_id = client.one("stock", "overview", "B", "--sections", "news")["id"]
+    whole = client.run("read", first_id, second_id, "--limit", "10", "--max-chars", "1000000")
+    doc = client.run("read", first_id, second_id, "--limit", "10", "--max-chars", "3500", code=8)
+    commands = [doc["continuation"]] if isinstance(doc["continuation"], str) else doc["continuation"]
+    assert any("--section snapshot" in c for c in commands) and any("--section news" in c for c in commands)
+    got = {"snapshot": list(doc["results"][0]["data"].get("snapshot") or []), "news": list(doc["results"][1]["data"].get("news") or [])}
+    for command in commands:
+        section = "snapshot" if "--section snapshot" in command else "news"
+        page = client.run(*shlex.split(command), code=None)
+        while True:
+            got[section] += [r for result in page["results"] for r in (result.get("data") or {}).get(section) or []]
+            follow = page.get("continuation")
+            if not follow:
+                break
+            page = client.run(*shlex.split(follow if isinstance(follow, str) else follow[0]), code=None)
+    assert got["snapshot"] == whole["results"][0]["data"]["snapshot"] and got["news"] == whole["results"][1]["data"]["news"]

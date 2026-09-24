@@ -228,7 +228,7 @@ def continuation(views, caps):
     first = next((v for v in views if v.picked), None)
     if first is None:
         return found
-    for name in first.sections:
+    for name in dict.fromkeys(name for v in views for name in v.picked):  # ids read together may have shown different sections
         cap = cap_of(caps, name)
         showing = [v for v in views if name in v.picked and not v.picked[name].absent]
         if not any(cap < len(v.picked[name].records) for v in showing):

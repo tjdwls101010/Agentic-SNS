@@ -115,7 +115,7 @@ RUN_ARGS = [
     (("--signal",), dict(default=None, help="Signal value from screen signals, e.g. ta_topgainers.")),
     (("--view",), dict(default="overview", choices=list(VIEWS), help="Table view: " + "; ".join(name + " (" + text + ")" for name, (_, text) in VIEWS.items()) + ". custom is implied by --columns.")),
     (("--columns",), dict(default=None, help="Comma-separated column ids or indices from screen columns for the custom view.")),
-    (("--sort",), dict(default=None, choices=SORT_KEYS + ["-" + k for k in SORT_KEYS], metavar="KEY", help="Sort key from the screener's order control, e.g. marketcap, pe, perf1w or change, and -marketcap for descending; schema screen run lists every choice.")),
+    (("--sort",), dict(default=None, choices=SORT_KEYS + ["-" + k for k in SORT_KEYS], metavar="KEY", help="Sort key from the screener's order control, e.g. marketcap, pe, perf1w or change; write --sort=-marketcap for descending. schema screen run lists every choice.")),
     (("--row",), dict(type=int, default=1, help="One-based source row the first page starts at (20 rows per page); a next command sets it.")),
     (("--pages",), dict(type=int, default=1, help="Source pages to fetch in this run, following each page's next row.")),
     (("--out",), dict(default=None, help="Write the selected rows as JSON Lines to this path; the result then reports the file instead of the rows.")),

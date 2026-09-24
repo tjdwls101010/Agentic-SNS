@@ -288,7 +288,7 @@ def in_order(items, key):
     "SEC filing list for the company with links to the originals; 30 per source page.",
     args=[
         (("--page",), dict(type=int, default=1, help="One-based source page; a next command sets it.")),
-        (("--sort",), dict(default=None, choices=FILING_SORTS + ["-" + k for k in FILING_SORTS], help="Source order: filingDate, reportDate or form, and -filingDate (the default) for descending.")),
+        (("--sort",), dict(default=None, choices=FILING_SORTS + ["-" + k for k in FILING_SORTS], help="Source order: filingDate, reportDate or form; write --sort=-filingDate (the default order) for descending.")),
         (("--category",), dict(default=None, choices=FILING_CATEGORIES, help="Source filter by Finviz's form category; form_categories lists each one's forms, and a category the company has no forms in returns nothing.")),
     ],
     collections={"filings": Collection("{form, filingDate, reportDate, description, filing (index URL), document (primary document URL), accessionNumber} newest filing first unless --sort", local=[Selector(("--form",), dict(default=None, help="Keep only this form type, e.g. 10-K; it narrows the received page, so page through with next commands (or use --category) to reach older filings."), one_form)])},

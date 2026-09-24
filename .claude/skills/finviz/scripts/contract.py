@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import re
 from pathlib import Path
 
 from transport import Failure
@@ -131,7 +132,11 @@ class Parser(argparse.ArgumentParser):
     """One JSON document on stdout is the contract; an argument error is one too, pointing at the command that refused it."""
 
     def error(self, message):
-        raise Failure("invalid_argument", message, "Correct the arguments; " + self.prog + " --help lists them and schema " + self.prog.removeprefix("finviz.py").strip() + " gives their defaults and choices.")
+        fix = "Correct the arguments; " + self.prog + " --help lists them and schema " + self.prog.removeprefix("finviz.py").strip() + " gives their defaults and choices."
+        flag = re.search(r"argument (--[\w-]+).*expected one argument", message)
+        if flag:  # a value such as -marketcap reads as an option unless it is attached with =
+            fix = "Attach a value that starts with - using =, e.g. " + flag[1] + "=-marketcap. " + fix
+        raise Failure("invalid_argument", message, fix)
 
 
 def without(options, *keys):
