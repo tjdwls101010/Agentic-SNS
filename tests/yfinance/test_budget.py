@@ -11,7 +11,7 @@ import shlex
 
 import pytest
 
-from conftest import SCRIPTS as SCRIPTS_PATH, inflate, shape
+from conftest import inflate, shape
 
 CHART = {"chart": {"error": None, "result": [{"meta": {"currency": "USD", "symbol": "AAPL", "exchangeName": "NMS", "instrumentType": "EQUITY", "firstTradeDate": 345479400, "regularMarketTime": 1704387600, "gmtoffset": -18000, "timezone": "EST", "exchangeTimezoneName": "America/New_York", "regularMarketPrice": 110, "chartPreviousClose": 100, "priceHint": 2, "dataGranularity": "1d", "validRanges": ["1d", "5d", "1mo", "max"]},
     "timestamp": [1704205800 + 86400 * i for i in range(300)],
@@ -231,30 +231,41 @@ def test_an_option_chain_reads_back_under_the_same_selection_contract(cli, tmp_p
     assert r["data"]["calls"]["columns"] == ["strike"], "a field the first call accepted was refused on read"
 
 
-def test_a_leaf_that_cannot_be_narrowed_does_not_claim_it_can(cli, tmp_path):
+def test_a_leaf_that_cannot_be_narrowed_does_not_claim_it_can(cli):
     """fund description returns one string: neither --fields nor --limit reduces it, so declaring either would put an
     argument in the recovery that returns the same size again."""
-    import sys
-    sys.path.insert(0, str(SCRIPTS_PATH))
-    import leaves
-    assert leaves.get("fund", "description").narrow == ()
-    assert "--limit" not in leaves.get("market", "summary").narrow
+    proc, doc = cli("schema", "fund", "description")
+    assert "narrowing" not in doc["results"][0]["data"]
+    proc, doc = cli("schema", "market", "summary")
+    assert "--limit" not in doc["results"][0]["data"]["narrowing"]
+
+
+def earnings_page_routes(count=25):
+    head = "<table><thead><tr><th>Symbol</th><th>Company</th><th>Earnings Date</th><th>EPS Estimate</th><th>Reported EPS</th><th>Surprise (%)</th></tr></thead><tbody>"
+    rows = "".join(f"<tr><td>AAPL</td><td>Apple</td><td>January {25 - i:02d}, 2024 at 4 PM EST</td><td>1</td><td>1</td><td>0</td></tr>" for i in range(count))
+    return [{"path": "/calendar/earnings", "text": head + rows + "</tbody></table>"}]
+
+
+def test_a_single_symbol_earnings_recovery_never_names_a_date_range(cli, tmp_path):
+    """--start/--end is a real narrowing for market-wide calendar earnings and rejected outright for the
+    single-symbol form. An explicit store lengthens the continuation enough that even one row refuses, so the
+    recovery sentence lists this leaf's narrowings."""
+    store = tmp_path / "an-explicitly-chosen-store"
+    proc, doc = cli("calendar", "earnings", "AAPL", "--max-chars", "1000", "--store", str(store), routes=earnings_page_routes(), store=tmp_path / "s")
+    assert proc.returncode == 9, proc.stdout[:300]
+    fix = doc["results"][0]["error"]["fix"]
+    assert "Narrow with" in fix and "--start" not in fix and "--end" not in fix, fix
 
 
 def test_a_recovery_never_names_an_argument_this_mode_forbids(cli, tmp_path):
-    """--start/--end is a real narrowing for market-wide calendar earnings and rejected outright for the
-    single-symbol form; naming it there sends the reader into an invalid-argument error."""
-    import sys
-    sys.path.insert(0, str(SCRIPTS_PATH))
-    import budget as budget_module
-
-    class A:
-        symbol, dataset, fields, store = "AAPL", "quotes", None, None
-    import leaves
-    named = budget_module.narrowings(leaves.get("calendar", "earnings"), A())
-    assert not any("--start" in n for n in named)
-    A.symbol, A.dataset = None, "news"
-    assert "--type" not in budget_module.narrowings(leaves.get("search", ""), A())
+    """--type is a real narrowing for instrument search and rejected outright for the other datasets; naming it there
+    sends the reader into an invalid-argument error."""
+    news = [{"uuid": f"u{i}", "title": "headline " * 30, "publisher": "p", "link": "l", "providerPublishTime": 1704067200, "type": "STORY"} for i in range(10)]
+    routes = [{"path": "/v1/finance/search", "json": {"quotes": [], "news": news, "lists": [], "researchReports": [], "nav": []}}]
+    proc, doc = cli("search", "apple", "--dataset", "news", "--max-chars", "1000", routes=routes, store=tmp_path / "s")
+    assert proc.returncode == 9, proc.stdout[:300]
+    fix = doc["results"][0]["error"]["fix"]
+    assert "Narrow with" in fix and "--type" not in fix, fix
 
 
 def test_a_single_row_over_the_budget_is_told_so_rather_than_sent_round_again(cli, tmp_path):

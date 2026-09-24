@@ -1,55 +1,45 @@
 """Saved observations: a paid request survives a result that did not fit, and reading it back does not change it."""
 import json
-import sys
+import os
+import time
 
-import pytest
-
-from conftest import SCRIPTS
-
-sys.path.insert(0, str(SCRIPTS))
-
-import store as store_module  # noqa: E402
-from output import InputError  # noqa: E402
-from test_budget import chart_routes, news_routes  # noqa: E402
+from test_budget import chart_routes, news_routes
 
 
-def test_the_same_observation_saved_twice_is_one_immutable_record(tmp_path):
-    saved = store_module.Store(tmp_path)
-    record = {"command": "prices history", "target": "AAPL", "data": {"a": 1}}
-    first, second = saved.save(record), saved.save(dict(record))
-    assert first == second
-    assert len(list(tmp_path.glob("*.json"))) == 1
-    assert saved.load(first) == record
+def observe(cli, store):
+    proc, doc = cli("prices", "history", "AAPL", "--period", "1mo", routes=chart_routes(), store=store)
+    assert proc.returncode in (0, 8), proc.stdout[:300]
+    return doc["results"][0]["id"]
 
 
-def test_a_changed_byte_is_refused_rather_than_read_as_the_original(tmp_path):
-    saved = store_module.Store(tmp_path)
-    ident = saved.save({"command": "prices history", "target": "AAPL", "data": {"a": 1}})
-    path = tmp_path / f"{ident}.json"
-    path.write_text(path.read_text().replace('"a":1', '"a":2'))
-    with pytest.raises(InputError, match="do not match their identifier"):
-        saved.load(ident)
+def test_a_changed_byte_is_refused_rather_than_read_as_the_original(cli, tmp_path):
+    store = tmp_path / "s"
+    ident = observe(cli, store)
+    path = store / f"{ident}.json"
+    path.write_text(path.read_text().replace('"AAPL"', '"MSFT"', 1))
+    proc, doc = cli("read", ident, routes=[], store=store)
+    assert proc.returncode == 2
+    assert "do not match their identifier" in doc["results"][0]["error"]["message"]
 
 
-def test_an_unknown_id_says_where_observations_live(tmp_path):
-    saved = store_module.Store(tmp_path)
-    with pytest.raises(InputError, match="per store directory"):
-        saved.load("0" * 16)
-    with pytest.raises(InputError, match="not an observation id"):
-        saved.load("nonsense")
+def test_an_unknown_id_says_where_observations_live(cli, tmp_path):
+    proc, doc = cli("read", "0" * 16, routes=[], store=tmp_path / "s")
+    assert proc.returncode == 2 and "per store directory" in doc["results"][0]["error"]["message"]
+    proc, doc = cli("read", "nonsense", routes=[], store=tmp_path / "s")
+    assert proc.returncode == 2 and "not an observation id" in doc["results"][0]["error"]["message"]
 
 
-def test_retention_deletes_by_age_and_says_nothing_about_being_current(tmp_path):
+def test_retention_deletes_by_age_and_says_nothing_about_being_current(cli, tmp_path):
     """Age is a disk policy. A quote saved a minute ago is stale the moment the market closed, and a statement saved
     last week is not, so the store never decides validity from it."""
-    saved = store_module.Store(tmp_path)
-    ident = saved.save({"command": "prices quote", "target": "AAPL", "data": {}})
-    import os
-    import time
+    store = tmp_path / "s"
+    ident = observe(cli, store)
     old = time.time() - 40 * 86400
-    os.utime(tmp_path / f"{ident}.json", (old, old))
-    assert saved.prune(14) == 1
-    assert saved.prune(0) == 0  # retention off deletes nothing
+    os.utime(store / f"{ident}.json", (old, old))
+    cli("--ttl-days", "0", "schema", "prices", routes=[], store=store)
+    assert (store / f"{ident}.json").exists(), "retention off deletes nothing"
+    cli("--ttl-days", "14", "schema", "prices", routes=[], store=store)
+    assert not (store / f"{ident}.json").exists()
 
 
 # ---- round trip through the CLI -----------------------------------------------------------------------------------

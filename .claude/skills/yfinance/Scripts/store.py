@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 import time
 
-from output import InputError, dump
+from envelope import InputError
 
 ID_LENGTH = 16  # 성진: 64자 전체를 실으면 다종목 회복 문장이 id만으로 예산을 먹는다; 16자는 충돌 확률이 무시할 만하고 한 줄에 열 개가 들어간다.
 
@@ -88,16 +88,3 @@ def age_seconds(observed_at):
     except (TypeError, ValueError):
         return None
 
-
-def matches_request(saved, request, keys):
-    """A continuation is bound to the query that produced it, so a cursor cannot be carried onto different arguments."""
-    original = saved.get("request") or {}
-    return all(original.get(k) == request.get(k) for k in keys)
-
-
-def summarize(store):
-    return {"directory": str(store.root), "observations": len(list(store.root.glob("*.json"))), "bytes": sum(p.stat().st_size for p in store.root.glob("*.json"))}
-
-
-def fits(text, budget):
-    return len(dump(text) if not isinstance(text, str) else text) <= budget
