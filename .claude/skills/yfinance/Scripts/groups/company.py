@@ -36,8 +36,8 @@ NEWS_FIELDS = ("content.title", "content.pubDate", "content.provider.displayName
       limit=10, fields=NEWS_FIELDS, narrow=["--fields", "--limit", "--tab"],
       interpretation={"payload": "Each entry nests its article under content, so a field path is dotted: content.title, content.provider.displayName.",
                       "not_the_article": "Entries locate sources; the text here is a summary, not the article. Read the article itself with a web reader."},
-      gotchas=["The default projection leaves out thumbnail and storyline, which measured together as over half the payload.",
-               "Entries are not strictly ordered by pubDate: measured, a later item carried a newer timestamp than an earlier one, so the first entry is not reliably the most recent."])
+      gotchas=["The default projection leaves out thumbnail and storyline, which are most of the payload; name them to get them.",
+               "Entries are not strictly ordered by pubDate, so the first entry is not reliably the most recent."])
 def news(ticker, args, context, warnings):
     context["upstream_requested"] = effective_limit(args, get("company", "news")) or 10
     return ticker.get_news(count=context["upstream_requested"], tab=args.tab)
@@ -48,6 +48,6 @@ def news(ticker, args, context, warnings):
       limit=20, fields=("date", "type", "title", "edgarUrl"), narrow=["--fields", "--limit"],
       interpretation={"dates": "date is the filing date. Entries arrive newest first.",
                       "not_the_filing": "These are links and metadata. Read the original filing with the sec skill."},
-      gotchas=["exhibits holds a link map per filing and measured as the majority of this payload; it is outside the default projection and has to be asked for by name."])
+      gotchas=["exhibits holds a link map per filing and is most of this payload; it is outside the default projection, so name it to get it."])
 def filings(ticker, args, context, warnings):
     return ticker.get_sec_filings()

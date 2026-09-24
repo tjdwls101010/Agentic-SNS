@@ -33,12 +33,12 @@ fund("equity", "Valuation multiples and growth for the fund's equity holdings.",
      units={"Price/Earnings": dict(MULTIPLE, inverted=True), "Price/Book": dict(MULTIPLE, inverted=True),
             "Price/Sales": dict(MULTIPLE, inverted=True), "Price/Cashflow": dict(MULTIPLE, inverted=True),
             "Median Market Cap": CURRENCY, "3 Year Earnings Growth": RATE},
-     interpretation={"inverted": "All four price multiples arrive as their reciprocals: the Price/Earnings row holds an earnings yield, so a P/E is 1 divided by the value. Measured across SPY, QQQ, VTI, IWM and VOO, the reciprocals matched each index's known multiple, so reporting the value as printed is wrong by that inversion."},
-     gotchas=["The Category Average column is often empty, and where it is populated it has been observed equal to the fund's own value, so it cannot be relied on as a peer comparison."])
+     interpretation={"inverted": "All four price multiples arrive as their reciprocals: the Price/Earnings row holds an earnings yield, so the P/E is 1 divided by the value."},
+     gotchas=["The Category Average column is often empty, and where populated it can equal the fund's own value, so it is not a peer comparison."])
 
 fund("operations", "Expense ratio, turnover and reported net assets.", "fund_operations", narrow=["--fields"],
      units={"Annual Report Expense Ratio": RATE, "Annual Holdings Turnover": RATE,
             "Total Net Assets": {"kind": "currency", "scale": "unverified"}},
      interpretation={"expense": "The expense ratio is a ratio, not a percent: 0.000945 is 0.0945%."},
-     gotchas=["Total Net Assets has no declared unit and does not reconcile: SPY reported 513,975.7 here while the same fund's totalAssets was 811,937,038,336, so it is neither the raw amount nor that amount in millions. Cite it only with the fund's own reporting.",
-              "The Category Average column has been observed holding an exact copy of the fund's own value, so a difference of zero there is not evidence of being at the peer average."])
+     gotchas=["Total Net Assets has no declared unit and does not reconcile with the fund's totalAssets as either the raw amount or millions. Cite it only with the fund's own reporting.",
+              "The Category Average column can hold an exact copy of the fund's own value, so a difference of zero there is not evidence of being at the peer average."])

@@ -56,7 +56,7 @@ def filtered(value, term):
 
 @leaf("screen", "presets", "Named screeners with the query each one actually runs.",
       args=[TYPE], check=check, narrow=["--filter", "--type"],
-      interpretation={"name_is_not_the_condition": "Each entry carries the query it runs. Describe a preset's results by that query, not by its name: measured, small_cap_gainers screens for small capitalisation sorted by volume and contains no gain condition at all."})
+      interpretation={"name_is_not_the_condition": "Each entry carries the query it runs. Describe a preset's results by that query, not by its name: small_cap_gainers, for one, screens for small capitalisation sorted by volume and has no gain condition."})
 def presets(target, args, context, warnings):
     return [{"name": name, "query": spec["query"].to_dict(), "sortField": spec["sortField"], "sortType": spec["sortType"]} for name, spec in yf.PREDEFINED_SCREENER_QUERIES.items() if isinstance(spec["query"], QUERY_TYPES[args.type]) and args.filter.lower() in name.lower()]
 
@@ -159,7 +159,7 @@ SCREEN_FIELDS = ("symbol", "shortName", "regularMarketPrice", "regularMarketChan
       limit=25, fields=SCREEN_FIELDS, narrow=["--fields", "--limit", "--query", "--preset", "--offset"],
       units={"regularMarketChangePercent": PERCENT, "fiftyTwoWeekChangePercent": PERCENT, "marketCap": CURRENCY,
              "trailingPE": MULTIPLE, "regularMarketVolume": COUNT},
-      interpretation={"query_scale": "A growth threshold in the query is in percentage points, while the same measurement in a quote is a ratio. Measured: BTWN quarterlyrevenuegrowth.quarterly 20 30 returned companies whose quote revenueGrowth was 0.242 and 0.28, and the same bounds written as 0.20 and 0.30 returned a different set entirely — companies growing a fifth of a percent. Neither call fails, so reusing an output ratio as a query bound screens for something a hundredfold smaller and returns a plausible list.",
+      interpretation={"query_scale": "A growth threshold in the query is in percentage points, while the same measurement in a quote is a ratio: BTWN quarterlyrevenuegrowth.quarterly 20 30 selects companies whose quote revenueGrowth is 0.2-0.3, and 0.20 0.30 selects companies growing a fifth of a percent. Neither call fails, so an output ratio reused as a bound screens for something a hundredfold smaller and still returns a plausible list.",
                       "matches_not_a_census": "These are the rows matching the query, ordered by the sort field. They are not a verified census of a market, and total is the provider's own claim.",
                       "paging": "--offset continues a query rather than reading an immutable snapshot; rows can move between pages.",
                       "default_fields": "Each row carries far more fields than the default projection; --fields reaches them and --list-fields names them."},

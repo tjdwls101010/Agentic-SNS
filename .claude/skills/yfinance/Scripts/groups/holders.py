@@ -14,7 +14,7 @@ holder("major", "Insider and institutional ownership percentages for the whole c
        units={"insidersPercentHeld": RATE, "institutionsPercentHeld": RATE, "institutionsFloatPercentHeld": RATE, "institutionsCount": COUNT},
        interpretation={"float": "institutionsPercentHeld is of shares outstanding while institutionsFloatPercentHeld is of the float, so the second is the larger of the two."})
 
-HOLDER_MIX = "Date Reported is when the position was filed, but Value is that share count priced at the current quote, not at the price on the reported date. Measured on AAPL, every row's Value divided by Shares gave the same live price while the filings were months old, so reading Value as a position's worth on its reported date is wrong by the price move since."
+HOLDER_MIX = "Date Reported is when the position was filed, but Value is that share count priced at the current quote, so it is not the position's worth on its reported date."
 
 for _leaf, _what, _method in [("institutional", "Institutional", "get_institutional_holders"), ("fund", "Mutual fund", "get_mutualfund_holders")]:
     holder(_leaf, _what + " holders with their reported share counts.", _method,
@@ -30,7 +30,7 @@ holder("insider-purchases", "Insider purchase and sale totals over the last six 
 holder("insider-transactions", "Individual insider transactions with dates, roles and values.", "get_insider_transactions",
        limit=20, narrow=["--fields", "--limit"],
        units={"Shares": SHARES, "Value": CURRENCY},
-       interpretation={"order": "The index is a row number, so it says nothing about time; Start Date does, and measured it arrives newest first, so a limit keeps the most recent transactions.",
+       interpretation={"order": "The index is a row number and says nothing about time; Start Date does, and rows arrive newest first, so a limit keeps the most recent transactions.",
                        "value": "Value is absent for transactions that report no price, such as gifts and some awards; that is a missing price, not a zero-value transfer."})
 
 holder("insider-roster", "Insiders and the shares they hold directly.", "get_insider_roster_holders",
