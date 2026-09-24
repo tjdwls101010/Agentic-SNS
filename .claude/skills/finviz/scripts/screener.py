@@ -165,7 +165,13 @@ def run(ctx, args, target):
     if len(pages) == 1 and failure is None and not writer:
         return pages[0].result
     tagged = [dict(r, observation_id=obs.id) for obs in pages for r in obs.result["collections"]["rows"]]
-    result = {"id": uuid4().hex if args.pages > 1 else pages[0].id, "leaf": "screen run", "target": "screen", "observed_at": pages[0].result["observed_at"], "source": {"pages": [obs.id for obs in pages]}, "status": "ok", "context": pages[0].result["context"], "collections": {"rows": tagged}, "conditions": merge_conditions(pages), "totals": {"rows": {"source_total": pages[-1].result["totals"]["rows"]["source_total"]} | ({"pages": len(pages)} if args.pages > 1 else {})}, "warnings": list(dict.fromkeys(w for obs in pages for w in obs.result.get("warnings", [])))}
+    result = {
+        "id": uuid4().hex if args.pages > 1 else pages[0].id, "leaf": "screen run", "target": "screen", "observed_at": pages[0].result["observed_at"],
+        "source": {"pages": [obs.id for obs in pages]}, "status": "ok", "context": pages[0].result["context"], "collections": {"rows": tagged},
+        "conditions": merge_conditions(pages),
+        "totals": {"rows": {"source_total": pages[-1].result["totals"]["rows"]["source_total"]} | ({"pages": len(pages)} if args.pages > 1 else {})},
+        "warnings": list(dict.fromkeys(w for obs in pages for w in obs.result.get("warnings", []))),
+    }
     if row is not None:
         result["next_page"] = row
     if failure is not None:

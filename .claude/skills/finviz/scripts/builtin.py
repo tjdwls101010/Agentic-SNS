@@ -56,7 +56,12 @@ def doctor(ctx, args, target):
     "schema",
     help="Describe groups, commands, arguments with defaults, collections, units, statuses and exit codes; offline.",
     args=[(("scope",), dict(nargs="*", metavar="SCOPE", help="Optional GROUP or GROUP LEAF to describe in detail."))],
-    context={"groups": "group -> command -> one-line purpose (unscoped)", "arguments": "name -> {help, default, choices, required} for the scoped command", "context": "non-record data fields and their meaning", "collections": "name -> {records, order, default_window, selectors}", "units": "numeric field -> unit, where the unit was confirmed against the page that displays it", "envelope": "meaning of each result field", "statuses": "result statuses", "exit_codes": "process exit code per outcome"},
+    context={
+        "groups": "group -> command -> one-line purpose (unscoped)", "arguments": "name -> {help, default, choices, required} for the scoped command",
+        "context": "non-record data fields and their meaning", "collections": "name -> {records, order, default_window, selectors}",
+        "units": "numeric field -> unit, where the unit was confirmed against the page that displays it", "envelope": "meaning of each result field",
+        "statuses": "result statuses", "exit_codes": "process exit code per outcome",
+    },
 )
 def schema(ctx, args, target):
     scope = args.scope
@@ -73,7 +78,12 @@ def schema(ctx, args, target):
 @leaf(
     "read",
     help="Show saved observations again with the selectors of the command that made them, or the raw response in character windows; no new request.",
-    args=[(("ids",), dict(nargs="+", metavar="ID", help="Observation IDs from earlier results; several must come from the same command.")), (("--section",), dict(default=None, help="The one collection to show from an observation whose command has several; defaults to the sections that command showed.")), (("--raw",), dict(action="store_true", help="Return the received response text instead of the extracted records.")), (("--chars",), dict(default=None, help="Character range START-END of the raw text, e.g. 0-20000 or 20000- for the rest; END is exclusive. Needs --raw."))],
+    args=[
+        (("ids",), dict(nargs="+", metavar="ID", help="Observation IDs from earlier results; several must come from the same command.")),
+        (("--section",), dict(default=None, help="The one collection to show from an observation whose command has several; defaults to the sections that command showed.")),
+        (("--raw",), dict(action="store_true", help="Return the received response text instead of the extracted records.")),
+        (("--chars",), dict(default=None, help="Character range START-END of the raw text, e.g. 0-20000 or 20000- for the rest; END is exclusive. Needs --raw.")),
+    ],
     context={"*": "the original command's context and collections, selected with that command's own selectors (--filter, --fields, --start, --limit and its collection selectors), with its status, warnings and conditions carried over"},
 )
 def read(ctx, args, target):
@@ -113,9 +123,10 @@ def read_views(ctx, args, extras):
         else:
             sections = list(origin.collections)
         check_locals(origin, sections, extras)
-        if s.get("status") == "error":
-            error = s.get("error") or {}
-            s = dict(s, status="ok", failed=True, error=None, warnings=list(s.get("warnings") or []) + ["The original observation failed (" + str(error.get("code")) + ": " + str(error.get("message")) + "); read " + s["id"] + " --raw returns the response it received."])
+        if s.get("status") == "error":  # a replay keeps the failure, so several ids read together stay partial
+            error = dict(s.get("error") or {})
+            error["fix"] = (error.get("fix") or "").rstrip(".") + ". read " + s["id"] + " --raw returns the response it received."
+            s = dict(s, error=error)
             sections = []
         views.append(View(s, origin, sel, sections, args))
     return views

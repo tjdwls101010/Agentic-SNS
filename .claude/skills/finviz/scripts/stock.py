@@ -126,7 +126,12 @@ def revision_history(records, period, context):
 EARNINGS = {
     "quarterly": Collection("{fiscalPeriod, earningsDate, fiscalEndDate, epsActual, epsEstimate, salesActual, salesEstimate, analyst counts}: reported quarters newest first, then the projected quarters", default=12),
     "annual": Collection("the same fields per fiscal year, projected years included", order="latest fiscal year first", reverse=True, default=10),
-    "revisions": Collection("{fiscalPeriod, estimateType, estimateDate, estimates, upRevisions, downRevisions, mean, high, low, price}; estimateType E is the EPS estimate (as epsEstimate), R the reported EPS estimate (as epsReportedEstimate) and S sales (as salesEstimate). Without --fiscal-period, the newest estimate of each period and type with history_count; with it, that period's every estimate", order="latest fiscal period first, newest estimate first within each period and type", reverse=True, local=[Selector(("--fiscal-period",), dict(default=None, help="Show this fiscal period's whole estimate history newest first, e.g. 2026Q4 or 2026FY, instead of the newest estimate per period."), revision_history)]),
+    "revisions": Collection(
+        "{fiscalPeriod, estimateType, estimateDate, estimates, upRevisions, downRevisions, mean, high, low, price}; estimateType E is the EPS estimate (as epsEstimate), R the reported EPS estimate (as epsReportedEstimate) and S sales (as salesEstimate). Without --fiscal-period, the newest estimate of each period and type with history_count; with it, that period's every estimate",
+        order="latest fiscal period first, newest estimate first within each period and type",
+        reverse=True,
+        local=[Selector(("--fiscal-period",), dict(default=None, help="Show this fiscal period's whole estimate history newest first, e.g. 2026Q4 or 2026FY, instead of the newest estimate per period."), revision_history)],
+    ),
     "reaction": Collection("{fiscalPeriod, reportDate, rsi, reactions: {window: {date, price, prevPrice, priceDiff, spyPriceDiff}}} newest report first", default=8),
 }
 
@@ -224,8 +229,15 @@ def around_last_close(records, keep, context):
 @stock_leaf(
     "options",
     "Option chain for one expiry, or one strike across every expiry, with Finviz's implied volatility and greeks.",
-    args=[(("--expiry",), dict(default=None, help="Expiry YYYY-MM-DD from a previous result's expiries; the source's nearest expiry when omitted.")), (("--strike",), dict(type=float, default=None, help="Read this strike across every expiry instead of one expiry's chain; each contract's exDate (YYMMDD) names its expiry.")), (("--all-expiries",), dict(action="store_true", help="Read every contract of every expiry at once (the source's plot view); --strikes still keeps the strikes nearest last_close."))],
-    collections={"contracts": Collection("{strike, type, exDate, openInterest, bidPrice, askPrice, lastClose, iv, delta, gamma, theta, vega, rho, ...} as published, by strike (or by expiry with --strike) with puts and calls interleaved", local=[Selector(("--type",), dict(default=None, choices=["call", "put"], help="Keep only calls or only puts."), one_side), Selector(("--strikes",), dict(type=int, default=20, help="Keep the contracts on the N strikes nearest last_close, calls and puts alike; 0 keeps the whole expiry."), around_last_close)])},
+    args=[
+        (("--expiry",), dict(default=None, help="Expiry YYYY-MM-DD from a previous result's expiries; the source's nearest expiry when omitted.")),
+        (("--strike",), dict(type=float, default=None, help="Read this strike across every expiry instead of one expiry's chain; each contract's exDate (YYMMDD) names its expiry.")),
+        (("--all-expiries",), dict(action="store_true", help="Read every contract of every expiry at once (the source's plot view); --strikes still keeps the strikes nearest last_close.")),
+    ],
+    collections={"contracts": Collection("{strike, type, exDate, openInterest, bidPrice, askPrice, lastClose, iv, delta, gamma, theta, vega, rho, ...} as published, by strike (or by expiry with --strike) with puts and calls interleaved", local=[
+        Selector(("--type",), dict(default=None, choices=["call", "put"], help="Keep only calls or only puts."), one_side),
+        Selector(("--strikes",), dict(type=int, default=20, help="Keep the contracts on the N strikes nearest last_close, calls and puts alike; 0 keeps the whole expiry."), around_last_close),
+    ])},
     context={"expiries": "expiries the source offers; pass one to --expiry", "current_expiry": "the expiry the chain belongs to; null with --strike", "last_close, last_time": "underlying price context"},
 )
 def options(ctx, args, ticker):
@@ -274,7 +286,11 @@ def in_order(items, key):
 @stock_leaf(
     "filings",
     "SEC filing list for the company with links to the originals; 30 per source page.",
-    args=[(("--page",), dict(type=int, default=1, help="One-based source page; a next command sets it.")), (("--sort",), dict(default=None, choices=FILING_SORTS + ["-" + k for k in FILING_SORTS], help="Source order: filingDate, reportDate or form, and -filingDate (the default) for descending.")), (("--category",), dict(default=None, choices=FILING_CATEGORIES, help="Source filter by Finviz's form category; form_categories lists each one's forms, and a category the company has no forms in returns nothing."))],
+    args=[
+        (("--page",), dict(type=int, default=1, help="One-based source page; a next command sets it.")),
+        (("--sort",), dict(default=None, choices=FILING_SORTS + ["-" + k for k in FILING_SORTS], help="Source order: filingDate, reportDate or form, and -filingDate (the default) for descending.")),
+        (("--category",), dict(default=None, choices=FILING_CATEGORIES, help="Source filter by Finviz's form category; form_categories lists each one's forms, and a category the company has no forms in returns nothing.")),
+    ],
     collections={"filings": Collection("{form, filingDate, reportDate, description, filing (index URL), document (primary document URL), accessionNumber} newest filing first unless --sort", local=[Selector(("--form",), dict(default=None, help="Keep only this form type, e.g. 10-K; it narrows the received page, so page through with next commands (or use --category) to reach older filings."), one_form)])},
     context={"available_forms": "form types present for this company", "form_categories": "Finviz's form groupings: {id, label, forms}; an id goes to --category"},
     paging="page",

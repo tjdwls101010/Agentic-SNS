@@ -111,12 +111,12 @@ def test_reading_an_empty_saved_response_is_empty_not_an_argument_error(client):
     assert client.one("read", failed["id"], "--raw", code=7)["data"] == ""
 
 
-def test_a_failed_observation_reads_as_a_warning_and_its_raw_response(client):
+def test_a_failed_observation_keeps_its_error_when_read_and_offers_its_raw_response(client):
     client.add("https://finviz.com/stock?t=A&ty=c", "<html><body>changed layout</body></html>")
     failed = client.one("stock", "overview", "A", code=6)
     assert failed["error"]["code"] == "structure_changed"
-    again = client.one("read", failed["id"])
-    assert again["status"] == "ok" and any("structure_changed" in w and "--raw" in w for w in again["warnings"])
+    again = client.one("read", failed["id"], code=6)
+    assert again["status"] == "error" and again["error"]["code"] == "structure_changed" and "read " + failed["id"] + " --raw" in again["error"]["fix"]
     assert "changed layout" in client.one("read", failed["id"], "--raw")["data"]
     refused = client.one("read", failed["id"], "--fields", "label", code=2)
     assert "read " + failed["id"] + " --raw" in refused["error"]["fix"]
@@ -179,3 +179,11 @@ def test_local_storage_failures_stay_inside_the_json_contract(client, tmp_path):
 def test_doctor_runs_offline_and_reports_the_store(client):
     result = client.one("doctor")
     assert result["data"]["problems"] == [] and result["data"]["store"] == str(client.store)
+
+
+def test_replaying_several_targets_keeps_a_failed_one_failed(client):
+    client.add("https://finviz.com/stock?t=A&ty=c", stock_overview())
+    client.add("https://finviz.com/stock?t=APPL&ty=c", "missing", status=404)
+    doc = client.run("stock", "overview", "A", "APPL", code=8)
+    again = client.run("read", *[r["id"] for r in doc["results"]], code=8)
+    assert again["status"] == "partial" and [r["status"] for r in again["results"]] == ["ok", "error"]

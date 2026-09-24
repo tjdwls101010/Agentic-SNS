@@ -15,7 +15,13 @@ PRESETS = {"top-insider": ({"or": "-10", "tv": "100000", "o": "-transactionValue
     "insiders",
     "trades",
     help="Latest insider trades across the market, with owner pages and SEC Form 4 links.",
-    args=[(("--transaction",), dict(default="all", choices=list(TRANSACTIONS), help="Transaction type.")), (("--owner",), dict(default=None, help="Owner id from a row's owner_url to list one insider's trades.")), (("--sort",), dict(default=None, choices=SORTS + ["-" + k for k in SORTS], metavar="KEY", help="Source order: " + ", ".join(SORTS) + "; a leading - sorts descending.")), (("--value",), dict(type=int, default=None, help="Keep trades whose value is at least this many dollars (source filter).")), (("--preset",), dict(default=None, choices=list(PRESETS), help="The source's recent-week buttons: top-insider (Top Insider Trading Recent Week, trades of $100,000 or more) or top-owner (Top 10% Owner Trading Recent Week, 10% owners' trades of $1,000,000 or more), largest first; --value and --sort override the threshold and order."))],
+    args=[
+        (("--transaction",), dict(default="all", choices=list(TRANSACTIONS), help="Transaction type.")),
+        (("--owner",), dict(default=None, help="Owner id from a row's owner_url to list one insider's trades.")),
+        (("--sort",), dict(default=None, choices=SORTS + ["-" + k for k in SORTS], metavar="KEY", help="Source order: " + ", ".join(SORTS) + "; a leading - sorts descending.")),
+        (("--value",), dict(type=int, default=None, help="Keep trades whose value is at least this many dollars (source filter).")),
+        (("--preset",), dict(default=None, choices=list(PRESETS), help="The source's recent-week buttons: top-insider (Top Insider Trading Recent Week, trades of $100,000 or more) or top-owner (Top 10% Owner Trading Recent Week, 10% owners' trades of $1,000,000 or more), largest first; --value and --sort override the threshold and order.")),
+    ],
     collections={"trades": Collection("rows keyed by the table headers plus ticker, url (stock page), owner_url and filing_url, in the source's order (newest first unless --sort)", default=20)},
     context={"sort_keys": "column label -> the key --sort accepts for it, from this table's header links"},
 )

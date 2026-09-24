@@ -99,7 +99,12 @@ def is_empty(value):
 ORDER = ["target", "request", "id", "observed_at", "source", "conditions", "coverage", "next", "status", "data", "chars", "warnings", "error"]
 
 
-def render(view, cap):
+def cap_of(caps, name):
+    """The budget's count for one section: one number for every section, or a mapping of section to number."""
+    return caps.get(name, 0) if isinstance(caps, dict) else caps
+
+
+def render(view, caps):
     result, item = view.result, view.item
     out = {"target": result.get("target"), "request": request_of(view), "id": result.get("id"), "observed_at": result.get("observed_at") or now(), "source": {k: v for k, v in (result.get("source") or {}).items() if k != "headers" and v not in (None, [], False, {})}, "conditions": result.get("conditions"), "status": result.get("status", "ok"), "warnings": list(result.get("warnings") or [])}
     if result.get("error"):
@@ -107,12 +112,12 @@ def render(view, cap):
     if out["status"] == "error":
         return ordered(out)
     if view.raw is not None:
-        return render_raw(view, out, cap)
+        return render_raw(view, out, cap_of(caps, "_raw"))
     context = result.get("context") or {}
     data = dict(context)
     covered, cut, following = {}, False, []
     for name, p in view.picked.items():
-        shown = min(len(p.records), cap)
+        shown = min(len(p.records), cap_of(caps, name))
         data[name] = p.records[:shown]
         covered[name] = coverage(p, shown, (result.get("totals") or {}).get(name))
         cut = cut or shown < len(p.records)
@@ -137,7 +142,7 @@ def render(view, cap):
         out["coverage"] = covered if item.multi else next(iter(covered.values()))
         if all(p.absent or p.received == 0 for p in view.picked.values()) and out["status"] == "ok":
             out["status"] = "empty"
-    elif is_empty(context) and out["status"] == "ok" and result.get("id") and not result.get("failed"):
+    elif is_empty(context) and out["status"] == "ok" and result.get("id"):
         out["status"] = "empty"
     if out["status"] == "empty":
         out["warnings"].append("The source returned no records; this is not proof that the data does not exist.")
@@ -212,9 +217,10 @@ def read_command(ids, item, sel, section, start, limit, ops):
     return command(words, ops)
 
 
-def continuation(views, cap):
+def continuation(views, caps):
     """One command per section the budget cut, covering every result that shows it: they were cut to the same count, so one --start continues all of them."""
     found = []
+    cap = cap_of(caps, "_raw")
     raw = next((v for v in views if v.raw is not None and cap < len(v.raw["text"])), None)
     if raw is not None:
         begin = raw.raw["start"] + cap
@@ -223,6 +229,7 @@ def continuation(views, cap):
     if first is None:
         return found
     for name in first.sections:
+        cap = cap_of(caps, name)
         showing = [v for v in views if name in v.picked and not v.picked[name].absent]
         if not any(cap < len(v.picked[name].records) for v in showing):
             continue

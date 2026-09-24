@@ -29,24 +29,48 @@ def overall(results):
 
 
 def fit(views, max_chars):
-    """The text to print: every requested record if it fits, else the largest equal count per collection that does, else a bounded too_large document."""
-    upper = max((v.upper for v in views), default=0)
-    text = dumps(document(views, upper))
+    """The text to print: every requested record if it fits; else the largest equal count per section, extended section by section into what the budget still holds; else a bounded too_large document."""
+    uppers = {}
+    for view in views:
+        for name, p in view.picked.items():
+            uppers[name] = max(uppers.get(name, 0), len(p.records))
+        if view.raw is not None:
+            uppers["_raw"] = len(view.raw["text"])
+    text = dumps(document(views, uppers))
     if len(text) <= max_chars:
         return text
-    # 성진: 모든 목표·절에 같은 상한 하나를 이진 탐색한다. 한 절의 첫 레코드가 혼자 넘치면 다른 절도 0이 되어 too_large가 된다; 절마다 따로 상한을 찾을 필요가 실측되면 절별 탐색으로 바꾼다.
-    low, high = 0, upper - 1  # upper itself did not fit
-    best = None
+
+    def fits(caps):
+        candidate = dumps(document(views, caps))
+        return candidate if len(candidate) <= max_chars else None
+
+    def widest(caps, name, low, high):
+        """The largest count for one section, the others held, that still fits."""
+        best = low
+        while low <= high:
+            middle = (low + high) // 2
+            if fits(dict(caps, **{name: middle})):
+                best, low = middle, middle + 1
+            else:
+                high = middle - 1
+        return best
+
+    # Equal counts first, so several targets or sections share the budget evenly and one --start continues each.
+    low, high, equal = 0, max(uppers.values(), default=0), 0
     while low <= high:
         middle = (low + high) // 2
-        candidate = dumps(document(views, middle))
-        if len(candidate) <= max_chars:
-            best, low = candidate, middle + 1
+        if fits({name: min(middle, upper) for name, upper in uppers.items()}):
+            equal, low = middle, middle + 1
         else:
             high = middle - 1
-    if best is not None and low - 1 > 0:
+    caps = {name: min(equal, upper) for name, upper in uppers.items()}
+    for name, upper in uppers.items():  # then what is left, in the order the sections were asked for
+        if caps[name] < upper:
+            caps[name] = widest(caps, name, caps[name], upper)
+    best = fits(caps)
+    if best is not None and any(caps.values()):
         return best
-    base = len(dumps(document(views, 0)))
+    base = len(dumps(document(views, {name: 0 for name in uppers})))
     return bounded([render(v, 0) if v.result.get("status") == "error" else too_large(v, len(text), max_chars, base) for v in views], max_chars)
 
 

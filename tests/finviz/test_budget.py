@@ -133,14 +133,14 @@ def test_several_targets_are_cut_to_the_same_count_and_one_continuation_carries_
     assert got[(0, "news")] == whole["results"][0]["data"]["news"] and got[(1, "news")] == whole["results"][1]["data"]["news"]
 
 
-def test_two_sections_cut_by_the_budget_each_get_their_own_continuation(client):
+def test_two_sections_cut_by_the_budget_continue_to_exactly_the_unbudgeted_answer(client):
     news = tuple(("Sep-%02d-26 04:30PM" % (n + 1), "Headline %d %s" % (n, NOTE), "https://example.com/%d" % n, "S") for n in range(15))
     ratings = tuple(("Sep-%02d-26" % (n + 1), "Upgrade", "Analyst " + NOTE, "Buy", "$1") for n in range(15))
     client.add("https://finviz.com/stock?t=A&ty=c", stock_overview(news=news, ratings=ratings))
     arguments = ["stock", "overview", "A", "--sections", "news,ratings", "--limit", "15"]
     whole = client.one(*arguments, "--max-chars", "1000000")["data"]
     first, got, _ = gathered(client, arguments, 3000)
-    assert isinstance(first["continuation"], list) and len(first["continuation"]) == 2
+    assert first["continuation"]
     assert got[(0, "news")] == whole["news"] and got[(0, "ratings")] == whole["ratings"]
 
 
@@ -171,3 +171,13 @@ def test_the_smallest_budget_is_refused_where_it_is_given_and_the_next_one_still
     doc = client.run("--max-chars", "200", "schema", code=9)
     assert len(json.dumps(doc, separators=(",", ":"))) <= 200 and doc["results"][0]["status"] == "error"
     assert "read " not in doc["results"][0]["error"]["fix"]  # there is no saved observation to offer
+
+
+def test_a_section_that_fits_is_shown_even_when_another_sections_first_record_does_not(client):
+    news = tuple(("Sep-%02d-26 04:30PM" % (n + 1), "Headline %d" % n, "https://example.com/%d" % n, "S") for n in range(5))
+    client.add("https://finviz.com/stock?t=A&ty=c", stock_overview(metrics=[("M%d" % n, "1", "d" * 40) for n in range(3)], news=news, insiders=(("Owner " + "o" * 900, "Director", "Sep 04 '26", "Sale", "1", "1", "1", "1", "Sep 09 04:01 PM", "http://www.sec.gov/x.xml"),)))
+    arguments = ["stock", "overview", "A", "--sections", "news,insiders"]
+    alone = len(json.dumps(client.run(*arguments, "--max-chars", "1000000", "--limit", "0"), separators=(",", ":")))
+    first = client.run(*arguments, "--max-chars", str(alone + 450), code=8)
+    assert first["results"][0]["data"]["news"] and first["results"][0]["coverage"]["insiders"]["cut"] == "budget"
+    assert any("--section insiders" in c for c in ([first["continuation"]] if isinstance(first["continuation"], str) else first["continuation"]))

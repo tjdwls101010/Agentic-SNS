@@ -14,7 +14,18 @@ GROUP_VIEWS = {"overview": "110", "valuation": "120", "performance": "140", "fin
 SECTORS = ["basicmaterials", "communicationservices", "consumercyclical", "consumerdefensive", "energy", "financial", "healthcare", "industrials", "realestate", "technology", "utilities"]
 GROUP_IDS = ["sector", "industry", "country", "capitalization"] + ["industry/" + s for s in SECTORS]
 GROUP_ARG = (("--group",), dict(dest="group_key", default="sector", choices=GROUP_IDS, help="Group universe: sector, industry, country, capitalization, or industry/<sector> for one sector's industries."))
-GROUP_SORTS = {"name": "Name", "marketcap": "Market Capitalization", "pe": "Price/Earnings", "forwardpe": "Forward Price/Earnings", "peg": "PEG", "ps": "Price/Sales", "pb": "Price/Book", "pc": "Price/Cash", "pfcf": "Price/Free Cash Flow", "enterprisevalue": "Enterprise Value", "evebitda": "EV/EBITDA", "evsales": "EV/Sales", "dividendyield": "Dividend Yield", "eps3years": "EPS growth past 3 years", "eps5years": "EPS growth past 5 years", "estltgrowth": "EPS growth next 5 years", "sales3years": "Sales growth past 3 years", "sales5years": "Sales growth past 5 years", "shortinterestshare": "Short Interest Share", "roa": "Return on Assets", "roe": "Return on Equity", "roi": "Return on Invested Capital", "curratio": "Current Ratio", "quickratio": "Quick Ratio", "ltdebteq": "LT Debt/Equity", "debteq": "Total Debt/Equity", "grossmargin": "Gross Margin", "opermargin": "Operating Margin", "netmargin": "Net Profit Margin", "recom": "Analyst Recommendation", "perf1w": "Performance (Week)", "perf4w": "Performance (Month)", "perf13w": "Performance (Quarter)", "perf26w": "Performance (Half Year)", "perf52w": "Performance (Year)", "perfytd": "Performance (Year To Date)", "averagevolume": "Average Volume (3 Month)", "relativevolume": "Relative Volume", "change": "Change %", "volume": "Volume", "count": "Number of Stocks", "employees": "Employees"}
+GROUP_SORTS = {
+    "name": "Name", "marketcap": "Market Capitalization", "pe": "Price/Earnings", "forwardpe": "Forward Price/Earnings", "peg": "PEG", "ps": "Price/Sales",
+    "pb": "Price/Book", "pc": "Price/Cash", "pfcf": "Price/Free Cash Flow", "enterprisevalue": "Enterprise Value", "evebitda": "EV/EBITDA",
+    "evsales": "EV/Sales", "dividendyield": "Dividend Yield", "eps3years": "EPS growth past 3 years", "eps5years": "EPS growth past 5 years",
+    "estltgrowth": "EPS growth next 5 years", "sales3years": "Sales growth past 3 years", "sales5years": "Sales growth past 5 years",
+    "shortinterestshare": "Short Interest Share", "roa": "Return on Assets", "roe": "Return on Equity", "roi": "Return on Invested Capital",
+    "curratio": "Current Ratio", "quickratio": "Quick Ratio", "ltdebteq": "LT Debt/Equity", "debteq": "Total Debt/Equity", "grossmargin": "Gross Margin",
+    "opermargin": "Operating Margin", "netmargin": "Net Profit Margin", "recom": "Analyst Recommendation", "perf1w": "Performance (Week)",
+    "perf4w": "Performance (Month)", "perf13w": "Performance (Quarter)", "perf26w": "Performance (Half Year)", "perf52w": "Performance (Year)",
+    "perfytd": "Performance (Year To Date)", "averagevolume": "Average Volume (3 Month)", "relativevolume": "Relative Volume", "change": "Change %",
+    "volume": "Volume", "count": "Number of Stocks", "employees": "Employees",
+}
 
 
 def group_query(group):
@@ -96,7 +107,7 @@ CURRENCY = (("--currency",), dict(default=None, choices=["USD", "USDT", "EUR", "
     "market",
     "quotes",
     help="Current quotes for every futures, forex or crypto instrument Finviz lists.",
-    args=[KIND, (("--timeframe",), dict(default="d", choices=["d", "w"], help="Timeframe of the change fields: d daily or w weekly.")), CURRENCY],
+    args=[KIND, (("--timeframe",), dict(default="d", choices=["d", "w"], help="Timeframe of the sparkline points: d the day's intraday points, w weekly; the change fields stay daily either way, and market performance has every period.")), CURRENCY],
     collections={"quotes": Collection("the quote as published with its instrument key as ticker, extra source fields included; the sparkline point arrays only with --sparkline", local=[Selector(("--sparkline",), dict(action="store_true", help="Keep each instrument's intraday sparkline points, most of the response's size."), keep_sparklines)])},
 )
 def quotes(ctx, args, target):
@@ -109,6 +120,8 @@ def quotes(ctx, args, target):
         raise obs.fail("structure_changed", "The quotes API did not return a mapping.", "Read the saved raw response with read ID --raw.")
     obs.result["conditions"] = {"timeframe": condition(args.timeframe, "unverified", None)} | ({"currency": condition(args.currency, "unverified", None)} if args.currency else {})
     obs.result["target"], obs.result["collections"] = args.kind, {"quotes": keyed_records(source)}
+    if args.timeframe != "d" and not args.sparkline:
+        obs.result["warnings"] = ["--timeframe changes only the sparkline points, which --sparkline shows; the change fields are daily either way."]
     return obs.result
 
 
@@ -161,7 +174,11 @@ def classified(performance, tree, field):
     "market",
     "map",
     help="Market map performance per ticker, optionally joined to the map's classification tree with its size weights.",
-    args=[(("--type",), dict(default="sec", choices=list(TYPES), help="Map universe: sec S&P 500 sectors, sec_all the full market, geo world, cap, etf, crypto variants, futures, sec_dji, sec_rut, sec_ndx and sec_comp index maps, themes.")), (("--period",), dict(default="d1", choices=list(MAP_PERIODS) + MAP_METRICS, metavar="PERIOD", help="What each tile shows: a performance period (" + ", ".join(k + " " + v for k, v in MAP_PERIODS.items()) + ") or a fundamental metric such as pe, fpe, ps, div, roe, netmargin, short or rec; schema market map lists every choice.")), (("--classification",), dict(action="store_true", help="Join each ticker to the map's group path, description and size weight; resolving the tree takes several more asset requests."))],
+    args=[
+        (("--type",), dict(default="sec", choices=list(TYPES), help="Map universe: sec S&P 500 sectors, sec_all the full market, geo world, cap, etf, crypto variants, futures, sec_dji, sec_rut, sec_ndx and sec_comp index maps, themes.")),
+        (("--period",), dict(default="d1", choices=list(MAP_PERIODS) + MAP_METRICS, metavar="PERIOD", help="What each tile shows: a performance period (" + ", ".join(k + " " + v for k, v in MAP_PERIODS.items()) + ") or a fundamental metric such as pe, fpe, ps, div, roe, netmargin, short or rec; schema market map lists every choice.")),
+        (("--classification",), dict(action="store_true", help="Join each ticker to the map's group path, description and size weight; resolving the tree takes several more asset requests.")),
+    ],
     collections={"tickers": Collection("{ticker, <period>: value} per map tile, the field named after the --period the source applied (a percent change for a performance period, the metric's value for a fundamental); with --classification also groups (the path of group names from the top), description and weight, the tile's size weight rather than a market cap")},
     context={"period, version": "as published by the performance API", "classification_source": "URL of the asset the tree came from, with --classification"},
 )
@@ -243,7 +260,14 @@ def classification(ctx, map_type, dependencies):
     return roots[0], chunk_obs.url
 
 
-AXES = ["sector", "ticker", "order", "marketCap", "dividendYield", "payoutRatio", "employees", "income", "sales", "epsQoQ", "epsYoY", "epsYoY1", "eps5Years", "estLTGrowth", "salesQoQ", "sales5Years", "PE", "forwardPE", "PEG", "PS", "PB", "PC", "PFCF", "roi", "roe", "roa", "grossMargin", "operMargin", "netMargin", "curRatio", "quickRatio", "ltdebtEq", "debtEq", "lastChange", "changeOpen", "gap", "lastVolume", "lastVolumeUsd", "averageVolume", "averageVolumeUsd", "relativeVolume", "perf1w", "perf4w", "perf13w", "perf26w", "perf52w", "perfYtd", "volatility1w", "volatility4w", "beta", "low52w", "high52w", "sma20", "sma50", "sma200", "rsi", "insiderOwn", "insiderTrans", "instOwn", "instTrans", "shortInterestShare", "shortInterestRatio", "consRecom", "targetPrice"]
+AXES = [
+    "sector", "ticker", "order", "marketCap", "dividendYield", "payoutRatio", "employees", "income", "sales", "epsQoQ", "epsYoY", "epsYoY1", "eps5Years",
+    "estLTGrowth", "salesQoQ", "sales5Years", "PE", "forwardPE", "PEG", "PS", "PB", "PC", "PFCF", "roi", "roe", "roa", "grossMargin", "operMargin",
+    "netMargin", "curRatio", "quickRatio", "ltdebtEq", "debtEq", "lastChange", "changeOpen", "gap", "lastVolume", "lastVolumeUsd", "averageVolume",
+    "averageVolumeUsd", "relativeVolume", "perf1w", "perf4w", "perf13w", "perf26w", "perf52w", "perfYtd", "volatility1w", "volatility4w", "beta", "low52w",
+    "high52w", "sma20", "sma50", "sma200", "rsi", "insiderOwn", "insiderTrans", "instOwn", "instTrans", "shortInterestShare", "shortInterestRatio",
+    "consRecom", "targetPrice",
+]
 SIZES = ["const", "marketCap", "lastVolume", "lastVolumeUsd", "averageVolume", "averageVolumeUsd", "relativeVolume"]
 COLORS = ["const", "sector", "industry", "country", "marketCap", "lastChange", "perf1w", "perf4w", "perf13w", "perf26w", "perf52w", "perfYtd", "lastVolume", "lastVolumeUsd", "averageVolume", "averageVolumeUsd", "relativeVolume", "consRecom"]
 CAPS = ["mega", "large", "mid", "small", "micro", "nano", "largeover", "midover", "smallover", "microover", "largeunder", "midunder", "smallunder", "microunder"]

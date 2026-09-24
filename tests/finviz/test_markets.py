@@ -81,7 +81,7 @@ def test_market_map_resolves_classification_from_the_page_assets_and_degrades_to
     degraded = client.one("market", "map", "--type", "geo", "--classification", code=8)
     assert degraded["status"] == "partial" and degraded["error"]["code"] == "asset_structure"
     assert degraded["data"]["tickers"] == [{"ticker": "RY", "d1": 1.2}, {"ticker": "TD", "d1": -0.4}]
-    assert any("asset_structure" in w for w in client.one("read", degraded["source"]["dependencies"][-1])["warnings"])
+    assert client.one("read", degraded["source"]["dependencies"][-1], code=6)["error"]["code"] == "asset_structure"
     assert client.one("read", degraded["id"], code=8)["status"] == "partial"  # a replay does not launder the gap
 
 
@@ -144,3 +144,10 @@ def test_bubble_filters_are_judged_by_the_stocks_that_came_back(client):
     assert client.one("market", "bubbles", "--exclude", "AAPL")["conditions"]["exclude"] == {"requested": "AAPL", "status": "not_applied", "evidence": {"excluded_but_returned": ["AAPL"]}}
     client.add("https://finviz.com/api/bubbles?x=sector&y=lastChange&size=marketCap&color=sector&idx=dji&cap=mega&sh_avgvol=o1000", tech)
     assert client.one("market", "bubbles", "--cap", "mega", "--avg-volume", "o1000")["conditions"]["cap"]["status"] == "unverified"
+
+
+def test_a_quote_timeframe_changes_only_the_sparkline_and_says_so_without_it(client):
+    client.add("https://finviz.com/api/futures_all?timeframe=w", {"ES": {"label": "S&P 500", "last": 6600.0, "change": 0.1, "sparkline": [1, 2]}})
+    plain = client.one("market", "quotes", "futures", "--timeframe", "w")
+    assert any("--sparkline" in w for w in plain["warnings"])
+    assert not client.one("market", "quotes", "futures", "--timeframe", "w", "--sparkline").get("warnings")

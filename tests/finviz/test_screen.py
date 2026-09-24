@@ -201,8 +201,8 @@ def test_a_caught_later_page_failure_is_saved_with_its_original_error(client, bo
     client.add("https://finviz.com/screener?v=111&ft=4&r=21", body, status=status, headers={"Retry-After": "30"})
     result = client.one("screen", "run", "--pages", "2", code=8)
     failed_id = re.search(r"observation ([a-f0-9]+)", " ".join(result["warnings"]))[1]
-    saved = client.one("read", failed_id)
-    assert any(code in w for w in saved["warnings"])
+    saved = client.one("read", failed_id, code=5 if code == "access_restricted" else 6)
+    assert saved["error"]["code"] == code
     assert client.one("read", failed_id, "--raw")["data"] == body
     assert client.one("read", result["id"], code=8)["status"] == "partial"  # reading a partial aggregate stays partial
 
