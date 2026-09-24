@@ -13,11 +13,11 @@ def test_history_preserves_axis_timezone_zero_and_large_integer(cli):
     r = doc["results"][0]
     assert r["data"]["columns"] == ["Close", "Volume"]
     assert r["data"]["data"] == [[100.0, 9007199254740993], [0.0, 0]]
-    assert r["data"]["index"] == ["2024-01-02T00:00:00-05:00", "2024-01-03T00:00:00-05:00"]
+    assert r["data"]["index"] == ["2024-01-02", "2024-01-03"]
+    assert r["context"]["timezone"] == "America/New_York", "a date-only axis is only lossless with its zone beside it"
     assert r["data"]["index_names"] == ["Date"]
     assert r["context"]["currency"] == "USD"
-    assert doc["request"]["period"] is None
-    assert doc["request"]["repair"] is False
+    assert "period" not in doc["request"] and "repair" not in doc["request"], "defaults left as they were are not echoed"
 
 
 def test_batch_retains_success_and_stops_remaining_targets_on_rate_limit(cli):
@@ -35,7 +35,7 @@ def test_adjustment_modes_keep_their_distinct_price_meaning(cli, adjust, expecte
     proc, doc = cli("prices", "history", "AAPL", "--start", "2024-01-02", "--end", "2024-01-03", "--adjust", adjust, "--fields", "Open,Close", routes=chart_routes())
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert doc["results"][0]["data"]["data"] == [[expected_open, expected_close]]
-    assert doc["request"]["adjust"] == adjust
+    assert doc["request"].get("adjust", "auto") == adjust
 
 
 def test_actions_keep_native_dividend_amount(cli):

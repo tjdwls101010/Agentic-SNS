@@ -201,3 +201,23 @@ def test_a_source_epoch_is_reported_in_the_same_form_as_every_other_time(cli):
     assert proc.returncode == 0, proc.stdout[:400]
     source_time = doc["results"][0]["source_time"]
     assert source_time.startswith("2026-") and source_time.endswith("+00:00")
+
+
+# ---- the index is a field a reader can name ------------------------------------------------------------------------
+
+
+def test_the_index_name_is_listed_and_accepted_as_a_field(cli):
+    """A baseline session asked for --fields Date,Close and was refused: the date is the index, which the listing
+    never named. It is always returned once, in index."""
+    proc, doc = cli("prices", "history", "AAPL", "--period", "5d", "--list-fields", routes=series_routes(3))
+    assert doc["results"][0]["data"][0] == "Date"
+    proc, doc = cli("prices", "history", "AAPL", "--period", "5d", "--fields", "Date,Close", routes=series_routes(3))
+    assert proc.returncode == 0, proc.stdout[:400]
+    data = doc["results"][0]["data"]
+    assert data["columns"] == ["Close"] and len(data["index"]) == 3
+
+
+def test_naming_only_the_index_is_refused_with_what_to_do(cli):
+    proc, doc = cli("prices", "history", "AAPL", "--period", "5d", "--fields", "Date", routes=series_routes(3))
+    assert proc.returncode == 2
+    assert "index is always returned" in doc["results"][0]["error"]["message"]

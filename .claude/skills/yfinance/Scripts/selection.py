@@ -65,9 +65,21 @@ def take_rows(data, keep, recent):
     return (data[-keep:] if recent else data[:keep]), side
 
 
+def index_names(data):
+    return [str(n) for n in data.get("index_names") or [] if n is not None] if is_table(data) else []
+
+
 def project(data, fields):
-    """Keep the named fields. Missing names are an error rather than a silent empty column."""
+    """Keep the named fields. Missing names are an error rather than a silent empty column.
+
+    A table's index is always returned once, in index, so naming it is accepted and changes nothing; naming only the
+    index would leave no column to show, which is refused rather than printed as an empty table.
+    """
     if is_table(data):
+        indexed = set(index_names(data))
+        if indexed and all(f in indexed for f in fields):
+            raise InputError(f"{fields} names only the index, and the index is always returned; name at least one column (see --list-fields).")
+        fields = [f for f in fields if f not in indexed]
         by_name = {str(c): i for i, c in enumerate(data["columns"])}
         missing = [f for f in fields if f not in by_name]
         if missing:
@@ -97,7 +109,7 @@ def select(data, args, item, coverage=None, keep=None):
     coverage = {} if coverage is None else coverage
     if getattr(args, "list_fields", False):
         term = (getattr(args, "filter", "") or "").lower()
-        return [f for f in available_fields(data) if term in f.lower()], coverage
+        return [f for f in index_names(data) + available_fields(data) if term in f.lower()], coverage
     received = row_count(data)
     if received is not None:
         coverage.setdefault("received", received)

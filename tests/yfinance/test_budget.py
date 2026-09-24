@@ -65,11 +65,13 @@ def test_following_the_read_recovery_returns_the_same_observation(cli, tmp_path)
 
 
 def test_the_budget_the_fix_names_is_the_budget_that_works(cli, tmp_path):
-    args = ("prices", "history", "AAPL", "--period", "1y", "--fields", "Close,Volume")
-    proc, doc = cli(*args, "--max-chars", "1000", routes=chart_routes(), store=tmp_path / "s")
+    symbols = [f"S{i:02d}" for i in range(6)]
+    routes = [r for s in symbols for r in chart_routes(s)]
+    args = ("prices", "history", *symbols, "--period", "1y", "--fields", "Close,Volume")
+    proc, doc = cli(*args, "--max-chars", "1000", routes=routes, store=tmp_path / "s")
     assert proc.returncode == 9
     raised = parse(doc["results"][0]["error"]["fix"], "max-chars")
-    proc, doc = cli(*args, *raised, routes=chart_routes(), store=tmp_path / "s")
+    proc, doc = cli(*args, *raised, routes=routes, store=tmp_path / "s")
     assert proc.returncode in (0, 8), proc.stdout[:400]
     assert len(proc.stdout.strip()) <= int(raised[1])
 
@@ -248,10 +250,10 @@ def earnings_page_routes(count=25):
 
 def test_a_single_symbol_earnings_recovery_never_names_a_date_range(cli, tmp_path):
     """--start/--end is a real narrowing for market-wide calendar earnings and rejected outright for the
-    single-symbol form. An explicit store lengthens the continuation enough that even one row refuses, so the
-    recovery sentence lists this leaf's narrowings."""
+    single-symbol form. With an explicit store the recovery commands grow enough that even one row refuses at the
+    minimum budget, so the refusal lists this leaf's narrowings."""
     store = tmp_path / "an-explicitly-chosen-store"
-    proc, doc = cli("calendar", "earnings", "AAPL", "--max-chars", "1000", "--store", str(store), routes=earnings_page_routes(), store=tmp_path / "s")
+    proc, doc = cli("calendar", "earnings", "AAPL", "--limit", "25", "--max-chars", "1000", "--store", str(store), routes=earnings_page_routes(), store=tmp_path / "s")
     assert proc.returncode == 9, proc.stdout[:300]
     fix = doc["results"][0]["error"]["fix"]
     assert "Narrow with" in fix and "--start" not in fix and "--end" not in fix, fix
@@ -289,3 +291,64 @@ def test_a_generated_recovery_points_at_the_store_the_observation_is_in(cli, tmp
     text = json.dumps(doc, ensure_ascii=False)
     assert str(store) in text, "a recovery command that omits --store sends the reader to a different cache"
     assert (store / (doc["results"][0]["id"] + ".json")).exists()
+
+
+# ---- recoveries that leave the budget behind ------------------------------------------------------------------------
+
+
+def test_a_budget_cut_series_names_the_file_and_the_coarser_view_and_both_work(cli, tmp_path):
+    """A window is not the series. The warning names the two ways out that do not page through the whole thing on
+    screen: the saved rows written to a file, and a coarser interval — which is a new request with a different
+    meaning, and says so."""
+    store = tmp_path / "s"
+    proc, doc = cli("prices", "history", "AAPL", "--period", "1y", "--max-chars", "3000", routes=chart_routes(), store=store)
+    assert proc.returncode == 8, proc.stdout[:300]
+    warning = next(w for w in doc["results"][0]["warnings"] if "budget narrowed" in w)
+    found = re.search(r"\bread ([0-9a-f]{16})((?: --\S+(?: \S+)?)*?) --out FILE", warning)
+    assert found, warning
+    out = tmp_path / "all.csv"
+    proc, back = cli("read", found[1], *shlex.split(found[2]), "--out", str(out), routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:300]
+    assert back["results"][0]["data"]["rows"] == 300
+    assert "--interval 1wk" in warning and "new request" in warning, warning
+    proc, weekly = cli("prices", "history", "AAPL", "--period", "1y", "--interval", "1wk", routes=chart_routes(), store=store)
+    assert proc.returncode in (0, 8), proc.stdout[:300]
+
+
+def test_a_refusal_names_the_file_when_the_rows_can_go_to_one(cli, tmp_path):
+    store = tmp_path / "s"
+    huge = [{"path": "/xhr/ncp", "json": {"data": {"tickerStream": {"stream": [{"id": "x", "content": {"title": "t", "summary": "s" * 30000}}]}}}}]
+    proc, doc = cli("company", "news", "AAPL", "--fields", "content.summary", routes=huge, store=store)
+    assert proc.returncode == 9, proc.stdout[:300]
+    fix = doc["results"][0]["error"]["fix"]
+    found = re.search(r"\bread ([0-9a-f]{16})((?: --\S+(?: \S+)?)*?) --out FILE", fix)
+    assert found, fix
+    proc, back = cli("read", found[1], *shlex.split(found[2]), "--out", str(tmp_path / "news.csv"), routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:300]
+
+
+def test_a_single_record_refusal_never_offers_a_file(cli, tmp_path):
+    profile = {"quoteType": {"quoteType": "ETF"}, "summaryProfile": {"longBusinessSummary": "x" * 30000},
+               "topHoldings": {"holdings": [], "sectorWeightings": [], "bondRatings": []}, "fundProfile": {"categoryName": "c", "family": "f", "legalType": "l"}}
+    routes = [{"path": "/quoteSummary/SPY", "json": {"quoteSummary": {"result": [profile]}}}]
+    proc, doc = cli("fund", "description", "SPY", routes=routes, store=tmp_path / "s")
+    assert proc.returncode == 9, proc.stdout[:300]
+    assert "--out" not in doc["results"][0]["error"]["fix"]
+
+
+def test_reading_a_long_saved_series_under_a_small_budget_narrows_rather_than_crashing(cli, tmp_path):
+    """read has no --interval, so a recovery built for the original command must not be built from read's arguments."""
+    store = tmp_path / "s"
+    proc, doc = cli("prices", "history", "AAPL", "--period", "1y", "--limit", "1", routes=chart_routes(), store=store)
+    proc, back = cli("read", doc["results"][0]["id"], "--max-chars", "1500", routes=[], store=store)
+    assert proc.returncode == 8, proc.stdout[:400] + proc.stderr[-400:]
+    assert back["results"][0]["continuation"]
+
+
+def test_a_multi_target_recovery_keeps_the_store_it_saved_to(cli, tmp_path):
+    store = tmp_path / "custom"
+    symbols = [f"S{i:02d}" for i in range(10)]
+    routes = [r for s in symbols for r in chart_routes(s)]
+    proc, doc = cli("prices", "history", *symbols, "--period", "1y", "--store", str(store), "--max-chars", "4000", routes=routes, store=tmp_path / "unused")
+    assert proc.returncode == 9, proc.stdout[:300]
+    assert f"--store {store}" in doc["results"][0]["error"]["fix"]

@@ -69,14 +69,15 @@ class Leaf:
     def __init__(self, group, name, purpose, fetch, *, args=(), ticker=False, limit=None, fields=(), recent=False, narrow=(),
                  units=None, interpretation=None, limits=None, gotchas=(), conditions=None, defaults=None, check=None,
                  forbidden=None, sliceable=True, shares_info=False, source_time=None, end_exclusive=False, epilog=None,
-                 exportable=True):
+                 exportable=True, precise=(), coarser=None):
         self.group, self.name, self.purpose, self.fetch = group, name, purpose, fetch
         self.args, self.ticker, self.limit, self.fields, self.recent = tuple(args), ticker, limit, tuple(fields), recent
         self.narrow, self.gotchas = tuple(narrow), tuple(gotchas)
         self.units, self.interpretation, self.limits = units or {}, interpretation or {}, limits or {}
         self.conditions, self.defaults, self.check, self.forbidden = conditions, defaults, check, forbidden
         self.sliceable, self.shares_info, self.source_time = sliceable, shares_info, source_time
-        self.end_exclusive, self.epilog, self.exportable = end_exclusive, epilog, exportable
+        self.end_exclusive, self.epilog, self.exportable, self.precise = end_exclusive, epilog, exportable, tuple(precise)
+        self.coarser = coarser
 
     @property
     def path(self):
@@ -125,6 +126,14 @@ def effective_limit(args, item):
     """
     explicit = getattr(args, "limit", None)
     return explicit if explicit is not None else (item.limit if item else None)
+
+
+OUT_HELP = ("Write this observation's rows to a new CSV file and print only a summary: every digit and timestamp as saved, one target column, "
+            "table indices as columns, option sides as side, mapping keys as key, lists of values as value, nested records as dotted columns, "
+            "other objects and lists as JSON cells, nulls as blank cells, and a name that would collide prefixed source. — read the returned columns. "
+            "The screen's default window and projection do not apply; an explicit --fields or --limit does. Commands that ask the source for a set number of rows "
+            "(news, screen, calendars) still ask for their default unless --limit raises it, and no further pages are fetched. "
+            "Targets with nothing selected add no rows and no file is made when none do, so check each target's status before comparing. An existing file is never overwritten.")
 
 
 def add_common(parser, selection=True, root=False):

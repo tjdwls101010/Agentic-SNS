@@ -31,6 +31,9 @@ def request(self, method, url, **kwargs):
             raise SystemExit(97)
     if payload.get("delay"):
         time.sleep(payload["delay"])
+    if payload.get("touch"):  # something else creates this file while the request is in flight
+        with open(payload["touch"], "w") as handle:
+            handle.write("arrived first\n")
     response = requests.Response()
     response.status_code = payload.get("status", 200)
     response.url = url

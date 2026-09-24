@@ -9,10 +9,12 @@ import sys
 import yfinance as yf
 
 import budget
+import copy
+import export
 import groups  # noqa: F401  registers every leaf
 import registry
 import store
-from encode import encode, is_empty, is_sided
+from encode import encode, is_empty, is_sided, is_table
 from envelope import InputError, error_info, now, ordered, result
 from schema import schema_data
 from selection import select, select_sides
@@ -41,6 +43,8 @@ def build_parser():
     reader.add_argument("id", help="Observation id from an earlier result.")
     reader.add_argument("--start", dest="row_start", type=int, default=0, help="Zero-based first row to return; each slice names the start of the next one.")
     registry.add_common(reader)
+    reader._option_string_actions["--limit"].help = "Maximum rows, counted forward from --start in saved order; unlike the first call, read does not keep the newest end. The same slice goes to --out."
+    reader.add_argument("--out", help=registry.OUT_HELP)
     reader.set_defaults(leaf="")
 
     members = {}
@@ -60,8 +64,11 @@ def build_parser():
                 p.epilog = item.epilog
             parsers[group, name] = p
             registry.add_common(p)
+            if item.exportable:
+                p.add_argument("--out", help=registry.OUT_HELP)
             for arg in item.args:
                 arg.add(p)
+    parsers["read"] = reader
     return parser, parsers
 
 
@@ -101,6 +108,10 @@ def validate(args, item):
             raise InputError("--period cannot be combined with --start or --end")
         if args.period and not re.fullmatch(r"([1-9][0-9]*(d|wk|mo|y)|ytd|max)", args.period):
             raise InputError("--period expects a positive range such as 5d, 1mo, 1y, ytd or max")
+    if getattr(args, "out", None):
+        if args.list_fields:
+            raise InputError("--list-fields names columns and --out writes rows; use one of them.")
+        export.check_path(args.out)
     if item.check:
         item.check(args)
     if item.defaults:
@@ -140,9 +151,9 @@ def observe(target, args, item, saved):
 
 
 def run(args, item, saved, request):
-    results, stopped = [], False
+    results, stopped, pending = [], False, {}
     plural = list(getattr(args, "symbols", [])) or [getattr(args, "symbol", None) or getattr(args, "query", None) or getattr(args, "key", None) or args.group]
-    for target in plural:
+    for position, target in enumerate(plural):
         if stopped:
             results.append(result(target, status="not_attempted", error=error_info("not_attempted", "Stopped after rate limiting", "Retry later with fewer targets.")))
             continue
@@ -152,6 +163,8 @@ def run(args, item, saved, request):
             with contextlib.redirect_stdout(sys.stderr):
                 encoded, context, warnings, conditions, observed_at, when, reused = observe(target, args, item, saved)
                 ident = reused or saved.save(store.record(item, target, request, encoded, context, warnings, "empty" if is_empty(encoded) else "ok", conditions, observed_at, when))
+                if getattr(args, "out", None):
+                    pending[position] = (ident, *exported(encoded, args, item))
                 coverage = {}
                 if is_sided(encoded) and not args.list_fields:
                     data = select_sides(encoded, args, item, coverage)
@@ -170,7 +183,64 @@ def run(args, item, saved, request):
             results.append(ordered(result(target, error=error_info(code, exc, fix))))
         finally:
             signal.alarm(0)
+    if getattr(args, "out", None):
+        write_out(results, pending, args)
     return results
+
+
+def exported(encoded, args, item):
+    """The rows a file gets: this observation's, projected only by an explicit --fields, cut only by an explicit --limit."""
+    whole = copy.copy(item)
+    whole.limit, whole.fields = None, ()  # the leaf's default window and projection are for the screen; a computation needs what arrived
+    coverage = {}
+    keyed = isinstance(encoded, dict) and not is_table(encoded) and not is_sided(encoded) and all(isinstance(v, dict) for v in encoded.values())
+    if keyed:  # a mapping of records windows like the rows it becomes, and keeps its key through --fields
+        encoded = [{"key": k, **{("source.key" if f == "key" else f): x for f, x in v.items()}} for k, v in encoded.items()]
+        if getattr(args, "fields", None) and "key" not in args.fields:
+            args = copy.copy(args)
+            args.fields = ["key", *args.fields]
+    if is_sided(encoded):
+        data = select_sides(encoded, args, whole, coverage)
+        sides = [v for v in coverage.values() if isinstance(v, dict) and "received" in v]
+        coverage = {"received": sum(s["received"] for s in sides), "shown": sum(s.get("shown", 0) for s in sides)}
+    else:
+        data, coverage = select(encoded, args, whole, coverage)
+    if is_empty(data):
+        return ([], []), coverage  # nothing usable was selected; this target contributes no rows, as its empty status says
+    return export.rows_of(data, keyed), coverage
+
+
+def retry(ident, args, coverage):
+    """The read that writes the same rows again: same store, same projection, same slice."""
+    start = coverage.get("start", 0)
+    if coverage.get("kept") == "newest":
+        start = coverage["received"] - coverage["shown"]
+    explicit = getattr(args, "limit", None)
+    names = [("--store", getattr(args, "store", None)), ("--fields", ",".join(args.fields) if getattr(args, "fields", None) else None),
+             ("--start", start or None), ("--limit", explicit)]
+    return f"read {ident}" + budget.quoted(args, names) + " --out NEWPATH"
+
+
+def write_out(results, pending, args):
+    """Publish every target's rows as one file, then give each result the summary in place of its rows."""
+    parts = [(results[i]["target"], rows) for i, (_, rows, _) in sorted(pending.items()) if rows[1]]
+    columns, failure = None, None
+    if parts:
+        try:
+            columns = export.publish(args.out, parts)
+        except export.Unpublished as exc:
+            failure = exc
+    for i, (ident, (keys, records), coverage) in pending.items():
+        envelope = results[i]
+        envelope.pop("_full", None)  # the rows are in the file; the budget has nothing here to narrow
+        if not records:
+            continue
+        if failure:
+            fix = f"Choose a new path; the rows are saved, so {retry(ident, args, coverage)} writes them without a new request."
+            results[i] = ordered(result(envelope["target"], error=error_info(failure.code, failure, fix), ident=ident))
+            continue
+        envelope["data"] = export.summary(args.out, columns, keys, records)
+        envelope["coverage"] = coverage
 
 
 def read(args, saved):
@@ -205,7 +275,23 @@ def read(args, saved):
                       observed_at=record.get("observed_at"), source_time=record.get("source_time"), extra=extra)
     envelope["stored_age_seconds"] = age
     envelope["_full"] = record["data"]
-    return [ordered(envelope)], item
+    results = [ordered(envelope)]
+    if getattr(args, "out", None):
+        if args.list_fields:
+            raise InputError("--list-fields names columns and --out writes rows; use one of them.")
+        export.check_path(args.out)
+        write_out(results, {0: (args.id, *exported(record["data"], args, item))}, args)
+        results[0].pop("continuation", None)
+    return results, item
+
+
+def chosen(request, given, parser):
+    """The printed request: what the caller chose and what a default filled in, not every parser default echoed back.
+
+    The saved observation keeps the whole request, since reproducing it needs every value.
+    """
+    defaults = {a.dest: registry.GLOBAL_DEFAULTS.get(a.dest) if a.default == argparse.SUPPRESS else a.default for a in parser._actions}
+    return {k: v for k, v in request.items() if k not in ("group", "leaf") and (v != given.get(k) or v != defaults.get(k, v))}
 
 
 def main():
@@ -218,15 +304,16 @@ def main():
         saved = store.Store(args.store)
         saved.prune(args.ttl_days)
         if args.group == "schema":
-            return budget.emit([ordered(result("schema", schema_data(args, parsers)))], args, None, {"scope": args.scope}, scoped=bool(args.scope))
+            return budget.emit([ordered(result("schema", schema_data(args, parsers, parser)))], args, None, {"scope": args.scope}, scoped=bool(args.scope))
         if args.group == "read":
             results, item = read(args, saved)
             return budget.emit(results, args, item, {"read": args.id})
         item = registry.get(args.group, args.leaf)
+        given = dict(vars(args))
         validate(args, item)
         yf.config.debug.hide_exceptions = False
         request = {k: v for k, v in vars(args).items() if k not in ("symbols", "store", "ttl_days", "max_chars", "list_fields")}
-        return budget.emit(run(args, item, saved, request), args, item, request)
+        return budget.emit(run(args, item, saved, request), args, item, chosen(request, given, parsers[args.group, args.leaf]))
     except InputError as exc:
         fix = "Use --help for this command's arguments, or schema GROUP LEAF for its defaults, units and limits."
         results = [ordered(result("request", error=error_info("invalid", exc, fix)))]

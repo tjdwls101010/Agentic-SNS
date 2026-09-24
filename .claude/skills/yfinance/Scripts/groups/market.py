@@ -28,7 +28,7 @@ def sectors(target, args, context, warnings):
 
 
 REGION_INTERPRETATION = {
-    "region": "--region takes only the country codes Yahoo actually serves for this dataset. The list is closed because unserved codes were measured returning the United States result with no warning, which is indistinguishable from a real answer.",
+    "region": "--region takes only the country codes Yahoo serves for this dataset; an unserved code returns the United States result with no warning, which is indistinguishable from a real answer.",
     "keys": "Sector keys are hyphenated (consumer-cyclical); fund sector-weights uses underscores.",
 }
 # 성진: 같은 값을 overview는 market_weight(밑줄), 구성종목 표는 "market weight"(공백)로 부른다. 한쪽만 선언하면
@@ -42,7 +42,7 @@ REGION_GOTCHA = "Outside the United States the name column arrives null for ever
 def domain_args(datasets):
     # 성진: 닫힌 선택지가 G1을 인터페이스 층에서 없앤다 — 서비스되지 않는 코드는 경고 없이 미국 데이터를 돌려줬다.
     return [Arg("key", help="Sector key from market sectors, or industry key from market sector KEY --dataset industries."),
-            Arg("--region", choices=DOMAIN_REGIONS, default="US", help="Country code, restricted to the regions measured as actually served; others returned the United States result with no warning. Outside the US the name column arrives null."),
+            Arg("--region", choices=DOMAIN_REGIONS, default="US", help="Country code, restricted to the regions Yahoo serves; others return the United States result with no warning. Outside the US the name column arrives null."),
             Arg("--dataset", choices=["overview", "top-companies", "research-reports"] + datasets, default="overview", help="Part of the sector or industry to return.")]
 
 

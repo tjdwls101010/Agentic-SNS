@@ -17,7 +17,7 @@ def analyst(name, purpose, method, **spec):
 RELATIVE = "0q, +1q, 0y and +1y are relative periods, not dates."
 ANALYST_COUNTS = {"strongBuy": COUNT, "buy": COUNT, "hold": COUNT, "sell": COUNT, "strongSell": COUNT}
 
-analyst("targets", "Current analyst price target range.", "get_analyst_price_targets", narrow=["--fields"],
+analyst("targets", "Current analyst price target range.", "get_analyst_price_targets", narrow=["--fields"], exportable=False,
         units={"current": CURRENCY, "high": CURRENCY, "low": CURRENCY, "mean": CURRENCY, "median": CURRENCY},
         interpretation={"currency": "Targets are in the quote currency.", "current": "current is the live price the targets are being compared against, not a target."})
 
