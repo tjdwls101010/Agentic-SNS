@@ -219,7 +219,9 @@ def test_tickers_screen_named_stocks_in_one_request_and_rows_outside_the_list_ar
     client.add("https://finviz.com/screener?v=121&ft=4&t=AAPL,MSFT,NVDA&r=1", page)
     result = client.one("screen", "run", "--tickers", "AAPL,MSFT,NVDA", "--view", "valuation")
     assert [r["ticker"] for r in result["data"]["rows"]] == ["AAPL", "MSFT", "NVDA"]
-    assert result["conditions"]["tickers"] == {"requested": "AAPL,MSFT,NVDA", "status": "confirmed", "evidence": {"ticker_input": "AAPL,MSFT,NVDA", "rows_outside_the_list": []}}
+    assert result["conditions"]["tickers"] == {"requested": "AAPL,MSFT,NVDA", "status": "confirmed", "evidence": {"ticker_input": "AAPL,MSFT,NVDA", "rows_outside_the_list": [], "requested_but_not_returned": []}}
+    client.add("https://finviz.com/screener?v=111&ft=4&t=AAPL,ZZZZ&r=1", screener_table(ROWS[:1], page_values=(1,)))
+    assert client.one("screen", "run", "--tickers", "AAPL,ZZZZ")["conditions"]["tickers"]["evidence"]["requested_but_not_returned"] == ["ZZZZ"]
     client.add("https://finviz.com/screener?v=111&ft=4&t=AAPL&r=1", screener_table(ROWS, page_values=(1,)))
     assert client.one("screen", "run", "--tickers", "AAPL")["conditions"]["tickers"]["status"] == "not_applied"
 

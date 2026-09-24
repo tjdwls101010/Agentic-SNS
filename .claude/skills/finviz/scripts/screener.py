@@ -240,7 +240,8 @@ def evidence(obs, page, args, requested_columns, row):
         box = page.select_one("input#tickersInput")
         shown = [r.get("ticker") for r in obs.result["collections"]["rows"] if r.get("ticker")] if obs.result.get("collections") else []
         outside = [t for t in shown if t.upper() not in asked]
-        conditions["tickers"] = condition(args.tickers, "not_applied" if outside else "confirmed" if shown else "unverified", {"ticker_input": box.get("value") if box is not None else None, "rows_outside_the_list": outside})
+        missing = [t for t in asked if t not in {x.upper() for x in shown}]  # an unknown ticker, a filter or the 20-row page can leave one out
+        conditions["tickers"] = condition(args.tickers, "not_applied" if outside else "confirmed" if shown else "unverified", {"ticker_input": box.get("value") if box is not None else None, "rows_outside_the_list": outside, "requested_but_not_returned": missing})
     if args.signal:
         chosen = [markup.query_param(o["value"], "s") for o in controls.get("signalSelect", []) if o["selected"]]
         conditions["signal"] = condition(args.signal, ("confirmed" if chosen == [args.signal] else "not_applied") if "signalSelect" in controls else "unverified", chosen[0] if chosen else None)
