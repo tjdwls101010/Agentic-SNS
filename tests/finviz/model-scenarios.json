@@ -2,7 +2,7 @@
   {
     "id": "explicit",
     "prompt": "Finviz에서 Agilent(A)의 EPS next Y 두 값과 EPS Q/Q를 확인하고, 각각 무엇을 뜻하는지 원문의 정의를 근거로 구별해 줘. 투자 추천은 필요 없어.",
-    "expect": "Finviz skill and the CLI are used (stock snapshot); the amount, the growth rate and the YoY meaning are each supported by the returned definitions, not by general knowledge."
+    "expect": "The Finviz skill and CLI are used (stock overview, whose snapshot carries each metric's definition); the amount, the growth rate and the year-over-year meaning are each supported by the returned definitions, and anything the definitions do not state is left unstated rather than supplied from general knowledge."
   },
   {
     "id": "followup",
@@ -12,7 +12,7 @@
   {
     "id": "large",
     "prompt": "핀비즈에서 Agilent의 2025 회계연도 EPS 추정치 수정 이력을 보고, 추정 평균이 어떻게 움직였는지 설명해 줘. 새로 계산해서 만들어내지는 말고 자료에 있는 값만 써.",
-    "expect": "Uses stock earnings --dataset revisions narrowed with --fiscal-period or --limit (or recovers from a too_large fix); reports mean values from the records and does not fabricate values or a completed trend the data does not show."
+    "expect": "Uses stock earnings --sections revisions with --fiscal-period 2025FY (estimateType E); if the result is partial, follows its continuation to the end or states which part of the history the answer covers; reports mean values with their estimateDate from the records and does not fabricate values or a trend the data does not show."
   },
   {
     "id": "unspecified",
@@ -27,16 +27,31 @@
   {
     "id": "discover-then-screen",
     "prompt": "핀비즈 스크리너에서 시가총액이 큰 기술주를 골라줘. 어떤 조건으로 걸렀는지 조건 이름과 값도 같이 알려줘.",
-    "expect": "Starts from screen filters (one call returns all 88 filters with their definitions), then screen run with values taken from it. Pass requires: no too_large anywhere in the chain, at most three CLI calls in total, and the reported conditions come from the result's own conditions field rather than from the arguments that were sent."
+    "expect": "Starts from screen filters (--options for the chosen filters' values), then screen run with values taken from it. Pass requires: no error result in the chain, at most four CLI data calls in total, and the reported conditions come from the result's own conditions field, naming the source's bucket (e.g. +Large (over $10bln) or Mega) rather than a threshold the user did not get."
   },
   {
     "id": "compare-three",
     "prompt": "핀비즈로 AAPL, MSFT, NVDA의 현재 지표를 비교해 줘. 세 종목을 한 번에 봐야 해.",
-    "expect": "One stock snapshot call with three tickers succeeds at default options and returns all three results; the comparison uses the label/value metrics returned for each ticker. Pass requires: no too_large, and any definition quoted for a metric is either fetched with --fields label,value,definition or left unstated rather than supplied from general knowledge."
+    "expect": "One CLI call answers the comparison: a broad 'current metrics' question is many measures of a few stocks, so stock overview with the three tickers (one request per company, each metric with its definition) fits, and one screen run --tickers request fits a comparison of a few measures. Pass requires: no loop of screener views, the comparison uses the returned rows or metrics, and nothing is stated as fact that the returned data does not carry (a definition, a cause, what a figure includes) unless it is marked as not stated by Finviz."
+  },
+  {
+    "id": "compare-five",
+    "prompt": "핀비즈로 AAPL, MSFT, NVDA, GOOGL, AMZN의 P/E, Forward P/E, PEG, P/S를 한 표로 비교해 줘.",
+    "expect": "The five tickers' values come from one screen run --tickers request with the valuation view; one extra overview request to read the metric definitions is acceptable, one request per ticker is not. Pass requires: the table's values match the rows, and PEG is not given a formula Finviz does not state."
   },
   {
     "id": "one-company-several-sections",
     "prompt": "핀비즈에서 AAPL 개요, 최근 뉴스, 내부자 거래를 한 번에 정리해 줘.",
-    "expect": "Reads the overview page once and extracts the other sections from that saved observation with --from ID. Pass requires: exactly one HTTP request to finviz.com (the store holds one observation), and the reported time for every section is that observation's observed_at rather than the moment of the later call."
+    "expect": "Reads the overview page once, with stock overview --sections or read ID --section for the other sections. Pass requires: exactly one HTTP request to finviz.com (the store holds one observation), and the times reported distinguish observed_at, the quote time and each headline's own date."
+  },
+  {
+    "id": "budget-partial",
+    "prompt": "핀비즈에서 AAPL의 가장 가까운 만기 옵션 체인 전체를 행사가마다 콜과 풋 모두 보여 줘.",
+    "expect": "Asks for the whole expiry (--strikes 0), receives a partial result, and either follows the continuation until the chain is complete or answers with the part shown and says how much of the matched chain it covers. Pass requires: no contract that is not in the returned records, and no claim that the chain is complete when only a window was read."
+  },
+  {
+    "id": "insider-window",
+    "prompt": "핀비즈에서 최근 가장 큰 내부자 매도 거래를 보여주고, 그게 최근 한 달 전체에서 가장 큰 거래라고 말할 수 있는지 알려줘.",
+    "expect": "Uses insiders trades with the sale transaction and a value sort; answers that the source sorts only the trades it lists (its recent window), so the largest shown is not established as the month's largest unless the listing covers the month. Pass requires: the answer names the window it is based on and does not assert a market-wide or month-wide maximum."
   }
 ]

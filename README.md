@@ -75,7 +75,7 @@ A successful read prints the profile row shown above, preceded by request and bu
 
 | Skill | Available reading and navigation |
 |---|---|
-| [finviz](.claude/skills/finviz/SKILL.md) | Public stock screening, company and ETF data, prices, statements, options, markets, numeric maps, calendars, news and insider trades; saved observations retain definitions, conditions and coverage. |
+| [finviz](.claude/skills/finviz/SKILL.md) | Public stock screening, company and ETF data, prices, statements, options, markets, numeric maps, calendars, news and insider trades; saved observations are read again with the original selectors and retain definitions, conditions and coverage. |
 | [sec](.claude/skills/sec/SKILL.md) | Company and filing lookup, filing/exhibit search, saved source documents, text and table navigation, and original image links; distinguishes filing dates, report periods, amendments and incomplete reads. |
 | [yfinance](.claude/skills/yfinance/SKILL.md) | Market and company data, field and condition discovery, options and calendars; structured results distinguish applied query conditions, missing data and partial failures. |
 | [twitter](.claude/skills/twitter/SKILL.md) | X feeds, posts and replies, profiles, search, followers/following, bookmarks/likes, trends, lists, and communities; continuation handles and query recovery. |

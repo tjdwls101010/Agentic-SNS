@@ -1,27 +1,45 @@
-"""Finviz screener: discovery of filters, signals, columns and views, and screening runs with condition evidence and paging."""
+"""Finviz screener: the filter, signal and column catalogues, and screening runs with condition evidence and paging."""
 
 import json
 from pathlib import Path
 from urllib.parse import urlencode
 from uuid import uuid4
 
+import contract
 import markup
-import output
-from finviz import LEAVES, condition, leaf
+import selection
+from contract import Collection, Selector, condition, leaf
 from transport import Failure
 
 BASE = "https://finviz.com/screener"
 VIEWS = {
-    "overview": ("111", "Ticker, company, sector, industry, country, market cap, P/E, price, change, volume"),
-    "valuation": ("121", "Valuation ratios: P/E, forward P/E, PEG, P/S, P/B, P/C, P/FCF, EPS and sales growth"),
-    "ownership": ("131", "Shares outstanding and float, insider and institutional ownership and transactions, short float"),
-    "performance": ("141", "Performance over week to year, volatility, relative volume, average volume"),
-    "financial": ("161", "Dividend yield, ROA, ROE, ROI, current and quick ratios, debt, margins, payout"),
-    "technical": ("171", "Beta, ATR, SMA distances, 52-week distances, RSI, price and change"),
-    "etf": ("181", "ETF overview: category, sponsor, AUM, expense ratio, flows"),
+    "overview": ("111", "ticker, company, sector, industry, country, market cap, P/E, price, change, volume"),
+    "valuation": ("121", "P/E, forward P/E, PEG, P/S, P/B, P/C, P/FCF, EPS and sales growth"),
+    "ownership": ("131", "shares outstanding and float, insider and institutional ownership and transactions, short float"),
+    "performance": ("141", "performance from week to year, volatility, relative and average volume"),
+    "financial": ("161", "dividend yield, ROA, ROE, ROI, current and quick ratios, debt, margins, payout"),
+    "technical": ("171", "beta, ATR, SMA distances, 52-week distances, RSI, price and change"),
+    "etf": ("181", "ETF category, sponsor, AUM, expense ratio, flows"),
     "etf-performance": ("191", "ETF performance over standard periods"),
-    "custom": ("152", "Columns chosen with --columns; discover them with screen columns"),
+    "custom": ("152", "the columns named with --columns, from screen columns"),
 }
+
+# The screener's own order control: every key it offers, in its order.
+SORT_KEYS = [
+    "ticker", "tickersfilter", "company", "sector", "industry", "country", "index", "exchange", "marketcap", "pe", "forwardpe", "peg", "ps", "pb", "pc",
+    "pfcf", "dividendyield", "payoutratio", "eps", "estq1", "epsyoy", "epsyoy1", "eps3years", "eps5years", "estltgrowth", "epsqoq", "epsyoyttm",
+    "sales3years", "sales5years", "salesqoq", "salesyoyttm", "epssurprise", "revenuesurprise", "sharesoutstanding2", "sharesfloat",
+    "floatoutstandingpct", "insiderown", "insidertrans", "instown", "insttrans", "shortinterestshare", "shortinterestratio", "shortinterest",
+    "earningsdate", "news_date", "roa", "roe", "roi", "curratio", "quickratio", "ltdebteq", "debteq", "grossmargin", "opermargin", "netmargin", "recom",
+    "perf1w", "perf4w", "perf13w", "perf26w", "perfytd", "perf52w", "perf3y", "perf5y", "perf10y", "beta", "averagetruerange", "volatility1w",
+    "volatility4w", "sma20", "sma50", "sma200", "high50d", "low50d", "high52w", "low52w", "52wrange", "highat", "lowat", "rsi", "averagevolume",
+    "relativevolume", "change", "changeopen", "gap", "volume", "open", "high", "low", "price", "prevclose", "targetprice", "ipodate", "book",
+    "cashpershare", "dividend", "dividendexdate", "dividendttm", "dividend1y", "dividend3y", "dividend5y", "employees", "income", "sales",
+    "enterpriseValue", "evebitda", "evsales", "optionable", "shortable", "newsurl", "newstitle", "newstime", "wiimdailydigest", "e.category", "e.tags",
+    "e.totalholdings", "e.assetsundermanagement", "e.netflows1month", "e.netflows1monthpct", "e.netflows3month", "e.netflows3monthpct", "e.netflowsytd",
+    "e.netflowsytdpct", "e.return1year", "e.return3year", "e.return5year", "e.netexpenseratio", "e.activepassive", "e.assettype", "e.etftype",
+    "e.sectortheme", "e.linkedindexname",
+]
 
 
 def screener_page(ctx, query):
@@ -30,7 +48,21 @@ def screener_page(ctx, query):
     return obs, markup.soup(obs)
 
 
-@leaf("screen", "filters", help="List the current screener filters: id, label, definition and, on request, the value strings --filters accepts.", args=[(("--options",), dict(action="store_true", help="Attach each filter's option values; the whole catalog of options is about fifteen times the size of the filter list, so narrow with --filter when asking for it."))], output={"list of filters": "{id, label, definition, option_count} and, with --options, options: [{value, label}] whose values go to screen run --filters, plus elite_only labels an anonymous read cannot select"}, narrow=["--filter", "--fields", "--limit"])
+def with_options(records, attach, context):
+    if attach:
+        return records
+    return [dict({k: v for k, v in r.items() if k not in ("options", "elite_only")}, option_count=len(r.get("options") or [])) for r in records]
+
+
+OPTIONS = Selector(("--options",), dict(action="store_true", help="Attach each filter's option values; the option lists together are many times the size of the filter list, so narrow with --filter first."), with_options)
+
+
+@leaf(
+    "screen",
+    "filters",
+    help="List the screener filters: id, label and definition, and on request the option values --filters accepts.",
+    collections={"filters": Collection("{id, label, definition, option_count}; with --options, options [{value, label}] whose values go to screen run --filters, and elite_only labels an anonymous read cannot select", local=[OPTIONS])},
+)
 def filters(ctx, args, target):
     obs, page = screener_page(ctx, {"ft": "4"})
     found = []
@@ -39,34 +71,33 @@ def filters(ctx, args, target):
         title = title.find_previous_sibling("td").select_one(".screener-combo-title") if title is not None and title.find_previous_sibling("td") else None
         definition = title.get("data-boxover-html") if title is not None else None
         key = select["id"][3:]
-        options = [{"value": key + "_" + o["value"], "label": markup.text(o)} for o in select.select("option") if o.get("value")]
         record = {"id": key, "label": markup.text(title) if title is not None else key, "definition": markup.text(markup.BeautifulSoup(definition, "html.parser")) if definition else None}
-        record["options" if args.options else "option_count"] = options if args.options else len(options)
+        record["options"] = [{"value": key + "_" + o["value"], "label": markup.text(o)} for o in select.select("option") if o.get("value")]
         elite = [markup.text(o) for o in select.select("option[data-elite-only]")]
-        if elite and args.options:  # nearly every filter repeats the same Elite-only entry; it belongs beside the option values, not in the catalogue
+        if elite:
             record["elite_only"] = elite
         found.append(record)
     if not found:
         raise obs.fail("structure_changed", "No filter controls were found on the screener page.", "Read the saved raw page with read ID --raw.")
-    obs.result["target"], obs.result["data"] = "filters", found
+    obs.result["target"], obs.result["collections"] = "filters", {"filters": found}
     return obs.result
 
 
-@leaf("screen", "signals", help="List the screener signals (top gainers, new high, unusual volume, patterns) that --signal accepts.", output={"list of signals": "{value, label}; pass value to screen run --signal"}, narrow=["--filter"])
+@leaf("screen", "signals", help="List the screener signals (top gainers, new high, unusual volume, patterns) that --signal accepts.", collections={"signals": Collection("{value, label}; pass value to screen run --signal")})
 def signals(ctx, args, target):
     obs, page = screener_page(ctx, {"ft": "4"})
     options = markup.selects(page).get("signalSelect")
     if not options:
         raise obs.fail("structure_changed", "No signal control was found on the screener page.", "Read the saved raw page with read ID --raw.")
     obs.result["target"] = "signals"
-    obs.result["data"] = [{"value": markup.query_param(o["value"], "s"), "label": o["label"]} for o in options if markup.query_param(o["value"], "s")]
+    obs.result["collections"] = {"signals": [{"value": markup.query_param(o["value"], "s"), "label": o["label"]} for o in options if markup.query_param(o["value"], "s")]}
     return obs.result
 
 
-@leaf("screen", "columns", help="List the columns available to the custom view: id, title, index and category.", output={"list of columns": "{id, title, index, category}; pass ids or indices to screen run --columns"}, narrow=["--filter", "--limit"])
+@leaf("screen", "columns", help="List the columns the custom view accepts: id, title, index and category.", collections={"columns": Collection("{id, title, index, category}; pass ids or indices to screen run --columns")})
 def columns(ctx, args, target):
     obs, page = screener_page(ctx, {"v": "152"})
-    obs.result["target"], obs.result["data"] = "columns", column_catalog(page, obs)
+    obs.result["target"], obs.result["collections"] = "columns", {"columns": column_catalog(page, obs)}
     return obs.result
 
 
@@ -78,86 +109,86 @@ def column_catalog(page, obs):
     return [{"id": c["id"], "title": c["title"], "index": c["index"], "category": categories[c["categoryIndex"]] if c.get("categoryIndex") is not None and c["categoryIndex"] < len(categories) else None} for c in settings.get("columnsMap", {}).values()]
 
 
-@leaf("screen", "views", help="Describe the table views --view accepts; offline.", output={"list of views": "{name, view_id, description}"})
-def views(ctx, args, target):
-    return output.plain("views", [{"name": name, "view_id": view_id, "description": description} for name, (view_id, description) in VIEWS.items()])
-
-
 RUN_ARGS = [
-    (("--filters",), dict(default=None, help="Comma-separated filter values from screen filters, e.g. sec_technology,cap_largeover.")),
+    (("--filters",), dict(default=None, help="Comma-separated filter values from screen filters --options, e.g. sec_technology,cap_largeover.")),
+    (("--tickers",), dict(default=None, help="Comma-separated tickers to screen by name, e.g. AAPL,MSFT,NVDA: one request returns each as a row of the chosen view, filters still apply.")),
     (("--signal",), dict(default=None, help="Signal value from screen signals, e.g. ta_topgainers.")),
-    (("--view",), dict(default="overview", choices=list(VIEWS), help="Table view; custom is implied when --columns is given.")),
+    (("--view",), dict(default="overview", choices=list(VIEWS), help="Table view: " + "; ".join(name + " (" + text + ")" for name, (_, text) in VIEWS.items()) + ". custom is implied by --columns.")),
     (("--columns",), dict(default=None, help="Comma-separated column ids or indices from screen columns for the custom view.")),
-    (("--sort",), dict(default=None, help="Sort key from the column header links, e.g. marketcap; write --sort=-marketcap for descending.")),
-    (("--start",), dict(type=int, default=1, help="One-based row offset of the first page; take it from a previous continuation.")),
-    (("--pages",), dict(type=int, default=1, help="Pages to fetch in this run, following continuations; 20 rows per page for anonymous access.")),
-    (("--out",), dict(default=None, help="Write rows as JSON Lines to this path; stdout then carries only the summary.")),
+    (("--sort",), dict(default=None, choices=SORT_KEYS + ["-" + k for k in SORT_KEYS], metavar="KEY", help="Sort key from the screener's order control, e.g. marketcap, pe, perf1w or change; write --sort=-marketcap for descending. schema screen run lists every choice.")),
+    (("--row",), dict(type=int, default=1, help="One-based source row the first page starts at (20 rows per page); a next command sets it.")),
+    (("--pages",), dict(type=int, default=1, help="Source pages to fetch in this run, following each page's next row.")),
+    (("--out",), dict(default=None, help="Write the selected rows as JSON Lines to this path; the result then reports the file instead of the rows.")),
     (("--append",), dict(action="store_true", help="Allow appending to an existing --out file; without it an existing file is refused.")),
 ]
 
 
-@leaf("screen", "run", help="Run the screener with filters, a signal, a view or custom columns, sorting and paging; rows keep source strings.", args=RUN_ARGS, output={"id": "when --pages > 1, a saved aggregate of all received rows before selection or export; source.pages lists independent page IDs; read ID --raw returns the aggregate JSON, while page IDs return source HTML", "list of rows": "one record per row keyed by the column headers, plus ticker and url (and observation_id when more than one page or --out); with --out the data is {path, rows_written, pages} instead", "conditions": "filters, signal, columns, sort and start as confirmed by each page's own controls; pages that disagree show evidence per observation id", "sort_keys": "the sort keys this view's own column headers carry, for --sort", "coverage": "received rows across pages, shown after selection, source_total from the page count, pages fetched, exhaustive false", "continuation": "{start} for the next page, or for the page that failed"}, narrow=["--fields", "--limit", "--out", "--pages 1"])
+@leaf(
+    "screen",
+    "run",
+    help="Run the screener with filters, a signal, a view or custom columns, sorting and paging; rows keep source strings.",
+    args=RUN_ARGS,
+    collections={"rows": Collection("one record per row keyed by the column headers, plus ticker and url, and observation_id when several pages were fetched or --out was given")},
+    context={"sort_keys": "column label -> the key --sort accepts for it, from this page's own header links; columns the source does not sort are absent", "export": "with --out: {path, rows_written, pages}"},
+    paging="row",
+)
 def run(ctx, args, target):
-    if args.pages < 1:
-        raise Failure("invalid_pages", "--pages must be at least 1.", "Use --pages 1 for a single page.")
+    if args.pages < 1 or args.row < 1:
+        raise Failure("invalid_argument", "--pages and --row start at 1.", "Use --pages 1 --row 1 for the first page.")
     requested_columns = resolve_columns(ctx, args.columns)
     view = "152" if requested_columns else VIEWS[args.view][0]
-    query = {"v": view, "ft": "4", "f": args.filters, "s": args.signal, "c": ",".join(map(str, requested_columns)) if requested_columns else None, "o": args.sort, "r": args.start}
+    query = {"v": view, "ft": "4", "f": args.filters, "t": args.tickers, "s": args.signal, "c": ",".join(map(str, requested_columns)) if requested_columns else None, "o": args.sort, "r": args.row}
     writer = Exporter(args) if args.out else None
-    pages, failure, start = [], None, args.start
+    pages, failure, row = [], None, args.row
     for index in range(args.pages):
-        query["r"] = start
+        query["r"] = row
         try:
             obs, page = screener_page(ctx, query)
-            headers, records = page_records(page, obs)
+            records = page_records(page, obs)
         except Failure as exc:
             exc.record()
             if index == 0:
                 raise
             failure = exc
             break
-        evidence(obs, page, args, requested_columns, start)
-        obs.result["data"] = records
-        obs.result["coverage"] = {"received": len(records), "source_total": markup.total_count(page), "exhaustive": False}
+        obs.result["collections"] = {"rows": records}
+        evidence(obs, page, args, requested_columns, row)
+        obs.result["totals"] = {"rows": {"source_total": markup.total_count(page)}}
+        nxt = next_row(page, row)
+        if nxt is not None:
+            obs.result["next_page"] = nxt
         pages.append(obs)
-        nxt = next_start(page, start)
         if nxt is None:
-            start = None
+            row = None
             break
-        start = nxt
-    result = dict(pages[0].result)
-    tagged = [dict(row, observation_id=obs.id) if len(pages) > 1 or writer else row for obs in pages for row in obs.result["data"]]
-    selected, total = output.select_records(tagged, args, next(item for item in LEAVES if item.path == "screen run"))
-    result["target"], result["selection_applied"] = "screen", True
-    result["source"] = dict(result["source"], pages=[obs.id for obs in pages])
-    result["conditions"] = merge_conditions(pages)
-    result["coverage"] = {"received": total, "shown": len(selected), "source_total": pages[-1].result["coverage"]["source_total"], "exhaustive": False, "pages": len(pages)}
-    result["warnings"] = list(dict.fromkeys(w for obs in pages for w in obs.result.get("warnings", [])))
-    result["sort_keys"] = pages[0].result.get("sort_keys") or {}
-    if start is not None:
-        result["continuation"] = {"start": start}
+        row = nxt
+    if len(pages) == 1 and failure is None and not writer:
+        return pages[0].result
+    tagged = [dict(r, observation_id=obs.id) for obs in pages for r in obs.result["collections"]["rows"]]
+    result = {
+        "id": uuid4().hex if args.pages > 1 else pages[0].id, "leaf": "screen run", "target": "screen", "observed_at": pages[0].result["observed_at"],
+        "source": {"pages": [obs.id for obs in pages]}, "status": "ok", "context": pages[0].result["context"], "collections": {"rows": tagged},
+        "conditions": merge_conditions(pages),
+        "totals": {"rows": {"source_total": pages[-1].result["totals"]["rows"]["source_total"]} | ({"pages": len(pages)} if args.pages > 1 else {})},
+        "warnings": list(dict.fromkeys(w for obs in pages for w in obs.result.get("warnings", []))),
+    }
+    if row is not None:
+        result["next_page"] = row
     if failure is not None:
         failed = failure.observation.id if failure.observation is not None else None
         result["status"], result["error"] = "partial", failure.info()
-        result["warnings"].append("The page at --start " + str(start) + " failed" + (" (observation " + failed + ")" if failed else "") + "; rows from " + str(len(pages)) + " completed pages are included. Resume with --start " + str(start) + (" and --append" if writer else "") + ".")
-    if writer:
-        writer.write(selected)
-        writer.close()
-        result["data"] = {"path": str(writer.path), "rows_written": writer.count, "pages": len(pages)}
-        if writer.count == 0 and result["status"] != "partial":
-            result["status"] = "empty"
-            result["warnings"].append("No rows were written; the source returned no matching rows or the selection removed them all.")
-    else:
-        result["data"] = selected
+        result["warnings"].append("The page at --row " + str(row) + " failed" + (" (observation " + failed + ")" if failed else "") + "; rows from " + str(len(pages)) + " completed pages are included. The next command resumes there.")
     if args.pages > 1:
-        result["id"] = uuid4().hex
-        result["source"] = {"pages": [obs.id for obs in pages]}
-        saved = {k: v for k, v in result.items() if k != "selection_applied"}
-        saved["data"] = tagged
-        saved["status"] = "partial" if failure else "ok" if tagged else "empty"
-        saved["coverage"] = dict(result["coverage"], shown=len(tagged))
-        ctx.store.save(saved, json.dumps(saved, ensure_ascii=False).encode("utf-8"))
-    return result
+        result["request"] = contract.request_of(args, contract.find("screen run"))
+        ctx.store.save(result, json.dumps(result, ensure_ascii=False).encode("utf-8"))
+    if not writer:
+        return result
+    picked = selection.pick(result, contract.find("screen run"), "rows", args)
+    writer.write(picked.records)
+    writer.close()
+    shown = dict(result, export={"path": str(writer.path), "rows_written": writer.count, "pages": len(pages)})
+    shown["export_coverage"] = selection.coverage(picked, len(picked.records), result["totals"]["rows"])
+    return shown
 
 
 def merge_conditions(pages):
@@ -167,7 +198,7 @@ def merge_conditions(pages):
     for key in dict.fromkeys(k for obs in pages for k in obs.result.get("conditions", {})):
         found = [(obs.id, obs.result["conditions"].get(key)) for obs in pages if key in obs.result.get("conditions", {})]
         statuses = {c["status"] for _, c in found}
-        if len(statuses) == 1:
+        if len(statuses) == 1 and len({json.dumps(c["evidence"]) for _, c in found}) == 1:
             merged[key] = found[0][1]
         else:
             worst = max(statuses, key=order.get)
@@ -193,11 +224,11 @@ def page_records(page, obs):
     table = page.select_one("table.screener_table")
     if table is None:
         raise obs.fail("structure_changed", "No screener table was found.", "Read the saved raw page with read ID --raw; the view may not be a table view.")
-    obs.result["sort_keys"] = markup.sort_keys(table)
-    return markup.table_records(table, obs.url)
+    obs.result["context"] = {"sort_keys": markup.sort_keys(table)}
+    return markup.table_records(table, obs.url)[1]
 
 
-def evidence(obs, page, args, requested_columns, start):
+def evidence(obs, page, args, requested_columns, row):
     """Confirm each chosen parameter from the page's own controls; a missing control leaves the condition unverified."""
     controls = markup.selects(page)
     conditions = {}
@@ -209,7 +240,14 @@ def evidence(obs, page, args, requested_columns, start):
         else:
             echoed = [markup.query_param(o["value"], "f") for o in controls.get("signalSelect", []) if o["selected"]]
             conditions["filters"] = condition(args.filters, "unverified", {"echoed_by_server": echoed[0]} if echoed and echoed[0] else None)
-            obs.result.setdefault("warnings", []).append("This view has no filter controls, so the filters are unverified; the server echoed them but an unknown filter is echoed too. Run the same filters with --view overview to confirm them.")
+            obs.result.setdefault("warnings", []).append("This view has no filter controls, so the filters are unverified; the server echoes an unknown filter too. Run the same filters with --view overview to confirm them.")
+    if args.tickers:
+        asked = [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+        box = page.select_one("input#tickersInput")
+        shown = [r.get("ticker") for r in obs.result["collections"]["rows"] if r.get("ticker")] if obs.result.get("collections") else []
+        outside = [t for t in shown if t.upper() not in asked]
+        missing = [t for t in asked if t not in {x.upper() for x in shown}]  # an unknown ticker, a filter or the 20-row page can leave one out
+        conditions["tickers"] = condition(args.tickers, "not_applied" if outside else "confirmed" if shown else "unverified", {"ticker_input": box.get("value") if box is not None else None, "rows_outside_the_list": outside, "requested_but_not_returned": missing})
     if args.signal:
         chosen = [markup.query_param(o["value"], "s") for o in controls.get("signalSelect", []) if o["selected"]]
         conditions["signal"] = condition(args.signal, ("confirmed" if chosen == [args.signal] else "not_applied") if "signalSelect" in controls else "unverified", chosen[0] if chosen else None)
@@ -224,13 +262,13 @@ def evidence(obs, page, args, requested_columns, start):
         conditions["sort"] = markup.sort_condition(args.sort, page, controls)
     pages = [o["value"] for o in controls.get("pageSelect", []) if o["selected"]]
     if pages:
-        conditions["start"] = condition(start, "confirmed" if pages[0] == str(start) else "not_applied", int(pages[0]) if pages[0].isdigit() else pages[0])
-    elif start != 1:
-        conditions["start"] = condition(start)
+        conditions["row"] = condition(row, "confirmed" if pages[0] == str(row) else "not_applied", int(pages[0]) if pages[0].isdigit() else pages[0])
+    elif row != 1:
+        conditions["row"] = condition(row)
     obs.result["conditions"] = conditions
 
 
-def next_start(page, current):
+def next_row(page, current):
     values = sorted(int(o.get("value")) for o in page.select("#pageSelect option") if str(o.get("value", "")).isdigit())
     return next((v for v in values if v > current), None)
 

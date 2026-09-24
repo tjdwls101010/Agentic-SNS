@@ -109,7 +109,7 @@ def article(page, base):
     body = page.select_one("article, .text-justify")
     if body is None:
         return None
-    # 성진: 단락 목록과 전문을 함께 싣던 것을 단락만 남긴다(실측 1.01배 중복). 단락 밖 텍스트는 링크 라벨이고 links가 그대로 들고 있다.
+    # Paragraphs only: the text outside them is link labels, which links already carries.
     return {"title": text(page.h1), "paragraphs": [text(p) for p in body.select("p")], "links": [{"text": text(a), "url": urljoin(base, a["href"])} for a in body.select("a[href]")], "images": [urljoin(base, img["src"]) for img in body.select("img[src]")]}
 
 

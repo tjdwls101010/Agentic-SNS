@@ -56,19 +56,19 @@ def client(tmp_path):
         def add(self, url, body, **kwargs):
             self.responses[url] = dict(body=body, **kwargs)
 
-        def raw(self, *args, code=None):
+        def raw(self, *args, code=None, extra_env=None):
             mapping.write_text(json.dumps(self.responses))
-            proc = subprocess.run([sys.executable, str(CLI), *args], env=env, cwd=tmp_path, text=True, capture_output=True)
+            proc = subprocess.run([sys.executable, str(CLI), *args], env=dict(env, **(extra_env or {})), cwd=tmp_path, text=True, capture_output=True)
             if code is not None:
                 assert proc.returncode == code, proc.stdout + proc.stderr
             return proc
 
-        def run(self, *args, code=0):
-            proc = self.raw(*args, code=code)
+        def run(self, *args, code=0, extra_env=None):
+            proc = self.raw(*args, code=code, extra_env=extra_env)
             return json.loads(proc.stdout)
 
-        def one(self, *args, code=0):
-            doc = self.run(*args, code=code)
+        def one(self, *args, code=0, extra_env=None):
+            doc = self.run(*args, code=code, extra_env=extra_env)
             assert len(doc["results"]) == 1, doc
             return doc["results"][0]
 
