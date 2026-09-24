@@ -134,7 +134,11 @@ def render(view, caps):
     out["data"] = data
     if result.get("export"):  # rows went to a file: the result reports the file and what the selection wrote
         data["export"], out["coverage"] = result["export"], result.get("export_coverage")
-        if result.get("next_page") and view.item.paging:
+        written = result.get("export_coverage") or {}
+        end = written.get("start", 0) + written.get("shown", 0)
+        if written.get("matched", 0) > end and view.item.paging:  # the rest of the pages already received, written by the same request
+            out["next"] = source_command(view, (result.get("request") or {}).get(view.item.paging), {"--start": end} | ({"--limit": view.sel.limit} if view.sel.limit is not None else {}))
+        elif result.get("next_page") and view.item.paging:
             out["next"] = source_command(view, result["next_page"])
         if not (result.get("export_coverage") or {}).get("received") and out["status"] == "ok":
             out["status"] = "empty"
@@ -256,8 +260,8 @@ def next_command(view, name, p, shown):
     return None
 
 
-def source_command(view, page):
-    """The same leaf asking the source for its next page: the request's arguments with the paging argument moved on, and the selectors minus the position."""
+def source_command(view, page, position=None):
+    """The same leaf asking the source for a page: the request's arguments with the paging argument set, and the selectors with `position` (--start, --limit) or without any."""
     item, request = view.item, dict(view.result.get("request") or {})
     request[item.paging] = page
     if request.get("out"):
@@ -276,7 +280,7 @@ def source_command(view, page):
             words.append(flags[0])
         elif value not in (None, False) and value != options.get("default"):
             words += pair(flags[0], value)
-    values = {k: v for k, v in selector_values(item, view.sel).items() if k not in ("--start", "--limit")}
+    values = {k: v for k, v in selector_values(item, view.sel).items() if k not in ("--start", "--limit")} | (position or {})
     if item.multi and view.sections != item.sections:
         values["--sections"] = ",".join(view.sections)
     return command(words + tokens(values), view.ops)

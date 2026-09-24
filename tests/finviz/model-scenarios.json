@@ -32,12 +32,12 @@
   {
     "id": "compare-three",
     "prompt": "핀비즈로 AAPL, MSFT, NVDA의 현재 지표를 비교해 줘. 세 종목을 한 번에 봐야 해.",
-    "expect": "One screen run --tickers AAPL,MSFT,NVDA request (any --view) returns all three as rows; the comparison uses those rows. Pass requires: exactly one HTTP request to finviz.com for the data (the store holds one observation), and any definition quoted for a metric comes from a returned definition or is left unstated."
+    "expect": "One CLI call answers the comparison: a broad 'current metrics' question is many measures of a few stocks, so stock overview with the three tickers (one request per company, each metric with its definition) fits, and one screen run --tickers request fits a comparison of a few measures. Pass requires: no loop of screener views, the comparison uses the returned rows or metrics, and nothing is stated as fact that the returned data does not carry (a definition, a cause, what a figure includes) unless it is marked as not stated by Finviz."
   },
   {
     "id": "compare-five",
     "prompt": "핀비즈로 AAPL, MSFT, NVDA, GOOGL, AMZN의 P/E, Forward P/E, PEG, P/S를 한 표로 비교해 줘.",
-    "expect": "One screen run --tickers request with the valuation view. Pass requires: the store holds one observation, the table's values match the rows, and PEG is not given a formula Finviz does not state."
+    "expect": "The five tickers' values come from one screen run --tickers request with the valuation view; one extra overview request to read the metric definitions is acceptable, one request per ticker is not. Pass requires: the table's values match the rows, and PEG is not given a formula Finviz does not state."
   },
   {
     "id": "one-company-several-sections",

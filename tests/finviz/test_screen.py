@@ -238,3 +238,15 @@ def test_a_next_command_for_a_descending_sort_runs_as_written(client):
     first = client.one("screen", "run", "--sort=-marketcap")
     assert first["next"] == "screen run --sort=-marketcap --row 21"
     assert client.one(*shlex.split(first["next"]))["conditions"]["row"]["status"] == "confirmed"
+
+
+def test_an_export_cut_by_a_limit_continues_on_the_same_page_before_the_next(client, tmp_path):
+    rows = [("T%02d" % n, ["Company", "1B"]) for n in range(20)]
+    client.add("https://finviz.com/screener?v=111&ft=4&r=1", screener_table(rows, page_values=(1, 21)))
+    client.add("https://finviz.com/screener?v=111&ft=4&r=21", screener_table([("U%02d" % n, ["Company", "1B"]) for n in range(20)], current=21, page_values=(1, 21)))
+    out = tmp_path / "rows.jsonl"
+    command = ["screen", "run", "--limit", "5", "--fields", "ticker", "--out", str(out)]
+    while command:
+        result = client.one(*command)
+        command = shlex.split(result["next"]) if result.get("next") else None
+    assert [json.loads(line)["ticker"] for line in out.read_text().splitlines()] == ["T%02d" % n for n in range(20)] + ["U%02d" % n for n in range(20)]
