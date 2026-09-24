@@ -8,7 +8,14 @@ from contract import Collection, condition, leaf
 TRANSACTIONS = {"all": "7", "buy": "1", "sale": "2"}
 
 
-@leaf("insiders", "trades", help="Latest insider trades across the market, with owner pages and SEC Form 4 links.", args=[(("--transaction",), dict(default="all", choices=list(TRANSACTIONS), help="Transaction type.")), (("--owner",), dict(default=None, help="Owner id from a row's owner_url to list one insider's trades.")), (("--sort",), dict(default=None, help="Source sort key; a result's sort_keys lists the keys this table's headers carry, and a leading - sorts descending.")), (("--value",), dict(default=None, help="Source transaction-value threshold parameter."))], collections={"trades": Collection("rows keyed by the table headers plus ticker, url (stock page), owner_url and filing_url, in the source's order (newest first unless --sort)", default=20)}, context={"sort_keys": "column label -> the key --sort accepts for it, from this table's header links"})
+@leaf(
+    "insiders",
+    "trades",
+    help="Latest insider trades across the market, with owner pages and SEC Form 4 links.",
+    args=[(("--transaction",), dict(default="all", choices=list(TRANSACTIONS), help="Transaction type.")), (("--owner",), dict(default=None, help="Owner id from a row's owner_url to list one insider's trades.")), (("--sort",), dict(default=None, help="Source sort key; a result's sort_keys lists the keys this table's headers carry, and a leading - sorts descending.")), (("--value",), dict(default=None, help="Source transaction-value threshold parameter."))],
+    collections={"trades": Collection("rows keyed by the table headers plus ticker, url (stock page), owner_url and filing_url, in the source's order (newest first unless --sort)", default=20)},
+    context={"sort_keys": "column label -> the key --sort accepts for it, from this table's header links"},
+)
 def trades(ctx, args, target):
     query = {"tc": TRANSACTIONS[args.transaction], "oc": args.owner, "o": args.sort, "tv": args.value}
     obs = ctx.observe("https://finviz.com/insidertrading?" + urlencode({k: v for k, v in query.items() if v is not None}))

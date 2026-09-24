@@ -33,7 +33,14 @@ def group_id(url):
     return markup.query_param(url, "g") + ("/" + markup.query_param(url, "sg") if markup.query_param(url, "sg") else "") if markup.query_param(url, "g") else None
 
 
-@leaf("groups", "table", help="Group table for a view: overview, valuation, performance, financial or custom; rows keep source strings.", args=[GROUP_ARG, (("--view",), dict(default="overview", choices=list(GROUP_VIEWS), help="Table view.")), (("--sort",), dict(default=None, type=sort_key, metavar="KEY", help="Sort key: " + ", ".join(k + " (" + v + ")" for k, v in GROUP_SORTS.items()) + "; write --sort=-marketcap for descending."))], collections={"groups": Collection("rows keyed by the table headers plus filter, the screener filter value that selects the group's stocks")}, context={"sort_keys": "column label -> the key --sort accepts for it, from this page's header links"})
+@leaf(
+    "groups",
+    "table",
+    help="Group table for a view: overview, valuation, performance, financial or custom; rows keep source strings.",
+    args=[GROUP_ARG, (("--view",), dict(default="overview", choices=list(GROUP_VIEWS), help="Table view.")), (("--sort",), dict(default=None, type=sort_key, metavar="KEY", help="Sort key: " + ", ".join(k + " (" + v + ")" for k, v in GROUP_SORTS.items()) + "; write --sort=-marketcap for descending."))],
+    collections={"groups": Collection("rows keyed by the table headers plus filter, the screener filter value that selects the group's stocks")},
+    context={"sort_keys": "column label -> the key --sort accepts for it, from this page's header links"},
+)
 def table(ctx, args, target):
     query = dict(group_query(args.group_key), v=GROUP_VIEWS[args.view], o=args.sort)
     obs = ctx.observe("https://finviz.com/groups?" + urlencode({k: v for k, v in query.items() if v is not None}))
@@ -92,7 +99,13 @@ def keyed_records(mapping):
 CURRENCY = (("--currency",), dict(default=None, choices=["USD", "USDT", "EUR", "BTC"], help="Crypto only: the quote currency; the source's USD pairs when omitted."))
 
 
-@leaf("market", "quotes", help="Current quotes for every futures, forex or crypto instrument Finviz lists.", args=[KIND, (("--timeframe",), dict(default="d", choices=["d", "w"], help="Timeframe of the change fields: d daily or w weekly.")), CURRENCY], collections={"quotes": Collection("the quote as published with its instrument key as ticker, extra source fields included; the sparkline point arrays only with --sparkline", local=[Selector(("--sparkline",), dict(action="store_true", help="Keep each instrument's intraday sparkline points, most of the response's size."), keep_sparklines)])})
+@leaf(
+    "market",
+    "quotes",
+    help="Current quotes for every futures, forex or crypto instrument Finviz lists.",
+    args=[KIND, (("--timeframe",), dict(default="d", choices=["d", "w"], help="Timeframe of the change fields: d daily or w weekly.")), CURRENCY],
+    collections={"quotes": Collection("the quote as published with its instrument key as ticker, extra source fields included; the sparkline point arrays only with --sparkline", local=[Selector(("--sparkline",), dict(action="store_true", help="Keep each instrument's intraday sparkline points, most of the response's size."), keep_sparklines)])},
+)
 def quotes(ctx, args, target):
     if args.currency and args.kind != "crypto":
         raise Failure("invalid_argument", "--currency applies to crypto quotes only.", "Drop --currency, or use market quotes crypto.")
@@ -106,7 +119,13 @@ def quotes(ctx, args, target):
     return obs.result
 
 
-@leaf("market", "performance", help="Performance of every futures, forex or crypto instrument over each period from five minutes to a year.", args=[KIND, CURRENCY], collections={"instruments": Collection("{ticker, label, group, last, perf5minPct, perfHourPct, perfDayPct, perfWeekPct, perfMonthPct, perfMtdPct, perfQuarterPct, perfHalfYearPct, perfYtdPct, perfYearPct} as published; forex and crypto add the same periods in pips")})
+@leaf(
+    "market",
+    "performance",
+    help="Performance of every futures, forex or crypto instrument over each period from five minutes to a year.",
+    args=[KIND, CURRENCY],
+    collections={"instruments": Collection("{ticker, label, group, last, perf5minPct, perfHourPct, perfDayPct, perfWeekPct, perfMonthPct, perfMtdPct, perfQuarterPct, perfHalfYearPct, perfYtdPct, perfYearPct} as published; forex and crypto add the same periods in pips")},
+)
 def market_performance(ctx, args, target):
     if args.currency and args.kind != "crypto":
         raise Failure("invalid_argument", "--currency applies to crypto performance only.", "Drop --currency, or use market performance crypto.")
@@ -141,7 +160,14 @@ def classified(performance, tree):
     return [dict({"ticker": ticker, "performance": value}, **found.get(ticker, {})) for ticker, value in performance.items()]
 
 
-@leaf("market", "map", help="Market map performance per ticker, optionally joined to the map's classification tree with its size weights.", args=[(("--type",), dict(default="sec", choices=list(TYPES), help="Map universe: sec S&P 500 sectors, sec_all the full market, geo world, cap, etf, crypto variants, futures, sec_dji, sec_rut, sec_ndx and sec_comp index maps, themes.")), (("--period",), dict(default="d1", help="Performance period: d1, w1, w4, w13, w26, w52, ytd.")), (("--classification",), dict(action="store_true", help="Join each ticker to the map's group path, description and size weight; resolving the tree takes several more asset requests."))], collections={"tickers": Collection("{ticker, performance} per map tile; with --classification also groups (the path of group names from the top), description and weight, the tile's size weight rather than a market cap")}, context={"period, version": "as published by the performance API", "classification_source": "URL of the asset the tree came from, with --classification"})
+@leaf(
+    "market",
+    "map",
+    help="Market map performance per ticker, optionally joined to the map's classification tree with its size weights.",
+    args=[(("--type",), dict(default="sec", choices=list(TYPES), help="Map universe: sec S&P 500 sectors, sec_all the full market, geo world, cap, etf, crypto variants, futures, sec_dji, sec_rut, sec_ndx and sec_comp index maps, themes.")), (("--period",), dict(default="d1", help="Performance period: d1, w1, w4, w13, w26, w52, ytd.")), (("--classification",), dict(action="store_true", help="Join each ticker to the map's group path, description and size weight; resolving the tree takes several more asset requests."))],
+    collections={"tickers": Collection("{ticker, performance} per map tile; with --classification also groups (the path of group names from the top), description and weight, the tile's size weight rather than a market cap")},
+    context={"period, version": "as published by the performance API", "classification_source": "URL of the asset the tree came from, with --classification"},
+)
 def market_map(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/map_perf?" + urlencode({"t": args.type, "st": args.period}))
     perf = obs.json()
@@ -223,7 +249,13 @@ AXES = ["PB", "PC", "PE", "PEG", "PFCF", "PS", "averageVolume", "beta", "curRati
 AXIS_HELP = " axis field; schema market bubbles lists the accepted ones under choices."
 
 
-@leaf("market", "bubbles", help="Bubble chart data: one record per stock with the chosen x, y, size and color fields.", args=[(("--x",), dict(default="sector", choices=AXES, metavar="FIELD", help="X" + AXIS_HELP)), (("--y",), dict(default="lastChange", choices=AXES, metavar="FIELD", help="Y" + AXIS_HELP)), (("--size",), dict(default="marketCap", choices=AXES, metavar="FIELD", help="Size" + AXIS_HELP)), (("--color",), dict(default="sector", choices=AXES, metavar="FIELD", help="Colour" + AXIS_HELP)), (("--index",), dict(default="dji", choices=["any", "sp500", "ndx", "dji", "rut"], help="Stock universe: dji 30 names, ndx 100, sp500 500, rut 2000, any every listed stock."))], collections={"stocks": Collection("{ticker, company, x, y, size, color, isETF} as published; size is the field chosen with --size, not necessarily market cap")})
+@leaf(
+    "market",
+    "bubbles",
+    help="Bubble chart data: one record per stock with the chosen x, y, size and color fields.",
+    args=[(("--x",), dict(default="sector", choices=AXES, metavar="FIELD", help="X" + AXIS_HELP)), (("--y",), dict(default="lastChange", choices=AXES, metavar="FIELD", help="Y" + AXIS_HELP)), (("--size",), dict(default="marketCap", choices=AXES, metavar="FIELD", help="Size" + AXIS_HELP)), (("--color",), dict(default="sector", choices=AXES, metavar="FIELD", help="Colour" + AXIS_HELP)), (("--index",), dict(default="dji", choices=["any", "sp500", "ndx", "dji", "rut"], help="Stock universe: dji 30 names, ndx 100, sp500 500, rut 2000, any every listed stock."))],
+    collections={"stocks": Collection("{ticker, company, x, y, size, color, isETF} as published; size is the field chosen with --size, not necessarily market cap")},
+)
 def bubbles(ctx, args, target):
     obs = ctx.observe("https://finviz.com/api/bubbles?" + urlencode({"x": args.x, "y": args.y, "size": args.size, "color": args.color, "idx": args.index}))
     records = obs.json()

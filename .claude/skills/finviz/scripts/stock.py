@@ -46,7 +46,13 @@ OVERVIEW = {
 }
 
 
-@stock_leaf("overview", "One overview page, read once: the header, the profile, and the snapshot, news, ratings, insider, ownership and fund-flow sections.", collections=OVERVIEW, sections=["snapshot"], context={"ticker, name, last_close, as_of, change": "header facts as displayed; as_of is Finviz's quote time text", "description, peers, website": "the profile paragraph, Finviz's peer tickers and the company website"})
+@stock_leaf(
+    "overview",
+    "One overview page, read once: the header, the profile, and the snapshot, news, ratings, insider, ownership and fund-flow sections.",
+    collections=OVERVIEW,
+    sections=["snapshot"],
+    context={"ticker, name, last_close, as_of, change": "header facts as displayed; as_of is Finviz's quote time text", "description, peers, website": "the profile paragraph, Finviz's peer tickers and the company website"},
+)
 def overview(ctx, args, ticker):
     obs, page = stock_page(ctx, ticker, "c")
     context = header(page)
@@ -119,12 +125,16 @@ def revision_history(records, period, context):
 EARNINGS = {
     "quarterly": Collection("{fiscalPeriod, earningsDate, fiscalEndDate, epsActual, epsEstimate, salesActual, salesEstimate, analyst counts}: reported quarters newest first, then the projected quarters", default=12),
     "annual": Collection("the same fields per fiscal year, projected years included", order="latest fiscal year first", reverse=True, default=10),
-    "revisions": Collection("{fiscalPeriod, estimateType, estimateDate, estimates, upRevisions, downRevisions, mean, high, low, price}; estimateType E is EPS and S is sales. Without --fiscal-period, the newest estimate of each period and type with history_count; with it, that period's every estimate", order="latest fiscal period first, newest estimate first within each period and type", reverse=True, local=[Selector(("--fiscal-period",), dict(default=None, help="Show this fiscal period's whole estimate history newest first, e.g. 2026Q4 or 2026FY, instead of the newest estimate per period."), revision_history)]),
+    "revisions": Collection("{fiscalPeriod, estimateType, estimateDate, estimates, upRevisions, downRevisions, mean, high, low, price}; estimateType E is the EPS estimate (as epsEstimate), R the reported EPS estimate (as epsReportedEstimate) and S sales (as salesEstimate). Without --fiscal-period, the newest estimate of each period and type with history_count; with it, that period's every estimate", order="latest fiscal period first, newest estimate first within each period and type", reverse=True, local=[Selector(("--fiscal-period",), dict(default=None, help="Show this fiscal period's whole estimate history newest first, e.g. 2026Q4 or 2026FY, instead of the newest estimate per period."), revision_history)]),
     "reaction": Collection("{fiscalPeriod, reportDate, rsi, reactions: {window: {date, price, prevPrice, priceDiff, spyPriceDiff}}} newest report first", default=8),
 }
 
 
-@stock_leaf("earnings", "Reported and estimated EPS and sales by quarter and year, estimate revisions, and price reactions around reports, from one page.", collections=EARNINGS, sections=["quarterly"], context={"next_earnings_date": "Finviz's next report date"})
+ESTIMATE_UNIT = {"by": "estimateType", "E": "USD per share", "R": "USD per share", "S": "millions USD"}
+EARNINGS_UNITS = {"salesActual": "millions USD", "salesEstimate": "millions USD", "epsActual": "USD per share", "epsEstimate": "USD per share", "epsReportedActual": "USD per share", "epsReportedEstimate": "USD per share", "mean": ESTIMATE_UNIT, "high": ESTIMATE_UNIT, "low": ESTIMATE_UNIT}
+
+
+@stock_leaf("earnings", "Reported and estimated EPS and sales by quarter and year, estimate revisions, and price reactions around reports, from one page.", collections=EARNINGS, sections=["quarterly"], context={"next_earnings_date": "Finviz's next report date"}, units=EARNINGS_UNITS)
 def earnings(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "ea")
     obs.result["context"] = {"next_earnings_date": init.get("earningsDate")}
@@ -132,7 +142,12 @@ def earnings(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("forecast", "Analyst price targets and the history of recommendation counts.", collections={"recommendations": Collection("{recomDate, targetPrice, targetPriceLow, targetPriceHigh, analysts, buy, overweight, hold, underweight, sell, price}", order="newest date first", reverse=True, default=20)}, context={"target_price, target_price_low, target_price_high, analysts": "current consensus as published", "last_close, last_time": "the price Finviz compares against"})
+@stock_leaf(
+    "forecast",
+    "Analyst price targets and the history of recommendation counts.",
+    collections={"recommendations": Collection("{recomDate, targetPrice, targetPriceLow, targetPriceHigh, analysts, buy, overweight, hold, underweight, sell, price}", order="newest date first", reverse=True, default=20)},
+    context={"target_price, target_price_low, target_price_high, analysts": "current consensus as published", "last_close, last_time": "the price Finviz compares against"},
+)
 def forecast(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "fc")
     obs.result["context"] = {"target_price": init.get("targetPrice"), "target_price_low": init.get("targetPriceLow"), "target_price_high": init.get("targetPriceHigh"), "analysts": init.get("targetPriceAnalysts"), "last_close": init.get("lastClose"), "last_time": init.get("lastTime")}
@@ -140,7 +155,13 @@ def forecast(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("dividends", "Dividend payments, annual totals and the current estimate.", collections={"payments": Collection("{Ticker, Exdate, Ordinary, Special} newest first", default=20), "annual": Collection("{FiscalPeriod, Amount, Yield, Payout, Estimate}; Estimate true marks a projected year", order="latest fiscal year first", reverse=True)}, sections=["payments", "annual"], context={"ex_date, estimate, ttm, last_close": "current dividend facts as published"})
+@stock_leaf(
+    "dividends",
+    "Dividend payments, annual totals and the current estimate.",
+    collections={"payments": Collection("{Ticker, Exdate, Ordinary, Special} newest first", default=20), "annual": Collection("{FiscalPeriod, Amount, Yield, Payout, Estimate}; Estimate true marks a projected year", order="latest fiscal year first", reverse=True)},
+    sections=["payments", "annual"],
+    context={"ex_date, estimate, ttm, last_close": "current dividend facts as published"},
+)
 def dividends(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "dv")
     obs.result["context"] = {"ex_date": init.get("dividendExDate"), "estimate": init.get("dividendEstimate"), "ttm": init.get("dividendTTM"), "last_close": init.get("lastClose")}
@@ -151,7 +172,13 @@ def dividends(ctx, args, ticker):
 REVENUE_BLOCKS = {"products": "products_and_services", "regions": "regions", "segments": "segment"}
 
 
-@stock_leaf("revenue", "Revenue by product, region or segment per fiscal year, with the SEC filing each value came from; one page holds all three breakdowns.", collections={name: Collection("{series, fiscal_year, report_end_date, value, source_filing_url, ...every other source field}, series in source order; --fields always keeps series", key="series") for name in REVENUE_BLOCKS}, sections=["products"], context={"unit": "breakdown -> the unit the source states for its values", "series": "breakdown -> series name -> record count, including series the source lists with no records"})
+@stock_leaf(
+    "revenue",
+    "Revenue by product, region or segment per fiscal year, with the SEC filing each value came from; one page holds all three breakdowns.",
+    collections={name: Collection("{series, fiscal_year, report_end_date, value, source_filing_url, ...every other source field}, series in source order; --fields always keeps series", key="series") for name in REVENUE_BLOCKS},
+    sections=["products"],
+    context={"unit": "breakdown -> the unit the source states for its values", "series": "breakdown -> series name -> record count, including series the source lists with no records"},
+)
 def revenue(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "rv")
     units, series, found = {}, {}, {}
@@ -167,7 +194,12 @@ def revenue(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("short-interest", "Short interest history with float and average volume.", collections={"readings": Collection("{ticker, timestamp (epoch seconds), shortInterest, sharesFloat, averageVolume} as published", order="newest reading first", reverse=True, default=24)})
+@stock_leaf(
+    "short-interest",
+    "Short interest history with float and average volume.",
+    collections={"readings": Collection("{ticker, timestamp (epoch seconds), shortInterest, sharesFloat, averageVolume} as published", order="newest reading first", reverse=True, default=24)},
+    units={"shortInterest": "millions of shares", "sharesFloat": "millions of shares", "averageVolume": "shares"},
+)
 def short_interest(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "si")
     obs.result["collections"] = {"readings": init if isinstance(init, list) else []}
@@ -188,7 +220,13 @@ def around_last_close(records, keep, context):
     return [c for c in records if c.get("strike") in chosen]
 
 
-@stock_leaf("options", "Option chain for one expiry with Finviz's implied volatility and greeks.", args=[(("--expiry",), dict(default=None, help="Expiry YYYY-MM-DD from a previous result's expiries; the source's nearest expiry when omitted."))], collections={"contracts": Collection("{strike, type, openInterest, bidPrice, askPrice, lastClose, iv, delta, gamma, theta, vega, rho, ...} as published, by strike with puts and calls interleaved", local=[Selector(("--type",), dict(default=None, choices=["call", "put"], help="Keep only calls or only puts."), one_side), Selector(("--strikes",), dict(type=int, default=20, help="Keep the contracts on the N strikes nearest last_close, calls and puts alike; 0 keeps the whole expiry."), around_last_close)])}, context={"expiries": "expiries the source offers; pass one to --expiry", "current_expiry": "the expiry the chain belongs to", "last_close, last_time": "underlying price context"})
+@stock_leaf(
+    "options",
+    "Option chain for one expiry with Finviz's implied volatility and greeks.",
+    args=[(("--expiry",), dict(default=None, help="Expiry YYYY-MM-DD from a previous result's expiries; the source's nearest expiry when omitted."))],
+    collections={"contracts": Collection("{strike, type, openInterest, bidPrice, askPrice, lastClose, iv, delta, gamma, theta, vega, rho, ...} as published, by strike with puts and calls interleaved", local=[Selector(("--type",), dict(default=None, choices=["call", "put"], help="Keep only calls or only puts."), one_side), Selector(("--strikes",), dict(type=int, default=20, help="Keep the contracts on the N strikes nearest last_close, calls and puts alike; 0 keeps the whole expiry."), around_last_close)])},
+    context={"expiries": "expiries the source offers; pass one to --expiry", "current_expiry": "the expiry the chain belongs to", "last_close, last_time": "underlying price context"},
+)
 def options(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "oc", e=args.expiry)
     if args.expiry:
@@ -202,7 +240,14 @@ def one_form(records, form, context):
     return [r for r in records if r.get("form") == form] if form else records
 
 
-@stock_leaf("filings", "SEC filing list for the company with links to the originals; 30 per source page.", args=[(("--page",), dict(type=int, default=1, help="One-based source page; a next command sets it.")), (("--sort",), dict(default=None, help="Source sort key, e.g. -filingDate (the default order)."))], collections={"filings": Collection("{form, filingDate, reportDate, description, filing (index URL), document (primary document URL), accessionNumber} newest filing first", local=[Selector(("--form",), dict(default=None, help="Keep only this form type, e.g. 10-K; it narrows the received page, so page through with next commands to reach older filings."), one_form)])}, context={"available_forms": "form types present for this company", "form_categories": "Finviz's form groupings"}, paging="page")
+@stock_leaf(
+    "filings",
+    "SEC filing list for the company with links to the originals; 30 per source page.",
+    args=[(("--page",), dict(type=int, default=1, help="One-based source page; a next command sets it.")), (("--sort",), dict(default=None, help="Source sort key, e.g. -filingDate (the default order)."))],
+    collections={"filings": Collection("{form, filingDate, reportDate, description, filing (index URL), document (primary document URL), accessionNumber} newest filing first", local=[Selector(("--form",), dict(default=None, help="Keep only this form type, e.g. 10-K; it narrows the received page, so page through with next commands to reach older filings."), one_form)])},
+    context={"available_forms": "form types present for this company", "form_categories": "Finviz's form groupings"},
+    paging="page",
+)
 def filings(ctx, args, ticker):
     obs, page, init = section_data(ctx, ticker, "lf", page=args.page if args.page != 1 else None, sort=args.sort)
     entries = init.get("entries") or {}
@@ -219,7 +264,13 @@ def filings(ctx, args, ticker):
     return obs.result
 
 
-@stock_leaf("statement", "Income statement, balance sheet or cash flow as Finviz publishes it: one record per line item with a source string per period.", args=[(("--kind",), dict(default="income", choices=["income", "balance", "cashflow"], help="Statement to read.")), (("--period",), dict(default="annual", choices=["annual", "quarterly"], help="Annual or quarterly columns."))], collections={"items": Collection("{item, <period>: value, ...} in source order; --filter matches line items, --fields names periods such as TTM or 2025FY and item is always kept", key="item")}, context={"currency": "currency label from the source; no scale is published", "periods": "column labels, e.g. TTM, 2025FY or 2026Q3", "period_end_dates": "period end date per column"})
+@stock_leaf(
+    "statement",
+    "Income statement, balance sheet or cash flow as Finviz publishes it: one record per line item with a source string per period.",
+    args=[(("--kind",), dict(default="income", choices=["income", "balance", "cashflow"], help="Statement to read.")), (("--period",), dict(default="annual", choices=["annual", "quarterly"], help="Annual or quarterly columns."))],
+    collections={"items": Collection("{item, <period>: value, ...} in source order; --filter matches line items, --fields names periods such as TTM or 2025FY and item is always kept", key="item")},
+    context={"currency": "currency label from the source; no scale is published", "periods": "column labels, e.g. TTM, 2025FY or 2026Q3", "period_end_dates": "period end date per column"},
+)
 def statement(ctx, args, ticker):
     code = {"income": "I", "balance": "B", "cashflow": "C"}[args.kind] + ("A" if args.period == "annual" else "Q")
     obs = ctx.observe("https://finviz.com/api/statement?" + urlencode({"t": ticker, "so": "F", "s": code}))
@@ -242,7 +293,13 @@ def statement(ctx, args, ticker):
 ARRAYS = ("date", "open", "high", "low", "close", "volume")
 
 
-@stock_leaf("prices", "Price bars from Finviz's quote API for a stock or a futures, forex or crypto instrument.", args=[(("--instrument",), dict(default="stock", choices=["stock", "futures", "forex", "crypto"], help="Instrument family the ticker belongs to.")), (("--timeframe",), dict(default="d", help="Source timeframe: d daily, w weekly, m monthly, or intraday codes such as i1, i5.")), (("--bars",), dict(type=int, default=30, help="Bars requested from the source; it may return fewer."))], collections={"bars": Collection("{date_epoch (seconds as supplied), open, high, low, close, volume}, only when every array has the same length", order="newest bar first", reverse=True)}, context={"last": "the remaining scalar fields as supplied, e.g. lastClose, lastTime"})
+@stock_leaf(
+    "prices",
+    "Price bars from Finviz's quote API for a stock or a futures, forex or crypto instrument.",
+    args=[(("--instrument",), dict(default="stock", choices=["stock", "futures", "forex", "crypto"], help="Instrument family the ticker belongs to.")), (("--timeframe",), dict(default="d", help="Source timeframe: d daily, w weekly, m monthly, or intraday codes such as i1, i5.")), (("--bars",), dict(type=int, default=30, help="Bars requested from the source; it may return fewer."))],
+    collections={"bars": Collection("{date_epoch (seconds as supplied), open, high, low, close, volume}, only when every array has the same length", order="newest bar first", reverse=True)},
+    context={"last": "the remaining scalar fields as supplied, e.g. lastClose, lastTime"},
+)
 def prices(ctx, args, ticker):
     obs = ctx.observe("https://finviz.com/api/quote?" + urlencode({"instrument": args.instrument, "ticker": ticker, "timeframe": args.timeframe, "barsCount": args.bars}))
     obs.result["target"] = ticker

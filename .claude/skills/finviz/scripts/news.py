@@ -34,7 +34,13 @@ def per_section(records, keep, context):
     return kept
 
 
-@leaf("news", "headlines", help="News headlines by time, by source, or the stock, ETF and crypto news lists.", args=[(("--kind",), dict(default="latest", choices=list(NEWS_VIEWS), help="Which news list to read."))], collections={"headlines": Collection("{time, title, url, source, section, tickers} in page order, newest first within each section; url is the external article and tickers are Finviz's tagged symbols", local=[Selector(("--per-section",), dict(type=int, default=20, help="Keep the first N headlines of each section so no section drops out; 0 keeps every headline."), per_section)])})
+@leaf(
+    "news",
+    "headlines",
+    help="News headlines by time, by source, or the stock, ETF and crypto news lists.",
+    args=[(("--kind",), dict(default="latest", choices=list(NEWS_VIEWS), help="Which news list to read."))],
+    collections={"headlines": Collection("{time, title, url, source, section, tickers} in page order, newest first within each section; url is the external article and tickers are Finviz's tagged symbols", local=[Selector(("--per-section",), dict(type=int, default=20, help="Keep the first N headlines of each section so no section drops out; 0 keeps every headline."), per_section)])},
+)
 def headlines(ctx, args, target):
     view = NEWS_VIEWS[args.kind]
     obs = ctx.observe("https://finviz.com/news" + ("?" + urlencode({"v": view}) if view else ""))
@@ -57,7 +63,13 @@ def headlines(ctx, args, target):
     return obs.result
 
 
-@leaf("news", "pulse", help="Market Pulse: Finviz's generated explanations of why stocks and the market moved; list the latest or read one by ID.", args=[(("id",), dict(nargs="?", metavar="ID", help="Pulse ID from the list; omitted lists the latest entries."))], collections={"entries": Collection("listed: {id, age, headline, tickers}; one ID: {id, ticker, dateTime, headline, summary (markdown), source, sentiment, catalyst, bulletPointsList} as published, a source-generated explanation rather than independent evidence")})
+@leaf(
+    "news",
+    "pulse",
+    help="Market Pulse: Finviz's generated explanations of why stocks and the market moved; list the latest or read one by ID.",
+    args=[(("id",), dict(nargs="?", metavar="ID", help="Pulse ID from the list; omitted lists the latest entries."))],
+    collections={"entries": Collection("listed: {id, age, headline, tickers}; one ID: {id, ticker, dateTime, headline, summary (markdown), source, sentiment, catalyst, bulletPointsList} as published, a source-generated explanation rather than independent evidence")},
+)
 def pulse(ctx, args, target):
     if args.id:
         if not args.id.isdigit():
@@ -75,7 +87,14 @@ def pulse(ctx, args, target):
     return obs.result
 
 
-@leaf("news", "article", help="Read a Finviz-hosted article (finviz.com/news/<id>/<slug>); other hosts need their own reader.", args=[(("url",), dict(metavar="URL", help="Article URL on finviz.com."))], collections={"paragraphs": Collection("{text} per paragraph as displayed")}, context={"title": "the article headline", "links, images": "links and images inside the body; text outside the paragraphs is a link label and appears there"})
+@leaf(
+    "news",
+    "article",
+    help="Read a Finviz-hosted article (finviz.com/news/<id>/<slug>); other hosts need their own reader.",
+    args=[(("url",), dict(metavar="URL", help="Article URL on finviz.com."))],
+    collections={"paragraphs": Collection("{text} per paragraph as displayed")},
+    context={"title": "the article headline", "links, images": "links and images inside the body; text outside the paragraphs is a link label and appears there"},
+)
 def article(ctx, args, target):
     validate_url(args.url)
     if not re.fullmatch(r"/news/\d+/[\w-]+", args.url.split("finviz.com", 1)[-1].split("?")[0]):

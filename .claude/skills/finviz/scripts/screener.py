@@ -40,7 +40,12 @@ def with_options(records, attach, context):
 OPTIONS = Selector(("--options",), dict(action="store_true", help="Attach each filter's option values; the option lists together are many times the size of the filter list, so narrow with --filter first."), with_options)
 
 
-@leaf("screen", "filters", help="List the screener filters: id, label and definition, and on request the option values --filters accepts.", collections={"filters": Collection("{id, label, definition, option_count}; with --options, options [{value, label}] whose values go to screen run --filters, and elite_only labels an anonymous read cannot select", local=[OPTIONS])})
+@leaf(
+    "screen",
+    "filters",
+    help="List the screener filters: id, label and definition, and on request the option values --filters accepts.",
+    collections={"filters": Collection("{id, label, definition, option_count}; with --options, options [{value, label}] whose values go to screen run --filters, and elite_only labels an anonymous read cannot select", local=[OPTIONS])},
+)
 def filters(ctx, args, target):
     obs, page = screener_page(ctx, {"ft": "4"})
     found = []
@@ -100,7 +105,15 @@ RUN_ARGS = [
 ]
 
 
-@leaf("screen", "run", help="Run the screener with filters, a signal, a view or custom columns, sorting and paging; rows keep source strings.", args=RUN_ARGS, collections={"rows": Collection("one record per row keyed by the column headers, plus ticker and url, and observation_id when several pages were fetched or --out was given")}, context={"sort_keys": "column label -> the key --sort accepts for it, from this page's own header links; columns the source does not sort are absent", "export": "with --out: {path, rows_written, pages}"}, paging="row")
+@leaf(
+    "screen",
+    "run",
+    help="Run the screener with filters, a signal, a view or custom columns, sorting and paging; rows keep source strings.",
+    args=RUN_ARGS,
+    collections={"rows": Collection("one record per row keyed by the column headers, plus ticker and url, and observation_id when several pages were fetched or --out was given")},
+    context={"sort_keys": "column label -> the key --sort accepts for it, from this page's own header links; columns the source does not sort are absent", "export": "with --out: {path, rows_written, pages}"},
+    paging="row",
+)
 def run(ctx, args, target):
     if args.pages < 1 or args.row < 1:
         raise Failure("invalid_argument", "--pages and --row start at 1.", "Use --pages 1 --row 1 for the first page.")

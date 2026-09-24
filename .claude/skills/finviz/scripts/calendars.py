@@ -18,7 +18,8 @@ def calendar_leaf(kind):
     context = {"date_from": "the start date the source states it used; null when the response states none, as the paging API does"}
     if kind == "season":
         context["totals_per_day"] = "report counts per day over the source's whole preview"
-    return leaf("calendar", kind, help=CALENDAR_HELP[kind], args=CALENDAR_ARGS[kind], collections={"items": Collection(CALENDAR_RECORDS[kind])}, context=context, paging="page" if PAGE_ARG in CALENDAR_ARGS[kind] else None)
+    units = {"marketCap": "millions USD"} if kind == "earnings" else None
+    return leaf("calendar", kind, help=CALENDAR_HELP[kind], args=CALENDAR_ARGS[kind], collections={"items": Collection(CALENDAR_RECORDS[kind])}, context=context, units=units, paging="page" if PAGE_ARG in CALENDAR_ARGS[kind] else None)
 
 
 def calendar(ctx, args, target):
