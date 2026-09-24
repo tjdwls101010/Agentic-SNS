@@ -3,7 +3,7 @@ import datetime as dt
 
 from encode import column, is_empty
 
-EXIT_CODES = {"ok": 0, "invalid": 2, "rate_limited": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}
+EXIT_CODES = {"ok": 0, "invalid": 2, "local_io": 4, "rate_limited": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}
 STATUSES = {
     "ok": "usable data within this leaf's own default window",
     "empty": "the source answered with nothing usable; not proof the data does not exist",

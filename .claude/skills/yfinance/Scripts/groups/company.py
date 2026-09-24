@@ -10,7 +10,7 @@ PROFILE_FIELDS = ("symbol", "longName", "quoteType", "currency", "financialCurre
                   "heldPercentInsiders", "heldPercentInstitutions", "lastFiscalYearEnd", "mostRecentQuarter", "lastSplitDate", "lastSplitFactor")
 
 leaf("company", "profile", "Business description, sector, governance risk and headquarters for one company.",
-     args=[SYMBOLS, FROM], ticker=True, shares_info=True, source_time=info_time,
+     args=[SYMBOLS, FROM], ticker=True, shares_info=True, source_time=info_time, exportable=False,
      fields=PROFILE_FIELDS, narrow=["--fields"], units=INFO_UNITS,
      interpretation={"sibling": "prices quote selects the price side of this same assembled response; --from reuses the observation rather than requesting it again.",
                      "currency": CURRENCY_SPLIT,

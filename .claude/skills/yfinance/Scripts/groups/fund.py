@@ -10,22 +10,22 @@ def fund(name, purpose, attribute, **spec):
     leaf("fund", name, purpose, args=[SYMBOLS], ticker=True, **spec)(fetch)
 
 
-fund("overview", "Fund family, category and legal type.", "fund_overview", narrow=["--fields"])
+fund("overview", "Fund family, category and legal type.", "fund_overview", narrow=["--fields"], exportable=False)
 
 # 성진: 반환값이 문자열 하나라 --fields도 --limit도 줄이지 못한다. 줄일 수 없는 리프는 줄이는 법을 선언하지 않는다 —
 # 선언하면 fix가 그 인자를 권하고, 따라간 결과가 같은 크기로 다시 실패한다.
-fund("description", "The fund's own investment objective text.", "description", narrow=(), sliceable=False,
+fund("description", "The fund's own investment objective text.", "description", narrow=(), sliceable=False, exportable=False,
      interpretation={"shape": "One text value. It cannot be narrowed by fields or rows; raise --max-chars or read the saved observation."})
 
 fund("holdings", "Largest reported holdings and their weights.", "top_holdings",
      limit=20, narrow=["--fields", "--limit"], units={"Holding Percent": WEIGHT},
      interpretation={"coverage": "These are the top reported holdings only, so the weights do not sum to one and the rest of the portfolio is not described here."})
 
-fund("asset-classes", "Allocation across cash, stock, bond, preferred and convertible.", "asset_classes", narrow=["--fields"],
+fund("asset-classes", "Allocation across cash, stock, bond, preferred and convertible.", "asset_classes", narrow=["--fields"], exportable=False,
      units={"cashPosition": WEIGHT, "stockPosition": WEIGHT, "bondPosition": WEIGHT, "preferredPosition": WEIGHT,
             "convertiblePosition": WEIGHT, "otherPosition": WEIGHT})
 
-fund("sector-weights", "Portfolio weight by sector.", "sector_weightings", narrow=["--fields"],
+fund("sector-weights", "Portfolio weight by sector.", "sector_weightings", narrow=["--fields"], exportable=False,
      units={"*": WEIGHT},
      interpretation={"keys": "Sector keys here use underscores (consumer_cyclical); market sector takes hyphenated keys (consumer-cyclical)."})
 

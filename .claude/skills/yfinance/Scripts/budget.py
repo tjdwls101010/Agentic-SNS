@@ -207,6 +207,8 @@ def code(results, status):
         return EXIT_CODES["rate_limited"]
     if "invalid" in codes:
         return EXIT_CODES["invalid"]
+    if "local_io" in codes:
+        return EXIT_CODES["local_io"]
     return EXIT_CODES["upstream"]
 
 

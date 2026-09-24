@@ -53,7 +53,7 @@ def info(ticker, args, context, warnings):
 
 
 leaf("prices", "quote", "Current price, trading session and market-capitalisation fields for one instrument.",
-     args=[SYMBOLS, FROM], ticker=True, shares_info=True, source_time=info_time,
+     args=[SYMBOLS, FROM], ticker=True, shares_info=True, source_time=info_time, exportable=False,
      fields=QUOTE_FIELDS, narrow=["--fields"], units=INFO_UNITS,
      interpretation={"sibling": "company profile selects the business side of this same assembled response; --from reuses the observation rather than requesting it again.",
                      "timing": QUOTE_TIME, "currency": CURRENCY_SPLIT,

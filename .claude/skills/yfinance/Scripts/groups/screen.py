@@ -69,7 +69,7 @@ def fields(target, args, context, warnings):
 
 
 @leaf("screen", "values", "Enumerated values accepted by query fields of the selected --type.",
-      args=[TYPE, FIELD], check=check, narrow=["--filter", "--field", "--type"])
+      args=[TYPE, FIELD], check=check, narrow=["--filter", "--field", "--type"], exportable=False)
 def values(target, args, context, warnings):
     catalog = query_catalog(args.type)
     found = catalog.valid_values

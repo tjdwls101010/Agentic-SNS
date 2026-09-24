@@ -28,15 +28,16 @@ SHARED = {
     "list_fields": "every data command and read",
     "limit": "every data command and read; screen caps it at 250 and calendar at 100",
     "timeout": "every data command, per target",
+    "out": "data commands whose results are rows (absent from single-record commands such as prices quote), and read",
     "ttl_days": "before the group only",
 }
-POINTER = "schema (no scope) describes the shared arguments (--fields, --list-fields, --limit, --timeout, --max-chars, --filter, --store) and the envelope, statuses and exit codes every result uses"
+POINTER = "schema (no scope) describes the shared arguments (--fields, --list-fields, --limit, --timeout, --out, --max-chars, --filter, --store) and the envelope, statuses and exit codes every result uses"
 
 
-def shared_arguments(root, sample):
+def shared_arguments(root, sample, reader):
     """Each shared argument once, with where it applies; a leaf's own window is in that leaf's default_window."""
     found = {}
-    for action in [*root._actions, *sample._actions]:
+    for action in [*root._actions, *sample._actions, *reader._actions]:
         if action.dest not in SHARED or action.option_strings[0] in found:
             continue
         default = registry.GLOBAL_DEFAULTS.get(action.dest) if action.default == argparse.SUPPRESS else action.default
@@ -104,6 +105,6 @@ def schema_data(args, parsers, root):
                  "next": "schema GROUP LEAF for that command's arguments, default window, units and known limits"}
     if not scope and not args.filter:
         # 성진: --filter를 준 호출은 명령을 찾는 중이다. 그때까지 봉투 설명을 함께 실으면 좁히려는 시도가 같은 예산에 다시 걸린다.
-        described["common_arguments"] = shared_arguments(root, next(iter(parsers.values())))
+        described["common_arguments"] = shared_arguments(root, next(iter(parsers.values())), parsers["read"])
         described["output"] = {"envelope": ENVELOPE, "statuses": STATUSES, "exit_codes": EXIT_CODES}
     return described

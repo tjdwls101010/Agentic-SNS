@@ -127,6 +127,9 @@ def effective_limit(args, item):
     return explicit if explicit is not None else (item.limit if item else None)
 
 
+OUT_HELP = "Write every row this observation received to a new CSV file (one target column, every digit and timestamp as saved) and print only a summary. The command's default window does not apply; an explicit --limit does. An existing file is never overwritten."
+
+
 def add_common(parser, selection=True, root=False):
     parser.add_argument("--max-chars", type=int, default=GLOBAL_DEFAULTS["max_chars"] if root else argparse.SUPPRESS, help="Maximum JSON characters. Each command's own default window is what keeps a result to one screen; this is the safety boundary behind it.")
     parser.add_argument("--filter", default=GLOBAL_DEFAULTS["filter"] if root else argparse.SUPPRESS, help="Case-insensitive substring for schema, catalogs or --list-fields.")

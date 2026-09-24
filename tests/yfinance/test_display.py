@@ -145,7 +145,7 @@ def test_five_years_of_daily_bars_show_about_twice_the_rows_in_one_screen(cli):
 
 # ---- schema density -----------------------------------------------------------------------------------------------
 
-COMMON = {"--max-chars", "--filter", "--store", "--fields", "--list-fields", "--limit", "--timeout"}
+COMMON = {"--max-chars", "--filter", "--store", "--fields", "--list-fields", "--limit", "--timeout", "--out"}
 
 
 def test_a_leaf_schema_carries_its_own_arguments_and_points_at_the_shared_ones(cli):
