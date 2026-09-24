@@ -61,6 +61,19 @@ leaf("prices", "quote", "Current price, trading session and market-capitalisatio
      gotchas=["An instrument that did not trade in the current session still returns regularMarket fields from the last session it did."])(info)
 
 
+BAR_NAMES = {"1d": "daily", "5d": "five-day", "1wk": "weekly", "1mo": "monthly", "3mo": "quarterly"}
+COARSER = {"1d": "1wk", "5d": "1wk", "1wk": "1mo", "1mo": "3mo"}
+
+
+def coarser_bars(args):
+    """The next interval up, for a window too long to read row by row; intraday bars step up to daily."""
+    step = COARSER.get(args.interval) or (None if args.interval == "3mo" else "1d")
+    if step is None:
+        return None
+    was = BAR_NAMES.get(args.interval, args.interval)
+    return f"--interval {step}", f"{BAR_NAMES[step]} bars, not a slice of these {was} ones"
+
+
 def period_unless_dates(args):
     if args.period is None and not (args.start or args.end):
         args.period = "1mo"
@@ -111,7 +124,7 @@ def bars(ticker, args, context, warnings):
 
 
 @leaf("prices", "history", "OHLCV bars, dividends and splits over a date range or relative period.",
-      args=BAR_ARGS, ticker=True, end_exclusive=True, defaults=period_unless_dates, conditions=dates_applied, precise=PRICE_COLUMNS,
+      args=BAR_ARGS, ticker=True, end_exclusive=True, defaults=period_unless_dates, conditions=dates_applied, precise=PRICE_COLUMNS, coarser=coarser_bars,
       recent=True, narrow=["--fields", "--limit", "--period", "--start/--end", "--interval"],
       interpretation={"dates": "start is inclusive and end is exclusive. A naive date is read in the exchange's timezone.",
                       "adjustment": "--adjust decides what Close means; adding dividends to an already adjusted return counts them twice.",

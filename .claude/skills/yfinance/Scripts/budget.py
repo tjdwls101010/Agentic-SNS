@@ -46,7 +46,10 @@ def shrink(envelope, item, args, size, max_chars):
         return False
     envelope["data"], envelope["coverage"] = data, coverage
     envelope["status"] = "partial"
-    notice = f"The budget narrowed this result to {coverage.get('shown')} of {coverage.get('received')} rows, so it answers a smaller range than was asked for; the whole observation is saved as id {envelope.get('id')} and read reaches the rest without a new request."
+    notice = (f"The budget narrowed this result to {coverage.get('shown')} of {coverage.get('received')} rows, so it answers a smaller range than was asked for; "
+              f"the whole observation is saved as id {envelope.get('id')}: read reaches the rest without a new request"
+              + (f", and {export_command(envelope.get('id'), args)} writes every row to a file to compute on" if item.exportable else "")
+              + "." + coarser(item, args))
     warnings = [w for w in envelope.get("warnings", []) if not w.startswith("The budget narrowed")]
     envelope["warnings"] = warnings + [notice]
     # 성진: continuation을 축소 전 개수로 계산해 두면 예산이 창을 줄인 만큼의 행을 건너뛴다 — 따라가면 조용히 빠진다.
@@ -57,6 +60,17 @@ def shrink(envelope, item, args, size, max_chars):
     else:
         envelope.pop("continuation", None)
     return True
+
+
+def export_command(ident, args):
+    """Writing the saved rows to a file costs no request and has no budget, so it is the way out for a computation."""
+    return f"read {ident}" + quoted(args, [("--store", getattr(args, "store", None))]) + " --out FILE"
+
+
+def coarser(item, args):
+    """A coarser view is a new request whose rows mean something else, so the sentence says both."""
+    found = item.coarser(args) if item.coarser else None
+    return f" For a coarser view, rerun the command with {found[0]}: a new request returning {found[1]}." if found else ""
 
 
 def quoted(args, names):
@@ -109,15 +123,18 @@ def too_large_fix(results, item, size, max_chars, args, needed=None):
         listed = "; ".join(f"{t} {i}" for t, i in saved)
         # 성진: 목표만 보존하고 투영을 빠뜨리면 회복이 기본 필드집합으로 돌아가 다른 값을 성공적으로 낸다 — 질문이 바뀐 것은 같다.
         kept = quoted(args, [("--fields", ",".join(args.fields) if getattr(args, "fields", None) else None)])
-        each = f" Each target was observed and saved separately: {listed}. Read one with read ID{kept}" + (f" --limit {keep}" if keep else "") + f", ask for fewer targets in one call, or rerun with --max-chars {needed}."
+        filed = ", rerun with --out FILE to write every target's rows to one file (a new request)" if item.exportable else ""
+        each = f" Each target was observed and saved separately: {listed}. Read one with read ID{kept}" + (f" --limit {keep}" if keep else "") + f", ask for fewer targets in one call{filed}, or rerun with --max-chars {needed}."
         return head + (f"Narrow with {narrow}." if narrow else "Ask for fewer targets.") + each
     if saved and keep is not None:
         if keep >= (shown or 0):
             # 성진: 한 행이 이미 예산보다 크면 더 작은 --limit을 권하는 회복은 같은 실패를 반복한다 — 무한루프가 아니라
             # 거짓 주장이다. 줄일 축이 남아 있으면 그것을, 없으면 통과할 크기를 말한다.
             axis = f"Narrow with {narrow}, which reduces this leaf by something other than rows. " if narrow and item.sliceable else ""
-            return head + f"A single entry is already larger than the budget, so fewer rows cannot fit it. {axis}Or rerun with --max-chars {needed}; the whole response is saved as {saved[0][1]}."
-        return head + (f"Narrow with {narrow}. " if narrow else "") + f"The whole response is saved: {read_command(saved[0][1], item, args, keep)} reads it in slices without a new request, and each slice names the next. Or rerun with --max-chars {needed}."
+            filed = f" {export_command(saved[0][1], args)} writes it to a file with no budget." if item.exportable else ""
+            return head + f"A single entry is already larger than the budget, so fewer rows cannot fit it. {axis}Or rerun with --max-chars {needed}; the whole response is saved as {saved[0][1]}.{filed}"
+        filed = f", {export_command(saved[0][1], args)} writes all of it to a file to compute on," if item.exportable else ""
+        return head + (f"Narrow with {narrow}. " if narrow else "") + f"The whole response is saved: {read_command(saved[0][1], item, args, keep)} reads it in slices without a new request, and each slice names the next{filed}. Or rerun with --max-chars {needed}."
     if narrow:
         return head + f"Narrow with {narrow}, or rerun with --max-chars {needed}."
     return head + f"Rerun with --max-chars {needed}."
