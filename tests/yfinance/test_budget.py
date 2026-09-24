@@ -240,6 +240,23 @@ def test_a_leaf_that_cannot_be_narrowed_does_not_claim_it_can(cli):
     assert "--limit" not in doc["results"][0]["data"]["narrowing"]
 
 
+def earnings_page_routes(count=25):
+    head = "<table><thead><tr><th>Symbol</th><th>Company</th><th>Earnings Date</th><th>EPS Estimate</th><th>Reported EPS</th><th>Surprise (%)</th></tr></thead><tbody>"
+    rows = "".join(f"<tr><td>AAPL</td><td>Apple</td><td>January {25 - i:02d}, 2024 at 4 PM EST</td><td>1</td><td>1</td><td>0</td></tr>" for i in range(count))
+    return [{"path": "/calendar/earnings", "text": head + rows + "</tbody></table>"}]
+
+
+def test_a_single_symbol_earnings_recovery_never_names_a_date_range(cli, tmp_path):
+    """--start/--end is a real narrowing for market-wide calendar earnings and rejected outright for the
+    single-symbol form. An explicit store lengthens the continuation enough that even one row refuses, so the
+    recovery sentence lists this leaf's narrowings."""
+    store = tmp_path / "an-explicitly-chosen-store"
+    proc, doc = cli("calendar", "earnings", "AAPL", "--max-chars", "1000", "--store", str(store), routes=earnings_page_routes(), store=tmp_path / "s")
+    assert proc.returncode == 9, proc.stdout[:300]
+    fix = doc["results"][0]["error"]["fix"]
+    assert "Narrow with" in fix and "--start" not in fix and "--end" not in fix, fix
+
+
 def test_a_recovery_never_names_an_argument_this_mode_forbids(cli, tmp_path):
     """--type is a real narrowing for instrument search and rejected outright for the other datasets; naming it there
     sends the reader into an invalid-argument error."""
