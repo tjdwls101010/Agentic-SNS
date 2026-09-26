@@ -170,3 +170,18 @@ def test_analyst_targets_and_growth(cli):
     proc, doc = cli("analysts", "growth", "AAPL", "--fields", "stockTrend,industryTrend", routes=routes)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert doc["results"][0]["data"]["data"] == [[0.2, 0.1]]
+
+
+def test_a_rate_limit_met_while_reading_the_statement_currency_stops_the_remaining_targets(cli):
+    """The currency lookup is a second request; a 429 there is still a rate limit, and going on to the next symbol
+    spends requests the source just refused."""
+    payload = {"timeseries": {"result": [{"meta": {"type": ["annualTotalRevenue"]}, "timestamp": [1735603200], "annualTotalRevenue": [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 120}}]}], "error": None}}
+    routes = [{"path": "/timeseries/AAPL", "json": payload},
+              {"path": "/quoteSummary/AAPL", "status": 429, "text": "Too Many Requests"},
+              {"path": "/v7/finance/quote", "status": 429, "text": "Too Many Requests"}]
+    proc, doc = cli("financials", "income", "AAPL", "MSFT", "--fields", "TotalRevenue", routes=routes)  # no MSFT route: any MSFT request fails the fixture
+    assert proc.returncode == 8, proc.stdout[:400]
+    first, second = doc["results"]
+    assert first["status"] == "ok" and first["data"]["data"] == [[120]]
+    assert any("currency" in w for w in first["warnings"])
+    assert second["status"] == "not_attempted"
