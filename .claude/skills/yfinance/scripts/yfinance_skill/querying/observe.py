@@ -67,7 +67,7 @@ def observe(target, args, item, saved, commands):
     conditions = item.conditions(encoded, args, context) if item.conditions else {}
     when = context.pop("source_time", None) or (item.source_time(encoded) if item.source_time else None)
     requested, received = context.pop("requested", None), row_count(encoded)
-    if item.dataset.shortfall and requested and received is not None and received < requested:
+    if item.dataset.shortfall and requested and received and received < requested:  # nothing at all is the empty status's to explain
         warnings.append(item.dataset.shortfall.format(received=received, requested=requested))
     return encoded, context, warnings, conditions, now(), when, None, requested
 
