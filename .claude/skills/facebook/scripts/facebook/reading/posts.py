@@ -7,7 +7,7 @@ from facebook.graphql.records.post import build_post, posts_from_raw
 from facebook.graphql.registry import get_query, FEED_SORT_TOKENS, GROUP_SORT_TOKENS
 from facebook.graphql.resolve import resolve_profile_id, resolve_group_id
 from facebook.reading.comments import comments, fetch_post_story
-from facebook.reading.paging import in_window, page_options, paginate
+from facebook.reading.paging import page_options, paginate
 
 
 def run(args, transport, *, state=None, commit=None):
@@ -16,14 +16,9 @@ def run(args, transport, *, state=None, commit=None):
         story = fetch_post_story(transport, args.target)
         post = build_post(story, source='permalink', captured_at=datetime.now().astimezone(),
                           include_raw=False).to_dict()
-        if not in_window(post, args.since, args.until):
-            result = dict(ok=True, results=[], stop_reason='exhausted')
-        else:
-            result = comments(args, transport, state={}, commit=None, story=story, first_batch=True)
-            result['results'].insert(0, post)
-            result['continuation_command'] = 'comments'
-        if commit and result['ok']:
-            commit(result['results'], {'exhausted': True}, 'exhausted')
+        result = comments(args, transport, state={}, commit=None, story=story, first_batch=True)
+        result['results'].insert(0, post)
+        result['continuation_command'] = 'comments'
         return result
     variables = {}
     referer = getattr(args, 'target', None)
@@ -51,6 +46,6 @@ def run(args, transport, *, state=None, commit=None):
 
     result = paginate(fetch, **page_options(args, state, commit))
     if args.since or args.until:
-        result['window_mode'] = 'server' if args.command == 'profile' else 'client'
-        result['window_complete'] = args.command == 'profile' and result['stop_reason'] == 'exhausted'
+        order = 'server' if args.command == 'profile' else 'chronological' if args.sort == 'recent' else 'ranked'
+        result['window'] = {'order': order, 'since': args.since, 'until': args.until}
     return result

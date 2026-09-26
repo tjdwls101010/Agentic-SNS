@@ -55,3 +55,35 @@ def test_the_seam_check_notices_a_private_import(tmp_path):
         ('facebook.graphql.records.post', ['build_post']), ('facebook.reading.paging', None),
         ('facebook.graphql.records', ['_post', 'post_page'])]
     assert '_post' not in public_records_names()
+
+
+def test_only_outcome_names_or_maps_stop_reasons():
+    """Production code may set a stop_reason only to a declared value, and only outcome.py maps one onto another."""
+    package = SKILL / 'scripts/facebook'
+    outcome = ast.parse((package / 'outcome.py').read_text())
+    declared = next(node.value for node in outcome.body if isinstance(node, ast.Assign)
+                    and any(isinstance(t, ast.Name) and t.id == 'STOP_REASONS' for t in node.targets))
+    reasons = {key.value for key in declared.keys}
+    problems = []
+    for path in sorted(package.rglob('*.py')):
+        if path.name == 'outcome.py':
+            continue
+        for node in ast.walk(ast.parse(path.read_text())):
+            values = []
+            if isinstance(node, ast.keyword) and node.arg == 'stop_reason':
+                values = [node.value]
+            elif isinstance(node, ast.Dict):
+                values = [v for k, v in zip(node.keys, node.values)
+                          if isinstance(k, ast.Constant) and k.value == 'stop_reason']
+                keys = [k.value for k in node.keys if isinstance(k, ast.Constant)]
+                mapped = [v.value for v in node.values if isinstance(v, ast.Constant)]
+                if keys and set(keys) <= reasons | {'already_complete', 'reply_batch_limit'} and set(mapped) <= reasons:
+                    problems.append(f'{path.name}:{node.lineno} maps stop reasons')
+            elif isinstance(node, ast.Assign) and any(
+                    isinstance(t, ast.Subscript) and isinstance(t.slice, ast.Constant) and t.slice.value == 'stop_reason'
+                    for t in node.targets):
+                values = [node.value]
+            for value in values:
+                if isinstance(value, ast.Constant) and value.value not in reasons | {None}:
+                    problems.append(f'{path.name}:{node.lineno} sets stop_reason {value.value!r}')
+    assert problems == []

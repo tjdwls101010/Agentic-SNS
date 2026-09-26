@@ -120,19 +120,23 @@ def render_about(fields) -> str:
                      for field in fields for data in [_data(field)])
 
 
-def render_results(results, *, command, sort=None, stop_reason='exhausted', more=None,
-                   chars=180, timezone=None) -> str:
-    """Render models or their to_dict output, plus caller-owned completion metadata.
+def render_page(envelope, *, chars=180, timezone=None) -> str:
+    """The text page of one result: a header naming scope and cost, the window, records, coverage, more:.
 
-    ``more`` is an already assembled command, not a raw cursor. ``chars=None``
-    shows full received text. Omitted timezone uses the machine's local zone.
+    ``chars=None`` shows full received text. Omitted timezone uses the machine's local zone.
     """
-    results = [_data(result) for result in results]
-    header = [_line(command)]
-    if sort is not None:
-        header.append(f'sort={_line(sort)}')
-    header.extend([f'{len(results)} shown', f'stopped={_line(stop_reason)}'])
+    results = [_data(result) for result in envelope['results']]
+    header = [_line(envelope['command'])]
+    header += [f'{key}={_line(envelope[key])}' for key in ('sort', 'type', 'section') if envelope.get(key) is not None]
+    header.append(f'{len(results)} shown')
+    if 'sponsored_skipped' in envelope:
+        header.append(f'sponsored_skipped={envelope["sponsored_skipped"]}')
+    header += [f'stopped={_line(envelope["stop_reason"])}',
+               f'requests={envelope["request_count"]}/{envelope["max_requests"]}']
     lines = [' · '.join(header)]
+    window = envelope.get('window')
+    if window:
+        lines.append(f'window {window.get("since") or ""}..{window.get("until") or ""} · {_line(window["coverage"])}')
     comments = [r for r in results if 'post_id' in r]
     labels = {c['id']: f'c{i}' for i, c in enumerate(comments, 1)}
     counts = {'p': 0, 'c': 0, 'e': 0}
@@ -149,6 +153,9 @@ def render_results(results, *, command, sort=None, stop_reason='exhausted', more
         else:
             counts['p'] += 1
             lines.append(render_post(data, index=counts['p'], chars=chars, timezone=timezone))
-    if more:
-        lines.append('more: ' + _line(more))
+    lines += ['coverage: ' + _line(note) for note in envelope.get('coverage') or []]
+    if envelope.get('error'):
+        lines.append(f'coverage: incomplete — {_line(envelope["message"])} fix: {_line(envelope["fix"])}')
+    if envelope.get('next'):
+        lines.append('more: ' + _line(envelope['next']))
     return '\n'.join(lines)

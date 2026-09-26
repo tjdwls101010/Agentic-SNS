@@ -3,6 +3,7 @@ from datetime import date, datetime
 import json
 
 from facebook.errors import FacebookError
+from facebook.outcome import FIXES
 
 # A JSON-safe local marker; never passed to Facebook as a cursor.
 END = {'exhausted': True}
@@ -36,12 +37,7 @@ def paginate(fetch_page, *, limit=None, since=None, until=None, cursor=None,
     identities, visited = set(seen or []), set()
 
     def outcome(reason, *, error=None):
-        result = dict(ok=error is None, results=results, stop_reason=reason,
-                      cursor=cursor, pending=waiting)
-        if error is not None:
-            result.update(error='partial' if results else 'query_failure',
-                          message=error.message, fix=error.fix, code=error.code)
-        return result
+        return dict(results=results, stop_reason=reason, failure=error, cursor=cursor, pending=waiting)
 
     while True:
         malformed = False
@@ -52,7 +48,7 @@ def paginate(fetch_page, *, limit=None, since=None, until=None, cursor=None,
         else:
             key = json.dumps(cursor, sort_keys=True)
             if key in visited:
-                return outcome('query_failure', error=FacebookError(6, 'The server repeated a cursor.'))
+                return outcome(None, error=FacebookError(6, 'Facebook repeated a page cursor.', FIXES['pagination']))
             visited.add(key)
             try:
                 records, info = fetch_page(cursor)
@@ -62,8 +58,7 @@ def paginate(fetch_page, *, limit=None, since=None, until=None, cursor=None,
                     if commit:
                         commit([], cursor, 'exhausted')
                     return outcome('exhausted')
-                reason = 'blocked' if error.code == 5 else 'budget' if error.code == 8 else 'query_failure'
-                return outcome(reason, error=error)
+                return outcome(None, error=error)
             info = info or {}
             if info.get('has_next_page') is False:
                 cursor = END
@@ -86,10 +81,11 @@ def paginate(fetch_page, *, limit=None, since=None, until=None, cursor=None,
             room = limit - len(results)
             waiting, records = records[room:], records[:room]
         results.extend(records)
-        reason = 'query_failure' if malformed else 'limit_reached' if reached else 'exhausted' if cursor == END else None
+        reason = None if malformed else 'limit_reached' if reached else 'exhausted' if cursor == END else None
         if commit and not malformed:
             commit(records, cursor, reason)
         if malformed:
-            return outcome('query_failure', error=FacebookError(6, 'Missing explicit pagination metadata.'))
+            return outcome(None, error=FacebookError(6, 'Facebook sent a page without pagination metadata.',
+                                                     FIXES['pagination']))
         if reason:
             return outcome(reason)

@@ -6,7 +6,6 @@ from facebook.errors import FacebookError
 from facebook.graphql.records import about as _about
 from facebook.graphql.registry import ABOUT_SECTION_ID
 from facebook.graphql.resolve import resolve_profile_id
-from facebook.reading.comments import _failure
 
 
 def about(args, transport, state, commit):
@@ -32,12 +31,9 @@ def about(args, transport, state, commit):
     fields = [r.to_dict() for r in _about.build_fields(
         bodies, profile_id=profile_id, collection_names=names, captured_at=datetime.now().astimezone())
         if not args.section or r.section == args.section]
-    result = {'ok': True, 'results': fields[:args.limit] if args.limit and not args.out else fields,
-              'stop_reason': 'limit_reached' if args.limit and len(fields) > args.limit else 'exhausted'}
+    result = {'results': fields, 'stop_reason': 'exhausted'}
     if failures:
-        result['failed_sections'] = failures
-        _failure(result, error)
-    if commit and not failures:
-        # About has no stable field id: commit the whole logical page only when complete.
-        commit(result['results'], {'exhausted': True}, 'exhausted')
+        result['details'] = {'failed_sections': failures}
+        result['coverage'] = [f'collection {f["section"]}: not read — fields there are missing' for f in failures]
+        result['failure'] = error
     return result

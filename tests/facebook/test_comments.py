@@ -88,6 +88,7 @@ def test_failed_reply_at_end_can_retry_without_repeating_shown_records(tmp_path)
         comment_page([comment_node('r1', 1, 'c1')], 'replies_connection'), FAILURE))
     assert first.code == 8, first.stdout
     assert first.ids == ['c1', 'r1', 'c2']
+    assert first.data['error'] == 'partial' and first.data['fix'].startswith('Run more:')
     assert first.data['replies_incomplete'] == [{'parent_id': 'c2', 'reason': 'request_failure', 'retryable': True,
                                                  'code': 6, 'message': 'Facebook query failed or its expected '
                                                                        'structure changed.'}]
@@ -102,8 +103,10 @@ def test_reply_batch_limit_is_reported_without_retrying_first_batch_forever(tmp_
     replies['data']['node']['replies_connection']['page_info'] = {'has_next_page': True, 'end_cursor': 'reply2'}
     result = Account(tmp_path).run('comments', POST_URL, '--limit', '1', '--replies', '--json', responses=opened(
         comment_page([comment_node('c1')]), envelope(replies)))
-    assert result.code == 8
-    assert result.data['stop_reason'] == 'query_failure'
+    # A first reply batch with more behind it is a coverage note, not a failure, and is never retried.
+    assert result.code == 0 and result.data['ok'] is True
+    assert result.data['stop_reason'] == 'limit_reached'
+    assert result.data['coverage'] == ['replies to c1: first batch only; Facebook offers no further reply page here']
     assert result.data['replies_incomplete'][0]['reason'] == 'batch_limit'
     assert result.data['replies_incomplete'][0]['retryable'] is False
     assert 'next' not in result.data
@@ -162,7 +165,7 @@ def test_post_text_renders_the_post_then_its_comments(tmp_path):
     result = Account(tmp_path).run('post', POST_URL, responses=opened(
         comment_page([comment_node('c1'), comment_node('r1', 1, 'c1', text='Reply\nline')])))
     lines = result.stdout.splitlines()
-    assert lines[0] == 'post · 2 shown · stopped=exhausted'
+    assert lines[0] == 'post · 2 shown · stopped=exhausted · requests=4/25'
     assert lines[1].startswith('[p1] unavailable · undated · status')
     assert lines[4].startswith('[c1] Synthetic · undated · reactions=? replies=1')
 

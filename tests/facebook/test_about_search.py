@@ -79,7 +79,7 @@ def test_search_entities_render_as_dense_rows(tmp_path):
                          'url': 'https://www.facebook.com/synthetic-page'}])
     result = Account(tmp_path).run('search', 'synthetic', '--type', 'pages', responses=[login(), page])
     assert result.stdout.splitlines() == [
-        'search · 1 shown · stopped=exhausted',
+        'search · type=pages · 1 shown · stopped=exhausted · requests=2/25',
         '[e1] page id=synthetic-page · Synthetic Page · verified=? · url: "https://www.facebook.com/synthetic-page"']
 
 

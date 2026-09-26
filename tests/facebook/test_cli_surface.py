@@ -23,7 +23,7 @@ def test_invalid_arguments_emit_one_json_error_before_any_request(tmp_path, args
     result = Account(tmp_path).run(*args)
     assert result.code == 2
     error = result.data
-    assert error['ok'] is False and error['error'] == 2 and error['message'] and error['fix']
+    assert error['ok'] is False and error['error'] == 'argument' and error['message'] and error['fix']
     assert result.calls == []
 
 
@@ -83,7 +83,7 @@ def test_verbose_diagnostics_scrub_secrets_that_reach_them_through_a_local_regis
     (['feed'], [login(), envelope({'data': {'viewer': {'news_feed': {'edges': [{'node': story('p1')}]}}}})], 8),
 ])
 def test_every_failure_exit_carries_its_recovery_instruction(tmp_path, args, responses, code):
-    result = Account(tmp_path).run(*args, responses=responses)
+    result = Account(tmp_path).run(*args, '--json', responses=responses)
     assert result.code == code
     assert result.data['ok'] is False and result.data['fix']
 
@@ -252,7 +252,7 @@ def test_verbose_is_a_root_option(tmp_path):
                                   ['doctor', '--json'], ['search', 'x', '--since', '2026-01-01'], ['profile', '42', '--sort', 'recent']])
 def test_an_option_a_command_does_not_declare_is_an_argument_error(tmp_path, args):
     result = Account(tmp_path).run(*args)
-    assert result.code == 2 and result.data['error'] == 2 and result.calls == []
+    assert result.code == 2 and result.data['error'] == 'argument' and result.calls == []
 
 
 def test_schema_and_help_work_without_touching_a_blocked_or_damaged_account(tmp_path):
@@ -264,3 +264,106 @@ def test_schema_and_help_work_without_touching_a_blocked_or_damaged_account(tmp_
         result = account.run(*args)
         assert result.code == 0 and result.calls == [], args
     assert account.run('feed').code == 5
+
+
+# --- one result generator: the result and exit matrix --------------------------------------------------------------
+
+def test_matrix_success_with_records(tmp_path):
+    result = Account(tmp_path).run('feed', '--limit', '1', '--json', responses=[login(), feed_page(['p1', 'p2'])])
+    assert (result.code, result.data['ok'], result.data['stop_reason']) == (0, True, 'limit_reached')
+    assert (result.data['request_count'], result.data['max_requests']) == (2, 25)
+
+
+def test_matrix_argument_error(tmp_path):
+    result = Account(tmp_path).run('feed', '--limit', '0')
+    assert (result.code, result.data['ok'], result.data['error']) == (2, False, 'argument')
+
+
+def test_matrix_aside_unavailable(tmp_path):
+    result = Account(tmp_path).run('feed', responses=[{'mode': 'fail'}])
+    assert (result.code, result.data['error']) == (3, 'aside')
+
+
+def test_matrix_login_required(tmp_path):
+    result = Account(tmp_path).run('feed', responses=[login(user='0')])
+    assert (result.code, result.data['error']) == (4, 'login')
+
+
+def test_matrix_blocked_now_and_blocked_from_saved_state(tmp_path):
+    account = Account(tmp_path)
+    now = account.run('feed', '--json', responses=[login(), LIMITED])
+    assert (now.code, now.data['error'], now.data['stop_reason']) == (5, 'blocked', 'blocked')
+    saved = account.run('feed')
+    assert (saved.code, saved.data['error']) == (5, 'blocked') and saved.calls == []
+
+
+def test_matrix_query_failure_without_records(tmp_path):
+    result = Account(tmp_path).run('feed', responses=[login(), envelope({'errors': [{'message': 'x'}]})])
+    assert (result.code, result.data['error'], result.data['stop_reason']) == (6, 'failed', 'query_failure')
+    assert result.data['fix'] == 'Run refresh, then retry the read command.'
+
+
+def test_matrix_explicitly_empty(tmp_path):
+    result = Account(tmp_path).run('feed', responses=[login(), feed_page([])])
+    assert (result.code, result.data['ok'], result.data['error'], result.data['stop_reason']) == (
+        7, False, 'empty', 'exhausted')
+
+
+def test_matrix_partial_result(tmp_path):
+    result = Account(tmp_path).run('feed', '--json', responses=[login(), feed_page(['p1'], 'next'),
+                                                                envelope({'errors': [{'message': 'x'}]})])
+    assert (result.code, result.data['ok'], result.data['error'], result.data['stop_reason']) == (
+        8, False, 'partial', 'query_failure')
+    assert result.ids == ['p1']
+
+
+def test_matrix_already_complete_output_file(tmp_path):
+    account = Account(tmp_path)
+    path = str(tmp_path / 'done.ndjson')
+    assert account.run('feed', '--out', path, responses=[login(), feed_page(['p1'])]).code == 0
+    result = account.run('feed', '--out', path, '--json', responses=[login()])
+    assert (result.code, result.data['ok'], result.data['stop_reason'], result.data['already_complete']) == (
+        0, True, 'exhausted', True)
+
+
+def test_matrix_maintenance(tmp_path):
+    doctor = Account(tmp_path).run('doctor', responses=[login()])
+    assert (doctor.code, doctor.data['ok'], doctor.data['stop_reason']) == (0, True, 'ready')
+    schema = Account(tmp_path).run('schema')
+    assert (schema.code, schema.data['stop_reason']) == (0, 'complete')
+
+
+@pytest.mark.parametrize('pages,message', [
+    ([feed_page(['p1'], 'same'), feed_page(['p2'], 'same')], 'Facebook repeated a page cursor.'),
+    ([envelope({'data': {'viewer': {'news_feed': {'edges': [{'node': story('p1')}]}}}})],
+     'Facebook sent a page without pagination metadata.'),
+])
+def test_pagination_failures_do_not_send_the_model_to_refresh(tmp_path, pages, message):
+    result = Account(tmp_path).run('feed', '--json', responses=[login(), *pages])
+    assert result.code == 8 and result.data['message'] == message
+    assert 'refresh' in result.data['fix'] and result.data['fix'].startswith('Retry later with the more: command')
+
+
+def test_text_header_names_scope_and_cost(tmp_path):
+    result = Account(tmp_path).run('feed', '--limit', '1', responses=[login(), feed_page(['p1', 'p2'])])
+    assert result.stdout.splitlines()[0] == 'feed · sort=top · 1 shown · stopped=limit_reached · requests=2/25'
+
+
+def test_a_partial_text_page_ends_with_its_failure_before_more(tmp_path):
+    result = Account(tmp_path).run('feed', responses=[login(), feed_page(['p1'], 'next'),
+                                                      envelope({'errors': [{'message': 'x'}]})])
+    assert result.code == 8
+    assert result.stdout.splitlines()[-2] == ('coverage: incomplete — Facebook query failed or its expected structure '
+                                             'changed. fix: Run refresh, then retry the read command.')
+    assert result.stdout.splitlines()[-1].startswith('more: ')
+
+
+def test_output_failure_is_one_summary_line(tmp_path):
+    path = tmp_path / 'fail.ndjson'
+    result = Account(tmp_path).run('feed', '--out', str(path), responses=[
+        login(), feed_page(['p1'], 'next'), envelope({'errors': [{'message': 'x'}]})])
+    assert result.code == 8
+    assert len(result.stdout.splitlines()) == 1
+    assert result.stdout.startswith(f'feed · 1 saved to {json.dumps(str(path))} · stopped=query_failure · requests=3/25'
+                                    ' · resume: uv run ')
+    assert result.stdout.rstrip().endswith('error=partial fix=Run refresh, then retry the read command.')

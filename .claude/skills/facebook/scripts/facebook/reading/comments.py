@@ -18,10 +18,16 @@ def fetch_post_story(transport, url):
     return story
 
 
-def _failure(result, error):
-    result.update(ok=False, error='partial' if result['results'] else 'query_failure',
-                  code=error.code, message=error.message, fix=error.fix)
-    result['stop_reason'] = 'blocked' if error.code == 5 else 'budget' if error.code == 8 else 'query_failure'
+REPLY_RETRY = 'Run more: (or the same --out command); it retries these replies before reading on.'
+
+
+def _coverage(failure):
+    parent = failure['parent_id']
+    if failure['reason'] == 'batch_limit':
+        return f'replies to {parent}: first batch only; Facebook offers no further reply page here'
+    if failure['reason'] == 'missing_page_info':
+        return f'replies to {parent}: first batch only; Facebook did not say whether more exist'
+    return f'replies to {parent}: not read; the comment carries no reply handle'
 
 
 def comments(args, transport, *, state, commit, story=None, first_batch=False):
@@ -130,7 +136,7 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
         options['page_limit'] = bool(args.out)
         options['since'] = options['until'] = None
     if fatal:
-        result = {'ok': True, 'results': [], 'cursor': cursor, 'pending': pending, 'stop_reason': 'query_failure'}
+        result = {'results': [], 'cursor': cursor, 'pending': pending, 'stop_reason': None, 'failure': fatal}
     else:
         result = paginate(fetch, **options)
     if first_batch and first_page_info.get('has_next_page') is True:
@@ -143,10 +149,8 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
     if result.get('cursor') is not None or retry_waiting:
         result['cursor'] = {'post_id': post_id, 'after': result['cursor'], 'reply_retries': retry_waiting}
     if failures:
-        result['replies_incomplete'] = failures
-        if result.get('code') not in (4, 5, 8):
-            query_failed = not result['ok']
-            _failure(result, fatal or FacebookError(6, 'Some replies could not be read completely.'))
-            if not query_failed and all(f['reason'] == 'batch_limit' for f in failures):
-                result['stop_reason'] = 'reply_batch_limit'
+        result['details'] = {'replies_incomplete': failures}
+        result['coverage'] = [_coverage(f) for f in failures if not f['retryable']]
+        if result.get('failure') is None and any(f['retryable'] for f in failures):
+            result['failure'] = fatal or FacebookError(6, 'Some replies could not be read.', REPLY_RETRY)
     return result

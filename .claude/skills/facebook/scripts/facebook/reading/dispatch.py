@@ -1,7 +1,8 @@
-"""Run one command: prepare its target, guard the account, then read through the transport and local stores.
+"""Run one command: prepare its target, guard the account, read through the transport and local stores, finish.
 
 The caller supplies each query's identity (its context, with `account_id` still unknown) and turns a returned
-`handle` into a continuation command; this module fills in the account and saves cursors, nothing more.
+`handle` into a continuation command; this module fills in the account, saves cursors and hands the reading to
+outcome.finish, nothing more.
 """
 import copy
 
@@ -10,6 +11,7 @@ from facebook.collect import OutFile
 from facebook.cursors import CursorStore
 from facebook.graphql.resolve import normalize_group, normalize_post, normalize_profile
 from facebook.graphql.transport import Transport
+from facebook.outcome import finish
 from facebook.reading import maintenance
 from facebook.reading.about import about
 from facebook.reading.comments import comments
@@ -31,9 +33,10 @@ def prepare(args):
         args.target = normalize_post(args.target)
 
 
-def run(args, *, context=None, continuation=None):
+def run(args, *, context=None, continuation=None, identity=None):
+    """(kind, envelope) of one command; failures before any reading raise FacebookError."""
     if args.command == 'schema':
-        return maintenance.schema(args.object)
+        return finish(maintenance.schema(args.object), command='schema', requests=0, budget=0)
     if args.command == 'doctor' and args.unblock:
         unblock()
     check_blocked()
@@ -43,8 +46,14 @@ def run(args, *, context=None, continuation=None):
     transport.verbose = args.verbose
     transport.start()
     if args.command in ('doctor', 'refresh'):
-        return maintenance.run(args, transport)
-    return read(args, transport, context, continuation)
+        reading = maintenance.run(args, transport)
+    else:
+        reading = read(args, transport, context, continuation)
+    kind, envelope = finish(reading, command=args.command, identity=identity, requests=transport.request_count,
+                            budget=budget, out=args.out)
+    if reading.get('handle'):
+        envelope['handle'] = reading['handle']
+    return kind, envelope
 
 
 def _with_account(context, transport):
@@ -62,16 +71,14 @@ def read(args, transport, context, continuation):
     output = OutFile(args.out, context) if args.out else None
     try:
         if output and output.complete:
-            return {'ok': True, 'results': [], 'stop_reason': 'already_complete',
-                    'out': args.out, 'count': output.count, 'already_complete': True}
+            return {'results': [], 'stop_reason': 'exhausted', 'count': output.count, 'already_complete': True}
         run_args = copy.copy(args)
         if output:
             state = {'cursor': output.cursor, 'pending': output.pending, 'seen': output.ids}
             saved_count = output.parent_count if args.command == 'comments' else output.count
             if args.limit is not None:
                 if saved_count >= args.limit:
-                    return {'ok': True, 'results': [], 'stop_reason': 'limit_reached',
-                            'out': args.out, 'count': output.count, 'request_count': transport.request_count}
+                    return {'results': [], 'stop_reason': 'limit_reached', 'count': output.count}
                 run_args.limit = args.limit - saved_count
         def commit_page(records, cursor, reason):
             end = cursor.get('after') if isinstance(cursor, dict) and 'post_id' in cursor else cursor
@@ -104,8 +111,7 @@ def read(args, transport, context, continuation):
         result.pop('pending', None)
         result.pop('cursor', None)
         if output:
-            result.update(out=args.out, count=output.count)
-        result['request_count'] = transport.request_count
+            result['count'] = output.count
         return result
     finally:
         if output:

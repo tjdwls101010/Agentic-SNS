@@ -1,14 +1,14 @@
 """Local schema and browser/registry diagnostics."""
 from datetime import date
 
+from facebook.errors import FacebookError
 from facebook.graphql.records import SCHEMAS
 from facebook.graphql.refresh import refresh
 from facebook.graphql.registry import load_registry
 
 
 def schema(name=None):
-    return {'ok': True, 'results': [SCHEMAS[name]] if name in SCHEMAS else list(SCHEMAS.values()),
-            'stop_reason': 'complete'}
+    return {'results': [SCHEMAS[name]] if name in SCHEMAS else list(SCHEMAS.values()), 'stop_reason': 'complete'}
 
 
 def run(args, transport):
@@ -18,19 +18,18 @@ def run(args, transport):
         if not args.capture:
             required -= {'comments', 'comments_page', 'replies'}
         missing = required - set(result['updated'])
-        result.update(ok=not missing, results=[], request_count=transport.request_count,
-                      stop_reason='query_failure' if missing else 'exhausted')
+        reading = {'results': [], 'stop_reason': 'complete', 'partial': bool(result['updated']), 'details': result}
         if missing:
-            result.update(code=8, error='refresh_incomplete', message='Some query candidates were not verified.',
-                          fix='Read missing/failed; only verified updates were saved. Use --capture POST_URL for comment queries.')
-        return result
+            reading['failure'] = FacebookError(6, 'Some query candidates were not verified.',
+                                               'Read missing and failed; only verified updates were saved. '
+                                               'Use --capture POST_URL for comment queries.')
+        return reading
     registry = load_registry()
     captured = registry.get('captured_at')
     try:
         age = (date.today() - date.fromisoformat(captured[:10])).days
     except (ValueError, TypeError):
         age = None
-    return {'ok': True, 'results': [{'account_id': transport.account_id, 'aside': 'available',
-                                    'login': 'ready', 'blocked': False, 'registry_age_days': age,
-                                    'queries': len(registry['queries'])}],
-            'stop_reason': 'ready', 'request_count': transport.request_count}
+    return {'results': [{'account_id': transport.account_id, 'aside': 'available', 'login': 'ready',
+                         'blocked': False, 'registry_age_days': age, 'queries': len(registry['queries'])}],
+            'stop_reason': 'ready'}

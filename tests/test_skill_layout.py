@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INVOCATION = 'Bash(uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" *)'
 SKILLS = {
     'facebook': ('facebook', {
-        'errors': 'common',
+        'errors': 'common', 'outcome': 'common',
         'aside': 'system', 'graphql': 'system',
         'account': 'store', 'cursors': 'store', 'collect': 'store',
         'reading': 'feature', 'render': 'feature',
