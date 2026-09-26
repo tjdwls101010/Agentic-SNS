@@ -35,6 +35,10 @@ FIXES = {
     'budget_restart': 'Rerun with a larger --max-requests.',
 }
 
+# The transport's own budget stop; finish words it by whether a later invocation can continue.
+BUDGET_SPENT = 'The request budget (--max-requests) is spent.'
+SETUP_BUDGET = 'The request budget ran out during setup, before any reading; setup needs 1–2 requests.'
+
 # Result kind → (situation, ok, stop reasons it can carry). cli.py gives each kind its exit code.
 KINDS = {
     'records': ('At least one record and no failure.', True, ('limit_reached', 'exhausted', 'window_reached')),
@@ -129,6 +133,11 @@ def finish(reading, *, command, requests, budget, identity=None, out=None, resum
     envelope['max_requests'] = budget
     if kind == 'empty':
         envelope.update(error='empty', message='This query explicitly returned no results.', fix=FIXES['empty'])
+    elif failure is not None and failure.code == 8 and kind == 'partial':
+        message = failure.message
+        if message == BUDGET_SPENT:
+            message = 'The request budget ran out before anything was saved to continue from.'
+        envelope.update(error=kind, message=message, fix=FIXES['budget_restart'])
     elif failure is not None and kind != 'resumable':
         envelope.update(error=kind, message=failure.message, fix=failure.fix)
     elif kind == 'resumable':

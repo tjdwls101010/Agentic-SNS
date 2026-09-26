@@ -11,7 +11,8 @@ from facebook.collect import OutFile
 from facebook.cursors import CursorStore
 from facebook.graphql.resolve import normalize_group, normalize_post, normalize_profile
 from facebook.graphql.transport import Transport
-from facebook.outcome import finish
+from facebook.errors import FacebookError
+from facebook.outcome import FIXES, SETUP_BUDGET, finish
 from facebook.reading import maintenance
 from facebook.reading.about import about
 from facebook.reading.comments import comments
@@ -44,13 +45,20 @@ def run(args, *, context=None, continuation=None, identity=None):
     budget = {'refresh': 400, 'doctor': 2}.get(args.command) or args.max_requests or 25
     transport = Transport(limit=budget)
     transport.verbose = args.verbose
-    transport.start()
-    if args.command in ('doctor', 'refresh'):
-        reading = maintenance.run(args, transport)
-    else:
-        reading = read(args, transport, context, continuation)
+    try:
+        transport.start()
+        if args.command in ('doctor', 'refresh'):
+            reading = maintenance.run(args, transport)
+        else:
+            reading = read(args, transport, context, continuation)
+    except FacebookError as error:
+        # A budget stop outside paging has no cursor to continue from: home, target id, permalink, About overview.
+        if error.code == 8 and args.command not in ('doctor', 'refresh'):
+            raise FacebookError(8, SETUP_BUDGET, FIXES['budget_restart']) from None
+        raise
+    resumable = bool(reading.get('handle')) or args.out is not None
     kind, envelope = finish(reading, command=args.command, identity=identity, requests=transport.request_count,
-                            budget=budget, out=args.out)
+                            budget=budget, out=args.out, resumable=resumable)
     if reading.get('handle'):
         envelope['handle'] = reading['handle']
     return kind, envelope

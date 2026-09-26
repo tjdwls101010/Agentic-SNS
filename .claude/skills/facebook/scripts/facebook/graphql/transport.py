@@ -12,6 +12,7 @@ from facebook.account import account_lock, cache_dir, check_blocked, set_blocked
 from facebook.graphql.registry import QuerySpec, build_variables, get_query
 from facebook.graphql.session import extract_tokens
 from facebook.errors import FacebookError, diagnostic
+from facebook.outcome import BUDGET_SPENT
 
 SNIPPETS = Path(__file__).resolve().parent / 'snippets'
 
@@ -296,7 +297,7 @@ class Transport:
             for attempt in range(2):
                 check_blocked()
                 if self.request_count >= self.limit:
-                    raise FacebookError(8, 'The shared request budget is exhausted.', 'Continue from the saved cursor in a later invocation.')
+                    raise FacebookError(8, BUDGET_SPENT)
                 self._pace()
                 self.request_count += 1
                 if getattr(self, 'verbose', False):

@@ -166,8 +166,8 @@ def test_budget_counts_setup_and_retries_and_stops_reading_at_the_limit(tmp_path
     temporary = graphql({'errors': [{'code': 1357054}]})
     result = Account(tmp_path).run('feed', '--json', responses=[login(), *pages, temporary, feed_page(['p22'], 'c22'),
                                                                 feed_page(['never'])])
-    assert result.code == 8, result.stdout
-    assert result.data['stop_reason'] == 'budget' and result.data['ok'] is False
+    assert result.code == 0, result.stdout
+    assert result.data['stop_reason'] == 'budget' and result.data['ok'] is True
     assert result.ids == ['p%d' % i for i in range(23)]
     assert result.data['request_count'] == 25 and len(result.calls) == 25 and result.left == 1
 
@@ -177,7 +177,7 @@ def test_budget_exhausted_on_a_rejected_request_leaves_no_retry(tmp_path):
     pages = [feed_page(['p%d' % i], 'c%d' % i) for i in range(23)]
     temporary = graphql({'errors': [{'code': 1357054}]})
     result = Account(tmp_path).run('feed', '--json', responses=[login(), *pages, temporary, feed_page(['retry'])])
-    assert result.code == 8, result.stdout
+    assert result.code == 0, result.stdout
     assert result.data['stop_reason'] == 'budget'
     assert len(result.calls) == 25 and result.left == 1
 
@@ -187,7 +187,7 @@ def test_budget_stop_keeps_the_uncommitted_cursor_for_the_next_invocation(tmp_pa
     account = Account(tmp_path)
     pages = [feed_page(['p%d' % i], 'c%d' % i) for i in range(24)]
     first = account.run('feed', '--json', responses=[login(), *pages])
-    assert first.code == 8 and first.data['stop_reason'] == 'budget'
+    assert first.code == 0 and first.data['stop_reason'] == 'budget'
     resumed = account.run(*more_args(first.data['next']), responses=[login(), feed_page(['p24'])])
     assert resumed.code == 0
     assert resumed.graphql()['variables']['cursor'] == 'c23'
