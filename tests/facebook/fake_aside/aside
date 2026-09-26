@@ -11,6 +11,19 @@ if len(sys.argv) != 5 or sys.argv[1:4] != ['--account', 'u0', 'repl']:
     sys.exit(2)
 code = sys.argv[4]
 mode = os.environ.get('FAKE_ASIDE_MODE', '')
+responses = os.environ.get('FAKE_ASIDE_RESPONSES')
+response = None
+if responses:
+    path = Path(responses)
+    records = json.loads(path.read_text())
+    if not records:
+        print('fake aside: response queue is empty', file=sys.stderr)
+        sys.exit(1)
+    response = records.pop(0)
+    path.write_text(json.dumps(records))
+    # A queued response may carry its own failure mode for just this call.
+    if isinstance(response, dict) and 'mode' in response:
+        mode = response['mode']
 if mode == 'fail':
     print(code)
     print(code, file=sys.stderr)
@@ -38,13 +51,7 @@ if log:
         # Session tokens stay out of the log; every other argument identifies the call.
         f.write(json.dumps({'name': name, 'time': time.time(),
                             'args': {k: v for k, v in arguments.items() if k != 'tokens'}}) + '\n')
-responses = os.environ.get('FAKE_ASIDE_RESPONSES')
-if responses:
-    path = Path(responses)
-    records = json.loads(path.read_text())
-    response = records.pop(0)
-    path.write_text(json.dumps(records))
-else:
+if response is None:
     response = {'status': 200, 'url': 'https://www.facebook.com/', 'body': 'synthetic'}
 if isinstance(response, dict) and 'raw_stdout' in response:
     # Raw mode reproduces Aside's own stdout framing (chunks, footers, status lines).
