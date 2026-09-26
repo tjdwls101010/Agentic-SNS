@@ -7,6 +7,9 @@ from pathlib import Path
 
 from facebook.errors import FacebookError
 
+# Bumped whenever a saved page or header changes meaning; older files are refused before any byte is touched.
+FORMAT = 2
+
 
 def _line(value):
     return (json.dumps(value, ensure_ascii=False, separators=(',', ':')) + '\n').encode()
@@ -34,7 +37,7 @@ class OutFile:
     def _recover(self):
         first = self.stream.readline()
         if not first:
-            self.stream.write(_line(dict(self.context, kind='header',
+            self.stream.write(_line(dict(self.context, kind='header', format=FORMAT,
                                          started_at=datetime.now(timezone.utc).isoformat(),
                                          limit_unit='page; may exceed the requested count by the remainder of one page')))
             self.stream.flush()
@@ -44,8 +47,11 @@ class OutFile:
             header = json.loads(first)
         except ValueError:
             raise FacebookError(2, 'The output header is incomplete.', 'Use a new output file.') from None
+        if isinstance(header, dict) and header.get('kind') == 'header' and header.get('format') != FORMAT:
+            raise FacebookError(2, 'The output file was written by an earlier version of this skill.', 'Restart the original query with a new --out path; this file was written by an earlier version.')
         if (not isinstance(header, dict) or header.get('kind') != 'header'
-                or {k: v for k, v in header.items() if k not in ('kind', 'started_at', 'limit_unit')} != self.context):
+                or {k: v for k, v in header.items() if k not in ('kind', 'format', 'started_at', 'limit_unit')}
+                != self.context):
             raise FacebookError(2, 'The output file belongs to a different query context.', 'Use a new output file.')
         boundary, page = self.stream.tell(), []
         while line := self.stream.readline():

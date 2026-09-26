@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from facebook.account import cache_dir
 from facebook.errors import FacebookError
 
+FORMAT = 2
+
 
 def _line(value):
     return (json.dumps(value, ensure_ascii=False, separators=(',', ':')) + '\n').encode()
@@ -32,7 +34,7 @@ class CursorStore:
                 os.fsync(counter.fileno())
                 path = self.directory / f'{number}.json'
                 with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'wb') as stream:
-                    stream.write(_line(dict(context=context, cursor=cursor, pending=pending or [],
+                    stream.write(_line(dict(format=FORMAT, context=context, cursor=cursor, pending=pending or [],
                                             created_at=datetime.now(timezone.utc).isoformat())))
                     stream.flush()
                     os.fsync(stream.fileno())
@@ -47,6 +49,9 @@ class CursorStore:
             data = json.loads((self.directory / f'{int(number)}.json').read_text())
         except (OSError, ValueError):
             raise FacebookError(2, 'Continuation handle is missing or incomplete.', 'Restart the original query.') from None
+        if isinstance(data, dict) and data.get('format') != FORMAT:
+            raise FacebookError(2, 'This continuation handle was created by an earlier version of this skill.',
+                                'Restart the original query without --after.')
         if not isinstance(data, dict) or data.get('context') != context:
             raise FacebookError(2, 'Continuation context does not match this query.', 'Copy the full more: command.')
         if 'cursor' not in data or not isinstance(data.get('pending'), list):

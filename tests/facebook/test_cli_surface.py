@@ -42,17 +42,17 @@ def test_root_help_lists_every_exit_code(tmp_path):
 
 def test_schema_is_local_and_doctor_checks_login(tmp_path):
     account = Account(tmp_path)
-    schema = account.run('schema', '--json')
+    schema = account.run('schema')
     assert schema.code == 0 and schema.calls == []
     assert {row['title'] for row in schema.data['results']} == {'Post', 'Comment', 'Entity', 'ProfileField'}
-    doctor = account.run('doctor', '--json', responses=[login()])
+    doctor = account.run('doctor', responses=[login()])
     assert doctor.code == 0
     assert doctor.data['results'][0]['account_id'] == '100'
     assert account.run('doctor', responses=[login(user='0')]).code == 4
 
 
 def test_verbose_keeps_one_stdout_document_and_only_safe_diagnostic_metadata(tmp_path):
-    result = Account(tmp_path).run('feed', '--limit', '1', '--json', '--verbose',
+    result = Account(tmp_path).run('--verbose', 'feed', '--limit', '1', '--json',
                                    responses=[login(dtsg='SECRET-DTSG'), feed_page(['p1'])])
     assert result.code == 0
     assert result.ids == ['p1']
@@ -67,7 +67,7 @@ def test_verbose_diagnostics_scrub_secrets_that_reach_them_through_a_local_regis
     account.home.mkdir(parents=True)
     name = 'Synthetic lsd=private-token https://scontent.example.fbcdn.net/p.jpg?sig=private-signature'
     (account.home / 'registry.json').write_text(json.dumps({'queries': {'newsfeed': {'name': name}}}))
-    result = account.run('feed', '--limit', '1', '--verbose', responses=[login(), feed_page(['p1'])])
+    result = account.run('--verbose', 'feed', '--limit', '1', responses=[login(), feed_page(['p1'])])
     assert result.code == 0
     query = json.loads(result.stderr.splitlines()[1])['query']
     assert query == 'Synthetic lsd=[REDACTED] https://scontent.example.fbcdn.net/p.jpg'
@@ -105,8 +105,7 @@ def test_more_is_the_allowed_tools_invocation_of_the_invoked_cli(tmp_path, direc
     more = text_more(result.stdout)
     # A POSIX shell, not shlex, decides what the copied line means; this uv only prints its arguments.
     parsed = subprocess.run(['sh', '-c', 'uv() { printf "%s\\n" "$@"; }\n' + more], capture_output=True, text=True)
-    assert parsed.stdout.splitlines() == ['run', str(cli), 'feed', '--sort', 'top', '--limit', '1', '--chars', '180',
-                                          '--after', '1']
+    assert parsed.stdout.splitlines() == ['run', str(cli), 'feed', '--sort', 'top', '--limit', '1', '--after', '1']
     if '"' not in directory:
         assert more.startswith(allowed_tools_prefix(skill) + ' ')
 
@@ -217,3 +216,51 @@ def test_post_permalinks_normalize_before_the_story_lookup(tmp_path):
                                                   'edges': [], 'page_info': {'has_next_page': False}}}}})])
     assert result.calls[1]['args']['url'] == 'https://www.facebook.com/permalink.php?story_fbid=9&id=4'
     assert result.graphql()['referer'] == 'https://www.facebook.com/permalink.php?story_fbid=9&id=4'
+
+
+# --- each command shows only its own arguments ---------------------------------------------------------------------
+
+READ = {'--limit', '--since', '--until', '--chars', '--after', '--out', '--json', '--max-requests'}
+OPTION_SETS = {
+    'feed': READ | {'--sort', '--include-sponsored'},
+    'profile': READ,
+    'group': READ | {'--sort'},
+    'post': {'--limit', '--json', '--max-requests'},
+    'comments': {'--sort', '--limit', '--replies', '--chars', '--after', '--out', '--json', '--max-requests'},
+    'search': {'--type', '--limit', '--chars', '--after', '--out', '--json', '--max-requests'},
+    'about': {'--section', '--json', '--max-requests'},
+    'doctor': {'--unblock'},
+    'refresh': {'--capture'},
+    'schema': set(),
+}
+
+
+@pytest.mark.parametrize('command', sorted(OPTION_SETS))
+def test_each_command_offers_exactly_its_own_options(tmp_path, command):
+    result = Account(tmp_path).run(command, '--help')
+    assert result.code == 0
+    offered = set(re.findall(r'^  (--[a-z-]+)', result.stdout, re.M)) - {'--help'}
+    assert offered == OPTION_SETS[command]
+
+
+def test_verbose_is_a_root_option(tmp_path):
+    assert '--verbose' in Account(tmp_path).run('--help').stdout
+    assert Account(tmp_path).run('feed', '--verbose').code == 2
+
+
+@pytest.mark.parametrize('args', [['about', 'zuck', '--since', '2026-01-01'], ['post', 'https://www.facebook.com/zuck/posts/1', '--out', 'x'],
+                                  ['doctor', '--json'], ['search', 'x', '--since', '2026-01-01'], ['profile', '42', '--sort', 'recent']])
+def test_an_option_a_command_does_not_declare_is_an_argument_error(tmp_path, args):
+    result = Account(tmp_path).run(*args)
+    assert result.code == 2 and result.data['error'] == 2 and result.calls == []
+
+
+def test_schema_and_help_work_without_touching_a_blocked_or_damaged_account(tmp_path):
+    account = Account(tmp_path)
+    account.home.mkdir(parents=True)
+    (account.home / 'blocked.json').write_text('{broken')
+    (account.home / 'pace.json').write_text('{broken')
+    for args in (['schema'], ['schema', 'post'], ['--help'], ['feed', '--help']):
+        result = account.run(*args)
+        assert result.code == 0 and result.calls == [], args
+    assert account.run('feed').code == 5

@@ -6,13 +6,14 @@ from facebook.graphql.refresh import refresh
 from facebook.graphql.registry import load_registry
 
 
-def schema():
-    return {'ok': True, 'results': list(SCHEMAS.values()), 'stop_reason': 'complete'}
+def schema(name=None):
+    return {'ok': True, 'results': [SCHEMAS[name]] if name in SCHEMAS else list(SCHEMAS.values()),
+            'stop_reason': 'complete'}
 
 
 def run(args, transport):
     if args.command == 'refresh':
-        result = refresh(transport, capture=args.capture, post=args.post)
+        result = refresh(transport, capture=bool(args.capture), post=args.capture)
         required = set(load_registry()['queries'])
         if not args.capture:
             required -= {'comments', 'comments_page', 'replies'}
@@ -21,7 +22,7 @@ def run(args, transport):
                       stop_reason='query_failure' if missing else 'exhausted')
         if missing:
             result.update(code=8, error='refresh_incomplete', message='Some query candidates were not verified.',
-                          fix='Read missing/failed; only verified updates were saved. Use --capture --post URL for comment queries.')
+                          fix='Read missing/failed; only verified updates were saved. Use --capture POST_URL for comment queries.')
         return result
     registry = load_registry()
     captured = registry.get('captured_at')

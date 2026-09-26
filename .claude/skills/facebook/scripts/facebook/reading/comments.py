@@ -40,7 +40,7 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
     failures, expanded, retry_waiting = [], {}, []
     shown = set(state.get('seen') or [])
     fatal = None
-    sort = getattr(args, 'sort', 'top')
+    sort = args.sort or 'top'
     first_page_info = {}
 
     def fetch(after):

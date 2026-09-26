@@ -165,3 +165,32 @@ def test_search_continuation_rejects_a_changed_type(tmp_path):
     args[args.index('pages')] = 'people'
     resumed = account.run(*args, responses=[login()])
     assert resumed.code == 2 and resumed.data['ok'] is False
+
+
+def test_a_continuation_handle_from_an_earlier_version_is_refused_untouched(tmp_path):
+    account = Account(tmp_path)
+    first = account.run('feed', '--limit', '1', '--json', responses=[login(), feed_page(['a', 'b'])])
+    handle = more_args(first.data['next'])[-1]
+    path = account.home / 'cursors' / f'{handle}.json'
+    old = json.loads(path.read_text())
+    old.pop('format')
+    path.write_text(json.dumps(old))
+    before = path.read_bytes()
+    result = account.run(*more_args(first.data['next']), responses=[login()])
+    assert result.code == 2 and 'earlier version' in result.data['message']
+    assert path.read_bytes() == before
+
+
+def test_an_output_file_from_an_earlier_version_is_refused_before_any_write(tmp_path):
+    account = Account(tmp_path)
+    path = tmp_path / 'old.ndjson'
+    assert account.run('feed', '--out', str(path), '--limit', '1', responses=[login(), feed_page(['1'], 'next')]).code == 0
+    lines = path.read_text().splitlines()
+    header = json.loads(lines[0])
+    header.pop('format')
+    path.write_text('\n'.join([json.dumps(header), *lines[1:]]) + '\n{"id": "torn')
+    before = path.read_bytes()
+    result = account.run('feed', '--out', str(path), '--limit', '5', responses=[login()])
+    assert result.code == 2 and 'earlier version' in result.data['message']
+    assert 'new --out path' in result.data['fix']
+    assert path.read_bytes() == before

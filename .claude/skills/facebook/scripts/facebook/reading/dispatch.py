@@ -20,8 +20,8 @@ from facebook.reading.search import search
 def prepare(args):
     """Normalize the target before any request; an unusable target is an argument error."""
     if args.command == 'refresh':
-        if args.post:
-            args.post = normalize_post(args.post)
+        if args.capture:
+            args.capture = normalize_post(args.capture)
         return
     if args.command in ('profile', 'about'):
         args.target = normalize_profile(args.target)
@@ -32,14 +32,13 @@ def prepare(args):
 
 
 def run(args, *, context=None, continuation=None):
+    if args.command == 'schema':
+        return maintenance.schema(args.object)
     if args.command == 'doctor' and args.unblock:
         unblock()
     check_blocked()
-    if args.command == 'schema':
-        return maintenance.schema()
-    # 성진: 400회 상한은 실계정 보호용, 일회용 계정으로 바꾸면 올려도 됨
-    budget = 400 if args.command == 'refresh' or any(
-        getattr(args, key, None) for key in ('limit', 'since', 'out')) else 25
+    # 성진: refresh의 400회는 실계정 보호 상한, 일회용 계정으로 바꾸면 올려도 됨
+    budget = {'refresh': 400, 'doctor': 2}.get(args.command) or args.max_requests or 25
     transport = Transport(limit=budget)
     transport.verbose = args.verbose
     transport.start()

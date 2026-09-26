@@ -164,8 +164,7 @@ def test_dense_post_text_separates_display_clipping_from_server_truncation(tmp_p
 def test_text_output_ends_with_the_continuation_command(tmp_path):
     result = Account(tmp_path).run('feed', '--limit', '1', responses=[login(), feed_page(['p1', 'p2'])])
     assert result.stdout.splitlines()[0] == 'feed · sort=top · 1 shown · stopped=limit_reached'
-    assert more_args(text_more(result.stdout)) == ['feed', '--sort', 'top', '--limit', '1', '--chars', '180',
-                                                   '--after', '1']
+    assert more_args(text_more(result.stdout)) == ['feed', '--sort', 'top', '--limit', '1', '--after', '1']
 
 
 def test_nested_shared_chain_renders_every_body_handle_and_truncation(tmp_path):
@@ -194,9 +193,9 @@ def test_deep_shared_chain_renders_the_tail(tmp_path):
     assert 'incomplete (cycle)' not in result.stdout
 
 
-def test_post_shows_full_text_whatever_chars_says(tmp_path):
+def test_post_shows_its_full_text(tmp_path):
     long_text = 'Complete synthetic post ' * 20
-    result = Account(tmp_path).run('post', 'https://www.facebook.com/zuck/posts/123', '--chars', '1', responses=[
+    result = Account(tmp_path).run('post', 'https://www.facebook.com/zuck/posts/123', responses=[
         login(), story_id_page(), post_response(long_text),
         envelope({'data': {'node': {'comments': {'edges': [], 'page_info': {'has_next_page': False}}}}})])
     assert result.code == 0

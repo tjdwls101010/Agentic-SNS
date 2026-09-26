@@ -64,7 +64,7 @@ def test_checkpoint_persists_until_explicit_unblock_even_for_refresh(tmp_path):
     assert account.blocked()
     refresh = account.run('refresh')
     assert refresh.code == 5 and refresh.calls == []
-    unblocked = account.run('doctor', '--unblock', '--json', responses=[login()])
+    unblocked = account.run('doctor', '--unblock', responses=[login()])
     assert unblocked.code == 0 and unblocked.data['results'][0]['blocked'] is False
     assert account.run('feed', '--limit', '1', responses=[login(), feed_page(['p1'])]).code == 0
 
