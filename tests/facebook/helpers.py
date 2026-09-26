@@ -52,6 +52,7 @@ class Account:
 
     def __init__(self, tmp_path, cli=CLI):
         self.tmp = Path(tmp_path)
+        self.tmp.mkdir(parents=True, exist_ok=True)
         self.home = self.tmp / 'state'
         self.cli = Path(cli)
         self.runs = 0

@@ -156,7 +156,7 @@ def test_dense_post_text_separates_display_clipping_from_server_truncation(tmp_p
                           'actors': [{'name': 'Synthetic Author'}], 'message': {'text': 'One\nTwo more'}}])
     result = Account(tmp_path).run('feed', '--chars', '7', env=SEOUL, responses=[login(), body])
     assert result.code == 0
-    assert result.stdout == ('feed · sort=top · 1 shown · stopped=exhausted · requests=2/25\n'
+    assert result.stdout == ('feed · sort=top · 1 shown · sponsored_skipped=0 · stopped=exhausted · requests=2/25\n'
                              '[p1] Synthetic Author · 1970-01-01T09:00+09:00 · status · reactions=0 comments=? shares=?\n'
                              '     text[7/12 chars, complete]: "One⏎Two…"\n'
                              '     url: unavailable   author: unavailable\n')
@@ -164,7 +164,7 @@ def test_dense_post_text_separates_display_clipping_from_server_truncation(tmp_p
 
 def test_text_output_ends_with_the_continuation_command(tmp_path):
     result = Account(tmp_path).run('feed', '--limit', '1', responses=[login(), feed_page(['p1', 'p2'])])
-    assert result.stdout.splitlines()[0] == 'feed · sort=top · 1 shown · stopped=limit_reached · requests=2/25'
+    assert result.stdout.splitlines()[0] == 'feed · sort=top · 1 shown · sponsored_skipped=0 · stopped=limit_reached · requests=2/25'
     assert more_args(text_more(result.stdout)) == ['feed', '--sort', 'top', '--limit', '1', '--after', '1']
 
 

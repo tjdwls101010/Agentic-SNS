@@ -75,7 +75,8 @@ def read(args, transport, context, continuation):
     state = CursorStore().load(args.after, context) if args.after else {}
     saved_cursor = state.get('cursor')
     if isinstance(saved_cursor, dict) and 'resume_cursor' in saved_cursor:
-        state.update(cursor=saved_cursor['resume_cursor'], seen=saved_cursor.get('seen', []))
+        state.update(cursor=saved_cursor['resume_cursor'], seen=saved_cursor.get('seen', []),
+                     window_closed=saved_cursor.get('window_closed', False))
     output = OutFile(args.out, context) if args.out else None
     try:
         if output and output.complete:
@@ -114,10 +115,12 @@ def read(args, transport, context, continuation):
         if not output and (pending or retry_replies or cursor is not None and end != {'exhausted': True}):
             seen = set(state.get('seen') or [])
             seen.update(r['id'] for r in result['results'] if r.get('id') is not None)
-            number = CursorStore().save(context, {'resume_cursor': cursor, 'seen': sorted(seen)}, pending=pending)
+            seen.update(i for i in result.get('skipped_ids') or [] if i is not None)
+            number = CursorStore().save(context, {'resume_cursor': cursor, 'seen': sorted(seen),
+                                                  'window_closed': bool(result.get('window_closed'))}, pending=pending)
             result['handle'] = {'number': number, 'command': command}
-        result.pop('pending', None)
-        result.pop('cursor', None)
+        for key in ('pending', 'cursor', 'window_closed', 'skipped_ids'):
+            result.pop(key, None)
         if output:
             result['count'] = output.count
         return result

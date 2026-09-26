@@ -346,7 +346,7 @@ def test_pagination_failures_do_not_send_the_model_to_refresh(tmp_path, pages, m
 
 def test_text_header_names_scope_and_cost(tmp_path):
     result = Account(tmp_path).run('feed', '--limit', '1', responses=[login(), feed_page(['p1', 'p2'])])
-    assert result.stdout.splitlines()[0] == 'feed · sort=top · 1 shown · stopped=limit_reached · requests=2/25'
+    assert result.stdout.splitlines()[0] == 'feed · sort=top · 1 shown · sponsored_skipped=0 · stopped=limit_reached · requests=2/25'
 
 
 def test_a_partial_text_page_ends_with_its_failure_before_more(tmp_path):

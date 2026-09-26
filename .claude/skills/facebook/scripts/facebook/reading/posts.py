@@ -44,7 +44,10 @@ def run(args, transport, *, state=None, commit=None):
             raise FacebookError(6, 'A nonempty feed connection contains no readable posts.', 'Run refresh, then retry.')
         return records, find_page_info(raw, spec.connection_key)
 
-    result = paginate(fetch, **page_options(args, state, commit))
+    newest_first = args.command in ('feed', 'group') and args.sort == 'recent'
+    skip_sponsored = args.command == 'feed' and not args.include_sponsored
+    result = paginate(fetch, **page_options(args, state, commit), newest_first=newest_first,
+                      skip_sponsored=skip_sponsored)
     if args.since or args.until:
         order = 'server' if args.command == 'profile' else 'chronological' if args.sort == 'recent' else 'ranked'
         result['window'] = {'order': order, 'since': args.since, 'until': args.until}

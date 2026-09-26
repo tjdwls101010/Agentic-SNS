@@ -108,7 +108,8 @@ class Command:
 
 
 COMMANDS = {
-    'feed': Command('Read the home feed.', ('sort', 'include_sponsored', *READ), identity=('sort', 'window'),
+    'feed': Command('Read the home feed.', ('sort', 'include_sponsored', *READ),
+                    identity=('sort', 'window', 'include_sponsored'),
                     overrides={'sort': {'choices': ['top', 'recent'], 'default': 'top',
                                         'help': 'top is ranked; recent is newest first'}}),
     'profile': Command('Read a profile timeline; --since/--until are applied by Facebook.', READ,
