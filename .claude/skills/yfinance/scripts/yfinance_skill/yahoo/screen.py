@@ -93,8 +93,6 @@ def parse_query(text, kind):
 def preset_defaults(args):
     """A preset fixes its own universe and sort."""
     if args.preset:
-        if args.preset not in yf.PREDEFINED_SCREENER_QUERIES:
-            raise InputError("Unknown --preset; use screen presets --filter TEXT")
         preset = yf.PREDEFINED_SCREENER_QUERIES[args.preset]
         args.type = next(kind for kind, cls in QUERY_TYPES.items() if isinstance(preset["query"], cls))
         args.sort = args.sort or preset["sortField"]

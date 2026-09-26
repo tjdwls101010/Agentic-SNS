@@ -158,7 +158,13 @@ def periods(minimum):
 SEARCH_TYPES = ["all", "stock", "mutualfund", "etf", "index", "future", "currency", "cryptocurrency"]
 
 TYPE = Arg("--type", choices=["equity", "fund", "etf"], default="equity", help="Query universe; fields, values and presets differ per type.")
+# 성진: --field·--sort(equity만 93개, --type마다 다름)와 산업 키(약 145개)는 choices로 두면 --help를 덮는다. 발견 명령
+# (screen fields, market sector KEY --dataset industries)과 오류의 fix가 그 목록을 맡는다. 작은 닫힌 집합만 choices다.
 FIELD = Arg("--field", help="Exact query field, useful for allowed-value lookup.")
+PRESETS = ["aggressive_small_caps", "day_gainers", "day_losers", "growth_technology_stocks", "most_actives", "most_shorted_stocks",
+           "small_cap_gainers", "undervalued_growth_stocks", "undervalued_large_caps", "conservative_foreign_funds", "high_yield_bond",
+           "portfolio_anchors", "solid_large_growth_funds", "solid_midcap_growth_funds", "top_mutual_funds", "top_etfs_us",
+           "top_performing_etfs", "technology_etfs", "bond_etfs"]  # yf.PREDEFINED_SCREENER_QUERIES in yfinance 1.7.0
 QUERY_HELP = '''JSON query: {"operator":OP,"operands":[...]}; field names come from screen fields, enumerated values from screen values.
 EQ [field, string|finite number] (2 operands); IS-IN [field, value, ...] (2+ operands).
 BTWN [field, number, number] (3 operands, inclusive lower/upper); GT, LT, GTE, LTE [field, finite number] (2 operands).
@@ -173,9 +179,13 @@ MARKET_REGIONS = ["US", "GB", "ASIA", "EUROPE", "RATES", "COMMODITIES", "CURRENC
 DOMAIN_REGIONS = ["US", "AR", "AU", "BR", "CA", "CN", "DE", "DK", "ES", "FI", "FR", "GB", "GR", "HK", "IL", "IN", "IT", "JP", "KR", "MY", "NO", "PT", "QA", "RU", "SE", "SG", "TH", "TR", "TW"]
 
 
-def domain_args(datasets):
+SECTOR_KEYS = ["basic-materials", "communication-services", "consumer-cyclical", "consumer-defensive", "energy", "financial-services",
+               "healthcare", "industrials", "real-estate", "technology", "utilities"]  # what market sectors lists
+
+
+def domain_args(key, datasets):
     # 성진: 닫힌 선택지가 G1을 인터페이스 층에서 없앤다 — 서비스되지 않는 코드는 경고 없이 미국 데이터를 돌려줬다.
-    return [Arg("key", help="Sector key from market sectors, or industry key from market sector KEY --dataset industries."),
+    return [key,
             Arg("--region", choices=DOMAIN_REGIONS, default="US", help="Country code, restricted to the regions Yahoo serves; others return the United States result with no warning. Outside the US the name column arrives null."),
             Arg("--dataset", choices=["overview", "top-companies", "research-reports"] + datasets, default="overview", help="Part of the sector or industry to return.")]
 
@@ -347,7 +357,7 @@ COMMANDS = {command.path: command for command in [
             args=[TYPE, FIELD], check=screen_check, narrow=["--filter", "--field", "--type"], exportable=False),
     Command("screen", "run", "Run a preset or a JSON query and return matching instruments.", "screen.run",
             args=[TYPE, OneOf(Arg("--query", help="JSON operator/operands object; see examples below."),
-                              Arg("--preset", help="Preset name from screen presets. Its name does not state its condition: describe results by context.preset_query, the query it actually ran."), required=True),
+                              Arg("--preset", choices=PRESETS, help="Named screener; screen presets shows the query each runs. Its name does not state its condition: describe results by context.preset_query, the query it actually ran."), required=True),
                   Arg("--offset", type=int, default=0, help="Remote row offset for the next page; context.next_offset supplies it."),
                   Arg("--sort", help="Sort field from screen fields; custom query default ticker, preset uses its defined sort."),
                   Arg("--ascending", action=argparse.BooleanOptionalAction, default=None, help="Sort direction: --ascending or --no-ascending; omitted means the preset's own direction, or descending for a custom query.")],
@@ -358,9 +368,11 @@ COMMANDS = {command.path: command for command in [
             args=[Arg("--region", choices=MARKET_REGIONS, default="US", help="Yahoo market region.")], narrow=["--fields", "--region"]),
     Command("market", "sectors", "Sector keys accepted by market sector.", "market.sectors", narrow=["--filter"]),
     Command("market", "sector", "One sector's overview, industries, top companies, funds or research.", "market.sector",
-            args=domain_args(["industries", "top-etfs", "top-funds"]), narrow=["--fields", "--limit", "--dataset"]),
+            args=domain_args(Arg("key", choices=SECTOR_KEYS, help="Sector key."), ["industries", "top-etfs", "top-funds"]),
+            narrow=["--fields", "--limit", "--dataset"]),
     Command("market", "industry", "One industry's overview, companies or research.", "market.industry",
-            args=domain_args(["top-performing", "top-growth"]), narrow=["--fields", "--limit", "--dataset"]),
+            args=domain_args(Arg("key", help="Industry key from market sector KEY --dataset industries."), ["top-performing", "top-growth"]),
+            narrow=["--fields", "--limit", "--dataset"]),
 
     calendar_command("earnings", "Earnings events, market-wide over a date range or one company's history.",
                      args=[*RANGE, Arg("symbol", nargs="?", help="Optional single symbol; omit for market-wide US earnings."),

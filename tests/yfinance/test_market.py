@@ -148,3 +148,19 @@ def test_preset_catalog_honors_the_selected_asset_universe(cli):
     names = [entry['name'] for entry in doc['results'][0]['data']]
     assert 'top_etfs_us' in names
     assert 'most_actives' not in names
+
+
+@pytest.mark.parametrize("argv,named", [(["screen", "run", "--preset", "nope"], "day_gainers"),
+                                        (["market", "sector", "nope"], "technology")])
+def test_a_value_outside_a_small_closed_set_is_refused_with_the_set(cli, argv, named):
+    """The valid values fit in the refusal, so the refusal lists them instead of sending the caller to a catalogue."""
+    proc, doc = cli(*argv, routes=[])
+    assert proc.returncode == 2, proc.stdout[:300]
+    assert named in doc["results"][0]["error"]["message"]
+
+
+def test_the_sector_keys_market_sector_accepts_are_the_ones_market_sectors_lists(cli):
+    proc, listed = cli("market", "sectors")
+    assert proc.returncode == 0, proc.stdout[:300]
+    proc, doc = cli("schema", "market", "sector")
+    assert doc["results"][0]["data"]["arguments"]["key"]["choices"] == listed["results"][0]["data"]
