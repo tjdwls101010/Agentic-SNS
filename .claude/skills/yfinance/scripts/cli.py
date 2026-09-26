@@ -18,17 +18,26 @@ import re
 from yfinance_skill import budget, querying, schema
 from yfinance_skill.envelope import InputError, error_info, ordered, result
 
-EXIT_CODES = {"ok": 0, "invalid": 2, "local_io": 4, "rate_limited": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}
+EXIT_CODES = {
+    "ok": (0, "every target returned usable data"),
+    "invalid": (2, "an argument, a saved id or an --out path was refused; the fix says what to change"),
+    "local_io": (4, "the store or the --out file could not be read or written"),
+    "rate_limited": (5, "Yahoo limited requests before any target returned data; the rest were not attempted"),
+    "upstream": (6, "the source failed or timed out for every target"),
+    "empty": (7, "the source answered with nothing usable, which does not prove the data does not exist"),
+    "partial": (8, "part of what was asked is missing: rows cut to fit the budget, or some targets failed or came back empty"),
+    "too_large": (9, "the result does not fit --max-chars; the fix names a narrowing or the saved id to read"),
+}
 
 
 def exit_code(status, codes):
     """A printed document's status as an exit code; a document with no usable result takes its most actionable error."""
     if status in ("ok", "partial", "empty", "too_large"):
-        return EXIT_CODES[status]
+        return EXIT_CODES[status][0]
     for code in ("rate_limited", "invalid", "local_io"):
         if code in codes:
-            return EXIT_CODES[code]
-    return EXIT_CODES["upstream"]
+            return EXIT_CODES[code][0]
+    return EXIT_CODES["upstream"][0]
 
 
 # ---- shared arguments and declaration tools -----------------------------------------------------------------------
@@ -376,7 +385,8 @@ class Parser(argparse.ArgumentParser):
 
 
 def build_parser():
-    parser = Parser(description="Query Yahoo Finance data by purpose. stdout: one JSON document; diagnostics: stderr. Discover with schema [GROUP [LEAF]].")
+    parser = Parser(description="Query Yahoo Finance data by purpose. stdout: one JSON document; diagnostics: stderr. Discover with schema [GROUP [LEAF]].",
+                    epilog="exit codes:\n" + "\n".join(f"  {number}  {name}: {meaning}" for name, (number, meaning) in EXIT_CODES.items()))
     add_common(parser, False, root=True)
     parser.add_argument("--ttl-days", type=int, default=GLOBAL_DEFAULTS["ttl_days"], help="Delete saved observations older than this many days. Retention only: an observation inside the window is not therefore current, and source_time is what says whether a value is fresh.")
     groups_parser = parser.add_subparsers(dest="group", required=True)
@@ -475,7 +485,7 @@ def main():
         saved = querying.open_store(args)
         if args.group == "schema":
             return exit_code(*schema.run(args, parsers, parser, groups=GROUPS, commands=COMMANDS, defaults=GLOBAL_DEFAULTS,
-                                         applies=SHARED, pointer=POINTER, exit_codes=EXIT_CODES))
+                                         applies=SHARED, pointer=POINTER, exit_codes={name: number for name, (number, _) in EXIT_CODES.items()}))
         if args.group == "read":
             return exit_code(*querying.read(args, saved, COMMANDS))
         command = COMMANDS[args.group + (" " + args.leaf if args.leaf else "")]

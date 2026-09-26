@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 def test_scoped_schema_is_offline_and_describes_inputs(cli):
@@ -150,3 +152,13 @@ def test_scoped_schema_states_its_own_defaults_and_the_document_contract(cli):
     proc, doc = cli("schema", "screen", "run", "--filter", "ascending")
     assert "--ascending" in doc["results"][0]["data"]["arguments"]
     assert list(doc["results"][0]["data"]["arguments"]) == ["--ascending"], "a filtered schema keeps only what matched"
+
+
+def test_the_root_help_and_schema_state_every_exit_code(cli):
+    """Exit codes other than 0 and 2 are defined by --help; a caller that branches on 8 must be able to read what 8 is."""
+    expected = {"ok": 0, "invalid": 2, "local_io": 4, "rate_limited": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}
+    text = cli("--help", raw=True).stdout
+    listed = {name: int(code) for code, name in re.findall(r"(?m)^\s+(\d)\s+(\w+): \S", text)}
+    assert listed == expected, text[-900:]
+    proc, doc = cli("schema")
+    assert doc["results"][0]["data"]["output"]["exit_codes"] == expected
