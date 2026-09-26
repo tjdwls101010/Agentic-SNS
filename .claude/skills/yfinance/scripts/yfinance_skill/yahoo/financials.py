@@ -1,7 +1,5 @@
 """Statements and valuation measures by period."""
-from yfinance_skill.registry import CURRENCY, MULTIPLE, PER_SHARE, RATE, SHARES, SYMBOLS, Arg, group, leaf
-
-group("financials", "Income, balance sheet, cash flow and valuation measures by period")
+from yfinance_skill.yahoo.datasets import CURRENCY, MULTIPLE, PER_SHARE, RATE, SHARES, Dataset
 
 STATEMENT_DATES = "Column labels are fiscal period end dates, not announcement dates."
 STATEMENT_INTERPRETATION = {
@@ -13,7 +11,6 @@ STATEMENT_INTERPRETATION = {
 STATEMENT_UNITS = {"TaxRateForCalcs": RATE, "TaxEffectOfUnusualItems": CURRENCY, "BasicEPS": PER_SHARE, "DilutedEPS": PER_SHARE,
                    "BasicAverageShares": SHARES, "DilutedAverageShares": SHARES, "ShareIssued": SHARES, "OrdinarySharesNumber": SHARES, "TreasurySharesNumber": SHARES}
 STATEMENTS = {"income": "get_income_stmt", "balance": "get_balance_sheet", "cashflow": "get_cash_flow"}
-FREQUENCY_HELP = "trailing means TTM, a rolling twelve months rather than a completed fiscal period."
 
 
 def statement_currency(ticker, context, warnings):
@@ -43,27 +40,21 @@ def statement(method):
     return fetch
 
 
-def periods(minimum, help):
-    return Arg("--periods", type=int, default=5, minimum=minimum, help=help)
-
-
-for _leaf, _what in [("income", "Income statement"), ("balance", "Balance sheet"), ("cashflow", "Cash flow statement")]:
-    leaf("financials", _leaf, _what + " line items by fiscal period, as reported.",
-         args=[SYMBOLS, Arg("--frequency", choices=["yearly", "quarterly"] if _leaf == "balance" else ["yearly", "quarterly", "trailing"], default="yearly", help=FREQUENCY_HELP),
-               periods(1, "Maximum periods; valuation sends this upstream (0 = Current only), statements select locally.")], ticker=True,
-         narrow=["--fields", "--periods", "--frequency"], units=STATEMENT_UNITS,
-         interpretation=dict(STATEMENT_INTERPRETATION, frequency=("Balance sheet frequencies are yearly and quarterly only." if _leaf == "balance" else "trailing returns TTM, which is a rolling twelve months and not a completed fiscal period.")))(statement(STATEMENTS[_leaf]))
-
-
-@leaf("financials", "valuation", "Valuation multiples and market-size measures by period.",
-      args=[SYMBOLS, Arg("--frequency", choices=["yearly", "quarterly", "monthly", "trailing"], default="quarterly", help=FREQUENCY_HELP),
-            periods(0, "Maximum periods; valuation sends this upstream (0 = Current only), statements select locally.")], ticker=True,
-      narrow=["--fields", "--periods", "--frequency"],
-      units={"Market Cap": CURRENCY, "Enterprise Value": CURRENCY, "Trailing P/E": MULTIPLE, "Forward P/E": MULTIPLE,
-             "PEG Ratio (5yr expected)": MULTIPLE, "Price/Sales": MULTIPLE, "Price/Book": MULTIPLE,
-             "Enterprise Value/Revenue": MULTIPLE, "Enterprise Value/EBITDA": MULTIPLE},
-      interpretation={"dates": "Labels other than Current are native period dates; Current is the latest trailing snapshot, not a completed fiscal period.",
-                      "periods": "--periods is sent upstream here rather than applied locally; 0 returns Current only."})
 def valuation(ticker, args, context, warnings):
     return ticker.get_valuation_measures(freq=args.frequency, periods=args.periods).T
 
+
+DATASETS = {
+    f"financials.{name}": Dataset(
+        statement(method), ticker=True, units=STATEMENT_UNITS,
+        interpretation=dict(STATEMENT_INTERPRETATION, frequency=("Balance sheet frequencies are yearly and quarterly only." if name == "balance" else "trailing returns TTM, which is a rolling twelve months and not a completed fiscal period.")))
+    for name, method in STATEMENTS.items()
+} | {
+    "financials.valuation": Dataset(
+        valuation, ticker=True,
+        units={"Market Cap": CURRENCY, "Enterprise Value": CURRENCY, "Trailing P/E": MULTIPLE, "Forward P/E": MULTIPLE,
+               "PEG Ratio (5yr expected)": MULTIPLE, "Price/Sales": MULTIPLE, "Price/Book": MULTIPLE,
+               "Enterprise Value/Revenue": MULTIPLE, "Enterprise Value/EBITDA": MULTIPLE},
+        interpretation={"dates": "Labels other than Current are native period dates; Current is the latest trailing snapshot, not a completed fiscal period.",
+                        "periods": "--periods is sent upstream here rather than applied locally; 0 returns Current only."}),
+}

@@ -1,5 +1,4 @@
 """Screener fields, enumerated values, named presets and runs."""
-import argparse
 from collections.abc import KeysView
 import json
 import math
@@ -7,25 +6,9 @@ import math
 import yfinance as yf
 
 from yfinance_skill.envelope import InputError, condition, monotonic
-from yfinance_skill.registry import COUNT, CURRENCY, MULTIPLE, PERCENT, Arg, OneOf, effective_limit, get, group, leaf
-
-group("screen", "Query fields, enumerated values, named presets and screening runs")
+from yfinance_skill.yahoo.datasets import COUNT, CURRENCY, MULTIPLE, PERCENT, Dataset, asked
 
 QUERY_TYPES = {"equity": yf.EquityQuery, "fund": yf.FundQuery, "etf": yf.ETFQuery}
-QUERY_HELP = '''JSON query: {"operator":OP,"operands":[...]}; field names come from screen fields, enumerated values from screen values.
-EQ [field, string|finite number] (2 operands); IS-IN [field, value, ...] (2+ operands).
-BTWN [field, number, number] (3 operands, inclusive lower/upper); GT, LT, GTE, LTE [field, finite number] (2 operands).
-AND, OR [query, query, ...] (2+ nested query objects). Booleans, null, NaN and Infinity are not query values.
-Nested example: {"operator":"AND","operands":[{"operator":"EQ","operands":["region","us"]},{"operator":"GT","operands":["intradaymarketcap",2000000000]}]}
-Use --query 'JSON' or --preset NAME. Fields and values can be narrowed with --filter TEXT and --field NAME.'''
-
-TYPE = Arg("--type", choices=["equity", "fund", "etf"], default="equity", help="Query universe; fields, values and presets differ per type.")
-FIELD = Arg("--field", help="Exact query field, useful for allowed-value lookup.")
-
-
-def check(args):
-    if args.limit and args.limit > 250:
-        raise InputError("Screen --limit cannot exceed Yahoo's 250-row cap")
 
 
 def query_catalog(kind):
@@ -54,22 +37,15 @@ def filtered(value, term):
     return value if term in str(value).lower() else None
 
 
-@leaf("screen", "presets", "Named screeners with the query each one actually runs.",
-      args=[TYPE], check=check, narrow=["--filter", "--type"],
-      interpretation={"name_is_not_the_condition": "Each entry carries the query it runs. Describe a preset's results by that query, not by its name: small_cap_gainers, for one, screens for small capitalisation sorted by volume and has no gain condition."})
 def presets(target, args, context, warnings):
     return [{"name": name, "query": spec["query"].to_dict(), "sortField": spec["sortField"], "sortType": spec["sortType"]} for name, spec in yf.PREDEFINED_SCREENER_QUERIES.items() if isinstance(spec["query"], QUERY_TYPES[args.type]) and args.filter.lower() in name.lower()]
 
 
-@leaf("screen", "fields", "Query fields available for the selected --type.",
-      args=[TYPE, FIELD], check=check, narrow=["--filter", "--field", "--type"])
 def fields(target, args, context, warnings):
     catalog = query_catalog(args.type)
     return [{"category": category, "field": field} for category, names in catalog.valid_fields.items() for field in sorted(names) if (not args.field or args.field == field) and args.filter.lower() in (category + field).lower()]
 
 
-@leaf("screen", "values", "Enumerated values accepted by query fields of the selected --type.",
-      args=[TYPE, FIELD], check=check, narrow=["--filter", "--field", "--type"], exportable=False)
 def values(target, args, context, warnings):
     catalog = query_catalog(args.type)
     found = catalog.valid_values
@@ -115,7 +91,7 @@ def parse_query(text, kind):
 
 
 def preset_defaults(args):
-    """A preset fixes its own universe and sort; a custom query sorts by ticker, descending, unless told otherwise."""
+    """A preset fixes its own universe and sort."""
     if args.preset:
         if args.preset not in yf.PREDEFINED_SCREENER_QUERIES:
             raise InputError("Unknown --preset; use screen presets --filter TEXT")
@@ -124,10 +100,6 @@ def preset_defaults(args):
         args.sort = args.sort or preset["sortField"]
         if args.ascending is None:
             args.ascending = preset["sortType"].lower() == "asc"
-    else:
-        args.sort = args.sort or "ticker"
-        if args.ascending is None:
-            args.ascending = False
 
 
 def screen_conditions(encoded, args, context):
@@ -137,7 +109,7 @@ def screen_conditions(encoded, args, context):
         applied = upstream.get("start") == args.offset
         found["offset"] = condition(args.offset, "confirmed" if applied else "not_applied", {"upstream_start": upstream.get("start")})
     if "count" in upstream:
-        size = effective_limit(args, get("screen", "run"))
+        size = asked(args, DATASETS["screen.run"])
         found["limit"] = condition(size, "confirmed" if upstream.get("count") <= size else "not_applied", {"upstream_count": upstream.get("count"), "total": upstream.get("total")})
     if args.sort:
         judged = monotonic(encoded, args.sort, bool(args.ascending))
@@ -149,26 +121,12 @@ SCREEN_FIELDS = ("symbol", "shortName", "regularMarketPrice", "regularMarketChan
                  "marketCap", "trailingPE", "fiftyTwoWeekChangePercent", "averageAnalystRating", "fullExchangeName")
 
 
-@leaf("screen", "run", "Run a preset or a JSON query and return matching instruments.",
-      args=[TYPE, OneOf(Arg("--query", help="JSON operator/operands object; see examples below."),
-                        Arg("--preset", help="Preset name from screen presets. Its name does not state its condition: describe results by context.preset_query, the query it actually ran."), required=True),
-            Arg("--offset", type=int, default=0, help="Remote row offset for the next page; context.next_offset supplies it."),
-            Arg("--sort", help="Sort field from screen fields; custom query default ticker, preset uses its defined sort."),
-            Arg("--ascending", action=argparse.BooleanOptionalAction, default=None, help="Sort direction: --ascending or --no-ascending; omitted means the preset's own direction, or descending for a custom query.")],
-      epilog=QUERY_HELP, check=check, defaults=preset_defaults, conditions=screen_conditions,
-      limit=25, fields=SCREEN_FIELDS, narrow=["--fields", "--limit", "--query", "--preset", "--offset"],
-      units={"regularMarketChangePercent": PERCENT, "fiftyTwoWeekChangePercent": PERCENT, "marketCap": CURRENCY,
-             "trailingPE": MULTIPLE, "regularMarketVolume": COUNT},
-      interpretation={"query_scale": "A growth threshold in the query is in percentage points, while the same measurement in a quote is a ratio: BTWN quarterlyrevenuegrowth.quarterly 20 30 selects companies whose quote revenueGrowth is 0.2-0.3, and 0.20 0.30 selects companies growing a fifth of a percent. Neither call fails, so an output ratio reused as a bound screens for something a hundredfold smaller and still returns a plausible list.",
-                      "matches_not_a_census": "These are the rows matching the query, ordered by the sort field. They are not a verified census of a market, and total is the provider's own claim.",
-                      "paging": "--offset continues a query rather than reading an immutable snapshot; rows can move between pages.",
-                      "default_fields": "Each row carries far more fields than the default projection; --fields reaches them and --list-fields names them."})
 def run(target, args, context, warnings):
     catalog = query_catalog(args.type)
     query = args.preset or parse_query(args.query, args.type)
     if args.sort and args.sort not in known_fields(catalog) and args.sort != "ticker":
         raise InputError("Unknown --sort field; use screen fields --filter TEXT")
-    size = effective_limit(args, get("screen", "run")) or 10
+    size = asked(args, DATASETS["screen.run"]) or 10
     response = yf.screen(query, offset=args.offset, size=size, count=size, sortField=args.sort, sortAsc=args.ascending)
     if not isinstance(response, dict):
         raise ValueError("Malformed screen response: expected a result object")
@@ -181,3 +139,20 @@ def run(target, args, context, warnings):
     if displayed and (len(data) > displayed or (isinstance(total, int) and args.offset + displayed < total) or (total is None and displayed == size)):
         context["next_offset"] = args.offset + displayed
     return data
+
+
+DATASETS = {
+    "screen.presets": Dataset(
+        presets,
+        interpretation={"name_is_not_the_condition": "Each entry carries the query it runs. Describe a preset's results by that query, not by its name: small_cap_gainers, for one, screens for small capitalisation sorted by volume and has no gain condition."}),
+    "screen.fields": Dataset(fields),
+    "screen.values": Dataset(values),
+    "screen.run": Dataset(
+        run, rows=25, fields=SCREEN_FIELDS, conditions=screen_conditions, prepare=preset_defaults,
+        units={"regularMarketChangePercent": PERCENT, "fiftyTwoWeekChangePercent": PERCENT, "marketCap": CURRENCY,
+               "trailingPE": MULTIPLE, "regularMarketVolume": COUNT},
+        interpretation={"query_scale": "A growth threshold in the query is in percentage points, while the same measurement in a quote is a ratio: BTWN quarterlyrevenuegrowth.quarterly 20 30 selects companies whose quote revenueGrowth is 0.2-0.3, and 0.20 0.30 selects companies growing a fifth of a percent. Neither call fails, so an output ratio reused as a bound screens for something a hundredfold smaller and still returns a plausible list.",
+                        "matches_not_a_census": "These are the rows matching the query, ordered by the sort field. They are not a verified census of a market, and total is the provider's own claim.",
+                        "paging": "--offset continues a query rather than reading an immutable snapshot; rows can move between pages.",
+                        "default_fields": "Each row carries far more fields than the default projection; --fields reaches them and --list-fields names them."}),
+}

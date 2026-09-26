@@ -22,6 +22,13 @@ SKILLS = {
         'account': 'store', 'cursors': 'store', 'collect': 'store',
         'reading': 'feature', 'render': 'feature',
     }),
+    'yfinance': ('yfinance_skill', {
+        'envelope': 'common', 'shape': 'common', 'display': 'common', 'selection': 'common', 'budget': 'common',
+        'leaf': 'common',
+        'yahoo': 'system',
+        'store': 'store', 'export': 'store',
+        'querying': 'feature', 'schema': 'feature',
+    }),
 }
 # What each kind of top-level child may import; features also import themselves, never another feature.
 ALLOWED = {
