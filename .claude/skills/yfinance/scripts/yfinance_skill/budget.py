@@ -129,7 +129,8 @@ def too_large_fix(results, item, size, max_chars, args, needed=None):
         # 성진: 저장소도 함께 — 명시한 --store를 빠뜨리면 이름 붙인 id가 기본 캐시에 없다.
         kept = quoted(args, [("--store", getattr(args, "store", None)), ("--fields", ",".join(args.fields) if getattr(args, "fields", None) else None)])
         filed = ", rerun with --out FILE to write every target's rows to one file (a new request)" if item.exportable else ""
-        each = f" Each target was observed and saved separately: {listed}. Read one with read ID{kept}" + (f" --limit {keep}" if keep else "") + f", ask for fewer targets in one call{filed}, or rerun with --max-chars {needed}."
+        which = "Each target was observed and saved separately" if len(saved) == len(results) else f"The {len(saved)} targets that returned data were saved separately"
+        each = f" {which}: {listed}. Read one with read ID{kept}" + (f" --limit {keep}" if keep else "") + f", ask for fewer targets in one call{filed}, or rerun with --max-chars {needed}."
         return head + (f"Narrow with {narrow}." if narrow else "Ask for fewer targets.") + each
     if saved and keep is not None:
         if keep >= (shown or 0):
@@ -160,21 +161,36 @@ def too_large_document(results, error, max_chars, request):
 
     Dropping the recovery sentence to fit would keep the boundary and lose the only thing that makes the failure
     survivable, so the ladder sheds targets and then fields, and keeps the id and the size that would pass to the end.
+    Only a target with an id was saved: the refusal is carried by the first of those, and a target that failed keeps
+    its own error, since calling it too large or saved would send the reader after a response that does not exist.
     """
+    saved = [r for r in results if r.get("id")]
+    first = saved[0] if saved else results[0]
+    unsaved = len(results) - len(saved)
     rest = error_info(error["code"], error["message"], "Recover with the fix on the first result; this target's own response is saved under the id here.")
-    rows = [{"target": r.get("target"), "id": r.get("id"), "status": "error", "error": error if i == 0 else rest} for i, r in enumerate(results)]
-    trimmed = [row if i == 0 else {k: v for k, v in row.items() if k != "error"} for i, row in enumerate(rows)]
-    dropped = dict(rows[0], error=error_info(error["code"], error["message"], error["fix"] + f" {len(results) - 1} further targets were saved but do not fit this document; ask for them in smaller groups."))
+
+    def row(r, whole):
+        if r is first:
+            return {"target": r.get("target"), "id": r.get("id"), "status": "error", "error": error}
+        if r.get("id"):
+            return {"target": r.get("target"), "id": r.get("id"), "status": "error", **({"error": rest} if whole else {})}
+        own = r.get("error") or {}
+        return {"target": r.get("target"), "status": r.get("status"), "error": own if whole else {"code": own.get("code")}}
+
+    rows, trimmed = [row(r, True) for r in results], [row(r, False) for r in results]
+    left = (f" {len(saved) - 1} further targets were saved but do not fit this document; ask for them in smaller groups." if len(saved) > 1 else "") \
+        + (f" Targets that failed have nothing saved: {unsaved}." if unsaved and len(results) > 1 else "")
+    dropped = dict(row(first, True), error=error_info(error["code"], error["message"], error["fix"] + left))
     for attempt in (rows, trimmed, [dropped] if len(results) > 1 else [rows[0]]):
         text = dump(document(attempt, "error", request))
         if attempt and len(text) <= max_chars:
             return text
     size = re.search(r"--max-chars (\d+)", error["fix"])
     # 성진: 가장 짧은 형태에도 복구에 필요한 셋은 남긴다 — 통과할 크기, 저장된 목표가 몇 개인지, 그것들이 여기 없다는 사실.
-    advice = (f"Rerun with --max-chars {size[1]}" if size else "Raise --max-chars") + (f"; all {len(results)} targets were saved and none of their ids fit this document, so rerun at that size or ask for fewer targets." if len(results) > 1 else ".")
-    smallest = [{k: v for k, v in {"id": results[0].get("id"), "status": "error",
+    advice = (f"Rerun with --max-chars {size[1]}" if size else "Raise --max-chars") + (f"; {len(saved)} targets were saved and none of their ids fit this document, so rerun at that size or ask for fewer targets." if len(saved) > 1 else ".")
+    smallest = [{k: v for k, v in {"id": first.get("id"), "status": "error",
                                    "error": error_info(error["code"], error["message"], advice)}.items() if v is not None}]
-    for attempt in ([rows[0]], smallest):
+    for attempt in ([row(first, True)], smallest):
         text = dump(document(attempt, "error", None))
         if len(text) <= max_chars:
             return text

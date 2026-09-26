@@ -352,3 +352,28 @@ def test_a_multi_target_recovery_keeps_the_store_it_saved_to(cli, tmp_path):
     proc, doc = cli("prices", "history", *symbols, "--period", "1y", "--store", str(store), "--max-chars", "4000", routes=routes, store=tmp_path / "unused")
     assert proc.returncode == 9, proc.stdout[:300]
     assert f"--store {store}" in doc["results"][0]["error"]["fix"]
+
+
+# ---- B8: a refusal promises only the saves that happened ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("budget", [1000, 1500, 3000])
+def test_a_refusal_counts_only_the_targets_that_were_saved(cli, tmp_path, budget):
+    """A target that failed has no saved response; counting it among the saved ones sends the reader after an id that
+    does not exist, and reporting it as refused for size hides the failure it actually had."""
+    store = tmp_path / "s"
+    symbols = ["S00", "S01", "S02", "S03", "ZZZZ", "S04", "S05", "S06", "S07", "S08"]
+    missing = [{"path": "/v8/finance/chart/ZZZZ", "json": {"chart": {"result": None, "error": {"code": "Not Found", "description": "No data found, symbol may be delisted"}}}}]
+    routes = [r for s in symbols if s != "ZZZZ" for r in chart_routes(s)] + missing + fallback_routes("ZZZZ")
+    proc, doc = cli("prices", "history", *symbols, "--period", "1y", "--max-chars", str(budget), routes=routes, store=store)
+    assert proc.returncode == 9, proc.stdout[:300]
+    saved = {p.stem for p in store.glob("*.json")}
+    assert len(saved) == 9
+    assert set(re.findall(r"\b[0-9a-f]{16}\b", proc.stdout)) <= saved
+    for found in re.findall(r"(\d+) further targets were saved", proc.stdout):
+        assert int(found) == 8, proc.stdout
+    for found in re.findall(r"all (\d+) targets were saved|(\d+) targets were saved and none", proc.stdout):
+        assert int(next(n for n in found if n)) == 9, proc.stdout
+    for row in doc["results"]:
+        if row["target"] == "ZZZZ":
+            assert row.get("id") is None and row["error"]["code"] == "upstream", row
