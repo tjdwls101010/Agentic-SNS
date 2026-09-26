@@ -167,7 +167,7 @@ def too_large_document(results, error, max_chars, request):
     saved = [r for r in results if r.get("id")]
     first = saved[0] if saved else results[0]
     unsaved = len(results) - len(saved)
-    rest = error_info(error["code"], error["message"], "Recover with the fix on the first result; this target's own response is saved under the id here.")
+    rest = error_info(error["code"], error["message"], f"Recover with the fix on {first.get('target')}'s result; this target's own response is saved under the id here.")
 
     def row(r, whole):
         if r is first:

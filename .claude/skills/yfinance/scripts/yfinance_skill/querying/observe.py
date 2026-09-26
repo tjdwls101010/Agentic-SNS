@@ -40,7 +40,7 @@ def check_out(args, targets):
     smallest receipt for it would not fit --max-chars, which would leave a written file no document could report."""
     export.check_path(args.out)
     if not budget.receipt_fits(args.out, targets, args.max_chars):
-        raise InputError(f"The receipt for --out {args.out} does not fit --max-chars {args.max_chars}; use a shorter path or raise --max-chars.")
+        raise InputError(f"The receipt for this --out path ({len(str(args.out))} characters) does not fit --max-chars {args.max_chars}; use a shorter path or raise --max-chars.")
 
 
 class DeadlineExpired(BaseException):
@@ -89,6 +89,7 @@ def run(args, item, saved, request, commands):
             signal.alarm(args.timeout)
             with contextlib.redirect_stdout(sys.stderr):
                 encoded, context, warnings, conditions, observed_at, when, reused, requested = observe(target, args, item, saved, commands)
+                stopped = context.get("rate_limited", False)  # met while observing; a later failure on this target does not lift it
                 ident = reused or saved.save(store.record(item, target, request, encoded, context, warnings, "empty" if is_empty(encoded) else "ok", conditions, observed_at, when, requested))
                 if getattr(args, "out", None):
                     rows, covered = exported(encoded, args, item)
@@ -102,11 +103,10 @@ def run(args, item, saved, request, commands):
             envelope = result(target, data, context, warnings, conditions=conditions, coverage=coverage, ident=ident, observed_at=observed_at, source_time=when)
             envelope["_full"] = encoded
             results.append(ordered(envelope))
-            stopped = context.get("rate_limited", False)
         except (Exception, DeadlineExpired) as exc:
             code = ("invalid" if isinstance(exc, InputError) else "local_io" if isinstance(exc, LocalFailure)
                     else "rate_limited" if is_rate_limited(exc) else "upstream")
-            stopped = code == "rate_limited"
+            stopped = stopped or code == "rate_limited"
             fix = (f"Correct the arguments; schema {item.path} reports this command's choices and defaults." if code == "invalid"
                    else LOCAL_FIX if code == "local_io"
                    else "Retry later with fewer targets; remaining targets were not attempted." if code == "rate_limited"

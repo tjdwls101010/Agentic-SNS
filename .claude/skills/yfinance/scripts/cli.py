@@ -496,19 +496,21 @@ def main():
             raise InputError(f"--max-chars must be >= {budget.MIN_CHARS} so recovery instructions remain readable")
         if args.ttl_days < 0:
             raise InputError("--ttl-days must be >= 0; 0 keeps every saved observation")
-        saved = querying.open_store(args)
         if args.group == "schema":
+            querying.open_store(args)  # retention runs on every command, schema included
             return exit_code(*schema.run(args, parsers, parser, groups=GROUPS, commands=COMMANDS, defaults=GLOBAL_DEFAULTS,
                                          applies=SHARED, pointer=POINTER, exit_codes={name: number for name, (number, _) in EXIT_CODES.items()}))
+        # 성진: 인자 검증은 저장소를 열기(생성·보존기간 정리) 전에 끝난다 — 거절될 호출이 관측을 지우거나 디렉터리를 만들면 안 된다.
         if args.group == "read":
             validate(args)
-            return exit_code(*querying.read(args, saved, COMMANDS))
+            return exit_code(*querying.read(args, querying.open_store(args), COMMANDS))
         command = COMMANDS[args.group + (" " + args.leaf if args.leaf else "")]
         given = dict(vars(args))  # a copy: prepare fills defaults in, and chosen() tells them apart from what was typed
         validate(args, command)
         querying.prepare(command, args)
         if args.fields and any(not f for f in args.fields):
             raise InputError("--fields requires nonempty comma-separated field names")
+        saved = querying.open_store(args)
         request = {k: v for k, v in vars(args).items() if k not in ("symbols", "store", "ttl_days", "max_chars", "list_fields")}
         return exit_code(*querying.answer(args, command, COMMANDS, saved, request, chosen(request, given, parsers[args.group, args.leaf])))
     except InputError as exc:

@@ -220,3 +220,13 @@ def test_a_news_page_shorter_than_asked_says_both_numbers_and_claims_no_end(cli,
     assert back["results"][0]["coverage"]["requested"] == 300, "a slice of the observation does not change what was asked of the source"
     assert any("196" in w for w in back["results"][0]["warnings"])
     assert "exhaustive" not in proc.stdout
+
+
+def test_a_rate_limit_is_kept_when_the_same_target_then_fails_locally(cli):
+    """The rate limit was met while observing AAPL; a selection error on AAPL afterwards does not make MSFT safe to ask."""
+    payload = {"timeseries": {"result": [{"meta": {"type": ["annualTotalRevenue"]}, "timestamp": [1735603200], "annualTotalRevenue": [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 120}}]}], "error": None}}
+    routes = [{"path": "/timeseries/AAPL", "json": payload},
+              {"path": "/quoteSummary/AAPL", "status": 429, "text": "Too Many Requests"},
+              {"path": "/v7/finance/quote", "status": 429, "text": "Too Many Requests"}]
+    proc, doc = cli("financials", "income", "AAPL", "MSFT", "--fields", "NoSuchLineItem", routes=routes)
+    assert [r["status"] for r in doc["results"]] == ["error", "not_attempted"], proc.stdout[:400]

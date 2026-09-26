@@ -220,3 +220,17 @@ def test_an_earlier_observation_without_a_requested_count_reads_without_one(cli,
     assert proc.returncode == 0, proc.stdout[:400]
     assert [row["content.title"] for row in doc["results"][0]["data"]] == ["Headline 0", "Headline 1", "Headline 2"]
     assert "requested" not in doc["results"][0]["coverage"]
+
+
+@pytest.mark.parametrize("argv", [["--start", "-1"], ["--limit", "0"]])
+def test_an_invalid_read_neither_prunes_nor_creates_a_store(cli, tmp_path, argv):
+    store = tmp_path / "s"
+    ident = observe(cli, store)
+    old = time.time() - 40 * 86400
+    os.utime(store / f"{ident}.json", (old, old))
+    proc, doc = cli("read", ident, *argv, routes=[], store=store)
+    assert proc.returncode == 2, proc.stdout[:300]
+    assert (store / f"{ident}.json").exists(), "an invalid call applied retention"
+    fresh = tmp_path / "never-created"
+    proc, doc = cli("read", ident, *argv, routes=[], store=fresh)
+    assert proc.returncode == 2 and not fresh.exists()

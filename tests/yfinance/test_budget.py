@@ -395,3 +395,18 @@ def test_each_upstream_range_constraint_is_answered_with_its_own_remedy(cli, tmp
     assert all(phrase in fix for phrase in own), fix
     assert not any(phrase in fix for phrase in other), fix
     assert "no such limit" not in fix, fix
+
+
+def test_a_refusal_points_at_the_target_that_carries_the_recovery(cli, tmp_path):
+    """With the failed target first, "the fix on the first result" named a failure's advice instead of the recovery."""
+    def body(symbol):
+        return {"serviceConfig": {"snippetCount": 10, "s": [symbol]}}
+    huge = {"data": {"tickerStream": {"stream": [{"id": "x", "content": {"title": "t", "summary": "s" * 30000}}]}}}
+    routes = [{"path": "/xhr/ncp", "body": body("ZZZ"), "status": 500, "text": "Internal Server Error"},
+              {"path": "/xhr/ncp", "body": body("AAA"), "json": huge}, {"path": "/xhr/ncp", "body": body("BBB"), "json": huge}]
+    proc, doc = cli("company", "news", "ZZZ", "AAA", "BBB", "--fields", "content.summary", "--max-chars", "3000", routes=routes, store=tmp_path / "s")
+    assert proc.returncode == 9, proc.stdout[:300]
+    carrier = next(r for r in doc["results"] if r.get("error", {}).get("code") == "too_large" and "--max-chars" in r["error"]["fix"])
+    pointers = [r["error"]["fix"] for r in doc["results"] if r.get("error", {}).get("fix", "").startswith("Recover with the fix on")]
+    assert carrier["target"] == "AAA" and pointers, proc.stdout[:800]
+    assert all("AAA" in fix for fix in pointers), pointers

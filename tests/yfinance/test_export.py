@@ -266,3 +266,4 @@ def test_a_path_too_long_for_its_own_receipt_is_refused_before_any_request(cli, 
     proc, doc = cli("company", "news", "AAA", "--out", str(out), "--max-chars", "1000", routes=[])
     assert proc.returncode == 2, proc.stdout[:400]
     assert "--max-chars" in doc["results"][0]["error"]["message"] and not out.exists()
+    assert len(proc.stdout.strip()) <= 1000, "the refusal of a path too long to report cannot itself carry the path"
