@@ -75,7 +75,7 @@ def reply_page(raw, *, post_id, parent_id, captured_at):
 def search_page(raw, *, search_type, captured_at, connection_key='results'):
     """One search page: posts and people, pages or groups, in the connection's index order."""
     return Page(search_records(raw, search_type, captured_at), find_page_info(raw, connection_key),
-                connection_has_items(raw, connection_key))
+                connection_has_items(raw, connection_key), list(parse_story_nodes([raw]).incomplete_reasons))
 
 
 def about_collections(raw):

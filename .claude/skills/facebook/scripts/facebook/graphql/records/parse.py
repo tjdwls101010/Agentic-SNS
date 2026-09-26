@@ -1,7 +1,8 @@
 """Decode GraphQL NDJSON and merge story fragments by feedback id.
 
-Path-only patches cannot be applied safely without validated capture paths;
-ParsedStories.incomplete exposes that loss rather than claiming full data.
+Path-only patches cannot be applied safely without validated capture paths. A patch or an error that carries a
+field the record builders read marks the story it points into as incomplete; one that reaches no story is a
+response-level issue. Patches of fields no record reads (page metadata, video player internals) change nothing.
 """
 
 from __future__ import annotations
@@ -107,6 +108,59 @@ def _merge_lists(a: list, b: list) -> list:
 # --- story-node discovery -------------------------------------------------------
 
 
+def _is_comment_shaped(obj: Any) -> bool:
+    return isinstance(obj, dict) and (obj.get("__typename") == "Comment" or ("depth" in obj and "author" in obj))
+
+
+#: Field names the post and comment builders read. A patch or an error naming none of them cannot change a record.
+RECORD_FIELDS = frozenset({
+    "message", "text", "body", "creation_time", "created_time", "actors", "author", "name", "url", "permalink_url",
+    "wwwURL", "attachments", "media", "image", "uri", "width", "height", "playable_url", "playable_url_quality_hd",
+    "title", "description", "attached_story", "feedback", "reaction_count", "share_count", "count",
+    "comment_rendering_instance", "comments", "total_count", "reactors", "count_reduced", "replies_fields",
+    "expansion_info", "expansion_token", "comment_action_links", "comment_direct_parent", "depth", "is_sponsored",
+    "sponsored_data", "ad_id", "is_pinned", "is_pinned_story", "is_featured", "preferred_body", "style_list",
+})
+
+
+def _read_field(name: Any) -> bool:
+    if not isinstance(name, str):
+        return False
+    lower = name.lower()
+    return (name in RECORD_FIELDS or ("edit" in lower and "time" in lower)
+            or any(marker in lower for marker in ("truncat", "see_more", "reel", "life_event", "lifeevent")))
+
+
+def _carries_read_field(value: Any) -> bool:
+    if isinstance(value, dict):
+        return any(_read_field(key) or _carries_read_field(child) for key, child in value.items())
+    if isinstance(value, list):
+        return any(_carries_read_field(child) for child in value)
+    return False
+
+
+def _story_at(anchors: list[tuple[list, Any]], path: list) -> str | None:
+    """The innermost story a response path points into, from the chunk that delivered that part of the tree."""
+    for prefix, data in sorted(anchors, key=lambda anchor: -len(anchor[0])):
+        if path[:len(prefix)] != prefix:
+            continue
+        owner, current = None, data
+        for key in path[len(prefix):]:
+            if _is_story_shaped(current):
+                owner = str(current["feedback"]["id"])
+            if isinstance(current, dict) and isinstance(key, str):
+                current = current.get(key)
+            elif isinstance(current, list) and type(key) is int and 0 <= key < len(current):
+                current = current[key]
+            else:
+                break
+        if _is_story_shaped(current):
+            owner = str(current["feedback"]["id"])
+        if owner:
+            return owner
+    return None
+
+
 def _is_story_shaped(obj: Any) -> bool:
     return (
         isinstance(obj, dict)
@@ -186,21 +240,38 @@ def parse_story_nodes(bodies: Iterable[bytes]) -> ParsedStories:
     stories: dict[str, dict] = {}
     top_level_seen: dict[str, None] = {}
     issues: list[str] = []
+    anchors: list[tuple[list, Any]] = []  # (path, data) of every chunk: where each part of the tree arrived
+    touched: set[str] = set()
     for obj in iter_json_objects(bodies, issues=issues):
         for chunk in [obj, *(obj.get("incremental") or [])]:
             if not isinstance(chunk, dict):
                 continue
-            if "path" in chunk:
-                data = chunk.get("data")
-                if not _is_story_shaped(data) and not (
-                    isinstance(data, dict) and _is_story_shaped(data.get("node"))
-                ):
+            path = chunk.get("path") if isinstance(chunk.get("path"), list) else None
+            data = chunk.get("data")
+            anchors.append((list(path or []), data))
+            if path is not None and not _is_story_shaped(data) and not (
+                isinstance(data, dict) and _is_story_shaped(data.get("node"))
+            ) and _carries_read_field(data):
+                owner = _story_at(anchors, path)
+                if owner:
+                    touched.add(owner)
+                else:
                     issues.append("unsupported_path_patch")
-            if chunk.get("errors"):
-                issues.append("graphql_errors")
+            for error in chunk.get("errors") or []:
+                where = error.get("path") if isinstance(error, dict) else None
+                if isinstance(where, list) and where and not any(_read_field(key) for key in where):
+                    continue  # an error on a field no record reads
+                owner = _story_at(anchors, where) if isinstance(where, list) and where else None
+                if owner:
+                    touched.add(owner)
+                else:
+                    issues.append("graphql_errors")
             _walk({k: v for k, v in chunk.items() if k != "incremental"},
                   stories, top_level_seen,
-                  is_nested_share="attached_story" in (chunk.get("path") or []))
+                  is_nested_share="attached_story" in (path or []))
+    for key in touched:
+        if key in stories:
+            stories[key]["incomplete"] = True
     def linked(story: dict, ancestors: frozenset[str]) -> dict:
         result = dict(story)
         attached = find_attached_story(story)
@@ -214,11 +285,6 @@ def parse_story_nodes(bodies: Iterable[bytes]) -> ParsedStories:
         return result
 
     stories = {key: linked(story, frozenset({key})) for key, story in stories.items()}
-    if issues:
-        for story in stories.values():
-            for node in iter_story_dicts(story):
-                if _is_story_shaped(node):
-                    node["incomplete"] = True
     return ParsedStories(stories, set(top_level_seen), bool(issues),
                          list(dict.fromkeys(issues)), list(top_level_seen))
 
@@ -228,8 +294,10 @@ def parse_story_nodes(bodies: Iterable[bytes]) -> ParsedStories:
 
 def iter_story_dicts(obj: Any, *, exclude_keys: frozenset[str] = frozenset(),
                      exclude_links: bool = False) -> Iterator[dict]:
-    """DFS excluding named containers and, optionally, whole link attachment subtrees."""
+    """DFS excluding named containers, comments embedded in a story, and optionally link attachment subtrees."""
     if isinstance(obj, dict):
+        if _is_comment_shaped(obj):
+            return
         if (exclude_links and isinstance(obj.get("url"), str) and "uri" not in obj
                 and ("title" in obj or "description" in obj)):
             return

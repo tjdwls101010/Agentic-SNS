@@ -34,6 +34,7 @@ class Comment:
     reaction_count: int | None
     reply_count: int | None
     captured_at: datetime
+    attachments: list[dict]  # [{kind}] — what a comment carries besides text
 
     def to_dict(self) -> dict:
         return {
@@ -48,6 +49,7 @@ class Comment:
             "parent_id": self.parent_id,
             "reaction_count": self.reaction_count,
             "reply_count": self.reply_count,
+            "attachments": [dict(a) for a in self.attachments],
             "captured_at": _iso(self.captured_at),
         }
 
@@ -77,6 +79,11 @@ FIELD_DESCRIPTIONS: dict[str, tuple[str, str]] = {
     "parent_id": ("string | null", "Id of the comment this one replies to; null at depth 0."),
     "reaction_count": ("integer | null", "Reactions on this comment, or null if unavailable."),
     "reply_count": ("integer | null", "Replies to this comment, or null if unavailable."),
+    "attachments": (
+        "array<object>",
+        "List of {kind}: photo | gif | sticker | video | link | other. A comment with empty text and an "
+        "attachment is that attachment, not an empty comment; media URLs are not included.",
+    ),
     "captured_at": (
         "string",
         "ISO-8601 UTC timestamp of when this tool captured the response. Changes every "
@@ -100,6 +107,7 @@ def _representative() -> Comment:
         reaction_count=None,
         reply_count=None,
         captured_at=now,
+        attachments=[],
     )
 
 
@@ -208,6 +216,22 @@ def feedback_id(node: dict) -> str | None:
     return feedback.get("id") if isinstance(feedback, dict) else None
 
 
+#: A comment attachment's first style names what it is.
+_ATTACHMENT_KINDS = {"photo": "photo", "album": "photo", "animated_image_share": "gif", "sticker": "sticker",
+                     "video": "video", "video_inline": "video", "share": "link", "link": "link"}
+
+
+def attachment_kinds(node: dict) -> list[dict]:
+    kinds = []
+    for attachment in node.get("attachments") or []:
+        if not isinstance(attachment, dict):
+            continue
+        styles = attachment.get("style_list")
+        first = styles[0] if isinstance(styles, list) and styles and isinstance(styles[0], str) else None
+        kinds.append({"kind": _ATTACHMENT_KINDS.get(first, "other")})
+    return kinds
+
+
 def build_comment(node: dict, *, post_id: str, captured_at: datetime) -> Comment:
     author = node.get("author") or {}
     body = node.get("body") or {}
@@ -228,6 +252,7 @@ def build_comment(node: dict, *, post_id: str, captured_at: datetime) -> Comment
         reaction_count=reaction_count(node),
         reply_count=_count(node, "feedback", "replies_fields", "total_count"),
         captured_at=captured_at,
+        attachments=attachment_kinds(node),
     )
 
 

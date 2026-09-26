@@ -4,18 +4,19 @@ from datetime import datetime
 from facebook.errors import FacebookError
 from facebook.graphql.records import comment as _comment
 from facebook.graphql.records.connection import find_page_info
-from facebook.graphql.records.post import requested_story
+from facebook.graphql.records import post_story
 from facebook.graphql.registry import COMMENT_SORT_TOKENS
 from facebook.graphql.resolve import resolve_story_id
 from facebook.reading.paging import page_options, paginate
 
 
 def fetch_post_story(transport, url):
+    """(story, response issues) of the permalink's own post."""
     raw = transport.query('post', {'storyID': resolve_story_id(transport, url)}, referer=url)
-    story = requested_story(raw)
+    story, issues = post_story(raw)
     if story is None:
         raise FacebookError(6, 'The post response contains no readable post.', 'Run refresh, then retry the permalink.')
-    return story
+    return story, issues
 
 
 REPLY_RETRY = 'Run more: (or the same --out command); it retries these replies before reading on.'
@@ -39,7 +40,7 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
     if isinstance(cursor, dict) and 'post_id' in cursor:
         post_id, cursor = cursor['post_id'], cursor['after']
     if post_id is None:
-        story = story or fetch_post_story(transport, args.target)
+        story = story or fetch_post_story(transport, args.target)[0]
         post_id = (story.get('feedback') or {}).get('id')
     if not post_id:
         raise FacebookError(6, 'The post has no comment feedback handle.')

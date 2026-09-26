@@ -90,9 +90,11 @@ def render_comment(comment, *, index=1, parent_label=None, chars=180, timezone=N
     data = _data(comment)
     indent = '  ' * min(max(data.get('depth', 0), 0), 20)
     parent = f' reply-to={parent_label or "unavailable"}' if data.get('depth') else ''
+    kinds = ','.join(_line(a.get('kind')) for a in data.get('attachments') or [])
+    attached = f' · attachment={kinds}' if kinds else ''
     return (f'{indent}[c{index}{parent}] {_line(data.get("author_name") or "unavailable")} · '
             f'{_time(data.get("created_at"), timezone)} · reactions={_count(data.get("reaction_count"))} '
-            f'replies={_count(data.get("reply_count"))}\n{indent}     {_text(data, chars)}\n'
+            f'replies={_count(data.get("reply_count"))}\n{indent}     {_text(data, chars)}{attached}\n'
             f'{indent}     author: {_handle(data.get("author_url"))}')
 
 

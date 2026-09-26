@@ -19,7 +19,11 @@ from check_fixtures_pii import TOKEN_SHAPED_KEYS, scan_file
 
 ENUMS = {
     '__typename': {'User', 'Page', 'Group', 'Story', 'Comment', 'Photo', 'Video',
-                   'SearchResult', 'CometSearchResultsEntityResult', 'Profile'},
+                   'SearchResult', 'CometSearchResultsEntityResult', 'Profile', 'TextWithEntities', 'Image',
+                   'GenericAttachmentMedia', 'StoryAttachmentPhotoStyleRenderer',
+                   'StoryAttachmentAnimatedImageShareStyleRenderer'},
+    'style_list': {'photo', 'animated_image_share', 'image_share', 'share', 'fallback', 'sticker', 'video',
+                   'video_inline', 'album'},
     'kind': {'image', 'video', 'unknown', 'person', 'page', 'group'},
     'field_section_type': {'directory_work', 'directory_college', 'directory_bio',
                            'directory_places', 'directory_contact', 'directory_family'},
@@ -53,7 +57,8 @@ def derive(objects: list[dict]) -> list[dict]:
         if isinstance(value, list):
             return [synth(v, key) for v in value]
         if isinstance(value, str):
-            if value in ENUMS.get(key, set()) or (key == 'path' and value in keys):
+            # A path element is a GraphQL field name, structural like a key.
+            if value in ENUMS.get(key, set()) or (key == 'path' and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', value)):
                 return value
             if value == '':
                 return ''

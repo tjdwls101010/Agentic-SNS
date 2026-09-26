@@ -36,6 +36,16 @@ FIXES = {
     'budget_restart': 'Rerun with a larger --max-requests.',
 }
 
+# Response-level issue (records.Page.issues) → the coverage line it becomes.
+ISSUES = {
+    'unsupported_path_patch': 'part of this response could not be placed on any record; some records may lack fields',
+    'graphql_errors': 'Facebook reported errors for part of this response; some records may lack fields',
+    'cyclic_shared_story': 'a chain of shares looped back on itself and was cut there',
+    'invalid_utf8': 'some text was not valid UTF-8 and was replaced',
+    'malformed_json': 'a line of the response could not be decoded; records in it are missing',
+    'non_object_json': 'a line of the response was not an object; records in it are missing',
+}
+
 # The transport's own budget stop; finish words it by whether a later invocation can continue.
 BUDGET_SPENT = 'The request budget (--max-requests) is spent.'
 SETUP_BUDGET = 'The request budget ran out during setup, before any reading; setup needs 1–2 requests.'
@@ -152,7 +162,8 @@ def finish(reading, *, command, requests, budget, identity=None, out=None, conti
         envelope.update(error=kind, message=failure.message, fix=fix)
     elif kind == 'resumable':
         envelope['fix'] = FIXES['budget_resume']
-    coverage = list(reading.get('coverage') or [])
+    coverage = list(reading.get('coverage') or []) + [ISSUES.get(issue, issue) for issue in
+                                                      dict.fromkeys(reading.get('issues') or [])]
     if coverage:
         envelope['coverage'] = coverage
     envelope.update(reading.get('details') or {})
