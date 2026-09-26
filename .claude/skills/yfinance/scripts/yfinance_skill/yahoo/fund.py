@@ -1,5 +1,5 @@
 """ETF and mutual fund composition, weights and operations."""
-from registry import CURRENCY, MULTIPLE, RATE, SYMBOLS, WEIGHT, group, leaf
+from yfinance_skill.registry import CURRENCY, MULTIPLE, RATE, SYMBOLS, WEIGHT, group, leaf
 
 group("fund", "ETF and mutual fund composition, weights and operations")
 

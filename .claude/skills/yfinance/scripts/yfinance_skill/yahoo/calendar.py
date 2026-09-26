@@ -3,8 +3,8 @@ from datetime import date, timedelta
 
 import yfinance as yf
 
-from envelope import InputError, condition, within_dates
-from registry import CURRENCY, PER_SHARE, PERCENT, Arg, dates, effective_limit, group, leaf, get
+from yfinance_skill.envelope import InputError, condition, within_dates
+from yfinance_skill.registry import CURRENCY, PER_SHARE, PERCENT, Arg, dates, effective_limit, group, leaf, get
 
 group("calendar", "Earnings, economic, IPO and split events by date")
 

@@ -16,8 +16,7 @@ import sys
 
 import pytest
 
-CLI = Path(__file__).resolve().parents[2] / ".claude/skills/yfinance/Scripts/yfinance_cli.py"
-PROJECT = CLI.parent
+CLI = Path(__file__).resolve().parents[2] / ".claude/skills/yfinance/scripts/cli.py"
 
 SYMBOL = {"fund": "SPY"}
 POSITIONAL = {("market", "sector"): ["technology"], ("market", "industry"): ["software-infrastructure"],
@@ -34,8 +33,8 @@ def defaults_for(group, name):
 
 def run(arguments, store, timeout=180):
     env = dict(os.environ, YF_STORE=str(store))
-    proc = subprocess.run(["uv", "run", "--frozen", "--project", str(PROJECT), "python", str(CLI), *arguments],
-                          capture_output=True, text=True, env=env, cwd=str(PROJECT), timeout=timeout)
+    proc = subprocess.run(["uv", "run", "--quiet", str(CLI), *arguments],
+                          capture_output=True, text=True, env=env, cwd=str(store.parent), timeout=timeout)
     return proc, (json.loads(proc.stdout) if proc.stdout.strip().startswith("{") else None)
 
 

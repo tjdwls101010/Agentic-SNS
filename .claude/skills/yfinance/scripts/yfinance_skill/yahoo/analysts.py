@@ -1,5 +1,5 @@
 """Analyst estimates, revisions, recommendations and rating actions."""
-from registry import COUNT, CURRENCY, PER_SHARE, RATE, SYMBOLS, group, leaf
+from yfinance_skill.registry import COUNT, CURRENCY, PER_SHARE, RATE, SYMBOLS, group, leaf
 
 group("analysts", "Estimates, revisions, recommendations and rating actions")
 

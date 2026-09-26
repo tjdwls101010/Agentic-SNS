@@ -2,8 +2,8 @@
 import argparse
 import contextlib
 
-import registry
-from envelope import EXIT_CODES, STATUSES, InputError
+from yfinance_skill import registry
+from yfinance_skill.envelope import EXIT_CODES, STATUSES, InputError
 
 ENVELOPE = {
     "target": "the symbol, query or key this result answers",

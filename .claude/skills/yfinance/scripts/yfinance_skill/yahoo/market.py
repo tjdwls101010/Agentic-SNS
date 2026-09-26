@@ -1,7 +1,7 @@
 """Market summaries, sectors and industries."""
 import yfinance as yf
 
-from registry import RATE, WEIGHT, Arg, group, leaf
+from yfinance_skill.registry import RATE, WEIGHT, Arg, group, leaf
 
 group("market", "Market summaries, sectors and industries")
 

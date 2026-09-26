@@ -6,8 +6,8 @@ import math
 
 import yfinance as yf
 
-from envelope import InputError, condition, monotonic
-from registry import COUNT, CURRENCY, MULTIPLE, PERCENT, Arg, OneOf, effective_limit, get, group, leaf
+from yfinance_skill.envelope import InputError, condition, monotonic
+from yfinance_skill.registry import COUNT, CURRENCY, MULTIPLE, PERCENT, Arg, OneOf, effective_limit, get, group, leaf
 
 group("screen", "Query fields, enumerated values, named presets and screening runs")
 

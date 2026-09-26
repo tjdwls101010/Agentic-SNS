@@ -1,6 +1,14 @@
+# /// script
+# requires-python = ">=3.12,<3.14"
+# dependencies = ["yfinance[repair]==1.7.0", "pandas", "numpy"]
+#
+# [tool.uv]
+# exclude-newer = "2026-09-13T13:10:00Z"
+# ///
 """Purpose-oriented Yahoo Finance CLI. Discover contracts with schema and --help."""
 import argparse
 import contextlib
+import copy
 from datetime import date
 import re
 import signal
@@ -8,16 +16,12 @@ import sys
 
 import yfinance as yf
 
-import budget
-import copy
-import export
-import groups  # noqa: F401  registers every leaf
-import registry
-import store
-from encode import encode, is_empty, is_sided, is_table
-from envelope import InputError, error_info, now, ordered, result
-from schema import schema_data
-from selection import select, select_sides
+from yfinance_skill import budget, export, registry, store
+import yfinance_skill.yahoo  # noqa: F401  registers every leaf
+from yfinance_skill.encode import encode, is_empty, is_sided, is_table
+from yfinance_skill.envelope import InputError, error_info, now, ordered, result
+from yfinance_skill.schema import schema_data
+from yfinance_skill.selection import select, select_sides
 
 
 class Parser(argparse.ArgumentParser):

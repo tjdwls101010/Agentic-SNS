@@ -3,8 +3,8 @@
 It runs on the encoded value, so the first call and every later `read` of the same observation select through this one
 function and cannot disagree about what a row or a field was.
 """
-from encode import is_table, row_count
-from envelope import InputError
+from yfinance_skill.encode import is_table, row_count
+from yfinance_skill.envelope import InputError
 
 
 # ---- field paths -------------------------------------------------------------------------------------------------

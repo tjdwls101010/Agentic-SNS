@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 import time
 
-from envelope import InputError
+from yfinance_skill.envelope import InputError
 
 ID_LENGTH = 16  # 성진: 64자 전체를 실으면 다종목 회복 문장이 id만으로 예산을 먹는다; 16자는 충돌 확률이 무시할 만하고 한 줄에 열 개가 들어간다.
 

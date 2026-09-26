@@ -48,5 +48,5 @@ jobs:
         with:
           python-version: '3.12'
       - uses: astral-sh/setup-uv@v6
-      - run: uv run --frozen --group dev --project .claude/skills/yfinance/Scripts python -m pytest tests/yfinance
-      - run: uv run --frozen --group dev --project .claude/skills/yfinance/Scripts ruff check --config pyproject.toml .claude/skills/yfinance/Scripts tests/yfinance
+      - run: bash -c 'set -euo pipefail; mkdir -p .tmp; uv export --quiet --script .claude/skills/yfinance/scripts/cli.py --no-hashes -o .tmp/yf-test-req.txt; uv run --isolated --no-project --python ">=3.12,<3.14" --with-requirements .tmp/yf-test-req.txt --with pytest==8.4.2 python -m pytest tests/yfinance tests/test_skill_layout.py'
+      - run: uvx ruff check --config pyproject.toml .claude/skills/yfinance/scripts tests/yfinance

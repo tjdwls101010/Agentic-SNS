@@ -1,5 +1,5 @@
 """Institutional, fund and insider ownership."""
-from registry import COUNT, CURRENCY, RATE, SHARES, SYMBOLS, group, leaf
+from yfinance_skill.registry import COUNT, CURRENCY, RATE, SHARES, SYMBOLS, group, leaf
 
 group("holders", "Institutional, fund and insider ownership")
 

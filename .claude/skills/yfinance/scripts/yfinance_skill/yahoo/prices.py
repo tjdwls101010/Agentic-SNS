@@ -1,8 +1,8 @@
 """Quotes, and bars and corporate actions with explicit adjustment and date semantics."""
 import pandas as pd
 
-from envelope import within_dates
-from registry import PERCENT, RATE, SYMBOLS, Arg, dates, group, leaf
+from yfinance_skill.envelope import within_dates
+from yfinance_skill.registry import PERCENT, RATE, SYMBOLS, Arg, dates, group, leaf
 
 group("prices", "Quotes, historical bars and corporate actions")
 

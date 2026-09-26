@@ -1,5 +1,5 @@
 """Statements and valuation measures by period."""
-from registry import CURRENCY, MULTIPLE, PER_SHARE, RATE, SHARES, SYMBOLS, Arg, group, leaf
+from yfinance_skill.registry import CURRENCY, MULTIPLE, PER_SHARE, RATE, SHARES, SYMBOLS, Arg, group, leaf
 
 group("financials", "Income, balance sheet, cash flow and valuation measures by period")
 

@@ -13,7 +13,7 @@ import sys
 
 import pytest
 
-SCRIPTS = Path(__file__).resolve().parents[2] / ".claude/skills/yfinance/Scripts"
+CLI = Path(__file__).resolve().parents[2] / ".claude/skills/yfinance/scripts/cli.py"
 SHAPES = Path(__file__).parent / "fixtures/shapes"
 
 
@@ -27,7 +27,7 @@ def cli(tmp_path):
         env = os.environ.copy()
         env.update(PYTHONPATH=str(Path(__file__).parent / "fixtures"), YF_HTTP_FIXTURE=str(fixture),
                    YF_TEST_CACHE=str(run_dir / "cache"), YF_STORE=str(store or (tmp_path / "store")))
-        proc = subprocess.run([sys.executable, str(SCRIPTS / "yfinance_cli.py"), *args], capture_output=True, text=True, env=env, timeout=60)
+        proc = subprocess.run([sys.executable, str(CLI), *args], capture_output=True, text=True, env=env, timeout=60)
         assert "UNEXPECTED NETWORK" not in proc.stderr, proc.stderr
         if raw:
             return proc

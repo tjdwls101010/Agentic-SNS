@@ -1,8 +1,8 @@
 """Instrument discovery by name, symbol or keyword."""
 import yfinance as yf
 
-from envelope import InputError
-from registry import Arg, effective_limit, get, group, leaf
+from yfinance_skill.envelope import InputError
+from yfinance_skill.registry import Arg, effective_limit, get, group, leaf
 
 group("search", "Find instruments by name, symbol or keyword")
 

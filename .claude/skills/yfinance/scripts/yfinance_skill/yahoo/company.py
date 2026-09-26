@@ -1,6 +1,6 @@
 """Company profile, shares outstanding, news and filing links."""
-from groups.prices import CURRENCY_SPLIT, FROM, INFO_UNITS, info, info_time
-from registry import SHARES, SYMBOLS, Arg, dates, effective_limit, get, group, leaf
+from yfinance_skill.yahoo.prices import CURRENCY_SPLIT, FROM, INFO_UNITS, info, info_time
+from yfinance_skill.registry import SHARES, SYMBOLS, Arg, dates, effective_limit, get, group, leaf
 
 group("company", "Profile, shares outstanding, news and filing links")
 

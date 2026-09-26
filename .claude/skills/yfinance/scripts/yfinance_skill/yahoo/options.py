@@ -1,6 +1,6 @@
 """Expirations and option chains."""
-from envelope import InputError, condition
-from registry import COUNT, CURRENCY, PERCENT, RATE, SYMBOLS, Arg, group, leaf
+from yfinance_skill.envelope import InputError, condition
+from yfinance_skill.registry import COUNT, CURRENCY, PERCENT, RATE, SYMBOLS, Arg, group, leaf
 
 group("options", "Expirations and option chains")
 

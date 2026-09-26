@@ -9,7 +9,7 @@ import tempfile
 
 import pytest
 
-from conftest import SCRIPTS, shape
+from conftest import CLI, shape
 
 
 STORE = tempfile.mkdtemp(prefix="yf-discovery-")
@@ -19,7 +19,7 @@ STORE = tempfile.mkdtemp(prefix="yf-discovery-")
 def schema(*scope):
     """schema is offline, so one call per scope serves every test that reads it."""
     env = dict(os.environ, YF_STORE=STORE)  # every command opens its store; keep that away from the user's cache
-    proc = subprocess.run([sys.executable, str(SCRIPTS / "yfinance_cli.py"), "schema", *scope], capture_output=True, text=True, env=env, timeout=60)
+    proc = subprocess.run([sys.executable, str(CLI), "schema", *scope], capture_output=True, text=True, env=env, timeout=60)
     assert proc.returncode == 0, proc.stdout[:400]
     return json.loads(proc.stdout)["results"][0]["data"]
 

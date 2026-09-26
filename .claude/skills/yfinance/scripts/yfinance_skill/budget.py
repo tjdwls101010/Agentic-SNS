@@ -10,9 +10,9 @@ the whole answer.
 import re
 import shlex
 
-from encode import display, dump, is_empty, row_count
-from envelope import EXIT_CODES, error_info
-from selection import select
+from yfinance_skill.encode import display, dump, is_empty, row_count
+from yfinance_skill.envelope import EXIT_CODES, error_info
+from yfinance_skill.selection import select
 
 MIN_CHARS = 1000
 

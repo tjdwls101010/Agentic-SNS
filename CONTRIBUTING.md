@@ -6,7 +6,7 @@ Keep the project focused on reading and exploring SNS through the user's logged-
 
 ## Development setup
 
-SNS runtime scripts require Python 3.11+ and Aside. SEC uses Python 3.11+ and yfinance the Python 3.12 that `uv` prepares from its `.python-version`; each has a separate `uv.lock` environment. Offline checks do not need Aside or SNS accounts. CI uses Python 3.12 and Node.js 22; pytest and Ruff are development dependencies.
+SNS runtime scripts require Python 3.11+ and Aside. SEC uses Python 3.11+ with its own `uv.lock` environment; yfinance uses Python 3.12 or 3.13 and the dependencies its `scripts/cli.py` header declares, which `uv` prepares. Offline checks do not need Aside or SNS accounts. CI uses Python 3.12 and Node.js 22; pytest and Ruff are development dependencies.
 
 ```bash
 python3 -m venv .tmp/dev-venv
@@ -28,7 +28,7 @@ python tests/twitter/tools/check_fixtures_pii.py
 ruff check --config pyproject.toml .claude/skills/twitter/scripts tests/twitter
 ```
 
-The [CI workflow](.github/workflows/test.yml) contains the corresponding commands for the SNS skills and separate locked SEC and yfinance jobs. Naver Blog uses `naver-blog` for its skill directory and `naver_blog` for its test directory. Run the complete offline suite when shared behavior or documentation examples change.
+The [CI workflow](.github/workflows/test.yml) contains the corresponding commands for the SNS skills and separate SEC and yfinance jobs. Naver Blog uses `naver-blog` for its skill directory and `naver_blog` for its test directory. Run the complete offline suite when shared behavior or documentation examples change.
 
 For the SEC skill, run its locked development environment:
 
@@ -39,14 +39,14 @@ uv run --isolated --frozen --group dev --project .claude/skills/sec/Scripts ruff
 
 Its fixture provenance distinguishes recorded public SEC responses from constructed edge cases. Live checks require the local requester identity; never record that identity in a fixture or diagnostic. The SEC skill's whole directory, including `Scripts/` with its `pyproject.toml` and `uv.lock`, must work independently of this repository.
 
-For yfinance, use its locked environment:
+For yfinance, build the test environment from the dependencies the script declares, so the suite runs against what `uv run` gives the skill:
 
 ```bash
-uv run --frozen --group dev --project .claude/skills/yfinance/Scripts python -m pytest tests/yfinance
-uv run --frozen --group dev --project .claude/skills/yfinance/Scripts ruff check --config pyproject.toml .claude/skills/yfinance/Scripts tests/yfinance
+bash -c 'set -euo pipefail; mkdir -p .tmp; uv export --quiet --script .claude/skills/yfinance/scripts/cli.py --no-hashes -o .tmp/yf-test-req.txt; uv run --isolated --no-project --python ">=3.12,<3.14" --with-requirements .tmp/yf-test-req.txt --with pytest==8.4.2 python -m pytest tests/yfinance tests/test_skill_layout.py'
+uvx ruff check --config pyproject.toml .claude/skills/yfinance/scripts tests/yfinance
 ```
 
-These tests exercise the public CLI in isolated processes with controlled HTTP responses and the real yfinance parser. Keep fixture provenance explicit and do not substitute mocked library getters for transport coverage. Live Yahoo queries and Claude/Codex skill-use scenarios are separate checks; a green offline suite does not establish either. The complete skill directory must run from another project without this repository's temporary source tree or system-installed yfinance.
+These tests exercise the public CLI in isolated processes with controlled HTTP responses and the real yfinance parser; `tests/yfinance/test_portability.py` also runs the skill through a real `uv run` from paths outside the repository. Keep fixture provenance explicit and do not substitute mocked library getters for transport coverage. Live Yahoo queries and Claude/Codex skill-use scenarios are separate checks; a green offline suite does not establish either. The complete skill directory must run from another project without this repository's temporary source tree or system-installed yfinance.
 
 For bugs, add a failing reproduction at the public behavior boundary before changing the implementation. Keep assertions focused on observable results, failures, privacy, and continuation behavior rather than private helper structure. For documentation-only changes, execute the changed commands, check links and output claims, and avoid tests that merely repeat the prose.
 
