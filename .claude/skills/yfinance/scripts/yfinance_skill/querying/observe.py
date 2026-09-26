@@ -84,6 +84,7 @@ def run(args, item, saved, request, commands):
         if stopped:
             results.append(result(target, status="not_attempted", error=error_info("not_attempted", "Stopped after rate limiting", "Retry later with fewer targets.")))
             continue
+        ident = None  # set once the response is saved, so a failure after that still names the handle to it
         try:
             signal.signal(signal.SIGALRM, timed_out)
             signal.alarm(args.timeout)
@@ -111,7 +112,7 @@ def run(args, item, saved, request, commands):
                    else LOCAL_FIX if code == "local_io"
                    else "Retry later with fewer targets; remaining targets were not attempted." if code == "rate_limited"
                    else upstream_fix(exc, item, args))
-            results.append(ordered(result(target, error=error_info(code, exc, fix))))
+            results.append(ordered(result(target, error=error_info(code, exc, fix), ident=ident)))
         finally:
             signal.alarm(0)
     if getattr(args, "out", None):

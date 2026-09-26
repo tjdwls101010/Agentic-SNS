@@ -234,3 +234,15 @@ def test_an_invalid_read_neither_prunes_nor_creates_a_store(cli, tmp_path, argv)
     fresh = tmp_path / "never-created"
     proc, doc = cli("read", ident, *argv, routes=[], store=fresh)
     assert proc.returncode == 2 and not fresh.exists()
+
+
+def test_a_target_that_fails_after_its_response_was_saved_still_names_the_saved_id(cli, tmp_path):
+    """The response was paid for and saved before the projection was refused; without the id the only way back to it
+    is a second request, and a result without an id reads as nothing saved."""
+    store = tmp_path / "s"
+    proc, doc = cli("prices", "history", "AAPL", "--period", "1mo", "--fields", "NoSuchColumn", routes=chart_routes(), store=store)
+    r = doc["results"][0]
+    assert r["status"] == "error" and r["error"]["code"] == "invalid", proc.stdout[:300]
+    assert r.get("id") and (store / f"{r['id']}.json").exists(), r
+    proc, back = cli("read", r["id"], "--fields", "Close", "--limit", "2", routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:300]
