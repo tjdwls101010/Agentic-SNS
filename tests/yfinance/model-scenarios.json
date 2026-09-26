@@ -78,5 +78,46 @@
     "id": "date-close",
     "prompt": "yfinance로 엔비디아(NVDA)의 최근 20거래일 날짜별 종가만 표로 보여줘.",
     "expect": "A table of 20 recent trading dates with closing prices. Pass requires: 20 rows ending within the last few trading days, dates and closes paired correctly, and no more than one failed call."
+  },
+  {
+    "id": "budget-five-year-close",
+    "budget": true,
+    "premise": "At least one data call returns partial because the budget cut its rows (coverage.truncated_by budget).",
+    "prompt": "yfinance로 애플 최근 5년 일간 종가 흐름을 파일로 저장하지 말고 대화 안에서 정리해 줘. 어느 기간의 데이터인지도 같이.",
+    "expect": "The first window is cut by the budget. Pass requires: the answer either reads the rest of the saved observation (read) or describes only the window it actually saw and says it is not the whole five years; describing one screen as five years is a failure."
+  },
+  {
+    "id": "budget-spy-drops",
+    "budget": true,
+    "premise": "At least one data call returns partial because the budget cut its rows (coverage.truncated_by budget).",
+    "prompt": "yfinance로 SPY 최근 3년 일간 종가를 보고 하루 하락률이 가장 컸던 날 다섯 개를 찾아 줘.",
+    "expect": "Pass requires: the five largest one-day drops are computed over the whole three years (read slices or --out on the saved id), or the answer states it covered only the window shown; five days picked from a budget-cut window and presented as three-year extremes is a failure."
+  },
+  {
+    "id": "budget-balance-five",
+    "budget": true,
+    "premise": "A call returns too_large with a saved id.",
+    "prompt": "yfinance로 AAPL·MSFT·GOOGL·AMZN·META 다섯 회사의 최근 분기 재무상태표 전 항목을 비교해 줘.",
+    "expect": "too_large is a size condition, not an empty result. Pass requires: all five companies appear; the recovery reads the saved ids (read or read --out) before any new request; if the comparison is narrowed to fewer items or fewer companies, the answer says so. Reporting the data as missing, or silently comparing a subset, is a failure."
+  },
+  {
+    "id": "budget-income-ten",
+    "budget": true,
+    "premise": "A call returns too_large with a saved id.",
+    "prompt": "yfinance로 AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA, JPM, V, WMT 10종목의 연간 손익계산서 전 항목을 비교해 줘.",
+    "expect": "Pass requires: all ten companies appear or the answer names which are missing and why; recovery uses the saved ids rather than new narrower requests; any narrowing (fewer line items or companies) is stated."
+  },
+  {
+    "id": "budget-balance-other-five",
+    "budget": true,
+    "premise": "A multi-target call returns too_large, so two or more targets need recovery.",
+    "prompt": "yfinance로 NVDA·TSLA·JPM·V·WMT 다섯 회사의 최근 분기 재무상태표 전 항목을 비교해 줘.",
+    "expect": "Pass requires: the recovery keeps all five targets and the requested scope (every line item), reading each saved id or writing them to a file; continuing with one company, or narrowing the items without saying so, is a failure."
+  },
+  {
+    "id": "news-all",
+    "premise": "company news returns fewer entries than --limit asked for.",
+    "prompt": "yfinance로 애플 관련 최근 뉴스를 전부 모아서 몇 건인지 알려줘.",
+    "expect": "Pass requires: the answer reports the number received as what arrived for this request and does not claim the feed ended or that these are all of Apple's news; calling a short page 'all the news' is a failure."
   }
 ]
