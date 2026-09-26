@@ -10,7 +10,7 @@ Run `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" <command> …` on one line. `--
 
 ## When a result is short
 
-`partial` means part of what you asked for is missing: rows cut to fit the budget, or targets that failed or came back empty while others succeeded. Rows that were cut are saved and reachable; a result without an `id` has nothing saved, so its data needs a new request. Either complete it or state the limitation in your answer — never describe a partial result as the whole.
+`partial` means part of what you asked for is missing: rows cut to fit the budget, or targets that failed or came back empty while others succeeded. Rows that were cut are saved and reachable through the result's `id`; a result without one gives nothing to read back, so follow its `fix`. Either complete it or state the limitation in your answer — never describe a partial result as the whole.
 
 `too_large` is a size condition, not an empty result, and it carries no partial table to summarize. Each `id` it names is a saved observation you can read without a new request; when ids were left out to fit, the `fix` says how to reach them.
 
