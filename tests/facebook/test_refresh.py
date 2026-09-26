@@ -119,18 +119,19 @@ def test_verified_home_feed_supplies_the_post_sample_without_saving_its_handle(t
 
 
 def test_refresh_does_not_report_success_when_no_queries_were_found(tmp_path):
-    result = Account(tmp_path).run('refresh', '--json', responses=[login(), *[mined(route) for route in ROUTES]])
-    assert result.code == 8
+    result = Account(tmp_path).run('refresh', responses=[login(), *[mined(route) for route in ROUTES]])
+    assert result.code == 6 and result.data['error'] == 'failed'
     assert result.data['ok'] is False and result.data['updated'] == []
     assert result.data['stop_reason'] == 'query_failure'
-    assert result.data['fix'].startswith('Read missing/failed; only verified updates were saved.')
+    assert result.data['fix'] == ('Read missing and failed; only verified updates were saved. '
+                                  'Use --capture POST_URL for comment queries.')
 
 
 @pytest.mark.parametrize('body', ['', '{"data":null}', '{"data":{"wrong":{}}}', '{"errors":[{"severity":"CRITICAL"}]}'])
 def test_unverified_replay_responses_never_replace_cache(tmp_path, body):
     account = Account(tmp_path)
     result = account.run('refresh', responses=[login(), *mining(), *[envelope(body)] * 5])
-    assert result.code == 8
+    assert result.code == 6
     assert result.data['updated'] == []
     assert set(result.data['failed'].values()) == {'replay_failed', 'sample_post_missing'}
     assert result.data['failed']['post'] == 'sample_post_missing'
@@ -140,7 +141,7 @@ def test_unverified_replay_responses_never_replace_cache(tmp_path, body):
 def test_bundle_request_failure_reports_every_mined_query_without_replaying_cached_ids(tmp_path):
     account = Account(tmp_path)
     result = account.run('refresh', responses=[login(), *mining(bundle_status=500)])
-    assert result.code == 8
+    assert result.code == 6
     assert result.data['updated'] == []
     assert result.data['failed'] == {key: 'mining_request_failed' for key in MINED}
     assert set(result.data['missing']) == {'comments', 'comments_page', 'replies'}
@@ -180,8 +181,8 @@ def test_login_or_block_during_replay_stops_further_requests_and_cache_write(tmp
     assert account.blocked() == (code == 5)
 
 
-@pytest.mark.parametrize('args', [['--capture'], ['--post', POST], ['--capture', '--post', 'https://evil.example/posts/1'],
-                                  ['--capture', '--post', 'https://www.facebook.com:bad/posts/1']])
+@pytest.mark.parametrize('args', [['--capture'], ['--post', POST], ['--capture', 'https://evil.example/posts/1'],
+                                  ['--capture', 'https://www.facebook.com:bad/posts/1'], ['--capture', 'https://www.facebook.com/zuck']])
 def test_capture_arguments_are_checked_before_any_request(tmp_path, args):
     result = Account(tmp_path).run('refresh', *args)
     assert result.code == 2 and result.calls == []
@@ -192,7 +193,7 @@ def capture_run(account, feed_capture, post_capture, after=None, **kwargs):
     if after is None:
         after = [*[replay(k) for k in ['newsfeed', 'about', 'comments', 'comments_page', 'group', 'replies', 'search',
                                        'timeline']], story_page(), replay('post')]
-    return account.run('refresh', '--capture', '--post', POST, responses=responses + after, **kwargs)
+    return account.run('refresh', '--capture', POST, responses=responses + after, **kwargs)
 
 
 def test_capture_saves_only_verified_metadata_and_replays_instance_variables(tmp_path):

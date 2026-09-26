@@ -1,12 +1,11 @@
-"""Comment schema and extraction (plan §5).
+"""Comment records and their extraction.
 
 Comments need their own extraction path rather than reusing ``parse.py``:
 a comment node carries its own ``feedback`` object, so the story walker
 counts comments as top-level *posts*. The two shapes are told apart by the
 ``depth`` + ``author`` + ``body`` triple that only comments have.
 
-``depth`` maps exactly onto the agreed design (recon §3): ``0`` is a
-top-level comment, ``>= 1`` is a reply.
+``depth`` ``0`` is a comment on the post, ``>= 1`` a reply.
 """
 
 from __future__ import annotations
@@ -16,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from facebook.graphql.records.fields import _iso, build_json_schema, build_schema_fields, timestamp
+from facebook.graphql.records.fields import _iso, timestamp
 from facebook.graphql.records.parse import deep_merge, iter_json_objects
 
 
@@ -34,6 +33,7 @@ class Comment:
     reaction_count: int | None
     reply_count: int | None
     captured_at: datetime
+    attachments: list[dict]  # [{kind}] — what a comment carries besides text
 
     def to_dict(self) -> dict:
         return {
@@ -48,71 +48,28 @@ class Comment:
             "parent_id": self.parent_id,
             "reaction_count": self.reaction_count,
             "reply_count": self.reply_count,
+            "attachments": [dict(a) for a in self.attachments],
             "captured_at": _iso(self.captured_at),
         }
 
 
-FIELD_DESCRIPTIONS: dict[str, tuple[str, str]] = {
-    "id": ("string", "Stable identity/dedup key for this comment."),
-    "post_id": (
-        "string",
-        "Feedback id of the post this comment belongs to — matches a Post's `id`, so "
-        "comments and posts can be joined.",
-    ),
-    "author_name": ("string | null", "Display name of the comment's author."),
-    "author_url": (
-        "string | null",
-        "Profile URL of the comment's author — the handle to chain into `profile` or `about`.",
-    ),
-    "author_id": ("string | null", "Numeric id of the comment's author."),
-    "text": (
-        "string",
-        "The comment body; empty string if it has none (e.g. a sticker-only reply).",
-    ),
-    "created_at": (
-        "string | null",
-        "ISO-8601 UTC timestamp with a 'Z' suffix; null if it could not be located.",
-    ),
-    "depth": ("integer", "0 for a top-level comment, 1 or more for a reply."),
-    "parent_id": ("string | null", "Id of the comment this one replies to; null at depth 0."),
-    "reaction_count": ("integer | null", "Reactions on this comment, or null if unavailable."),
-    "reply_count": ("integer | null", "Replies to this comment, or null if unavailable."),
-    "captured_at": (
-        "string",
-        "ISO-8601 UTC timestamp of when this tool captured the response. Changes every "
-        "run — never a dedup key.",
-    ),
+FIELDS = {
+    "id": "string — stable identity of the comment",
+    "post_id": "string — id of the post it belongs to; matches that post record's id",
+    "author_name": "string | null — display name of the commenter",
+    "author_url": "string | null — the commenter's profile URL; the profile and about commands' argument",
+    "author_id": "string | null — numeric id of the commenter",
+    "text": "string — the comment body as received; empty for a comment that is only an attachment",
+    "created_at": "string | null — ISO-8601 UTC time the comment was made",
+    "depth": "integer — 0 for a comment on the post, 1 or more for a reply",
+    "parent_id": "string | null — id of the comment this one replies to; null at depth 0",
+    "reaction_count": "integer | null — reactions; null when not sent, never guessed from an abbreviation",
+    "reply_count": "integer | null — replies Facebook reports; null when not sent",
+    "attachments": "array<object> — what the comment carries besides text; empty text plus an attachment is that "
+                   "attachment, not an empty comment",
+    "attachments[].kind": "string — photo | gif | sticker | video | link | other; media URLs are not included",
+    "captured_at": "string — ISO-8601 UTC time this tool received it; changes every run",
 }
-
-
-def _representative() -> Comment:
-    now = datetime(2026, 1, 1, tzinfo=UTC)
-    return Comment(
-        id="1",
-        post_id="1",
-        author_name=None,
-        author_url=None,
-        author_id=None,
-        text="",
-        created_at=now,
-        depth=0,
-        parent_id=None,
-        reaction_count=None,
-        reply_count=None,
-        captured_at=now,
-    )
-
-
-def schema_fields() -> list[dict]:
-    return build_schema_fields(_representative().to_dict(), FIELD_DESCRIPTIONS, optional=set())
-
-
-def json_schema() -> dict:
-    return build_json_schema(
-        "Comment",
-        "One element of the comments output array (or one NDJSON line).",
-        schema_fields(),
-    )
 
 
 # --- extraction ---------------------------------------------------------------
@@ -122,7 +79,7 @@ def _is_comment_shaped(obj: Any) -> bool:
     return (
         isinstance(obj, dict)
         and "depth" in obj
-        and isinstance(obj.get("author"), dict)
+        and "author" in obj and isinstance(obj.get("author"), dict | type(None))
         and isinstance(obj.get("body"), dict | type(None))
         and obj.get("id") is not None
     )
@@ -208,6 +165,22 @@ def feedback_id(node: dict) -> str | None:
     return feedback.get("id") if isinstance(feedback, dict) else None
 
 
+#: A comment attachment's first style names what it is.
+_ATTACHMENT_KINDS = {"photo": "photo", "album": "photo", "animated_image_share": "gif", "sticker": "sticker",
+                     "video": "video", "video_inline": "video", "share": "link", "link": "link"}
+
+
+def attachment_kinds(node: dict) -> list[dict]:
+    kinds = []
+    for attachment in node.get("attachments") or []:
+        if not isinstance(attachment, dict):
+            continue
+        styles = attachment.get("style_list")
+        first = styles[0] if isinstance(styles, list) and styles and isinstance(styles[0], str) else None
+        kinds.append({"kind": _ATTACHMENT_KINDS.get(first, "other")})
+    return kinds
+
+
 def build_comment(node: dict, *, post_id: str, captured_at: datetime) -> Comment:
     author = node.get("author") or {}
     body = node.get("body") or {}
@@ -228,6 +201,7 @@ def build_comment(node: dict, *, post_id: str, captured_at: datetime) -> Comment
         reaction_count=reaction_count(node),
         reply_count=_count(node, "feedback", "replies_fields", "total_count"),
         captured_at=captured_at,
+        attachments=attachment_kinds(node),
     )
 
 

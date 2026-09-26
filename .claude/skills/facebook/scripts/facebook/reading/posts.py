@@ -2,28 +2,23 @@
 from datetime import datetime, time, date
 
 from facebook.errors import FacebookError
-from facebook.graphql.records.connection import find_page_info, connection_has_items
-from facebook.graphql.records.post import build_post, posts_from_raw
+from facebook.graphql.records import post_page, post_record
 from facebook.graphql.registry import get_query, FEED_SORT_TOKENS, GROUP_SORT_TOKENS
 from facebook.graphql.resolve import resolve_profile_id, resolve_group_id
+from facebook.outcome import ISSUES
 from facebook.reading.comments import comments, fetch_post_story
-from facebook.reading.paging import in_window, page_options, paginate
+from facebook.reading.paging import page_options, paginate
 
 
 def run(args, transport, *, state=None, commit=None):
     state = state or {}
     if args.command == 'post':
-        story = fetch_post_story(transport, args.target)
-        post = build_post(story, source='permalink', captured_at=datetime.now().astimezone(),
-                          include_raw=False).to_dict()
-        if not in_window(post, args.since, args.until):
-            result = dict(ok=True, results=[], stop_reason='exhausted')
-        else:
-            result = comments(args, transport, state={}, commit=None, story=story, first_batch=True)
-            result['results'].insert(0, post)
-            result['continuation_command'] = 'comments'
-        if commit and result['ok']:
-            commit(result['results'], {'exhausted': True}, 'exhausted')
+        story, issues = fetch_post_story(transport, args.target)
+        post = post_record(story, source='permalink', captured_at=datetime.now().astimezone())
+        result = comments(args, transport, state={}, commit=None, story=story, first_batch=True)
+        result['results'].insert(0, post)
+        result['issues'] = issues + result.get('issues', [])
+        result['continuation_command'] = 'comments'
         return result
     variables = {}
     referer = getattr(args, 'target', None)
@@ -42,15 +37,27 @@ def run(args, transport, *, state=None, commit=None):
         variables.update(id=resolve_group_id(transport, args.target), sortingSetting=GROUP_SORT_TOKENS[args.sort])
     spec = get_query(key)
 
+    issues = []
+
     def fetch(cursor):
         raw = transport.query(key, {**variables, spec.cursor_var: cursor}, referer=referer)
-        records = posts_from_raw(raw, source)
-        if not records and connection_has_items(raw, spec.connection_key):
+        page = post_page(raw, source=source, connection_key=spec.connection_key,
+                         captured_at=datetime.now().astimezone())
+        if not page.records and page.has_items:
             raise FacebookError(6, 'A nonempty feed connection contains no readable posts.', 'Run refresh, then retry.')
-        return records, find_page_info(raw, spec.connection_key)
+        issues.extend(page.issues)
+        page_notes.extend(ISSUES.get(issue, issue) for issue in page.issues)
+        return page.records, page.page_info
 
-    result = paginate(fetch, **page_options(args, state, commit))
-    if args.since or args.until:
-        result['window_mode'] = 'server' if args.command == 'profile' else 'client'
-        result['window_complete'] = args.command == 'profile' and result['stop_reason'] == 'exhausted'
+    page_notes = []
+
+    def commit_with_notes(records, cursor, reason, skipped=()):
+        commit(records, cursor, reason, skipped, list(dict.fromkeys(page_notes)))
+        page_notes.clear()
+
+    newest_first = args.command in ('feed', 'group') and args.sort == 'recent'
+    skip_sponsored = args.command == 'feed' and not args.include_sponsored
+    options = page_options(args, state, commit_with_notes if commit else None)
+    result = paginate(fetch, **options, newest_first=newest_first, skip_sponsored=skip_sponsored)
+    result['issues'] = issues
     return result

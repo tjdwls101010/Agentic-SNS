@@ -88,6 +88,7 @@ def test_failed_reply_at_end_can_retry_without_repeating_shown_records(tmp_path)
         comment_page([comment_node('r1', 1, 'c1')], 'replies_connection'), FAILURE))
     assert first.code == 8, first.stdout
     assert first.ids == ['c1', 'r1', 'c2']
+    assert first.data['error'] == 'partial' and first.data['fix'].startswith('Run more:')
     assert first.data['replies_incomplete'] == [{'parent_id': 'c2', 'reason': 'request_failure', 'retryable': True,
                                                  'code': 6, 'message': 'Facebook query failed or its expected '
                                                                        'structure changed.'}]
@@ -102,8 +103,10 @@ def test_reply_batch_limit_is_reported_without_retrying_first_batch_forever(tmp_
     replies['data']['node']['replies_connection']['page_info'] = {'has_next_page': True, 'end_cursor': 'reply2'}
     result = Account(tmp_path).run('comments', POST_URL, '--limit', '1', '--replies', '--json', responses=opened(
         comment_page([comment_node('c1')]), envelope(replies)))
-    assert result.code == 8
-    assert result.data['stop_reason'] == 'query_failure'
+    # A first reply batch with more behind it is a coverage note, not a failure, and is never retried.
+    assert result.code == 0 and result.data['ok'] is True
+    assert result.data['stop_reason'] == 'exhausted'
+    assert result.data['coverage'] == ['replies to c1: first batch only; Facebook offers no further reply page here']
     assert result.data['replies_incomplete'][0]['reason'] == 'batch_limit'
     assert result.data['replies_incomplete'][0]['retryable'] is False
     assert 'next' not in result.data
@@ -137,8 +140,7 @@ def test_post_continues_comments_with_the_first_batch_root_cursor(tmp_path):
     first = account.run('post', POST_URL, '--json', responses=opened(
         comment_page([comment_node('c1')], cursor='page2')))
     assert first.code == 0
-    assert more_args(first.data['next']) == ['comments', POST_URL, '--sort', 'top', '--chars', '180', '--json',
-                                             '--after', '1']
+    assert more_args(first.data['next']) == ['comments', POST_URL, '--sort', 'top', '--json', '--after', '1']
     following = account.run(*more_args(first.data['next']), responses=[login(), comment_page([comment_node('c2')])])
     assert following.code == 0 and following.ids == ['c2']
     assert following.graphql()['variables']['commentsAfterCursor'] == 'page2'
@@ -163,7 +165,7 @@ def test_post_text_renders_the_post_then_its_comments(tmp_path):
     result = Account(tmp_path).run('post', POST_URL, responses=opened(
         comment_page([comment_node('c1'), comment_node('r1', 1, 'c1', text='Reply\nline')])))
     lines = result.stdout.splitlines()
-    assert lines[0] == 'post · 2 shown · stopped=exhausted'
+    assert lines[0] == 'post · 2 shown · stopped=exhausted · requests=4/25'
     assert lines[1].startswith('[p1] unavailable · undated · status')
     assert lines[4].startswith('[c1] Synthetic · undated · reactions=? replies=1')
 
@@ -174,4 +176,27 @@ def test_replies_render_indented_under_their_parent_label(tmp_path):
         comment_page([comment_node('r1', 1, 'c1', text='Reply\nline')], 'replies_connection')))
     assert result.code == 0
     assert '\n  [c2 reply-to=c1] Synthetic · ' in result.stdout
-    assert 'text[10/10 chars, complete]: "Reply⏎line"' in result.stdout
+    assert 'text[10 of 10 chars shown, complete]: "Reply⏎line"' in result.stdout
+
+
+def test_post_continuation_carries_only_the_comment_query_and_explicit_controls(tmp_path):
+    result = Account(tmp_path).run('post', POST_URL, '--limit', '1', '--max-requests', '9', '--json',
+                                   responses=opened(comment_page([comment_node('c1'), comment_node('c2')])))
+    assert more_args(result.data['next']) == ['comments', POST_URL, '--sort', 'top', '--json', '--max-requests', '9',
+                                              '--after', '1']
+
+
+def test_post_continuation_serves_the_unshown_tail_of_a_cut_first_batch(tmp_path):
+    account = Account(tmp_path)
+    first = account.run('post', POST_URL, '--limit', '1', '--json', responses=opened(
+        comment_page([comment_node('c1'), comment_node('c2')], cursor='page2')))
+    # The continuation carries no page size: it serves the unshown c2, then reads on from the root cursor.
+    rest = account.run(*more_args(first.data['next']), responses=[login(), comment_page([comment_node('c3')])])
+    assert rest.code == 0 and rest.ids == ['c2', 'c3']
+    assert rest.graphql()['variables']['commentsAfterCursor'] == 'page2'
+
+
+def test_post_whose_comments_fail_keeps_the_post_and_offers_no_continuation(tmp_path):
+    result = Account(tmp_path).run('post', POST_URL, '--json', responses=opened(FAILURE))
+    assert result.code == 8
+    assert result.ids == ['post-feedback'] and 'next' not in result.data

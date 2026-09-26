@@ -7,6 +7,30 @@ from pathlib import Path
 
 from facebook.errors import FacebookError
 
+# Bumped whenever a saved page or header changes meaning; older files are refused before any byte is touched.
+FORMAT = 2
+
+
+def describe_out():
+    """The --out file schema."""
+    return {
+        'object': 'out',
+        'description': 'The NDJSON file --out writes: one header, then records, each page closed by a page line.',
+        'format': FORMAT,
+        'control_records': {
+            'header': 'first line: kind "header", format, the query identity (command, target, options, account_id), '
+                      'started_at',
+            'page': 'after each committed page: kind "page" with no "id", cursor, ids and n of the records above it, '
+                    'stop_reason, skipped (sponsored ids left out), coverage (notes for that page). Every other line '
+                    'after the header is a record; entities carry kind person, page or group together with an id',
+        },
+        'resume': 'Rerun the same command with the same --out path: records after the last page line are dropped '
+                  'and re-read, ids already saved are skipped, and --limit counts what is saved (parent comments for '
+                  'comments, where count still reports every saved record). A file for another query or an earlier '
+                  'format is refused before any byte changes; use a new path.',
+        'records': 'post, comment or entity records (see schema <object>)',
+    }
+
 
 def _line(value):
     return (json.dumps(value, ensure_ascii=False, separators=(',', ':')) + '\n').encode()
@@ -17,6 +41,7 @@ class OutFile:
     def __init__(self, path, context):
         self.path, self.context = Path(path).expanduser(), dict(context)
         self.ids, self.count, self.cursor, self.pending, self.complete = set(), 0, None, [], False
+        self.skipped = set()  # sponsored ids left out of saved pages, so a resume does not count them again
         self.parent_count = 0
         self.stream = None
         try:
@@ -34,7 +59,7 @@ class OutFile:
     def _recover(self):
         first = self.stream.readline()
         if not first:
-            self.stream.write(_line(dict(self.context, kind='header',
+            self.stream.write(_line(dict(self.context, kind='header', format=FORMAT,
                                          started_at=datetime.now(timezone.utc).isoformat(),
                                          limit_unit='page; may exceed the requested count by the remainder of one page')))
             self.stream.flush()
@@ -44,8 +69,11 @@ class OutFile:
             header = json.loads(first)
         except ValueError:
             raise FacebookError(2, 'The output header is incomplete.', 'Use a new output file.') from None
+        if isinstance(header, dict) and header.get('kind') == 'header' and header.get('format') != FORMAT:
+            raise FacebookError(2, 'The output file was written by an earlier version of this skill.', 'Restart the original query with a new --out path; this file was written by an earlier version.')
         if (not isinstance(header, dict) or header.get('kind') != 'header'
-                or {k: v for k, v in header.items() if k not in ('kind', 'started_at', 'limit_unit')} != self.context):
+                or {k: v for k, v in header.items() if k not in ('kind', 'format', 'started_at', 'limit_unit')}
+                != self.context):
             raise FacebookError(2, 'The output file belongs to a different query context.', 'Use a new output file.')
         boundary, page = self.stream.tell(), []
         while line := self.stream.readline():
@@ -62,6 +90,7 @@ class OutFile:
                 if record.get('ids') != page_ids or record.get('n') != len(page):
                     raise FacebookError(2, 'Output page integrity check failed.', 'Preserve this file and use a new path.')
                 self.ids.update(x for x in page_ids if x is not None)
+                self.skipped.update(record.get('skipped') or [])
                 self.count += len(page)
                 self.parent_count += sum('post_id' in record and not record.get('depth') for record in page)
                 self.cursor = record.get('cursor')
@@ -72,7 +101,7 @@ class OutFile:
         self.stream.seek(boundary)
         self.stream.truncate()
 
-    def commit(self, records, cursor, stop_reason):
+    def commit(self, records, cursor, stop_reason, skipped=(), notes=()):
         page, new_ids = [], set()
         for record in records:
             identity = record.get('id')
@@ -84,14 +113,20 @@ class OutFile:
         try:
             for record in page:
                 self.stream.write(_line(record))
-            self.stream.write(_line(dict(kind='page', cursor=cursor,
-                                         ids=[r.get('id') for r in page], n=len(page), stop_reason=stop_reason)))
+            marker = dict(kind='page', cursor=cursor, ids=[r.get('id') for r in page], n=len(page),
+                          stop_reason=stop_reason)
+            if skipped:
+                marker['skipped'] = list(skipped)
+            if notes:
+                marker['coverage'] = list(notes)
+            self.stream.write(_line(marker))
             self.stream.flush()
             os.fsync(self.stream.fileno())
         except OSError:
-            raise FacebookError(8, 'Output page could not be committed.',
+            raise FacebookError(6, 'Output page could not be committed.',
                                 'Free disk space and resume with the same command and file.') from None
         self.ids.update(new_ids)
+        self.skipped.update(skipped)
         self.count += len(page)
         self.parent_count += sum('post_id' in record and not record.get('depth') for record in page)
         self.cursor = cursor

@@ -2,26 +2,33 @@
 from datetime import datetime
 
 from facebook.errors import FacebookError
-from facebook.graphql.records import comment as _comment
-from facebook.graphql.records.connection import find_page_info
-from facebook.graphql.records.post import requested_story
+from facebook.graphql import records
+from facebook.graphql.records import post_story
+from facebook.outcome import ISSUES
 from facebook.graphql.registry import COMMENT_SORT_TOKENS
 from facebook.graphql.resolve import resolve_story_id
 from facebook.reading.paging import page_options, paginate
 
 
 def fetch_post_story(transport, url):
+    """(story, response issues) of the permalink's own post."""
     raw = transport.query('post', {'storyID': resolve_story_id(transport, url)}, referer=url)
-    story = requested_story(raw)
+    story, issues = post_story(raw)
     if story is None:
         raise FacebookError(6, 'The post response contains no readable post.', 'Run refresh, then retry the permalink.')
-    return story
+    return story, issues
 
 
-def _failure(result, error):
-    result.update(ok=False, error='partial' if result['results'] else 'query_failure',
-                  code=error.code, message=error.message, fix=error.fix)
-    result['stop_reason'] = 'blocked' if error.code == 5 else 'budget' if error.code == 8 else 'query_failure'
+REPLY_RETRY = 'Run more: (or the same --out command); it retries these replies before reading on.'
+
+
+def _coverage(failure):
+    parent = failure['parent_id']
+    if failure['reason'] == 'batch_limit':
+        return f'replies to {parent}: first batch only; Facebook offers no further reply page here'
+    if failure['reason'] == 'missing_page_info':
+        return f'replies to {parent}: first batch only; Facebook did not say whether more exist'
+    return f'replies to {parent}: not read; the comment carries no reply handle'
 
 
 def comments(args, transport, *, state, commit, story=None, first_batch=False):
@@ -33,15 +40,14 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
     if isinstance(cursor, dict) and 'post_id' in cursor:
         post_id, cursor = cursor['post_id'], cursor['after']
     if post_id is None:
-        story = story or fetch_post_story(transport, args.target)
+        story = story or fetch_post_story(transport, args.target)[0]
         post_id = (story.get('feedback') or {}).get('id')
     if not post_id:
         raise FacebookError(6, 'The post has no comment feedback handle.')
-    failures, expanded, retry_waiting = [], {}, []
+    failures, expanded, retry_waiting, issues, page_notes = [], {}, [], [], []
     shown = set(state.get('seen') or [])
     fatal = None
-    sort = getattr(args, 'sort', 'top')
-    first_page_info = {}
+    sort = args.sort or 'top'
 
     def fetch(after):
         if fatal:
@@ -51,25 +57,27 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
         if after is not None:
             variables['commentsAfterCursor'] = after
         raw = transport.query(key, variables, referer=args.target)
+        page = records.comment_page(raw, post_id=post_id, captured_at=datetime.now().astimezone(), parents_only=True)
+        if not page.records and page.has_items:
+            raise FacebookError(6, 'A nonempty comment connection contains no readable comments.',
+                                'Run refresh, then retry.')
+        issues.extend(page.issues)
+        page_notes.extend(ISSUES.get(issue, issue) for issue in page.issues)
         parents = []
-        for node in _comment.iter_comment_nodes([raw]):
-            comment = _comment.build_comment(node, post_id=post_id, captured_at=datetime.now().astimezone())
-            if comment.depth != 0:
-                continue
-            record = comment.to_dict()
-            record['_reply_handle'] = {'id': _comment.feedback_id(node), 'token': _comment.expansion_token(node)}
-            parents.append(record)
-        info = find_page_info(raw, 'comments')
-        if first_batch and info:
-            first_page_info.update(info)
-            info = {'has_next_page': False, 'end_cursor': None}
-        return parents, info
+        for record in page.records:
+            handle = page.handles.get(record['id'], {})
+            parents.append({**record, '_reply_handle': {'id': handle.get('feedback_id'),
+                                                        'token': handle.get('expansion_token')}})
+        return parents, page.page_info
 
     def expand(parent):
         nonlocal fatal
         handle = parent.get('_reply_handle', {})
         replies = []
-        if not getattr(args, 'replies', False) or not parent.get('reply_count'):
+        # A reply count of None was not sent, so the handle still decides; 0 means Facebook says there are none.
+        if not args.replies or parent.get('reply_count') == 0:
+            return replies
+        if parent.get('reply_count') is None and not handle.get('token'):
             return replies
         failure = {'parent_id': parent['id']}
         if fatal:
@@ -82,14 +90,16 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
             try:
                 raw = transport.query('replies', {'id': handle['id'], 'expansionToken': handle['token']},
                                       referer=args.target)
-                replies = [r.to_dict() for r in _comment.build_comments(
-                    [raw], post_id=post_id, captured_at=datetime.now().astimezone()) if r.depth > 0]
-                for reply in replies:
-                    if not reply.get('parent_id'):
-                        reply['parent_id'] = parent['id']
-                replies = [r for r in replies if r['parent_id'] == parent['id'] and r['id'] not in shown]
+                page = records.reply_page(raw, post_id=post_id, parent_id=parent['id'],
+                                          captured_at=datetime.now().astimezone())
+                if not page.records and page.has_items:
+                    raise FacebookError(6, 'A nonempty reply connection contains no readable replies.',
+                                        'Run refresh, then retry.')
+                issues.extend(page.issues)
+                page_notes.extend(ISSUES.get(issue, issue) for issue in page.issues)
+                replies = [r for r in page.records if r['id'] not in shown]
                 shown.update(r['id'] for r in replies)
-                info = find_page_info(raw, 'replies_connection')
+                info = page.page_info
                 if info and info.get('has_next_page') is False:
                     return replies
                 failure.update(reason='batch_limit' if info and info.get('has_next_page') else 'missing_page_info',
@@ -105,10 +115,11 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
             retry_waiting.append(dict(parent))
         return replies
 
-    def finish_page(records, after, reason):
+    def finish_page(parents, after, reason, skipped=()):
         nonlocal fatal
         output = []
-        for parent in records:
+        before = len(failures)
+        for parent in parents:
             replies = expand(parent)
             expanded[parent['id']] = replies
             output.append({k: v for k, v in parent.items() if k != '_reply_handle'})
@@ -118,7 +129,9 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
                 # Retry the uncommitted page so failed reply expansions cannot disappear.
                 fatal = fatal or FacebookError(6, 'A reply page is incomplete; resume the same output file.')
             else:
-                commit(output, {'post_id': post_id, 'after': after}, reason)
+                notes = page_notes + [_coverage(f) for f in failures[before:] if not f['retryable']]
+                commit(output, {'post_id': post_id, 'after': after}, reason, (), list(dict.fromkeys(notes)))
+        page_notes.clear()
 
     retried = []
     for parent in retry_parents:
@@ -126,27 +139,28 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
 
     options = page_options(args, {**state, 'cursor': cursor}, finish_page)
     if first_batch:
-        # post returns only this root batch; --limit still selects parents within it.
-        options['page_limit'] = bool(args.out)
-        options['since'] = options['until'] = None
+        # post reads only the root batch; --limit still selects parents within it, more: continues after it.
+        options['max_pages'] = 1
     if fatal:
-        result = {'ok': True, 'results': [], 'cursor': cursor, 'pending': pending, 'stop_reason': 'query_failure'}
+        result = {'results': [], 'cursor': cursor, 'pending': pending, 'stop_reason': None, 'failure': fatal}
     else:
         result = paginate(fetch, **options)
-    if first_batch and first_page_info.get('has_next_page') is True:
-        result['cursor'] = first_page_info.get('end_cursor')
-        if result['stop_reason'] == 'exhausted':
-            result['stop_reason'] = 'limit_reached'
     result['results'] = retried + [item for parent in result['results']
         for item in [{k: v for k, v in parent.items() if k != '_reply_handle'},
                      *expanded.get(parent['id'], [])]]
     if result.get('cursor') is not None or retry_waiting:
         result['cursor'] = {'post_id': post_id, 'after': result['cursor'], 'reply_retries': retry_waiting}
+    result['issues'] = issues
     if failures:
-        result['replies_incomplete'] = failures
-        if result.get('code') not in (4, 5, 8):
-            query_failed = not result['ok']
-            _failure(result, fatal or FacebookError(6, 'Some replies could not be read completely.'))
-            if not query_failed and all(f['reason'] == 'batch_limit' for f in failures):
-                result['stop_reason'] = 'reply_batch_limit'
+        result['details'] = {'replies_incomplete': failures}
+        result['coverage'] = [_coverage(f) for f in failures if not f['retryable']]
+        current = result.get('failure') or fatal
+        # A block or login stop outranks everything; a real reply failure outranks a later budget stop.
+        failed = any(f['retryable'] and f.get('code') not in (None, 4, 5, 8) for f in failures)
+        if current is not None and current.code != 8:
+            result['failure'] = current
+        elif failed or current is None and any(f['retryable'] for f in failures):
+            result['failure'] = FacebookError(6, 'Some replies could not be read.', REPLY_RETRY)
+        else:
+            result['failure'] = current
     return result

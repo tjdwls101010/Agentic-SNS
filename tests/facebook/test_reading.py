@@ -61,7 +61,7 @@ def test_missing_page_info_is_a_partial_failure_not_exhaustion(tmp_path):
     result = Account(tmp_path).run('feed', '--json', responses=[login(), page])
     assert result.code == 8
     assert result.data['stop_reason'] == 'query_failure' and result.ids == ['p1']
-    assert result.data['message'] == 'Missing explicit pagination metadata.'
+    assert result.data['message'] == 'Facebook sent a page without pagination metadata.'
 
 
 @pytest.mark.parametrize('edges,has_next,code', [([{'node': story('x')}], False, 0), ([], False, 7),
@@ -103,7 +103,7 @@ def test_repeated_cursor_stops_as_a_query_failure(tmp_path):
     result = Account(tmp_path).run('feed', '--json', responses=[login(), feed_page(['p1'], 'same'),
                                                                 feed_page(['p2'], 'same'), feed_page(['p3'])])
     assert result.code == 8 and result.ids == ['p1', 'p2']
-    assert result.data['message'] == 'The server repeated a cursor.'
+    assert result.data['message'] == 'Facebook repeated a page cursor.'
 
 
 @pytest.mark.parametrize('command,page,target', [('profile', timeline_page, '42'), ('group', group_page, '123')])
@@ -121,7 +121,8 @@ def test_profile_window_is_sent_to_the_server_as_local_day_bounds(tmp_path):
     variables = result.graphql()['variables']
     assert variables['afterTime'] == 1788188400    # 2026-09-01T00:00:00+09:00
     assert variables['beforeTime'] == 1788620399   # 2026-09-05T23:59:59+09:00
-    assert result.data['window_mode'] == 'server' and result.data['window_complete'] is True
+    assert result.data['window'] == {'since': '2026-09-01', 'until': '2026-09-05',
+                                      'coverage': 'closed (server-filtered)'}
 
 
 def test_ranked_date_window_filters_without_resorting_or_stopping_at_old_posts(tmp_path):
@@ -133,7 +134,7 @@ def test_ranked_date_window_filters_without_resorting_or_stopping_at_old_posts(t
                                    '--json', responses=[login(), first, second])
     assert result.code == 0 and result.ids == ['pinned', 'newer', 'new']
     assert result.data['stop_reason'] == 'exhausted'
-    assert result.data['window_mode'] == 'client' and result.data['window_complete'] is False
+    assert result.data['window']['coverage'] == 'sample (ranked order)'
 
 
 @pytest.mark.parametrize('command,args,response', [
@@ -155,17 +156,16 @@ def test_dense_post_text_separates_display_clipping_from_server_truncation(tmp_p
                           'actors': [{'name': 'Synthetic Author'}], 'message': {'text': 'One\nTwo more'}}])
     result = Account(tmp_path).run('feed', '--chars', '7', env=SEOUL, responses=[login(), body])
     assert result.code == 0
-    assert result.stdout == ('feed · sort=top · 1 shown · stopped=exhausted\n'
+    assert result.stdout == ('feed · sort=top · 1 shown · sponsored_skipped=0 · stopped=exhausted · requests=2/25\n'
                              '[p1] Synthetic Author · 1970-01-01T09:00+09:00 · status · reactions=0 comments=? shares=?\n'
-                             '     text[7/12 chars, complete]: "One⏎Two…"\n'
+                             '     text[7 of 12 chars shown, complete]: "One⏎Two…"\n'
                              '     url: unavailable   author: unavailable\n')
 
 
 def test_text_output_ends_with_the_continuation_command(tmp_path):
     result = Account(tmp_path).run('feed', '--limit', '1', responses=[login(), feed_page(['p1', 'p2'])])
-    assert result.stdout.splitlines()[0] == 'feed · sort=top · 1 shown · stopped=limit_reached'
-    assert more_args(text_more(result.stdout)) == ['feed', '--sort', 'top', '--limit', '1', '--chars', '180',
-                                                   '--after', '1']
+    assert result.stdout.splitlines()[0] == 'feed · sort=top · 1 shown · sponsored_skipped=0 · stopped=limit_reached · requests=2/25'
+    assert more_args(text_more(result.stdout)) == ['feed', '--sort', 'top', '--limit', '1', '--after', '1']
 
 
 def test_nested_shared_chain_renders_every_body_handle_and_truncation(tmp_path):
@@ -174,9 +174,9 @@ def test_nested_shared_chain_renders_every_body_handle_and_truncation(tmp_path):
         envelope({'data': {'node': {'comments': {'edges': [], 'page_info': {'has_next_page': False}}}}})])
     assert result.code == 0, result.stdout
     text = result.stdout
-    assert 'text[11/11 chars, complete]: "Synthetic B"' in text
+    assert 'text[11 of 11 chars shown, complete]: "Synthetic B"' in text
     assert 'url: "https://example.test/posts/B"' in text
-    assert 'text[15/15 chars, truncated]: "Synthetic C cut"' in text
+    assert 'text[15 of 15 chars shown, truncated]: "Synthetic C cut"' in text
     assert 'url: "https://example.test/posts/C"' in text
     assert text.index('Synthetic B') < text.index('Synthetic C cut')
 
@@ -190,13 +190,13 @@ def test_deep_shared_chain_renders_the_tail(tmp_path):
     result = Account(tmp_path).run('feed', '--chars', '500', responses=[login(), feed_stories([node])])
     assert result.code == 0
     assert 'shared-from[30]: unavailable · undated · url: "https://example.test/tail" · ' \
-           'text[17/17 chars, complete]: "Deepest synthetic"' in result.stdout
+           'text[17 of 17 chars shown, complete]: "Deepest synthetic"' in result.stdout
     assert 'incomplete (cycle)' not in result.stdout
 
 
-def test_post_shows_full_text_whatever_chars_says(tmp_path):
+def test_post_shows_its_full_text(tmp_path):
     long_text = 'Complete synthetic post ' * 20
-    result = Account(tmp_path).run('post', 'https://www.facebook.com/zuck/posts/123', '--chars', '1', responses=[
+    result = Account(tmp_path).run('post', 'https://www.facebook.com/zuck/posts/123', responses=[
         login(), story_id_page(), post_response(long_text),
         envelope({'data': {'node': {'comments': {'edges': [], 'page_info': {'has_next_page': False}}}}})])
     assert result.code == 0

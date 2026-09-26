@@ -5,6 +5,7 @@
 # ///
 """Read Facebook through the logged-in Aside browser."""
 import argparse
+from dataclasses import dataclass, field
 from datetime import date
 import json
 import os
@@ -14,18 +15,23 @@ import sys
 
 from facebook.errors import FacebookError
 from facebook.reading import dispatch
-from facebook.render import render_results
+from facebook.outcome import failure_envelope
+from facebook.render import render_page
 
 EXIT_CODES = {
-    0: 'success',
-    2: 'invalid arguments, or a continuation or output file from a different query',
+    0: 'success: records, a stop that more: or the same --out command resumes, an already complete --out file, '
+       'or a doctor/refresh/schema result',
+    2: 'invalid arguments, or a continuation or output file that belongs to another query or an earlier version',
     3: 'Aside is unavailable or returned an invalid response',
     4: 'Facebook login is required',
     5: 'requests are blocked for this account (checkpoint, rate limit or unreadable protection state)',
-    6: 'the query failed before any record was read',
-    7: 'the query explicitly returned no results',
-    8: 'partial result: records plus a failure, or the request budget ran out',
+    6: 'a request failed before any record was read',
+    7: 'Facebook explicitly returned nothing, or nothing fell inside the window',
+    8: 'partial: records were read, then a request failed; or the budget ran out where reading must restart',
 }
+# Result kind (facebook.outcome.KINDS) → exit code.
+KIND_EXIT = {'records': 0, 'resumable': 0, 'complete': 0, 'maintenance': 0, 'argument': 2, 'aside': 3, 'login': 4,
+             'blocked': 5, 'failed': 6, 'empty': 7, 'partial': 8}
 
 
 class Parser(argparse.ArgumentParser):
@@ -51,6 +57,14 @@ def positive(value):
     raise argparse.ArgumentTypeError('expected a positive integer')
 
 
+def budget(value):
+    result = positive(value)
+    # 성진: 400회 상한은 실계정 보호용, 일회용 계정으로 바꾸면 올려도 됨
+    if result > 400:
+        raise argparse.ArgumentTypeError('at most 400 requests per invocation')
+    return result
+
+
 def day(value):
     try:
         return date.fromisoformat(value).isoformat()
@@ -58,104 +72,135 @@ def day(value):
         raise argparse.ArgumentTypeError('expected a date in YYYY-MM-DD format') from None
 
 
+# Every option a command may declare: flags and argparse settings, with help a command can override.
+OPTIONS = {
+    'sort': (('--sort',), {'help': 'Server order'}),
+    'limit': (('--limit',), {'type': positive, 'help': 'Records to show; omitted: until the request budget or the end'}),
+    'since': (('--since',), {'type': day, 'help': 'Inclusive local start date YYYY-MM-DD'}),
+    'until': (('--until',), {'type': day, 'help': 'Inclusive local end date YYYY-MM-DD'}),
+    'include_sponsored': (('--include-sponsored',), {'action': 'store_true',
+                                                     'help': 'Keep sponsored posts; by default they are skipped and counted'}),
+    'replies': (('--replies',), {'action': 'store_true', 'help': 'Expand replies of the selected parents, one request each'}),
+    'type': (('--type',), {'choices': ['top', 'posts', 'people', 'pages', 'groups'], 'default': 'top',
+                           'help': 'Result category; top mixes posts with people, pages and groups'}),
+    'section': (('--section',), {'help': 'Only this locale-independent section, e.g. directory_work'}),
+    'chars': (('--chars',), {'type': positive, 'help': 'Characters of each text shown (default 180); JSON keeps full text'}),
+    'after': (('--after',), {'type': positive, 'help': 'Continue from the numbered handle a more: line printed'}),
+    'out': (('--out',), {'help': 'Collect into this NDJSON file, committed a whole page at a time; rerun the same '
+                                 'command to resume. --limit then counts what is already saved (parent comments '
+                                 'for comments)'}),
+    'json': (('--json',), {'action': 'store_true', 'help': 'Emit one complete JSON document'}),
+    'max_requests': (('--max-requests',), {'type': budget,
+                                           'help': 'Facebook requests this invocation may make, setup included '
+                                                   '(default 25, at most 400)'}),
+}
+READ = ('limit', 'since', 'until', 'chars', 'after', 'out', 'json', 'max_requests')
+
+
+@dataclass(frozen=True)
+class Command:
+    help: str
+    options: tuple = ()
+    target: str | None = None
+    identity: tuple = ()          # options that make two invocations the same query
+    continues_as: str | None = None
+    epilog: str | None = None
+    overrides: dict = field(default_factory=dict)
+
+
+COMMANDS = {
+    'feed': Command('Read the home feed.', ('sort', 'include_sponsored', *READ),
+                    identity=('sort', 'window', 'include_sponsored'),
+                    overrides={'sort': {'choices': ['top', 'recent'], 'default': 'top',
+                                        'help': 'top is ranked; recent is newest first'}}),
+    'profile': Command('Read a profile timeline; --since/--until are applied by Facebook.', READ,
+                       target='Facebook profile URL, vanity name or numeric id', identity=('window',)),
+    'group': Command('Read a group feed.', ('sort', *READ), target='Facebook group URL, vanity name or numeric id',
+                     identity=('sort', 'window'),
+                     overrides={'sort': {'choices': ['top', 'recent', 'activity'], 'default': 'top',
+                                         'help': 'top and activity are ranked; recent is newest first'}}),
+    'post': Command('Read one post in full and its first batch of parent comments.', ('limit', 'json', 'max_requests'),
+                    target='Facebook post URL', continues_as='comments',
+                    overrides={'limit': {'type': positive, 'help': 'Parent comments to show from the first batch'}}),
+    'comments': Command('Read a post\'s parent comments, then replies of the selected parents.',
+                        ('sort', 'replies', 'limit', 'chars', 'after', 'out', 'json', 'max_requests'),
+                        target='Facebook post URL', identity=('sort', 'replies'),
+                        overrides={'sort': {'choices': ['top', 'recent'], 'default': 'top', 'help': 'Comment order'},
+                                   'limit': {'type': positive, 'help': 'Parent comments to show; replies are extra. '
+                                                                       'With --out it counts parent comments saved'}}),
+    'search': Command('Search posts, people, pages or groups.', ('type', 'limit', 'chars', 'after', 'out', 'json',
+                                                                'max_requests'),
+                      target='Search text', identity=('type',)),
+    'about': Command('Read a profile\'s visible About fields.', ('section', 'json', 'max_requests'),
+                     target='Facebook profile URL, vanity name or numeric id', identity=('section',),
+                     epilog='Without --section it reads the overview and every visible collection: 3 + collections '
+                            'requests (2 + collections for a numeric id). --section stops at the first place that '
+                            'shows that section, and reads every collection only when none does.'),
+    'doctor': Command('Check Aside, login, block status and registry age; always JSON.', ('unblock',)),
+    'refresh': Command('Replace stale query ids with verified ones from Facebook\'s own pages; always JSON.',
+                       ('capture',), epilog='Up to 400 paced requests; this can take several minutes.'),
+    'schema': Command('Describe results, output files and record fields; always JSON, no request.', ('object',)),
+}
+MAINTENANCE = {
+    'unblock': (('--unblock',), {'action': 'store_true',
+                                 'help': 'Clear a persisted block after checking Facebook in the browser yourself'}),
+    'capture': (('--capture',), {'metavar': 'POST_URL', 'help': 'Also capture comment queries by opening this post in '
+                                                                 'a browser tab, and feed flags from the home feed'}),
+    'object': (('object',), {'nargs': '?', 'choices': ['result', 'out', 'post', 'comment', 'entity', 'about'],
+                             'help': 'What to describe; omitted: the list of objects'}),
+}
+DESTS = sorted({*OPTIONS, *MAINTENANCE, 'target'})
+
+
 def parser():
     table = '\n'.join(f'  {code}  {meaning}' for code, meaning in EXIT_CODES.items())
     root = Parser(description=__doc__, formatter_class=EpilogFormatter,
-                  epilog='Read-only. Default request budget: 25; explicit --limit, --since, or --out: up to 400. All requests share pacing and account block protection.'
+                  epilog='Read-only. All invocations share account pacing and block protection.'
                   + '\n\nexit codes:\n' + table)
     root.add_argument('--verbose', action='store_true', help='Write scrubbed request metadata to stderr')
     commands = root.add_subparsers(dest='command', required=True)
-    descriptions = {
-        'feed': 'Read the home feed in ranked or recent order.',
-        'profile': 'Read a profile timeline; dates use local time and server filtering.',
-        'group': 'Read a group feed; dates are client filters, not a completeness guarantee.',
-        'post': 'Read one full post and its first batch of parent comments.',
-        'comments': 'Read parent comments; limit counts parents before expanding replies.',
-        'search': 'Search posts or people, pages, and groups.',
-        'about': 'Read visible profile About fields and their collections.',
-    }
-    for name, description in descriptions.items():
-        command = commands.add_parser(name, help=description, description=description)
-        if name != 'feed':
-            command.add_argument('target', help='Search text' if name == 'search' else
-                                 'Facebook post URL' if name in ('post', 'comments') else
-                                 'Facebook URL, vanity name, or numeric id')
-        command.add_argument('--verbose', action='store_true', default=argparse.SUPPRESS,
-                             help='Write scrubbed request metadata to stderr; never raw captures')
-        command.add_argument('--json', action='store_true', help='Emit one complete JSON document')
-        command.add_argument('--chars', type=positive, default=180, help='Text preview length (post always shows full text)')
-        command.add_argument('--limit', type=positive, help='Maximum records (parent comments for comments; omitted: request budget)')
-        command.add_argument('--since', type=day, help='Inclusive local start date YYYY-MM-DD; unavailable for undated entities/About')
-        command.add_argument('--until', type=day, help='Inclusive local end date YYYY-MM-DD; unavailable for undated entities/About')
-        command.add_argument('--out', help='Write/resume context-checked NDJSON; commit whole pages, possibly exceeding --limit')
-        command.add_argument('--after', type=positive, help='Resume the numbered cursor from more: with identical query context')
-        if name in ('feed', 'group', 'comments', 'profile'):
-            choices = ['recent'] if name == 'profile' else ['top', 'recent']
-            if name == 'group':
-                choices.append('activity')
-            command.add_argument('--sort', choices=choices, default='recent' if name == 'profile' else 'top',
-                                 help='Server order (profile supports recent only)')
-        if name == 'comments':
-            command.add_argument('--replies', action='store_true', help='Expand replies only for selected, deduplicated parents')
-        if name == 'search':
-            command.add_argument('--type', choices=['top', 'posts', 'people', 'pages', 'groups'], default='top',
-                                 help='Result category (default: top, mixed posts and entities)')
-        if name == 'about':
-            command.add_argument('--section', help='Exact locale-independent section, e.g. directory_work')
-    doctor = commands.add_parser('doctor', help='Check Aside, login, block status, and registry age')
-    doctor.add_argument('--unblock', action='store_true', help='Clear persisted block after checking the browser manually')
-    doctor.add_argument('--json', action='store_true', help='Emit one JSON document')
-    refresh = commands.add_parser('refresh', help='Refresh query ids from Facebook client bundles',
-                                  description='Mine and replay read queries. Up to 400 paced requests; this can take several minutes.')
-    refresh.add_argument('--capture', action='store_true', help='Capture current feed flags and comment queries in browser tabs, then replay candidates')
-    refresh.add_argument('--post', help='Facebook post URL used for comment capture')
-    refresh.add_argument('--json', action='store_true', help='Emit one JSON document')
-    schema = commands.add_parser('schema', help='Describe Post, Comment, Entity, and ProfileField from their public schemas')
-    schema.add_argument('--json', action='store_true', help='Emit one JSON document')
-    for command in (doctor, refresh, schema):
-        command.add_argument('--verbose', action='store_true', default=argparse.SUPPRESS,
-                             help='Write scrubbed request metadata to stderr')
+    for name, command in COMMANDS.items():
+        sub = commands.add_parser(name, help=command.help, description=command.help, epilog=command.epilog)
+        if command.target:
+            sub.add_argument('target', help=command.target)
+        for option in command.options:
+            flags, settings = OPTIONS.get(option) or MAINTENANCE[option]
+            sub.add_argument(*flags, **{**settings, **command.overrides.get(option, {})})
+        sub.set_defaults(**{dest: None for dest in DESTS if dest not in command.options and dest != 'target'})
+        if not command.target:
+            sub.set_defaults(target=None)
     return root
 
 
 def validate(args):
-    if args.command in ('doctor', 'schema'):
-        return
-    if args.command == 'refresh':
-        if bool(args.capture) != bool(args.post):
-            raise FacebookError(2, '--capture and --post must be used together.')
-        return
+    for name in ('target', 'section', 'out', 'capture'):
+        value = getattr(args, name)
+        if isinstance(value, str) and any(ord(c) < 32 or ord(c) == 127 for c in value):
+            raise FacebookError(2, f'The {name} contains a line break or another control character.',
+                                'Pass it on one line.')
     if args.since and args.until and args.since > args.until:
         raise FacebookError(2, '--since must not be later than --until.')
     if args.after and args.out:
-        raise FacebookError(2, '--after and --out cannot be combined; --out resumes its own file.')
-    if args.command in ('about', 'post') and args.after:
-        raise FacebookError(2, '--after is supported by feed, profile, group, comments, and search.')
-    if (args.since or args.until) and (args.command == 'about' or
-            args.command == 'search' and args.type != 'posts'):
-        raise FacebookError(2, 'Date filters require dated results; use search --type posts or profile.')
+        raise FacebookError(2, '--after and --out cannot be combined; --out resumes its own file.',
+                            'Rerun the same command with the same --out path.')
     if args.command == 'search' and not args.target.strip():
         raise FacebookError(2, 'Search text must not be empty.')
 
 
-def context_for(args):
-    """A query's identity; the account is filled in once the browser session is known."""
-    context = {'command': args.command, 'target': getattr(args, 'target', None),
-               'sort': getattr(args, 'sort', None),
-               'window': {'since': args.since, 'until': args.until},
-               'account_id': None}
-    for key in ('type', 'section', 'replies'):
-        if hasattr(args, key):
-            context[key] = getattr(args, key)
+def context_for(args, name=None):
+    """A query's identity from its declaration; the account is filled in once the browser session is known."""
+    command = name or args.command
+    context = {'command': command, 'target': args.target}
+    for key in COMMANDS[command].identity:
+        context[key] = {'since': args.since, 'until': args.until} if key == 'window' else getattr(args, key)
+    context['account_id'] = None
     return context
 
 
 def continuation_args(args):
-    """post continues as comments on the same post, in top order without replies or a window."""
+    """post continues as comments on the same post: top order, no replies, a fresh page size."""
     continued = argparse.Namespace(**vars(args))
-    continued.command, continued.sort = 'comments', 'top'
-    continued.replies = False
-    continued.since = continued.until = None
+    continued.command, continued.sort, continued.replies, continued.limit = 'comments', 'top', False, None
     return continued
 
 
@@ -165,62 +210,69 @@ def invocation():
     return 'uv run "' + re.sub(r'([\\"$`])', r'\\\1', path) + '"'
 
 
-def next_command(args, number, command=None):
-    name = command or args.command
-    words = [name]
-    if getattr(args, 'target', None):
-        words.append(args.target)
-    if name == 'comments' and args.command == 'post':
-        words += ['--sort', 'top']
-    else:
-        for key in ('sort', 'type', 'section', 'since', 'until', 'limit', 'chars'):
-            if getattr(args, key, None) is not None:
-                words += ['--' + key, str(getattr(args, key))]
-        if getattr(args, 'replies', False):
-            words.append('--replies')
-    if getattr(args, 'json', False):
+def query_words(args):
+    """The command, its target, its identity options, then the controls the caller chose."""
+    dashed = bool(args.target) and args.target.startswith('-')
+    words = [args.command] + ([args.target] if args.target and not dashed else [])
+    for key in COMMANDS[args.command].identity:
+        if key == 'window':
+            words += [w for flag in ('since', 'until') if getattr(args, flag) for w in ('--' + flag, getattr(args, flag))]
+        elif getattr(args, key) is True:
+            words.append('--' + key.replace('_', '-'))
+        elif getattr(args, key) not in (None, False):
+            words += ['--' + key.replace('_', '-'), str(getattr(args, key))]
+    for key in ('limit', 'chars'):
+        if getattr(args, key) is not None:
+            words += ['--' + key, str(getattr(args, key))]
+    if args.json:
         words.append('--json')
-    words += ['--after', str(number)]
-    return invocation() + ' ' + shlex.join(words)
+    if args.max_requests is not None:
+        words += ['--max-requests', str(args.max_requests)]
+    return words
 
 
-def emit(result, json_mode=False, chars=180, command='', sort=None):
-    """One stdout document on JSON/error paths; never mix diagnostics with data."""
-    result = dict(result)
-    records = result.setdefault('results', [])
-    code = result.pop('code', 0)
-    result.setdefault('ok', True)
-    result.setdefault('stop_reason', 'exhausted')
-    result['stop_reason'] = {'already_complete': 'exhausted', 'reply_batch_limit': 'query_failure'}.get(
-        result['stop_reason'], result['stop_reason'])
-    if not result['ok']:
-        code = code or (5 if result['stop_reason'] == 'blocked' else 8 if records else 6)
-        if records and code not in (4, 5):
-            code = 8
-        result.setdefault('error', 'partial' if records else 'query_failure')
-        result.setdefault('message', 'The request did not complete.')
-        result.setdefault('fix', 'Read stop_reason before continuing.')
-    elif not records and command not in ('schema', 'doctor', 'refresh') and not result.get('out'):
-        result.update(ok=False, error='empty', message='This query explicitly returned no results.',
-                      fix='Try a different target or date window; this is not a stale-query failure.')
-        code = 7
-    if json_mode or not result['ok']:
-        print(json.dumps(result, ensure_ascii=False))
-    elif result.get('out'):
-        print(f'{command} · {result.get("count", len(records))} saved · stopped={result["stop_reason"]} · '
-              + json.dumps(str(result['out']), ensure_ascii=False)
-              + (' · already complete' if result.get('already_complete') else ''))
-    elif command in ('schema', 'doctor', 'refresh'):
-        print(json.dumps(result, ensure_ascii=False))
+def positional_tail(args):
+    """A target that looks like an option goes last, after `--`."""
+    return ['--', args.target] if args.target and args.target.startswith('-') else []
+
+
+def next_command(args, number):
+    """The same query from the numbered handle."""
+    return invocation() + ' ' + shlex.join(query_words(args) + ['--after', str(number)] + positional_tail(args))
+
+
+def resume_command(args):
+    """The same --out invocation, which picks up where the file ends."""
+    return invocation() + ' ' + shlex.join(query_words(args) + ['--out=' + args.out] + positional_tail(args))
+
+
+def emit(kind, envelope, args):
+    """One stdout document: JSON, a one-line --out summary, or the dense text page."""
+    if args.json or args.command in ('doctor', 'refresh', 'schema') or (not envelope['results'] and not envelope['ok']
+                                                                      and not args.out):
+        print(json.dumps(envelope, ensure_ascii=False))
+    elif args.out:
+        parts = [args.command, f'{envelope.get("count", 0)} saved to {json.dumps(args.out, ensure_ascii=False)}']
+        if 'sponsored_skipped' in envelope:
+            parts.append(f'sponsored_skipped={envelope["sponsored_skipped"]}')
+        parts += [f'stopped={envelope["stop_reason"]}',
+                  f'requests={envelope["request_count"]}/{envelope["max_requests"]}']
+        if envelope.get('already_complete'):
+            parts.append('already complete')
+        if envelope.get('coverage'):
+            parts.append('coverage: ' + '; '.join(envelope['coverage']))
+        if envelope['stop_reason'] in ('budget', 'query_failure'):
+            parts.append('resume: ' + resume_command(args))
+        if envelope.get('error'):
+            parts.append(f'error={envelope["error"]} fix={envelope["fix"]}')
+        print(' · '.join(parts))
     else:
-        print(render_results(records, command=command, sort=sort, stop_reason=result['stop_reason'],
-                             more=result.get('next'), chars=chars))
-        if result.get('note'):
-            print(str(result['note']).replace('\n', ' '))
-    return code
+        print(render_page(envelope, chars=args.chars or (None if args.command == 'post' else 180)))
+    return KIND_EXIT[kind]
 
 
 def main(argv=None):
+    args = None
     try:
         args = parser().parse_args(argv)
         validate(args)
@@ -228,24 +280,25 @@ def main(argv=None):
         context = continuation = None
         if args.command not in ('doctor', 'refresh', 'schema'):
             context = context_for(args)
-            if args.command == 'post':
-                continuation = context_for(continuation_args(args))
-        result = dispatch.run(args, context=context, continuation=continuation)
-        handle = result.get('handle')
+            if COMMANDS[args.command].continues_as:
+                continuation = context_for(continuation_args(args), COMMANDS[args.command].continues_as)
+        identity = {key: getattr(args, key) for key in ('sort', 'type', 'section') if getattr(args, key) is not None}
+        exit_codes = [(code, meaning, [kind for kind, number in KIND_EXIT.items() if number == code])
+                      for code, meaning in EXIT_CODES.items()]
+        kind, envelope = dispatch.run(args, context=context, continuation=continuation, identity=identity,
+                                      exit_codes=exit_codes)
+        handle = envelope.pop('handle', None)
         if handle:
             continued = continuation_args(args) if handle['command'] != args.command else args
-            result = {('next' if key == 'handle' else key): (next_command(continued, handle['number'])
-                                                            if key == 'handle' else value)
-                      for key, value in result.items()}
-        return emit(result, json_mode=args.json, chars=None if args.command == 'post' else getattr(args, 'chars', 180),
-                    command=args.command, sort=getattr(args, 'sort', None))
+            envelope['next'] = next_command(continued, handle['number'])
+        return emit(kind, envelope, args)
     except FacebookError as error:
-        print(json.dumps({'ok': False, 'error': error.code, 'message': error.message, 'fix': error.fix,
-                          'results': []}, ensure_ascii=False))
-        return error.code
+        envelope = failure_envelope(error)
     except OSError:
-        print(json.dumps({'ok': False, 'error': 6, 'message': 'Could not read or write local state.', 'results': []}))
-        return 6
+        envelope = failure_envelope(FacebookError(6, 'Could not read or write local state.',
+                                                  'Check the Facebook cache directory and the --out path.'))
+    print(json.dumps(envelope, ensure_ascii=False))
+    return KIND_EXIT[envelope['error']]
 
 
 if __name__ == '__main__':

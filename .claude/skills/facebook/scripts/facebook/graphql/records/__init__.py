@@ -40,10 +40,15 @@ def post_record(story, *, source, captured_at):
     return _post.build_post(story, source=source, captured_at=captured_at).to_dict()
 
 
+def _problems(bodies):
+    """Every response issue, including those placed on one node: comment and About records carry no incomplete flag."""
+    parsed = parse_story_nodes(bodies)
+    return list(dict.fromkeys(parsed.incomplete_reasons + parsed.attributed_reasons))
+
+
 def comment_page(raw, *, post_id, captured_at, parents_only):
     """Comments of one page; with parents_only, depth-0 parents and their reply expansion handles."""
-    issues = []
-    list(iter_json_objects([raw], issues=issues))
+    issues = _problems([raw])
     if parents_only:
         records, handles = [], {}
         for node in _comment.iter_comment_nodes([raw]):
@@ -69,13 +74,14 @@ def reply_page(raw, *, post_id, parent_id, captured_at):
         data['parent_id'] = data['parent_id'] or parent_id
         if data['parent_id'] == parent_id:
             replies.append(data)
-    return Page(replies, find_page_info(raw, 'replies_connection'))
+    return Page(replies, find_page_info(raw, 'replies_connection'), connection_has_items(raw, 'replies_connection'),
+                _problems([raw]))
 
 
 def search_page(raw, *, search_type, captured_at, connection_key='results'):
     """One search page: posts and people, pages or groups, in the connection's index order."""
     return Page(search_records(raw, search_type, captured_at), find_page_info(raw, connection_key),
-                connection_has_items(raw, connection_key))
+                connection_has_items(raw, connection_key), list(parse_story_nodes([raw]).incomplete_reasons))
 
 
 def about_collections(raw):
@@ -88,5 +94,25 @@ def about_fields(bodies, *, profile_id, collection_names, captured_at):
                                                      collection_names=collection_names, captured_at=captured_at)]
 
 
-SCHEMAS = {'post': _post.json_schema(), 'comment': _comment.json_schema(),
-           'entity': _entity.json_schema(), 'about': _about.json_schema()}
+def about_issues(bodies):
+    """Response issues of About responses. Every part of one is read, so any error or unmerged patch counts."""
+    issues = []
+    for obj in iter_json_objects(bodies, issues=issues):
+        for chunk in [obj, *(obj.get('incremental') or [])]:
+            if not isinstance(chunk, dict):
+                continue
+            if chunk.get('errors'):
+                issues.append('graphql_errors')
+            if isinstance(chunk.get('path'), list):
+                issues.append('unsupported_path_patch')
+    return list(dict.fromkeys(issues))
+
+
+SCHEMAS = {
+    'post': {'object': 'post', 'description': 'A post from feed, profile, group, search or post.',
+             'fields': _post.FIELDS},
+    'comment': {'object': 'comment', 'description': 'A comment or reply from comments or post.',
+                'fields': _comment.FIELDS},
+    'entity': {'object': 'entity', 'description': 'A person, page or group from search.', 'fields': _entity.FIELDS},
+    'about': {'object': 'about', 'description': 'One visible About field from about.', 'fields': _about.FIELDS},
+}

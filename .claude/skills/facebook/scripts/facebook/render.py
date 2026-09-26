@@ -47,7 +47,7 @@ def _text(data, chars) -> str:
     shown = text if chars is None else text[:chars]
     state = 'truncated' if data.get('text_truncated') and not data.get('text_resolved') else 'complete'
     suffix = '…' if len(shown) < len(text) else ''
-    return f'text[{len(shown)}/{len(text)} chars, {state}]: {_quote(shown + suffix)}'
+    return f'text[{len(shown)} of {len(text)} chars shown, {state}]: {_quote(shown + suffix)}'
 
 
 def render_post(post, *, index=1, chars=180, timezone=None) -> str:
@@ -56,7 +56,7 @@ def render_post(post, *, index=1, chars=180, timezone=None) -> str:
     if data.get('created_at') or not data.get('sponsored'):
         labels.append(_time(data.get('created_at'), timezone))
     for flag in ('sponsored', 'pinned', 'incomplete'):
-        if data.get(flag) or (flag == 'pinned' and data.get('is_pinned')):
+        if data.get(flag):
             labels.append(flag)
     labels += [data.get('type', 'unknown'),
                f'reactions={_count(data.get("reaction_count"))} comments={_count(data.get("comment_count"))} shares={_count(data.get("share_count"))}']
@@ -90,9 +90,11 @@ def render_comment(comment, *, index=1, parent_label=None, chars=180, timezone=N
     data = _data(comment)
     indent = '  ' * min(max(data.get('depth', 0), 0), 20)
     parent = f' reply-to={parent_label or "unavailable"}' if data.get('depth') else ''
+    kinds = ','.join(_line(a.get('kind')) for a in data.get('attachments') or [])
+    attached = f' · attachment={kinds}' if kinds else ''
     return (f'{indent}[c{index}{parent}] {_line(data.get("author_name") or "unavailable")} · '
             f'{_time(data.get("created_at"), timezone)} · reactions={_count(data.get("reaction_count"))} '
-            f'replies={_count(data.get("reply_count"))}\n{indent}     {_text(data, chars)}\n'
+            f'replies={_count(data.get("reply_count"))}\n{indent}     {_text(data, chars)}{attached}\n'
             f'{indent}     author: {_handle(data.get("author_url"))}')
 
 
@@ -116,23 +118,28 @@ def render_entities(entities) -> str:
 
 
 def render_about(fields) -> str:
-    return '\n'.join(f'{_line(data["section"])}: {_line(data["text"])} ({_handle(data.get("url"))})'
+    return '\n'.join(f'{_line(data["section"])}: {_line(data["text"])}'
+                     + (f' ({_quote(data["url"])})' if data.get('url') else '')
                      for field in fields for data in [_data(field)])
 
 
-def render_results(results, *, command, sort=None, stop_reason='exhausted', more=None,
-                   chars=180, timezone=None) -> str:
-    """Render models or their to_dict output, plus caller-owned completion metadata.
+def render_page(envelope, *, chars=180, timezone=None) -> str:
+    """The text page of one result: a header naming scope and cost, the window, records, coverage, more:.
 
-    ``more`` is an already assembled command, not a raw cursor. ``chars=None``
-    shows full received text. Omitted timezone uses the machine's local zone.
+    ``chars=None`` shows full received text. Omitted timezone uses the machine's local zone.
     """
-    results = [_data(result) for result in results]
-    header = [_line(command)]
-    if sort is not None:
-        header.append(f'sort={_line(sort)}')
-    header.extend([f'{len(results)} shown', f'stopped={_line(stop_reason)}'])
+    results = [_data(result) for result in envelope['results']]
+    header = [_line(envelope['command'])]
+    header += [f'{key}={_line(envelope[key])}' for key in ('sort', 'type', 'section') if envelope.get(key) is not None]
+    header.append(f'{len(results)} shown')
+    if 'sponsored_skipped' in envelope:
+        header.append(f'sponsored_skipped={envelope["sponsored_skipped"]}')
+    header += [f'stopped={_line(envelope["stop_reason"])}',
+               f'requests={envelope["request_count"]}/{envelope["max_requests"]}']
     lines = [' · '.join(header)]
+    window = envelope.get('window')
+    if window:
+        lines.append(f'window {window.get("since") or ""}..{window.get("until") or ""} · {_line(window["coverage"])}')
     comments = [r for r in results if 'post_id' in r]
     labels = {c['id']: f'c{i}' for i, c in enumerate(comments, 1)}
     counts = {'p': 0, 'c': 0, 'e': 0}
@@ -149,6 +156,9 @@ def render_results(results, *, command, sort=None, stop_reason='exhausted', more
         else:
             counts['p'] += 1
             lines.append(render_post(data, index=counts['p'], chars=chars, timezone=timezone))
-    if more:
-        lines.append('more: ' + _line(more))
+    lines += ['coverage: ' + _line(note) for note in envelope.get('coverage') or []]
+    if envelope.get('error'):
+        lines.append(f'coverage: incomplete — {_line(envelope["message"])} fix: {_line(envelope["fix"])}')
+    if envelope.get('next'):
+        lines.append('more: ' + envelope['next'])  # executable: printed exactly as it runs
     return '\n'.join(lines)

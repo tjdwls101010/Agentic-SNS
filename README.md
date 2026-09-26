@@ -80,7 +80,7 @@ A successful read prints the profile row shown above, preceded by request and bu
 | [yfinance](.claude/skills/yfinance/SKILL.md) | Market and company data, field and condition discovery, options and calendars; structured results distinguish applied query conditions, missing data and partial failures. |
 | [twitter](.claude/skills/twitter/SKILL.md) | X feeds, posts and replies, profiles, search, followers/following, bookmarks/likes, trends, lists, and communities; continuation handles and query recovery. |
 | [reddit](.claude/skills/reddit/SKILL.md) | Feeds, subreddits, posts, comment threads, users, search, subscriptions, saved/upvoted posts; cached comment continuation and resumable exports. |
-| [facebook](.claude/skills/facebook/SKILL.md) | Feeds, posts, comments, profiles and About fields, search, and groups; paginated collection and query recovery. |
+| [facebook](.claude/skills/facebook/SKILL.md) | Feeds, posts, comments, profiles and About fields, search, and groups; date windows that say whether they closed, per-call request budgets, resumable collection and query recovery. |
 | [threads](.claude/skills/threads/SKILL.md) | Feeds, posts with parent chains and replies, profiles, search, relationships, liked/saved posts; reports reply coverage and local request budgets. |
 | [naver-blog](.claude/skills/naver-blog/SKILL.md) | Search, blog profiles and categories, full posts, comments, neighbor feeds/lists, topic directories, and blogs of the month; reports extraction coverage and distinguishes observed counts from server totals. |
 

@@ -85,21 +85,21 @@ def test_lists_without_ids_keep_every_distinct_item_across_fragments():
     assert {m['url'] for m in media} == {'https://example.test/a.jpg', 'https://example.test/b.jpg'}
 
 
-def test_unsupported_path_patch_reports_incomplete():
+def test_an_unmergeable_patch_of_a_read_field_marks_the_story_it_reaches():
     body = b'{"data":{"node":{"feedback":{"id":"synthetic-post"}}}}\n'
     patch = b'{"path":["node","feedback"],"data":{"reaction_count":{"count":7}}}\n'
     page = posts(body + patch)
-    assert page.issues == ['unsupported_path_patch']
+    assert page.issues == []
     assert page.records[0]['incomplete'] is True
     complete = posts(body)
     assert complete.issues == [] and complete.records[0]['incomplete'] is False
 
 
-def test_unparseable_line_is_skipped_and_marks_the_story_incomplete():
+def test_unparseable_line_is_skipped_and_reported_for_the_whole_response():
     story, issues = post_story(b'{"data": {"node": {"feedback": {"id": "ok"}}}}\nnot json at all\n')
     assert issues == ['malformed_json']
     post = record(story, source='permalink')
-    assert post['id'] == 'ok' and post['incomplete'] is True
+    assert post['id'] == 'ok' and post['incomplete'] is False
 
 
 def test_comment_feedback_does_not_become_a_post():
@@ -212,10 +212,10 @@ def test_post_preserves_unknown_counts_and_marks_sponsored_pinned_undated():
                    'is_pinned_story': True, 'incomplete': True, 'message': {'text': 'Synthetic post'}})
     assert post['reaction_count'] == 0
     assert post['comment_count'] is None and post['share_count'] is None
-    assert all(post[key] for key in ('sponsored', 'pinned', 'is_pinned', 'undated', 'incomplete'))
+    assert all(post[key] for key in ('sponsored', 'pinned', 'undated', 'incomplete'))
     assert post['captured_at'] == '2026-09-05T00:00:00Z'
     assert post['source'] == 'newsfeed'
-    assert {'sponsored', 'pinned', 'undated', 'incomplete'} <= set(SCHEMAS['post']['properties'])
+    assert {'sponsored', 'pinned', 'undated', 'incomplete'} <= set(SCHEMAS['post']['fields'])
 
 
 def test_invalid_scalar_counts_and_timestamps_are_unknown_not_zero_or_crashes():
@@ -294,8 +294,8 @@ def test_comment_maps_every_field():
     assert row == {'id': 'c1', 'post_id': POST_ID, 'author_name': 'A Commenter',
                    'author_url': 'https://www.facebook.com/someone', 'author_id': '42', 'text': 'hello',
                    'created_at': '2026-07-18T02:41:28Z', 'depth': 0, 'parent_id': None, 'reaction_count': 7,
-                   'reply_count': 3, 'captured_at': '2026-09-05T00:00:00Z'}
-    assert set(SCHEMAS['comment']['properties']) == set(row)
+                   'reply_count': 3, 'attachments': [], 'captured_at': '2026-09-05T00:00:00Z'}
+    assert {key for key in SCHEMAS['comment']['fields'] if '[]' not in key} == set(row)
 
 
 def test_depth_distinguishes_a_reply_from_a_top_level_comment():
@@ -407,7 +407,7 @@ def test_entity_fields_map_through_and_missing_verified_is_null():
     assert (row['id'], row['name'], row['verified'], row['url']) == ('42', 'A Page', True,
                                                                      'https://www.facebook.com/42')
     assert searched(search_body(entity('1', 'Group')), 'groups')[0]['verified'] is None
-    assert set(SCHEMAS['entity']['properties']) == set(row)
+    assert set(SCHEMAS['entity']['fields']) == set(row)
 
 
 def test_nodes_without_a_url_or_name_are_not_entities():
@@ -458,7 +458,7 @@ def test_about_discovers_collections_and_deduplicates_fields_by_section():
                                               'collection': None, 'field_type': 'work', 'text': 'Synthetic Work',
                                               'url': 'https://example.test/work',
                                               'captured_at': '2026-09-05T00:00:00Z'}]
-    assert SCHEMAS['about']['title'] == 'ProfileField'
+    assert SCHEMAS['about']['object'] == 'about'
 
 
 # --- fixtures and their tools (no production code) -----------------------------------------------------------------
