@@ -44,7 +44,8 @@ def monotonic(data, field, ascending):
 
 # ---- result envelope ---------------------------------------------------------------------------------------------
 
-ORDER = ("target", "id", "observed_at", "source_time", "stored_age_seconds", "status", "context", "conditions", "coverage", "continuation", "data", "warnings", "error")
+# 성진: 싼 신호(상태·범위·경고)를 비싼 상세(data) 앞에 둔다 — 잘린 출력이나 앞부분만 읽는 쪽도 경고는 본다.
+ORDER = ("target", "id", "observed_at", "source_time", "stored_age_seconds", "status", "context", "conditions", "coverage", "continuation", "warnings", "data", "error")
 
 
 def as_time(value):

@@ -11,7 +11,7 @@ import re
 import shlex
 
 from yfinance_skill.display import display, dump
-from yfinance_skill.envelope import error_info
+from yfinance_skill.envelope import error_info, ordered
 from yfinance_skill.shape import is_empty, row_count
 from yfinance_skill.selection import select
 
@@ -225,12 +225,13 @@ def emit(results, args, item, request=None, scoped=False):
 
 
 def strip(envelope, item=None):
-    """The printed copy: private keys dropped, and the data shown at the precision the source had."""
+    """The printed copy: private keys dropped, the data shown at the precision the source had, and the keys in envelope
+    order — ordered here, at the last step, because a narrowing adds its warning after the result was first built."""
     shown = {k: v for k, v in envelope.items() if not k.startswith("_")}
     if item is not None and shown.get("data") is not None:
         zoned = bool((shown.get("context") or {}).get("timezone"))
         shown["data"] = display(shown["data"], envelope.get("_full"), item.precise, zoned)
-    return shown
+    return ordered(shown)
 
 
 def outcome(results, status):
