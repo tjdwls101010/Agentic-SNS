@@ -50,7 +50,7 @@ def test_a_limit_on_an_oldest_first_series_keeps_the_newest_rows(cli):
     assert proc.returncode == 0, proc.stdout[:400]
     r = doc["results"][0]
     assert closes(r) == [1250, 1251, 1252, 1253, 1254]
-    assert r["coverage"] == {"received": 1255, "kept": "newest", "truncated_by": "explicit_limit", "shown": 5, "exhaustive": False}
+    assert r["coverage"] == {"received": 1255, "kept": "newest", "truncated_by": "explicit_limit", "shown": 5}
 
 
 def test_a_limit_on_a_newest_first_series_still_keeps_the_newest_rows(cli):
@@ -77,13 +77,13 @@ def test_coverage_names_the_cut_even_when_the_leaf_chose_it(cli):
     proc, doc = cli("company", "filings", "AAPL", routes=filings_routes(80))
     assert proc.returncode == 0, proc.stdout[:400]
     coverage = doc["results"][0]["coverage"]
-    assert coverage["truncated_by"] == "leaf_default" and coverage["shown"] == 20 and coverage["exhaustive"] is False
+    assert coverage["truncated_by"] == "leaf_default" and coverage["shown"] == 20 and coverage["received"] == 80
 
 
 def test_an_untruncated_result_says_so(cli):
     proc, doc = cli("prices", "history", "AAPL", "--period", "5d", routes=series_routes(3))
     coverage = doc["results"][0]["coverage"]
-    assert coverage["exhaustive"] is True and "kept" not in coverage
+    assert coverage["shown"] == coverage["received"] == 3 and "kept" not in coverage and "truncated_by" not in coverage
 
 
 # ---- paging: the window walks forward -----------------------------------------------------------------------------
