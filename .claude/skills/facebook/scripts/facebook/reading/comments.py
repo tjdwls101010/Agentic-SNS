@@ -47,7 +47,6 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
     shown = set(state.get('seen') or [])
     fatal = None
     sort = args.sort or 'top'
-    first_page_info = {}
 
     def fetch(after):
         if fatal:
@@ -65,11 +64,7 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
             record = comment.to_dict()
             record['_reply_handle'] = {'id': _comment.feedback_id(node), 'token': _comment.expansion_token(node)}
             parents.append(record)
-        info = find_page_info(raw, 'comments')
-        if first_batch and info:
-            first_page_info.update(info)
-            info = {'has_next_page': False, 'end_cursor': None}
-        return parents, info
+        return parents, find_page_info(raw, 'comments')
 
     def expand(parent):
         nonlocal fatal
@@ -111,7 +106,7 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
             retry_waiting.append(dict(parent))
         return replies
 
-    def finish_page(records, after, reason):
+    def finish_page(records, after, reason, skipped=()):
         nonlocal fatal
         output = []
         for parent in records:
@@ -132,17 +127,12 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
 
     options = page_options(args, {**state, 'cursor': cursor}, finish_page)
     if first_batch:
-        # post returns only this root batch; --limit still selects parents within it.
-        options['page_limit'] = bool(args.out)
-        options['since'] = options['until'] = None
+        # post reads only the root batch; --limit still selects parents within it, more: continues after it.
+        options['max_pages'] = 1
     if fatal:
         result = {'results': [], 'cursor': cursor, 'pending': pending, 'stop_reason': None, 'failure': fatal}
     else:
         result = paginate(fetch, **options)
-    if first_batch and first_page_info.get('has_next_page') is True:
-        result['cursor'] = first_page_info.get('end_cursor')
-        if result['stop_reason'] == 'exhausted':
-            result['stop_reason'] = 'limit_reached'
     result['results'] = retried + [item for parent in result['results']
         for item in [{k: v for k, v in parent.items() if k != '_reply_handle'},
                      *expanded.get(parent['id'], [])]]
@@ -151,6 +141,13 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
     if failures:
         result['details'] = {'replies_incomplete': failures}
         result['coverage'] = [_coverage(f) for f in failures if not f['retryable']]
-        if result.get('failure') is None and any(f['retryable'] for f in failures):
-            result['failure'] = fatal or FacebookError(6, 'Some replies could not be read.', REPLY_RETRY)
+        current = result.get('failure') or fatal
+        # A block or login stop outranks everything; a real reply failure outranks a later budget stop.
+        failed = any(f['retryable'] and f.get('code') not in (None, 4, 5, 8) for f in failures)
+        if current is not None and current.code != 8:
+            result['failure'] = current
+        elif failed or current is None and any(f['retryable'] for f in failures):
+            result['failure'] = FacebookError(6, 'Some replies could not be read.', REPLY_RETRY)
+        else:
+            result['failure'] = current
     return result

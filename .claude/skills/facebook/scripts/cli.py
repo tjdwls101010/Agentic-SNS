@@ -170,6 +170,11 @@ def parser():
 
 
 def validate(args):
+    for name in ('target', 'section', 'out', 'capture'):
+        value = getattr(args, name)
+        if isinstance(value, str) and any(ord(c) < 32 or ord(c) == 127 for c in value):
+            raise FacebookError(2, f'The {name} contains a line break or another control character.',
+                                'Pass it on one line.')
     if args.since and args.until and args.since > args.until:
         raise FacebookError(2, '--since must not be later than --until.')
     if args.after and args.out:
@@ -204,7 +209,8 @@ def invocation():
 
 def query_words(args):
     """The command, its target, its identity options, then the controls the caller chose."""
-    words = [args.command] + ([args.target] if args.target else [])
+    dashed = bool(args.target) and args.target.startswith('-')
+    words = [args.command] + ([args.target] if args.target and not dashed else [])
     for key in COMMANDS[args.command].identity:
         if key == 'window':
             words += [w for flag in ('since', 'until') if getattr(args, flag) for w in ('--' + flag, getattr(args, flag))]
@@ -222,14 +228,19 @@ def query_words(args):
     return words
 
 
+def positional_tail(args):
+    """A target that looks like an option goes last, after `--`."""
+    return ['--', args.target] if args.target and args.target.startswith('-') else []
+
+
 def next_command(args, number):
     """The same query from the numbered handle."""
-    return invocation() + ' ' + shlex.join(query_words(args) + ['--after', str(number)])
+    return invocation() + ' ' + shlex.join(query_words(args) + ['--after', str(number)] + positional_tail(args))
 
 
 def resume_command(args):
     """The same --out invocation, which picks up where the file ends."""
-    return invocation() + ' ' + shlex.join(query_words(args) + ['--out', args.out])
+    return invocation() + ' ' + shlex.join(query_words(args) + ['--out=' + args.out] + positional_tail(args))
 
 
 def emit(kind, envelope, args):
@@ -238,8 +249,11 @@ def emit(kind, envelope, args):
                                                                       and not args.out):
         print(json.dumps(envelope, ensure_ascii=False))
     elif args.out:
-        parts = [args.command, f'{envelope.get("count", 0)} saved to {json.dumps(args.out, ensure_ascii=False)}',
-                 f'stopped={envelope["stop_reason"]}', f'requests={envelope["request_count"]}/{envelope["max_requests"]}']
+        parts = [args.command, f'{envelope.get("count", 0)} saved to {json.dumps(args.out, ensure_ascii=False)}']
+        if 'sponsored_skipped' in envelope:
+            parts.append(f'sponsored_skipped={envelope["sponsored_skipped"]}')
+        parts += [f'stopped={envelope["stop_reason"]}',
+                  f'requests={envelope["request_count"]}/{envelope["max_requests"]}']
         if envelope.get('already_complete'):
             parts.append('already complete')
         if envelope['stop_reason'] in ('budget', 'query_failure'):

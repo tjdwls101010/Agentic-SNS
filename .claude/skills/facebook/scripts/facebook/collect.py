@@ -20,6 +20,7 @@ class OutFile:
     def __init__(self, path, context):
         self.path, self.context = Path(path).expanduser(), dict(context)
         self.ids, self.count, self.cursor, self.pending, self.complete = set(), 0, None, [], False
+        self.skipped = set()  # sponsored ids left out of saved pages, so a resume does not count them again
         self.parent_count = 0
         self.stream = None
         try:
@@ -68,6 +69,7 @@ class OutFile:
                 if record.get('ids') != page_ids or record.get('n') != len(page):
                     raise FacebookError(2, 'Output page integrity check failed.', 'Preserve this file and use a new path.')
                 self.ids.update(x for x in page_ids if x is not None)
+                self.skipped.update(record.get('skipped') or [])
                 self.count += len(page)
                 self.parent_count += sum('post_id' in record and not record.get('depth') for record in page)
                 self.cursor = record.get('cursor')
@@ -78,7 +80,7 @@ class OutFile:
         self.stream.seek(boundary)
         self.stream.truncate()
 
-    def commit(self, records, cursor, stop_reason):
+    def commit(self, records, cursor, stop_reason, skipped=()):
         page, new_ids = [], set()
         for record in records:
             identity = record.get('id')
@@ -90,14 +92,18 @@ class OutFile:
         try:
             for record in page:
                 self.stream.write(_line(record))
-            self.stream.write(_line(dict(kind='page', cursor=cursor,
-                                         ids=[r.get('id') for r in page], n=len(page), stop_reason=stop_reason)))
+            marker = dict(kind='page', cursor=cursor, ids=[r.get('id') for r in page], n=len(page),
+                          stop_reason=stop_reason)
+            if skipped:
+                marker['skipped'] = list(skipped)
+            self.stream.write(_line(marker))
             self.stream.flush()
             os.fsync(self.stream.fileno())
         except OSError:
-            raise FacebookError(8, 'Output page could not be committed.',
+            raise FacebookError(6, 'Output page could not be committed.',
                                 'Free disk space and resume with the same command and file.') from None
         self.ids.update(new_ids)
+        self.skipped.update(skipped)
         self.count += len(page)
         self.parent_count += sum('post_id' in record and not record.get('depth') for record in page)
         self.cursor = cursor

@@ -12,7 +12,7 @@ from facebook.cursors import CursorStore
 from facebook.graphql.resolve import normalize_group, normalize_post, normalize_profile
 from facebook.graphql.transport import Transport
 from facebook.errors import FacebookError
-from facebook.outcome import FIXES, SETUP_BUDGET, finish
+from facebook.outcome import BUDGET_SPENT, FIXES, SETUP_BUDGET, finish
 from facebook.reading import maintenance
 from facebook.reading.about import about
 from facebook.reading.comments import comments
@@ -34,31 +34,44 @@ def prepare(args):
         args.target = normalize_post(args.target)
 
 
+def window_of(args):
+    """The date window of a dated read and how its order can close it."""
+    if args.command not in ('feed', 'profile', 'group') or not (args.since or args.until):
+        return None
+    order = 'server' if args.command == 'profile' else 'chronological' if args.sort == 'recent' else 'ranked'
+    return {'order': order, 'since': args.since, 'until': args.until}
+
+
 def run(args, *, context=None, continuation=None, identity=None):
-    """(kind, envelope) of one command; failures before any reading raise FacebookError."""
+    """(kind, envelope) of one command. Only argument errors are raised; every other failure is finished."""
     if args.command == 'schema':
         return finish(maintenance.schema(args.object), command='schema', requests=0, budget=0)
-    if args.command == 'doctor' and args.unblock:
-        unblock()
-    check_blocked()
     # 성진: refresh의 400회는 실계정 보호 상한, 일회용 계정으로 바꾸면 올려도 됨
     budget = {'refresh': 400, 'doctor': 2}.get(args.command) or args.max_requests or 25
-    transport = Transport(limit=budget)
-    transport.verbose = args.verbose
+    transport = None
     try:
+        if args.command == 'doctor' and args.unblock:
+            unblock()
+        check_blocked()
+        transport = Transport(limit=budget)
+        transport.verbose = args.verbose
         transport.start()
         if args.command in ('doctor', 'refresh'):
             reading = maintenance.run(args, transport)
         else:
             reading = read(args, transport, context, continuation)
     except FacebookError as error:
+        if error.code == 2:
+            raise
         # A budget stop outside paging has no cursor to continue from: home, target id, permalink, About overview.
-        if error.code == 8 and args.command not in ('doctor', 'refresh'):
-            raise FacebookError(8, SETUP_BUDGET, FIXES['budget_restart']) from None
-        raise
-    resumable = bool(reading.get('handle')) or args.out is not None
-    kind, envelope = finish(reading, command=args.command, identity=identity, requests=transport.request_count,
-                            budget=budget, out=args.out, resumable=resumable)
+        if error.code == 8 and error.message == BUDGET_SPENT and args.command not in ('doctor', 'refresh'):
+            error = FacebookError(8, SETUP_BUDGET, FIXES['budget_restart'])
+        reading = {'results': [], 'failure': error}
+    if window_of(args):
+        reading['window'] = window_of(args)
+    kind, envelope = finish(reading, command=args.command, identity=identity,
+                            requests=transport.request_count if transport else 0, budget=budget, out=args.out,
+                            continuable=bool(reading.get('continuable')))
     if reading.get('handle'):
         envelope['handle'] = reading['handle']
     return kind, envelope
@@ -83,17 +96,14 @@ def read(args, transport, context, continuation):
             return {'results': [], 'stop_reason': 'exhausted', 'count': output.count, 'already_complete': True}
         run_args = copy.copy(args)
         if output:
-            state = {'cursor': output.cursor, 'pending': output.pending, 'seen': output.ids}
+            state = {'cursor': output.cursor, 'pending': output.pending, 'seen': output.ids | output.skipped}
             saved_count = output.parent_count if args.command == 'comments' else output.count
             if args.limit is not None:
                 if saved_count >= args.limit:
                     return {'results': [], 'stop_reason': 'limit_reached', 'count': output.count}
                 run_args.limit = args.limit - saved_count
-        def commit_page(records, cursor, reason):
-            end = cursor.get('after') if isinstance(cursor, dict) and 'post_id' in cursor else cursor
-            if end == {'exhausted': True} and reason in ('limit_reached', 'exhausted', None):
-                reason = 'exhausted'
-            output.commit(records, cursor, reason)
+        def commit_page(records, cursor, reason, skipped=()):
+            output.commit(records, cursor, reason, skipped)
 
         commit = commit_page if output else None
         if args.command in ('feed', 'profile', 'group', 'post'):
@@ -116,9 +126,16 @@ def read(args, transport, context, continuation):
             seen = set(state.get('seen') or [])
             seen.update(r['id'] for r in result['results'] if r.get('id') is not None)
             seen.update(i for i in result.get('skipped_ids') or [] if i is not None)
-            number = CursorStore().save(context, {'resume_cursor': cursor, 'seen': sorted(seen),
-                                                  'window_closed': bool(result.get('window_closed'))}, pending=pending)
-            result['handle'] = {'number': number, 'command': command}
+            try:
+                number = CursorStore().save(context, {'resume_cursor': cursor, 'seen': sorted(seen),
+                                                      'window_closed': bool(result.get('window_closed'))},
+                                            pending=pending)
+                result['handle'] = {'number': number, 'command': command}
+            except FacebookError as error:
+                # A store that cannot save outranks a budget stop: more budget would not help.
+                current = result.get('failure')
+                result['failure'] = error if current is None or current.code == 8 else current
+        result['continuable'] = bool(result.get('handle')) or bool(output and output.cursor is not None)
         for key in ('pending', 'cursor', 'window_closed', 'skipped_ids'):
             result.pop(key, None)
         if output:

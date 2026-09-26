@@ -30,6 +30,7 @@ FIXES = {
     'blocked': 'Stop requests. After a person checks Facebook in Aside, run doctor --unblock.',
     'stale_query': 'Run refresh, then retry the read command.',
     'pagination': 'Retry later with the more: command; refresh does not change pagination.',
+    'pagination_restart': 'Rerun the same command later; refresh does not change pagination.',
     'empty': 'Try a different target or window; an explicitly empty result is not a stale query.',
     'budget_resume': 'Run more: to continue; raise --max-requests if one invocation should read further.',
     'budget_restart': 'Rerun with a larger --max-requests.',
@@ -89,16 +90,22 @@ def window_state(order, stop_reason, failure):
 
 
 def failure_envelope(error):
-    return {'ok': False, 'error': error_kind(error), 'message': error.message, 'fix': error.fix, 'results': []}
+    """An argument error, or a local failure outside any reading."""
+    kind = error_kind(error)
+    envelope = {'ok': False, 'error': kind, 'message': error.message, 'fix': error.fix, 'results': []}
+    if kind != 'argument':
+        envelope['stop_reason'] = {'blocked': 'blocked', 'partial': 'budget'}.get(kind, 'query_failure')
+    return envelope
 
 
-def finish(reading, *, command, requests, budget, identity=None, out=None, resumable=False):
+def finish(reading, *, command, requests, budget, identity=None, out=None, continuable=False):
     """(kind, envelope) for one reading.
 
     `reading` holds results, stop_reason (the natural stop when nothing failed), failure (FacebookError or None),
-    coverage notes, window ({order, since, until}) and details for JSON; `resumable` says whether a saved cursor
-    or the --out file lets a later invocation continue after a budget stop.
+    coverage notes, window ({order, since, until}) and details for JSON; `continuable` says whether a saved cursor
+    or committed --out pages let a later invocation continue.
     """
+    resumable = continuable
     records = reading.get('results') or []
     failure = reading.get('failure')
     stop_reason = reading.get('stop_reason') or 'exhausted'
@@ -133,13 +140,16 @@ def finish(reading, *, command, requests, budget, identity=None, out=None, resum
     envelope['max_requests'] = budget
     if kind == 'empty':
         envelope.update(error='empty', message='This query explicitly returned no results.', fix=FIXES['empty'])
-    elif failure is not None and failure.code == 8 and kind == 'partial':
+    elif failure is not None and failure.code == 8 and kind == 'partial' and command not in ('doctor', 'refresh'):
         message = failure.message
         if message == BUDGET_SPENT:
             message = 'The request budget ran out before anything was saved to continue from.'
         envelope.update(error=kind, message=message, fix=FIXES['budget_restart'])
     elif failure is not None and kind != 'resumable':
-        envelope.update(error=kind, message=failure.message, fix=failure.fix)
+        fix = failure.fix
+        if fix == FIXES['pagination'] and not continuable:
+            fix = FIXES['pagination_restart']
+        envelope.update(error=kind, message=failure.message, fix=fix)
     elif kind == 'resumable':
         envelope['fix'] = FIXES['budget_resume']
     coverage = list(reading.get('coverage') or [])

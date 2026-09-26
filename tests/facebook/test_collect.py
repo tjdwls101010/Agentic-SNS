@@ -23,7 +23,8 @@ def test_output_file_commits_full_page_and_resumes_without_requery(tmp_path):
 def test_text_summary_names_the_file_and_the_count(tmp_path):
     path = tmp_path / 'posts.ndjson'
     result = Account(tmp_path).run('feed', '--out', str(path), responses=[login(), feed_page(['p1'])])
-    assert result.stdout == f'feed · 1 saved to {json.dumps(str(path))} · stopped=exhausted · requests=2/25\n'
+    assert result.stdout == (f'feed · 1 saved to {json.dumps(str(path))} · sponsored_skipped=0 · stopped=exhausted · '
+                             'requests=2/25\n')
 
 
 def test_page_limit_keeps_whole_page_and_skips_ids_already_saved(tmp_path):

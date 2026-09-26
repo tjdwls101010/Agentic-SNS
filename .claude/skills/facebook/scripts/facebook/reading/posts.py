@@ -46,9 +46,5 @@ def run(args, transport, *, state=None, commit=None):
 
     newest_first = args.command in ('feed', 'group') and args.sort == 'recent'
     skip_sponsored = args.command == 'feed' and not args.include_sponsored
-    result = paginate(fetch, **page_options(args, state, commit), newest_first=newest_first,
-                      skip_sponsored=skip_sponsored)
-    if args.since or args.until:
-        order = 'server' if args.command == 'profile' else 'chronological' if args.sort == 'recent' else 'ranked'
-        result['window'] = {'order': order, 'since': args.since, 'until': args.until}
-    return result
+    return paginate(fetch, **page_options(args, state, commit), newest_first=newest_first,
+                    skip_sponsored=skip_sponsored)

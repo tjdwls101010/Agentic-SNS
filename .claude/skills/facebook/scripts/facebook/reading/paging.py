@@ -42,7 +42,8 @@ def page_options(args, state, commit):
 
 
 def paginate(fetch_page, *, limit=None, since=None, until=None, cursor=None, seen=None, commit=None,
-             page_limit=False, pending=None, newest_first=False, window_closed=False, skip_sponsored=False):
+             page_limit=False, pending=None, newest_first=False, window_closed=False, skip_sponsored=False,
+             max_pages=None):
     """fetch_page(cursor) -> (records, page_info); commit at complete page boundaries.
 
     ``pending`` holds an unshown tail; ``END`` after that tail means no more requests. A newest-first read with
@@ -53,6 +54,15 @@ def paginate(fetch_page, *, limit=None, since=None, until=None, cursor=None, see
     results, waiting = [], list(pending or [])
     identities, visited = set(seen or []), set()
     skipped = []
+    pages = 0
+
+    def committed(records, reason, page_skipped=()):
+        """Commit one page; a store that cannot write ends the reading with what it has."""
+        try:
+            commit(records, cursor, reason, page_skipped)
+        except FacebookError as error:
+            return error
+        return None
 
     def outcome(reason, *, error=None):
         result = dict(results=results, stop_reason=reason, failure=error, cursor=cursor, pending=waiting,
@@ -74,12 +84,12 @@ def paginate(fetch_page, *, limit=None, since=None, until=None, cursor=None, see
             visited.add(key)
             try:
                 records, info = fetch_page(cursor)
+                pages += 1
             except FacebookError as error:
                 if error.code == 7:
                     cursor = END
-                    if commit:
-                        commit([], cursor, 'exhausted')
-                    return outcome('exhausted')
+                    failed = committed([], 'exhausted') if commit else None
+                    return outcome(None, error=failed) if failed else outcome('exhausted')
                 return outcome(None, error=error)
             info = info or {}
             if info.get('has_next_page') is False:
@@ -90,7 +100,7 @@ def paginate(fetch_page, *, limit=None, since=None, until=None, cursor=None, see
                 malformed = True
             if newest_first and since and passes_boundary(records, since):
                 cursor, window_closed, malformed = END, True, False
-        unique = []
+        unique, page_skipped = [], []
         for record in records:
             identity = record.get('id')
             if identity is not None and identity in identities:
@@ -99,19 +109,27 @@ def paginate(fetch_page, *, limit=None, since=None, until=None, cursor=None, see
                 identities.add(identity)
             if skip_sponsored and record.get('sponsored'):
                 skipped.append(identity)
+                page_skipped.append(identity)
                 continue
             if in_window(record, since, until):
                 unique.append(record)
         records = unique
-        reached = limit is not None and len(results) + len(records) >= limit
-        if reached and not page_limit:
+        full = limit is not None and len(results) + len(records) >= limit
+        reached = full or max_pages is not None and pages >= max_pages and cursor != END
+        if full and not page_limit:
             room = limit - len(results)
             waiting, records = records[room:], records[:room]
         results.extend(records)
-        reason = (None if malformed else 'window_reached' if window_closed and cursor == END and not waiting
-                  else 'limit_reached' if reached else 'exhausted' if cursor == END else None)
+        if malformed:
+            reason = None
+        elif cursor == END and not waiting:
+            reason = 'window_reached' if window_closed else 'exhausted'
+        else:
+            reason = 'limit_reached' if reached else None
         if commit and not malformed:
-            commit(records, cursor, reason)
+            failed = committed(records, reason, page_skipped)
+            if failed:
+                return outcome(None, error=failed)
         if malformed:
             return outcome(None, error=FacebookError(6, 'Facebook sent a page without pagination metadata.',
                                                      FIXES['pagination']))

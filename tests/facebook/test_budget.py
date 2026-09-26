@@ -34,7 +34,7 @@ def test_budget_stop_in_an_output_file_resumes_with_the_same_command(tmp_path):
     assert result.code == 0
     summary, resume = result.stdout.strip().split(' · resume: ')
     assert summary.endswith(' · stopped=budget · requests=3/3')
-    assert more_args(resume) == ['feed', '--sort', 'top', '--max-requests', '3', '--out', str(path)]
+    assert more_args(resume) == ['feed', '--sort', 'top', '--max-requests', '3', f'--out={path}']
 
 
 def test_budget_spent_during_setup_must_restart_and_says_what_setup_needs(tmp_path):

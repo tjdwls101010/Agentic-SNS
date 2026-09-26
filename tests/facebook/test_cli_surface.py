@@ -333,15 +333,17 @@ def test_matrix_maintenance(tmp_path):
     assert (schema.code, schema.data['stop_reason']) == (0, 'complete')
 
 
-@pytest.mark.parametrize('pages,message', [
-    ([feed_page(['p1'], 'same'), feed_page(['p2'], 'same')], 'Facebook repeated a page cursor.'),
+@pytest.mark.parametrize('pages,message,fix', [
+    ([feed_page(['p1'], 'same'), feed_page(['p2'], 'same')], 'Facebook repeated a page cursor.',
+     'Retry later with the more: command; refresh does not change pagination.'),
     ([envelope({'data': {'viewer': {'news_feed': {'edges': [{'node': story('p1')}]}}}})],
-     'Facebook sent a page without pagination metadata.'),
+     'Facebook sent a page without pagination metadata.',
+     'Rerun the same command later; refresh does not change pagination.'),
 ])
-def test_pagination_failures_do_not_send_the_model_to_refresh(tmp_path, pages, message):
+def test_pagination_failures_do_not_send_the_model_to_refresh(tmp_path, pages, message, fix):
     result = Account(tmp_path).run('feed', '--json', responses=[login(), *pages])
     assert result.code == 8 and result.data['message'] == message
-    assert 'refresh' in result.data['fix'] and result.data['fix'].startswith('Retry later with the more: command')
+    assert result.data['fix'] == fix and ('next' in result.data) == fix.startswith('Retry later with the more:')
 
 
 def test_text_header_names_scope_and_cost(tmp_path):
@@ -364,6 +366,6 @@ def test_output_failure_is_one_summary_line(tmp_path):
         login(), feed_page(['p1'], 'next'), envelope({'errors': [{'message': 'x'}]})])
     assert result.code == 8
     assert len(result.stdout.splitlines()) == 1
-    assert result.stdout.startswith(f'feed · 1 saved to {json.dumps(str(path))} · stopped=query_failure · requests=3/25'
-                                    ' · resume: uv run ')
+    assert result.stdout.startswith(f'feed · 1 saved to {json.dumps(str(path))} · sponsored_skipped=0 · '
+                                    'stopped=query_failure · requests=3/25 · resume: uv run ')
     assert result.stdout.rstrip().endswith('error=partial fix=Run refresh, then retry the read command.')

@@ -157,5 +157,5 @@ def render_page(envelope, *, chars=180, timezone=None) -> str:
     if envelope.get('error'):
         lines.append(f'coverage: incomplete — {_line(envelope["message"])} fix: {_line(envelope["fix"])}')
     if envelope.get('next'):
-        lines.append('more: ' + _line(envelope['next']))
+        lines.append('more: ' + envelope['next'])  # executable: printed exactly as it runs
     return '\n'.join(lines)

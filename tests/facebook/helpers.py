@@ -64,7 +64,8 @@ class Account:
         queue.write_text(json.dumps(list(responses)))
         environment = {**os.environ, 'FACEBOOK_ASIDE_BIN': str(FAKE_ASIDE), 'FAKE_ASIDE_RESPONSES': str(queue),
                        'FAKE_ASIDE_LOG': str(log), 'FACEBOOK_HOME': str(self.home)}
-        for name in ('FAKE_ASIDE_MODE', 'FAKE_ASIDE_EXPECTED_ARGS', 'FAKE_NO_SLEEP', 'FAKE_FAIL_REPLACE'):
+        for name in ('FAKE_ASIDE_MODE', 'FAKE_ASIDE_EXPECTED_ARGS', 'FAKE_NO_SLEEP', 'FAKE_FAIL_REPLACE',
+                     'FAKE_FAIL_FSYNC'):
             environment.pop(name, None)
         environment['PYTHONPATH'] = str(PROCESS_DOUBLES)
         if not paced:

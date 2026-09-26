@@ -18,7 +18,11 @@ class CursorStore:
     """Opaque monotonically increasing handles bind cursors to one query context."""
     def __init__(self):
         self.directory = cache_dir() / 'cursors'
-        self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        except OSError:
+            raise FacebookError(6, 'Cannot save a continuation handle.', 'Check that the Facebook cache directory '
+                                                                          'is writable, then rerun the command.') from None
 
     def save(self, context, cursor, pending=None):
         try:
@@ -40,7 +44,8 @@ class CursorStore:
                     os.fsync(stream.fileno())
                 return number
         except (OSError, ValueError):
-            raise FacebookError(8, 'Cannot save a continuation handle.', 'Check the Facebook cache directory.') from None
+            raise FacebookError(6, 'Cannot save a continuation handle.', 'Check that the Facebook cache directory '
+                                                                          'is writable, then rerun the command.') from None
 
     def load(self, number, context):
         if not str(number).isdigit() or int(number) < 1:

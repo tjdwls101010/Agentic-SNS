@@ -105,7 +105,7 @@ def test_reply_batch_limit_is_reported_without_retrying_first_batch_forever(tmp_
         comment_page([comment_node('c1')]), envelope(replies)))
     # A first reply batch with more behind it is a coverage note, not a failure, and is never retried.
     assert result.code == 0 and result.data['ok'] is True
-    assert result.data['stop_reason'] == 'limit_reached'
+    assert result.data['stop_reason'] == 'exhausted'
     assert result.data['coverage'] == ['replies to c1: first batch only; Facebook offers no further reply page here']
     assert result.data['replies_incomplete'][0]['reason'] == 'batch_limit'
     assert result.data['replies_incomplete'][0]['retryable'] is False
