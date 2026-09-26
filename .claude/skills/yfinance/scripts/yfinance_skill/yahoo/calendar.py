@@ -81,7 +81,7 @@ DATASETS = {
         interpretation={"dates": CALENDAR_DATES,
                         "two_modes": "With a SYMBOL this returns that company's own earnings history and upcoming dates, paged by --limit and --offset with no date filter, newest first. Without one it returns market-wide US earnings inside the date range.",
                         "surprise": "Surprise(%) is on a percent scale: 33.33 means 33.33%. analysts history reports the same measurement as surprisePercent on a ratio scale, so the two are 100x apart.",
-                        "zero_loss": "yfinance converts zero to null in the estimate, actual and surprise columns, so a null there can be a real zero and the distinction is already lost upstream of this CLI."}),
+                        "zero_loss": "Market-wide, yfinance converts zero to null in the estimate, actual and surprise columns, so a null there can be a real zero and the distinction is already lost upstream of this CLI. A single symbol's history keeps its zeros."}),
     "calendar.economic": calendar(
         events,
         interpretation={"dates": CALENDAR_DATES,

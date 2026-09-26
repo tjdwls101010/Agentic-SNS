@@ -14,7 +14,7 @@ DATASETS = {
     # 선언하면 fix가 그 인자를 권하고, 따라간 결과가 같은 크기로 다시 실패한다.
     "fund.description": fund(
         "description", sliceable=False,
-        interpretation={"shape": "One text value. It cannot be narrowed by fields or rows; raise --max-chars or read the saved observation."}),
+        interpretation={"shape": "One text value. It cannot be narrowed by fields or rows; raise --max-chars, or read the saved id again with a larger --max-chars, which costs no new request."}),
     "fund.holdings": fund(
         "top_holdings", rows=20, units={"Holding Percent": WEIGHT},
         interpretation={"coverage": "These are the top reported holdings only, so the weights do not sum to one and the rest of the portfolio is not described here."}),

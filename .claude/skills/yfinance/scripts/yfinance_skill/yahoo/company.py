@@ -34,7 +34,7 @@ DATASETS = {
     "company.shares": Dataset(
         shares, ticker=True, recent=True, units={"value": SHARES},
         interpretation={"dates": "Each row is a Yahoo observation timestamp rounded to a whole day, not a filing or record date.",
-                        "range": "An omitted --end means now and an omitted --start means about 18 months earlier."}),
+                        "range": "An omitted --end means now and an omitted --start means about 18 months before the end."}),
     "company.news": Dataset(
         news, ticker=True, rows=10, fields=NEWS_FIELDS,
         shortfall=("{received} usable entries arrived of the {requested} asked for. yfinance drops sponsored entries from what the feed sent, "

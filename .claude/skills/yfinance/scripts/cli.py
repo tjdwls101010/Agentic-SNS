@@ -48,7 +48,7 @@ OUT_HELP = ("Write this observation's rows to a new CSV file and print only a su
             "table indices as columns, option sides as side, mapping keys as key, lists of values as value, nested records as dotted columns, "
             "other objects and lists as JSON cells, nulls as blank cells, and a name that would collide prefixed source. — read the returned columns. "
             "The screen's default window and projection do not apply; an explicit --fields or --limit does. Commands that ask the source for a set number of rows "
-            "(news, screen, calendars) still ask for their default unless --limit raises it, and no further pages are fetched. "
+            "(news, screen, calendars, search) ask for their default count, or for an explicit --limit instead, and fetch no further pages. "
             "Targets with nothing selected add no rows and no file is made when none do, so check each target's status before comparing. "
             "When the summaries do not fit --max-chars, one receipt reports the path, the total rows and the targets the file lacks. An existing file is never overwritten.")
 
@@ -141,7 +141,7 @@ SYMBOLS = Arg("symbols", nargs="+", help="One or more Yahoo symbols; each is que
 FROM = Arg("--from", dest="from_id", help="Read this saved observation instead of making a new request. prices quote and company profile select different sides of the same assembled response, so the second one costs nothing.")
 
 INTERVALS = ["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"]
-BAR_ARGS = [SYMBOLS, *dates("ISO date YYYY-MM-DD; inclusive.", "ISO date YYYY-MM-DD; exclusive, so the last bar returned is the day before."),
+BAR_ARGS = [SYMBOLS, *dates("ISO date YYYY-MM-DD; inclusive.", "ISO date YYYY-MM-DD; exclusive: bars dated on or after it are not returned."),
             Arg("--period", help="Relative range such as 5d, 1mo, 1y, ytd or max; default 1mo only when start/end are absent."),
             Arg("--interval", choices=INTERVALS, default="1d", help="Bar size. Intraday intervals carry range limits the source enforces; schema prices history reports those limits."),
             Arg("--adjust", choices=["none", "auto", "back"], default="auto", help="none: unadjusted OHLC as supplied plus Adj Close; auto: Open/High/Low/Close scaled for splits and dividends, Adj Close removed; back: Close kept raw while Open/High/Low are scaled by the adjustment ratio, Adj Close removed."),
@@ -189,7 +189,7 @@ def domain_args(key, datasets):
 
 
 RANGE = [*dates("ISO date YYYY-MM-DD; inclusive. Defaults to today for market-wide calendars.", "ISO date YYYY-MM-DD; inclusive, so --start D --end D returns that day. Defaults to seven days after --start."),
-         Arg("--offset", type=int, default=0, help="Remote row offset; next_offset advances by displayed rows, not native batch size.")]
+         Arg("--offset", type=int, default=0, help="Remote row offset for the next source page; context.next_offset is the offset after the rows this call received, not after a native batch. Rows the budget then cut are read back with the continuation, not a new offset.")]
 
 
 # ---- argument defaults, checks and recovery wording -----------------------------------------------------------------
@@ -278,7 +278,8 @@ def calendar_command(name, purpose, args=RANGE, **spec):
 def statement_command(name, what):
     frequencies = ["yearly", "quarterly"] if name == "balance" else ["yearly", "quarterly", "trailing"]
     return Command("financials", name, what + " line items by fiscal period, as reported.", f"financials.{name}",
-                   args=[SYMBOLS, Arg("--frequency", choices=frequencies, default="yearly", help=FREQUENCY_HELP),
+                   args=[SYMBOLS, Arg("--frequency", choices=frequencies, default="yearly",
+                                      help="yearly or quarterly periods; a balance sheet has no trailing (TTM) form." if name == "balance" else FREQUENCY_HELP),
                          periods(1, "Maximum fiscal periods, newest first, selected locally from what the source returned.")],
                    narrow=["--fields", "--periods", "--frequency"])
 
@@ -302,7 +303,7 @@ COMMANDS = {command.path: command for command in [
     Command("company", "profile", "Business description, sector, governance risk and headquarters for one company.", "company.profile",
             args=[SYMBOLS, FROM], narrow=["--fields"], exportable=False),
     Command("company", "shares", "Shares outstanding as Yahoo observed it over a date range.", "company.shares",
-            args=[SYMBOLS, *dates("ISO date YYYY-MM-DD; default is about 18 months ago.", "ISO date YYYY-MM-DD; default is now.")],
+            args=[SYMBOLS, *dates("ISO date YYYY-MM-DD; default is about 18 months before --end.", "ISO date YYYY-MM-DD; default is now.")],
             narrow=["--limit", "--start/--end"]),
     Command("company", "news", "Recent article and press-release entries referencing this company.", "company.news",
             args=[SYMBOLS, Arg("--tab", choices=["news", "all", "press releases"], default="news", help="Article source: news articles, press releases, or all.")],
@@ -412,6 +413,7 @@ def build_parser():
     reader.add_argument("--start", dest="row_start", type=int, default=0, help="Zero-based first row to return; each slice names the start of the next one.")
     add_common(reader)
     reader._option_string_actions["--limit"].help = "Maximum rows, counted forward from --start in saved order; unlike the first call, read does not keep the newest end. The same slice goes to --out."
+    reader._option_string_actions["--timeout"].help = "Unused by read, which makes no request."
     reader.add_argument("--out", help=OUT_HELP)
     reader.set_defaults(leaf="")
 
