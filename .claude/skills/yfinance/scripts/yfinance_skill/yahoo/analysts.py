@@ -54,5 +54,5 @@ DATASETS = {
         interpretation={"periods": "Rows are relative periods and columns are how long ago the estimate was current."}),
     "analysts.growth": analyst(
         "get_growth_estimates", units={"stockTrend": RATE, "indexTrend": RATE},
-        interpretation={"periods": "0q, +1q, 0y, +1y and LTG are relative periods; LTG is a long-term annualised expectation."}),
+        interpretation={"periods": "0q, +1q, 0y, +1y and LTG are relative periods; LTG is the long-term growth estimate."}),
 }

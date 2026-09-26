@@ -8,7 +8,7 @@ def holder(method, **spec):
     return Dataset(fetch, ticker=True, **spec)
 
 
-HOLDER_MIX = "Date Reported is when the position was filed, but Value is that share count priced at the current quote, so it is not the position's worth on its reported date."
+HOLDER_MIX = "Date Reported is the quarter end the position is reported as of, while Value is that share count priced at the current quote, so it is not the position's worth on that date."
 
 DATASETS = {
     "holders.major": holder(
@@ -29,9 +29,9 @@ DATASETS = {
     "holders.insider-transactions": holder(
         "get_insider_transactions", rows=20, units={"Shares": SHARES, "Value": CURRENCY},
         interpretation={"order": "The index is a row number and says nothing about time; Start Date does, and rows arrive newest first, so a limit keeps the most recent transactions.",
-                        "value": "Value is absent for transactions that report no price, such as gifts and some awards; that is a missing price, not a zero-value transfer."}),
+                        "value": "Value is absent where the source reports no price, including every row whose Text is empty; that is a missing price, not a zero-value transfer."}),
     "holders.insider-roster": holder(
         "get_insider_roster_holders", rows=20, units={"Shares Owned Directly": SHARES},
         interpretation={"direct_only": "Shares Owned Directly excludes indirect holdings through trusts and partnerships, so it understates total control.",
-                        "dates": "Latest Transaction Date is that insider's most recent filing, so different rows are current as of different dates."}),
+                        "dates": "Latest Transaction Date is that insider's most recent reported transaction, so different rows are current as of different dates."}),
 }

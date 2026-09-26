@@ -84,5 +84,5 @@ DATASETS = {
     "prices.actions": Dataset(
         actions, ticker=True, conditions=dates_applied, recent=True,
         interpretation={"dates": "start is inclusive and end is exclusive; rows appear only on dates carrying an action.",
-                        "empty": "The default period is one month, in which most instruments have no action at all. An empty return here is normal and is not evidence that the instrument pays nothing."}),
+                        "empty": "The default period is one month, which for a quarterly payer often holds no action at all. An empty return here is normal and is not evidence that the instrument pays nothing."}),
 }
