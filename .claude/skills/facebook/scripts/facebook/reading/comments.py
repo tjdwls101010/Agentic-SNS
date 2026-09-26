@@ -92,6 +92,9 @@ def comments(args, transport, *, state, commit, story=None, first_batch=False):
                                       referer=args.target)
                 page = records.reply_page(raw, post_id=post_id, parent_id=parent['id'],
                                           captured_at=datetime.now().astimezone())
+                if not page.records and page.has_items:
+                    raise FacebookError(6, 'A nonempty reply connection contains no readable replies.',
+                                        'Run refresh, then retry.')
                 issues.extend(page.issues)
                 page_notes.extend(ISSUES.get(issue, issue) for issue in page.issues)
                 replies = [r for r in page.records if r['id'] not in shown]

@@ -17,7 +17,7 @@ def run(args, transport, *, state=None, commit=None):
         post = post_record(story, source='permalink', captured_at=datetime.now().astimezone())
         result = comments(args, transport, state={}, commit=None, story=story, first_batch=True)
         result['results'].insert(0, post)
-        result['issues'] = issues
+        result['issues'] = issues + result.get('issues', [])
         result['continuation_command'] = 'comments'
         return result
     variables = {}

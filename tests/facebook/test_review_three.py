@@ -104,3 +104,29 @@ def test_doctor_names_the_cache_and_which_files_are_protection_state(tmp_path):
     assert doctor['cache_dir'] == str(account.home)
     assert set(doctor['protection_state']) == {'blocked.json', 'pace.json', 'account.lock'}
     assert doctor['holds_personal_data'] == ['cursors/']
+
+
+def test_a_nonempty_reply_page_with_nothing_readable_is_a_retryable_failure(tmp_path):
+    unreadable = envelope({'data': {'node': {'replies_connection': {'edges': [{'node': {'unknown': 'shape'}}],
+                                                                    'page_info': {'has_next_page': False}}}}})
+    result = Account(tmp_path).run('comments', POST_URL, '--replies', '--json', responses=opened(
+        comment_page([comment_node('c1')]), unreadable))
+    assert result.code == 8 and result.ids == ['c1'] and result.data['next']
+    assert result.data['replies_incomplete'][0]['retryable'] is True
+
+
+def test_an_error_on_an_about_container_keeps_the_section_open(tmp_path):
+    overview = chunks(json.loads(about_overview([about_section('directory_bio', 'Bio')])['body']),
+                      {'errors': [{'message': 'partial', 'path': ['user', 'about_app_sections']}], 'data': {'user': {}}})
+    result = Account(tmp_path).run('about', '42', '--section', 'directory_work', '--json', responses=[login(), overview])
+    assert "not in this profile's visible About" not in json.dumps(result.data)
+
+
+def test_post_keeps_the_issues_of_its_comment_batch(tmp_path):
+    body = chunks(json.loads(comment_page([comment_node('c1')])['body']),
+                  {'errors': [{'message': 'x', 'path': ['node', 'comments', 'edges', 0, 'node', 'body']}],
+                   'data': {'node': {}}})
+    result = Account(tmp_path).run('post', POST_URL, '--json', responses=opened(body))
+    assert result.code == 0
+    assert result.data['coverage'] == ['Facebook reported errors for part of this response; '
+                                       'some records may lack fields']

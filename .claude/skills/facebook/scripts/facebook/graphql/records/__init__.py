@@ -10,7 +10,7 @@ from facebook.graphql.records import comment as _comment
 from facebook.graphql.records import entity as _entity
 from facebook.graphql.records import post as _post
 from facebook.graphql.records.connection import connection_has_items, find_page_info, search_records
-from facebook.graphql.records.parse import parse_story_nodes
+from facebook.graphql.records.parse import iter_json_objects, parse_story_nodes
 
 
 @dataclass
@@ -95,8 +95,17 @@ def about_fields(bodies, *, profile_id, collection_names, captured_at):
 
 
 def about_issues(bodies):
-    """Response issues of About responses; a section may hide behind one."""
-    return _problems(bodies)
+    """Response issues of About responses. Every part of one is read, so any error or unmerged patch counts."""
+    issues = []
+    for obj in iter_json_objects(bodies, issues=issues):
+        for chunk in [obj, *(obj.get('incremental') or [])]:
+            if not isinstance(chunk, dict):
+                continue
+            if chunk.get('errors'):
+                issues.append('graphql_errors')
+            if isinstance(chunk.get('path'), list):
+                issues.append('unsupported_path_patch')
+    return list(dict.fromkeys(issues))
 
 
 SCHEMAS = {
