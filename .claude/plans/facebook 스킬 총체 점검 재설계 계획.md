@@ -437,3 +437,44 @@ FACEBOOK_ASIDE_BIN=.tmp/fb-ledger/aside python3 -m pytest -m live tests/facebook
 ## 하지 않는 것
 
 - 쓰기 동작, 반응한 사람 목록, 릴스·스토리·메신저, 미디어 다운로드, CI 재활성화, 새 명령 추가, 형제 스킬 변경.
+
+# 구현 기록 (2026-09-26, PR #23 `refactor/facebook-layered-layout`, PR #24 `feat/facebook-honest-interface`)
+
+## 계획을 따르지 않은 곳과 그 이유
+- 테스트 전용 프로세스 대역 `tests/facebook/process_doubles/sitecustomize.py`를 두었다. CLI 서브프로세스의 페이싱 sleep을 건너뛰어(간격 자체는 실시간 동시 실행 테스트가 본다) 스위트가 약 130초에서 60초 안팎이 됐고, `os.replace`·`fsync` 실패처럼 프로세스 밖에서 달리 만들 수 없는 저장 실패를 주입한다.
+- `tests/facebook/__init__.py`와 `helpers.py`를 두었다. 계획은 conftest의 run_cli 헬퍼였지만 여러 스위트의 `conftest` 모듈 이름이 겹쳐 import할 수 없어서다.
+- 골든 캡처는 `test_cli.py` 시나리오의 고정 사본(`.tmp/fb-golden/scenarios`)으로 돌렸다. 단계 3이 테스트 파일을 재편해도 같은 CLI 시나리오를 비교하기 위해서다.
+- 읽기 계층도 records 공개 API(`post_page`·`post_story`·`search_page`·`comment_page`·`reply_page`·`about_issues`)를 쓴다. 응답 이슈가 coverage: 줄까지 가는 길을 하나로 만들기 위해서다.
+- post의 첫 댓글 배치는 `first_page_info` 재매핑 대신 paginate의 `max_pages=1` 한도로 멈춘다(코덱스 리뷰 ② F12: outcome 밖 사유 재매핑 금지).
+- refresh가 아무것도 검증하지 못하면 exit 6(failed), 일부만 검증하면 exit 8(partial)이다. 계획의 행렬에는 유지보수 명령의 실패 행이 없었다.
+- 본문 표시를 `text[600/11584 chars, complete]`에서 `text[600 of 11584 chars shown, complete]`로 바꿨다(성진 결정). 시나리오 F5에서 모델이 전문을 받은 글을 "앞부분 600자만 받았다"고 전했다.
+- 제거 시험을 위해 오늘 하루 한도(150)를 풀었다(성진 결정, 누적 300 유지). 구현 세션 실계정 요청 합계 295: 원본 수집 14, 신호 확인 8, 이동성 3, live 테스트 32, 전체본 시나리오 82, 제거 시험 156.
+- 전체본 시나리오 F1–F6은 SKILL.md에서 괄호 하나와 doctor 안내를 고치기 전 본문, 옛 본문 표시로 돌렸다. 제거 시험은 최종 코드로 돌렸다.
+
+## 문단 제거 시험 결과 (판정 모델 Claude Opus 5.5, 문단당 1차 + 삭제 후보만 2차)
+| 문단 | 1차 | 2차 | 판정 |
+|---|---|---|---|
+| 실계정·팬아웃·예산 | F2 같음(18요청, 두 명) | F6 비용 언급 사라짐 | 유지 |
+| 순서가 창의 증명력을 정함 | F4 같음(최신순·closed) | F5 같음(server-filtered, 5개) | 삭제 |
+| 닫힌 창도 피드가 보여준 것 | F4 "피드가 보여준 글" 단서 사라짐 | — | 유지 |
+| 누구를 따라갈지 | F3 같음(인증 배지로 선택) | F2 같음 | 삭제 |
+| 부분 결과가 뒷받침하는 것 | F2 "앞부분만 읽음" 단서 사라짐 | — | 유지 |
+| 수집·개인정보·보호 상태 | F6 파일 삭제 권고 사라짐 | — | 유지 |
+
+전체본 시나리오: F1 통과(읽기 2회: 내용 없는 피드 단위 1건을 대체), F2 통과(19요청, 첨부 댓글을 "사진·GIF"로 서술, Aside 연결 끊김 1회는 doctor 후 재시도), F3 통과(인증 계정 선택), F4 통과(live `window_reached`·`closed (as served)`, 93건·광고 14 제외), F5 통과(`closed (server-filtered)` 5건), F6 통과(--out 60건, 22요청 언급, 파일 삭제 권고).
+
+## 남은 실패와 알려진 한계
+- 최신순 피드에는 작성자·날짜·본문이 없는 단위(type unknown, undated)가 섞여 --limit을 차지한다. 계획대로 undated로 남겼다. 원본 수집에서는 날짜 없는 비광고 글이 재현되지 않았다.
+- 첨부 종류는 live에서 photo·gif만 관측했다. sticker·video·link는 style_list 이름에 기댄 대응이다.
+- 서버가 본문을 자른 글(truncated true)은 이번 live에서 관측되지 않았다. 판정 키는 유지하고 댓글 노드 안으로 내려가지 않게만 고쳤다.
+- 제거 시험의 F2는 과제가 "두 명"을 정해 팬아웃 절제를 약하게만 시험한다.
+- 도달 불가로 남은 코드: `entity.returns_entities`, `build_comments(sort='recent')`, refresh의 mine/query_spec 부재 분기.
+- GitHub의 Social skill checks 워크플로는 꺼져 있어 검증은 로컬 실행이다.
+
+## 계약이 서로 물린 곳 (하나만 고치면 깨진다)
+- `outcome.STOP_REASONS`·`KINDS`·`COVERAGE` ↔ `cli.EXIT_CODES`·`KIND_EXIT` ↔ `schema result` ↔ `test_schema.py`의 AST 대조.
+- `parse.RECORD_FIELDS`·`ID_READERS` ↔ post·comment 빌더가 읽는 키. 빌더가 새 필드를 읽으면 여기에 넣어야 그 필드의 미병합 패치가 incomplete가 된다.
+- 각 records 모듈의 `FIELDS` ↔ `to_dict()` 키(양방향 테스트).
+- `--out` 페이지 표시(kind "page"이면서 id 없음) ↔ `OutFile._recover` ↔ `schema out`. cursor·헤더의 `format: 2` ↔ 거절 테스트.
+- `more:`·`resume:`의 `uv run "<cli.py>"` 형태 ↔ SKILL.md allowed-tools ↔ `test_skill_layout.py`·테스트의 `more_args` 접두 단언.
+- `process_doubles/sitecustomize.py` ↔ `helpers.Account`의 PYTHONPATH와 환경 변수 이름.
