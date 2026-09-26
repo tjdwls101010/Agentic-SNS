@@ -4,13 +4,30 @@ import math
 import random
 import time
 import re
+from pathlib import Path
 from urllib.parse import urlsplit
 
-from _aside import run_snippet
-from _blocked import account_lock, cache_dir, check_blocked, set_blocked, write_state
-from _registry import QuerySpec, build_variables, get_query
-from _session import extract_tokens
-from _errors import FacebookError, diagnostic
+from facebook.aside import repl
+from facebook.account import account_lock, cache_dir, check_blocked, set_blocked, write_state
+from facebook.graphql.registry import QuerySpec, build_variables, get_query
+from facebook.graphql.session import extract_tokens
+from facebook.errors import FacebookError, diagnostic
+
+SNIPPETS = Path(__file__).resolve().parent / 'snippets'
+
+
+def run_snippet(name, args):
+    """Load one bundled browser snippet by name and run it through Aside."""
+    if not isinstance(name, str) or Path(name).name != name:
+        raise FacebookError(3, 'Invalid browser snippet.', 'Reinstall the Facebook skill.')
+    name = name if name.endswith('.js') else name + '.js'
+    try:
+        source = (SNIPPETS / name).read_text(encoding='utf-8')
+        if not source.strip():
+            raise ValueError
+    except (OSError, ValueError):
+        raise FacebookError(3, 'Browser snippet is missing or invalid.', 'Reinstall the Facebook skill.') from None
+    return repl.run(source, args)
 
 
 def iter_chunks(body):

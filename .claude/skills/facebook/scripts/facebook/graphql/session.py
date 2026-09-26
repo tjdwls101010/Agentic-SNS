@@ -2,7 +2,7 @@
 import json
 import re
 
-from _errors import FacebookError
+from facebook.errors import FacebookError
 
 
 def extract_tokens(html):

@@ -1,15 +1,9 @@
 import json
-import sys
-from pathlib import Path
-
-
-SCRIPTS = Path(__file__).resolve().parents[2] / '.claude/skills/facebook/scripts'
-sys.path.insert(0, str(SCRIPTS))
 
 
 def test_registry_preserves_queries_flags_and_isolates_variables(tmp_path, monkeypatch):
     monkeypatch.setenv('FACEBOOK_HOME', str(tmp_path))
-    from _registry import build_variables, get_query, load_registry
+    from facebook.graphql.registry import build_variables, get_query, load_registry
     registry = load_registry()
     assert set(registry['queries']) == {'about', 'timeline', 'newsfeed', 'group', 'search', 'post', 'comments', 'comments_page', 'replies'}
     assert len(registry['relay_provider_flags']) == 46

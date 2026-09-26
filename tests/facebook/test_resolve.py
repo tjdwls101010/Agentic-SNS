@@ -1,7 +1,7 @@
 import pytest
 
-from _errors import FacebookError
-from _resolve import normalize_profile, normalize_group, normalize_post
+from facebook.errors import FacebookError
+from facebook.graphql.resolve import normalize_profile, normalize_group, normalize_post
 
 
 def test_profile_handles_normalize_to_same_target():

@@ -8,7 +8,7 @@ import sys
 import pytest
 
 pytestmark = pytest.mark.live
-CLI = Path(__file__).resolve().parents[3] / '.claude/skills/facebook/scripts/facebook.py'
+CLI = Path(__file__).resolve().parents[3] / '.claude/skills/facebook/scripts/cli.py'
 
 
 def read(*args):

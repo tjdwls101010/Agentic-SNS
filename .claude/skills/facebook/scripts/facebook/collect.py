@@ -1,11 +1,11 @@
-"""Private cursor handles and crash-resumable, page-committed NDJSON output."""
+"""Crash-resumable, page-committed NDJSON output for one query context."""
 import fcntl
 import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from _errors import FacebookError
+from facebook.errors import FacebookError
 
 
 def _line(value):
@@ -101,83 +101,3 @@ class OutFile:
         if self.stream is not None:
             self.stream.close()
             self.stream = None
-
-
-class CursorStore:
-    """Opaque monotonically increasing handles bind cursors to one query context."""
-    def __init__(self):
-        from _blocked import cache_dir
-        self.directory = cache_dir() / 'cursors'
-        self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-
-    def save(self, context, cursor, pending=None):
-        try:
-            fd = os.open(self.directory / 'counter', os.O_RDWR | os.O_CREAT, 0o600)
-            with os.fdopen(fd, 'r+b') as counter:
-                fcntl.flock(counter, fcntl.LOCK_EX)
-                number = int(counter.read() or b'0') + 1
-                # Persist the reservation first: an interrupted save leaves a gap, never a reused handle.
-                counter.seek(0)
-                counter.write(str(number).encode())
-                counter.truncate()
-                counter.flush()
-                os.fsync(counter.fileno())
-                path = self.directory / f'{number}.json'
-                with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'wb') as stream:
-                    stream.write(_line(dict(context=context, cursor=cursor, pending=pending or [],
-                                            created_at=datetime.now(timezone.utc).isoformat())))
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                return number
-        except (OSError, ValueError):
-            raise FacebookError(8, 'Cannot save a continuation handle.', 'Check the Facebook cache directory.') from None
-
-    def load(self, number, context):
-        if not str(number).isdigit() or int(number) < 1:
-            raise FacebookError(2, 'Continuation handles are positive numbers.', 'Copy the full more: command.')
-        try:
-            data = json.loads((self.directory / f'{int(number)}.json').read_text())
-        except (OSError, ValueError):
-            raise FacebookError(2, 'Continuation handle is missing or incomplete.', 'Restart the original query.') from None
-        if not isinstance(data, dict) or data.get('context') != context:
-            raise FacebookError(2, 'Continuation context does not match this query.', 'Copy the full more: command.')
-        if 'cursor' not in data or not isinstance(data.get('pending'), list):
-            raise FacebookError(2, 'Continuation handle is incomplete.', 'Restart the original query.')
-        return data
-
-
-def emit(result, json_mode=False, chars=180, command='', sort=None):
-    """One stdout document on JSON/error paths; never mix diagnostics with data."""
-    result = dict(result)
-    records = result.setdefault('results', [])
-    code = result.pop('code', 0)
-    result.setdefault('ok', True)
-    result.setdefault('stop_reason', 'exhausted')
-    result['stop_reason'] = {'already_complete': 'exhausted', 'reply_batch_limit': 'query_failure'}.get(
-        result['stop_reason'], result['stop_reason'])
-    if not result['ok']:
-        code = code or (5 if result['stop_reason'] == 'blocked' else 8 if records else 6)
-        if records and code not in (4, 5):
-            code = 8
-        result.setdefault('error', 'partial' if records else 'query_failure')
-        result.setdefault('message', 'The request did not complete.')
-        result.setdefault('fix', 'Read stop_reason before continuing.')
-    elif not records and command not in ('schema', 'doctor', 'refresh') and not result.get('out'):
-        result.update(ok=False, error='empty', message='This query explicitly returned no results.',
-                      fix='Try a different target or date window; this is not a stale-query failure.')
-        code = 7
-    if json_mode or not result['ok']:
-        print(json.dumps(result, ensure_ascii=False))
-    elif result.get('out'):
-        print(f'{command} · {result.get("count", len(records))} saved · stopped={result["stop_reason"]} · '
-              + json.dumps(str(result['out']), ensure_ascii=False)
-              + (' · already complete' if result.get('already_complete') else ''))
-    elif command in ('schema', 'doctor', 'refresh'):
-        print(json.dumps(result, ensure_ascii=False))
-    else:
-        from _render import render_results
-        print(render_results(records, command=command, sort=sort, stop_reason=result['stop_reason'],
-                             more=result.get('next'), chars=chars))
-        if result.get('note'):
-            print(str(result['note']).replace('\n', ' '))
-    return code

@@ -4,23 +4,15 @@ import os
 import re
 import shutil
 import subprocess
-from pathlib import Path
 
-from _errors import FacebookError
-
-SNIPPETS = Path(__file__).resolve().parent / 'browser'
+from facebook.errors import FacebookError
 
 
-def run_snippet(name, args):
-    if not isinstance(name, str) or Path(name).name != name:
-        raise FacebookError(3, 'Invalid browser snippet.', 'Reinstall the Facebook skill.')
-    name = name if name.endswith('.js') else name + '.js'
+def run(source, args):
+    """Run one browser snippet source with its ARGS in the Aside REPL and return its response envelope."""
     try:
-        source = (SNIPPETS / name).read_text(encoding='utf-8')
-        if not source.strip():
-            raise ValueError
         code = 'const ARGS = ' + json.dumps(args, ensure_ascii=True) + ';\n' + source
-    except (OSError, ValueError, TypeError):
+    except (ValueError, TypeError):
         raise FacebookError(3, 'Browser snippet is missing or invalid.', 'Reinstall the Facebook skill.') from None
     binary = os.environ.get('FACEBOOK_ASIDE_BIN') or shutil.which('aside')
     if not binary:

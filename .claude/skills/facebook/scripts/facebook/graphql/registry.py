@@ -4,8 +4,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from _blocked import cache_dir
-from _errors import FacebookError
+from facebook.account import cache_dir
+from facebook.errors import FacebookError
 
 
 @dataclass(frozen=True)

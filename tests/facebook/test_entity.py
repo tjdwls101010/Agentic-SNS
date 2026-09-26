@@ -1,8 +1,8 @@
 import json
 from datetime import UTC, datetime
-from _entity import build_entities
+from facebook.graphql.records.entity import build_entities
 import pytest
-import _entity as search
+from facebook.graphql.records import entity as search
 
 
 NOW = datetime(2026, 9, 5, tzinfo=UTC)

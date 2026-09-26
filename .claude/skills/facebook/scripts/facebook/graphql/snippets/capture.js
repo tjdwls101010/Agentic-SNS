@@ -1,3 +1,4 @@
+// facebook-snippet: capture
 // Aside supports openTab/evaluate/closeTab; no request listeners or init scripts.
 // Budget counts one bootstrap navigation and intercepted GraphQL dispatches, not assets.
 // Instance variables live only in this result for immediate replay, never in cache.

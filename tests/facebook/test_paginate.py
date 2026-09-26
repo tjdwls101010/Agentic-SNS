@@ -1,4 +1,4 @@
-from _paginate import paginate
+from facebook.reading.paging import paginate
 
 
 def test_limit_preserves_unshown_items_without_fetching_same_page_twice():
@@ -64,7 +64,7 @@ def test_page_commit_limit_keeps_whole_page_and_deduplicates_existing_ids():
 
 
 def test_budget_failure_retains_results_and_uncommitted_cursor():
-    from _errors import FacebookError
+    from facebook.errors import FacebookError
     def fetch(cursor):
         if cursor:
             raise FacebookError(8, 'Request budget reached.', 'Continue later.')
@@ -77,13 +77,13 @@ def test_budget_failure_retains_results_and_uncommitted_cursor():
 
 
 def test_deferred_pagination_ignores_nested_other_connections():
-    from _paginate import find_page_info
+    from facebook.graphql.records.connection import find_page_info
     raw = b'{"data":{"news_feed":{"edges":[]},"other":{"page_info":{"end_cursor":"wrong"}}}}\n'
     raw += b'{"path":["viewer","news_feed"],"data":{"page_info":{"has_next_page":false}}}\n'
     assert find_page_info(raw, 'news_feed') == {'has_next_page': False}
 
 
 def test_page_info_accepts_the_same_anti_json_prefix_as_transport():
-    from _paginate import find_page_info
+    from facebook.graphql.records.connection import find_page_info
     raw = b'for (;;);{"data":{"news_feed":{"edges":[],"page_info":{"has_next_page":true,"end_cursor":"next"}}}}'
     assert find_page_info(raw, 'news_feed') == {'has_next_page': True, 'end_cursor': 'next'}

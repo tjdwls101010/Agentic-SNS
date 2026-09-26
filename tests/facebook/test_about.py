@@ -1,6 +1,6 @@
 import json
 from datetime import UTC, datetime
-from _about import build_fields, iter_collections, json_schema
+from facebook.graphql.records.about import build_fields, iter_collections, json_schema
 
 
 NOW = datetime(2026, 9, 5, tzinfo=UTC)

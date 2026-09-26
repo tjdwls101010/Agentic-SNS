@@ -1,5 +1,6 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = [".claude/skills/facebook/scripts"]
 addopts = "-m 'not live'"
 markers = ["live: reads the real logged-in account"]
 

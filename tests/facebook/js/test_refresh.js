@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const test = require('node:test');
-const browser = path.resolve(__dirname, '../../../.claude/skills/facebook/scripts/browser');
+const browser = path.resolve(__dirname, '../../../.claude/skills/facebook/scripts/facebook/graphql/snippets');
 async function snippet(name, args, globals = {}) {
   const output = [];
   const context = vm.createContext({ARGS: args, console: {log: s => output.push(JSON.parse(s))}, ...globals});

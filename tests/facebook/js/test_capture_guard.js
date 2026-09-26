@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const test = require('node:test');
-const source = fs.readFileSync(path.resolve(__dirname, '../../../.claude/skills/facebook/scripts/browser/capture.js'), 'utf8');
+const source = fs.readFileSync(path.resolve(__dirname, '../../../.claude/skills/facebook/scripts/facebook/graphql/snippets/capture.js'), 'utf8');
 
 async function capture({budget = 4, kind = 'fetch', status = 200, checkpoint = false} = {}) {
   const sent = [], output = [], pending = [];

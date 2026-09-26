@@ -3,7 +3,7 @@ import html
 import re
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit, unquote
 
-from _errors import FacebookError
+from facebook.errors import FacebookError
 
 BASE = 'https://www.facebook.com'
 _RESERVED = {'groups', 'reel', 'watch', 'hashtag', 'events', 'marketplace', 'stories',

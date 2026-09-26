@@ -2,7 +2,7 @@
 import json
 from datetime import datetime, timezone
 
-from _entity import build_entities
+from facebook.graphql.records.entity import build_entities
 
 
 def test_entity_in_edge_rendering_strategy_is_a_search_result():

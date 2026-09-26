@@ -7,12 +7,12 @@ import re
 import tempfile
 from urllib.parse import urlsplit
 
-from _blocked import cache_dir, account_lock
-from _errors import FacebookError
-from _registry import ABOUT_SECTION_ID, QuerySpec, load_registry
-from _resolve import normalize_post, resolve_story_id
-from _cmds_posts import posts_from_raw
-from _transport import classify
+from facebook.account import cache_dir, account_lock
+from facebook.errors import FacebookError
+from facebook.graphql.records.post import posts_from_raw
+from facebook.graphql.registry import ABOUT_SECTION_ID, QuerySpec, load_registry
+from facebook.graphql.resolve import normalize_post, resolve_story_id
+from facebook.graphql.transport import classify
 
 COMMENT_KEYS = {'comments', 'comments_page', 'replies'}
 ROUTES = ('https://www.facebook.com/', 'https://www.facebook.com/zuck',

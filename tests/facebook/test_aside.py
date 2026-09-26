@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from _errors import FacebookError
+from facebook.errors import FacebookError
 
 
 @pytest.fixture(autouse=True)
@@ -11,13 +11,13 @@ def fake(monkeypatch):
 
 
 def test_process_returns_one_envelope():
-    from _aside import run_snippet
+    from facebook.graphql.transport import run_snippet
     assert run_snippet('tokens', {}) == {'status': 200, 'url': 'https://www.facebook.com/', 'body': 'synthetic'}
 
 
 @pytest.mark.parametrize('mode', ['fail', 'timeout', 'malformed', 'duplicate'])
 def test_process_failures_never_disclose_source_or_arguments(monkeypatch, mode):
-    from _aside import run_snippet
+    from facebook.graphql.transport import run_snippet
     monkeypatch.setenv('FAKE_ASIDE_MODE', mode)
     with pytest.raises(FacebookError) as error:
         run_snippet('tokens.js', {'token': 'SECRET-&+한'})

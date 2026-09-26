@@ -4,16 +4,16 @@ from pathlib import Path
 
 import pytest
 
-from _blocked import cache_dir
-from _errors import FacebookError
-from _registry import load_registry
+from facebook.account import cache_dir
+from facebook.errors import FacebookError
+from facebook.graphql.registry import load_registry
 
 @pytest.fixture(autouse=True)
 def offline_browser(monkeypatch):
     def forbidden(*args, **kwargs):
         raise AssertionError('Live Aside is forbidden')
-    monkeypatch.setattr('_aside.run_snippet', forbidden)
-    monkeypatch.setattr('_transport.run_snippet', forbidden)
+    monkeypatch.setattr('facebook.aside.repl.run', forbidden)
+    monkeypatch.setattr('facebook.graphql.transport.run_snippet', forbidden)
 
 
 class Transport:
@@ -76,7 +76,7 @@ class Transport:
 
 
 def test_refresh_verifies_six_mined_candidates_and_preserves_other_overrides(monkeypatch):
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     cache_dir().mkdir(parents=True)
     previous = {'queries': {'comments': {'doc_id': '777'}, 'newsfeed': {'variables': {'count': 9}}},
                 'relay_provider_flags': {'__relay_internal__pv__Existingrelayprovider': True}}
@@ -104,7 +104,7 @@ def test_refresh_verifies_six_mined_candidates_and_preserves_other_overrides(mon
 
 
 def test_capture_only_saves_verified_metadata_and_replays_instance_variables(monkeypatch):
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     def snippets(args):
         assert 1 <= args['request_budget'] <= 400
         registry = load_registry()['queries']
@@ -139,7 +139,7 @@ def test_capture_only_saves_verified_metadata_and_replays_instance_variables(mon
 @pytest.mark.parametrize('body', [b'', b'{"data":null}', b'{"data":{"wrong":{}}}',
                                   b'{"errors":[{"severity":"CRITICAL"}]}'])
 def test_unverified_replay_responses_never_replace_cache(monkeypatch, body):
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     transport = Transport()
     transport.query_spec = lambda *args, **kwargs: body
     result = _refresh.refresh(transport)
@@ -149,7 +149,7 @@ def test_unverified_replay_responses_never_replace_cache(monkeypatch, body):
 
 
 def test_missing_candidate_protocol_does_not_replay_cached_query_or_write(monkeypatch):
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     transport = Transport()
     transport.query_spec = None
     result = _refresh.refresh(transport)
@@ -160,7 +160,7 @@ def test_missing_candidate_protocol_does_not_replay_cached_query_or_write(monkey
 
 
 def test_atomic_replace_failure_preserves_old_cache_and_removes_temporary(monkeypatch):
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     cache_dir().mkdir(parents=True)
     original = '{"queries":{"comments":{"doc_id":"777"}}}\n'
     path = cache_dir() / 'registry.json'
@@ -181,7 +181,7 @@ def test_atomic_replace_failure_preserves_old_cache_and_removes_temporary(monkey
 
 @pytest.mark.parametrize('code', [4, 5, 8])
 def test_login_blocked_or_budget_error_stops_further_requests_and_cache_write(monkeypatch, code):
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     transport = Transport()
     attempts = []
     def stopped(*args, **kwargs):
@@ -197,7 +197,7 @@ def test_login_blocked_or_budget_error_stops_further_requests_and_cache_write(mo
 
 @pytest.mark.parametrize('post', [None, 'https://evil.example/posts/1', 'https://www.facebook.com:bad/posts/1'])
 def test_invalid_capture_url_is_rejected_before_network(post):
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     transport = Transport()
     with pytest.raises(FacebookError) as error:
         _refresh.refresh(transport, capture=True, post=post)
@@ -206,7 +206,7 @@ def test_invalid_capture_url_is_rejected_before_network(post):
 
 
 def test_transport_rejecting_bundle_urls_reports_failed_queries_without_bypass(monkeypatch):
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     transport = Transport()
     original_html = transport.html
     def facebook_only(url):
@@ -223,7 +223,7 @@ def test_transport_rejecting_bundle_urls_reports_failed_queries_without_bypass(m
 
 
 def test_post_referer_is_validated_even_without_capture(monkeypatch):
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     transport = Transport()
     with pytest.raises(FacebookError) as error:
         _refresh.refresh(transport, post='https://evil.example/post')
@@ -232,7 +232,7 @@ def test_post_referer_is_validated_even_without_capture(monkeypatch):
 
 
 def test_verified_home_feed_supplies_post_sample_without_saving_its_handle():
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     transport = Transport()
     result = _refresh.refresh(transport)
     assert 'post' in result['updated']
@@ -249,8 +249,8 @@ def test_verified_home_feed_supplies_post_sample_without_saving_its_handle():
     {'status': 200, 'url': 'https://www.facebook.com/checkpoint/', 'body': '{}'},
 ])
 def test_capture_observation_persists_block_before_replay(observation):
-    import _refresh
-    from _blocked import check_blocked
+    from facebook.graphql import refresh as _refresh
+    from facebook.account import check_blocked
     transport = Transport()
     transport.captured = lambda args: {'status': 200, 'url': args['url'], 'body': json.dumps({
         'queries': [], 'envelopes': [observation], 'failed': None,
@@ -266,8 +266,8 @@ def test_capture_observation_persists_block_before_replay(observation):
 
 
 def test_capture_is_run_through_real_transport_guard(monkeypatch):
-    from _transport import Transport as GuardedTransport
-    from _blocked import set_blocked
+    from facebook.graphql.transport import Transport as GuardedTransport
+    from facebook.account import set_blocked
     transport = GuardedTransport()
     set_blocked('checkpoint')
     with pytest.raises(FacebookError) as error:
@@ -278,7 +278,7 @@ def test_capture_is_run_through_real_transport_guard(monkeypatch):
 
 
 def test_missing_mining_protocol_reports_failure_without_bypassing_transport():
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     transport = Transport()
     transport.mine = None
     result = _refresh.refresh(transport)
@@ -288,7 +288,7 @@ def test_missing_mining_protocol_reports_failure_without_bypassing_transport():
 
 
 def test_captured_common_flag_reaches_mined_candidate_in_same_refresh():
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     flag = '__relay_internal__pv__NewCommonrelayprovider'
     transport = Transport()
     name = load_registry()['queries']['comments']['name']
@@ -307,7 +307,7 @@ def test_captured_common_flag_reaches_mined_candidate_in_same_refresh():
 
 
 def test_prefetched_provider_flags_verify_new_queries_without_opening_tabs():
-    import _refresh
+    from facebook.graphql import refresh as _refresh
     flag = '__relay_internal__pv__PrefetchedCurrentrelayprovider'
     transport = Transport()
     mine = transport.mine

@@ -1,7 +1,7 @@
 import json
 from datetime import UTC, datetime
-from _comment import build_comments
-import _comment as cm
+from facebook.graphql.records.comment import build_comments
+from facebook.graphql.records import comment as cm
 
 
 NOW = datetime(2026, 9, 5, tzinfo=UTC)

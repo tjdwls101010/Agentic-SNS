@@ -2,6 +2,8 @@
 from datetime import date, datetime
 import json
 
+from facebook.errors import FacebookError
+
 # A JSON-safe local marker; never passed to Facebook as a cursor.
 END = {'exhausted': True}
 
@@ -17,55 +19,10 @@ def in_window(record, since=None, until=None):
     return (start is None or day >= start) and (end is None or day <= end)
 
 
-def find_page_info(raw, connection_key):
-    """Read only this connection's inline or path-addressed deferred metadata."""
-    def walk(obj):
-        if isinstance(obj, dict):
-            connection = obj.get(connection_key)
-            if isinstance(connection, dict) and isinstance(connection.get('page_info'), dict):
-                return connection['page_info']
-            for value in obj.values():
-                found = walk(value)
-                if found is not None:
-                    return found
-        elif isinstance(obj, list):
-            for value in obj:
-                found = walk(value)
-                if found is not None:
-                    return found
-        return None
-    from _transport import iter_chunks
-    found = None
-    for chunk in iter_chunks(raw):
-        path, data = chunk.get('path'), chunk.get('data')
-        if isinstance(path, list) and path and path[-1] == connection_key and isinstance(data, dict):
-            if isinstance(data.get('page_info'), dict):
-                found = data['page_info']
-        found = walk(data) or found
-    return found
-
-
-def connection_has_items(raw, key):
-    """Distinguish an empty continuation page from nonempty data a model could not parse."""
-    from _transport import iter_chunks
-    for chunk in iter_chunks(raw):
-        path = chunk.get('path') or []
-        data = chunk.get('data')
-        if path and path[-1] == key and isinstance(data, dict) and (data.get('edges') or data.get('nodes')):
-            return True
-        if key in path and any(part in ('edges', 'nodes') for part in path) and chunk.get('data'):
-            return True
-        stack = [chunk.get('data')]
-        while stack:
-            item = stack.pop()
-            if isinstance(item, dict):
-                connection = item.get(key)
-                if isinstance(connection, dict) and (connection.get('edges') or connection.get('nodes')):
-                    return True
-                stack.extend(item.values())
-            elif isinstance(item, list):
-                stack.extend(item)
-    return False
+def page_options(args, state, commit):
+    return dict(limit=args.limit, since=args.since, until=args.until,
+                cursor=state.get('cursor'), pending=state.get('pending'),
+                seen=state.get('seen'), commit=commit, page_limit=bool(args.out))
 
 
 def paginate(fetch_page, *, limit=None, since=None, until=None, cursor=None,
@@ -75,7 +32,6 @@ def paginate(fetch_page, *, limit=None, since=None, until=None, cursor=None,
     ``pending`` holds an unshown tail; ``END`` after that tail means no more requests.
     Errors retain earlier results and the cursor of the uncommitted page.
     """
-    from _errors import FacebookError
     results, waiting = [], list(pending or [])
     identities, visited = set(seen or []), set()
 

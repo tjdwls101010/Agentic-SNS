@@ -3,12 +3,12 @@ import time
 
 import pytest
 
-from _errors import FacebookError
+from facebook.errors import FacebookError
 
 
 def test_checkpoint_persists_until_explicit_unblock(tmp_path, monkeypatch):
     monkeypatch.setenv('FACEBOOK_HOME', str(tmp_path))
-    from _blocked import cache_dir, check_blocked, set_blocked, unblock
+    from facebook.account import cache_dir, check_blocked, set_blocked, unblock
     assert cache_dir() == tmp_path
     assert check_blocked() is None
     set_blocked('checkpoint')
@@ -22,7 +22,7 @@ def test_checkpoint_persists_until_explicit_unblock(tmp_path, monkeypatch):
 
 def test_rate_limit_expires_but_corrupt_state_fails_closed(tmp_path, monkeypatch):
     monkeypatch.setenv('FACEBOOK_HOME', str(tmp_path))
-    from _blocked import check_blocked, set_blocked
+    from facebook.account import check_blocked, set_blocked
     set_blocked('rate_limit')
     record = json.loads((tmp_path / 'blocked.json').read_text())
     assert 1795 < record['expires_at'] - time.time() <= 1800

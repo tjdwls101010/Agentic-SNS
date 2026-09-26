@@ -8,7 +8,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from _errors import FacebookError
+from facebook.errors import FacebookError
 
 
 def cache_dir():

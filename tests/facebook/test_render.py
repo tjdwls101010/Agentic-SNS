@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
-from _post import build_post
-from _render import render_posts
+from facebook.graphql.records.post import build_post
+from facebook.render import render_posts
 
 
 NOW = datetime(2026, 9, 5, tzinfo=UTC)
@@ -17,10 +17,10 @@ def test_dense_post_golden_separates_display_clipping_from_server_truncation():
 
 
 def test_render_mixed_results_replies_and_followup_are_dense():
-    from _comment import build_comment
-    from _entity import Entity
-    from _about import ProfileField
-    from _render import render_results
+    from facebook.graphql.records.comment import build_comment
+    from facebook.graphql.records.entity import Entity
+    from facebook.graphql.records.about import ProfileField
+    from facebook.render import render_results
     parent = build_comment({'id': 'synthetic-parent', 'depth': 0, 'body': {'text': 'Parent'}, 'author': {}},
                            post_id='synthetic-post', captured_at=NOW)
     reply = build_comment({'id': 'synthetic-reply', 'depth': 1, 'body': {'text': 'Reply\nline'}, 'author': {},
@@ -39,7 +39,7 @@ def test_render_mixed_results_replies_and_followup_are_dense():
 
 def test_nested_shared_chain_renders_every_body_handle_and_truncation():
     from pathlib import Path
-    from _parse import parse_story_nodes
+    from facebook.graphql.records.parse import parse_story_nodes
     body = (Path(__file__).parent / 'fixtures/nested_shared_chain.ndjson').read_bytes()
     post = build_post(parse_story_nodes([body]).stories['A'], captured_at=NOW, source='newsfeed')
     for value in (post, post.to_dict()):
@@ -52,7 +52,7 @@ def test_nested_shared_chain_renders_every_body_handle_and_truncation():
 
 
 def test_shared_rendering_bounds_cycles_for_models_and_dictionaries():
-    from _render import render_results
+    from facebook.render import render_results
     post = build_post({'feedback': {'id': 'synthetic-cycle'}}, captured_at=NOW, source='newsfeed')
     data = post.to_dict()
     post.shared_post = post

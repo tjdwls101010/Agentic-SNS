@@ -10,8 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-import _parse as parse
-from _schema import _iso, build_schema_fields, build_json_schema, timestamp
+from facebook.graphql.records import parse
+from facebook.graphql.records.fields import _iso, build_schema_fields, build_json_schema, timestamp
 
 
 @dataclass
@@ -388,3 +388,25 @@ def _find_sponsored(story: dict) -> bool:
     return any(node.get("is_sponsored") is True or isinstance(node.get("sponsored_data"), dict)
                or bool(node.get("ad_id"))
                for node in parse.iter_story_dicts(story, exclude_keys=parse.SHARE_EXCLUDE))
+
+
+def posts_from_raw(raw, source, captured_at=None):
+    parsed = parse.parse_story_nodes([raw])
+    return [build_post(parsed.stories[key], source=source, captured_at=captured_at or datetime.now().astimezone(),
+                       include_raw=False).to_dict() for key in parsed.top_level_ids()]
+
+
+def requested_story(raw):
+    """The permalink's own root story, never a decoy story elsewhere in the response; None when absent."""
+    parsed = parse.parse_story_nodes([raw])
+    for chunk in parse.iter_json_objects([raw]):
+        if chunk.get('path'):
+            continue
+        data = chunk.get('data')
+        if isinstance(data, dict):
+            root = data.get('node_v2') or data.get('node') or data.get('story')
+            if isinstance(root, dict):
+                identity = (root.get('feedback') or {}).get('id')
+                if identity is not None and str(identity) in parsed.stories:
+                    return parsed.stories[str(identity)]
+    return None

@@ -4,7 +4,7 @@ import sys
 
 
 def test_aside_ok_footer_is_not_mistaken_for_response_json(tmp_path, monkeypatch):
-    from _aside import run_snippet
+    from facebook.graphql.transport import run_snippet
     executable = tmp_path / 'aside'
     envelope = {'status': 200, 'url': 'https://www.facebook.com/', 'body': 'synthetic'}
     executable.write_text('#!' + sys.executable + '\nprint(' + repr(json.dumps(envelope))
@@ -15,7 +15,7 @@ def test_aside_ok_footer_is_not_mistaken_for_response_json(tmp_path, monkeypatch
 
 
 def test_chunked_envelope_is_reassembled_without_writing_a_response_file(tmp_path, monkeypatch):
-    from _aside import run_snippet
+    from facebook.graphql.transport import run_snippet
     executable = tmp_path / 'aside'
     records = [{'kind': 'body_chunk', 'index': 0, 'body': 'synthetic '},
                {'kind': 'body_chunk', 'index': 1, 'body': 'large response'},
@@ -29,8 +29,8 @@ def test_chunked_envelope_is_reassembled_without_writing_a_response_file(tmp_pat
 
 def test_unexpected_file_envelope_cannot_read_local_files(tmp_path, monkeypatch):
     import pytest
-    from _aside import run_snippet
-    from _errors import FacebookError
+    from facebook.graphql.transport import run_snippet
+    from facebook.errors import FacebookError
     body_file = tmp_path / 'facebook-response-private.ndjson'
     body_file.write_text('private')
     executable = tmp_path / 'aside'
@@ -45,7 +45,7 @@ def test_unexpected_file_envelope_cannot_read_local_files(tmp_path, monkeypatch)
 
 
 def test_browser_operation_status_lines_do_not_hide_a_valid_envelope(tmp_path, monkeypatch):
-    from _aside import run_snippet
+    from facebook.graphql.transport import run_snippet
     executable = tmp_path / 'aside'
     envelope = {'status': 200, 'url': 'https://www.facebook.com/', 'body': '{}'}
     executable.write_text('#!' + sys.executable + '\nprint("Opened tab synthetic")\nprint('

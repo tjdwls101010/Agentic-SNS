@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from _parse import parse_story_nodes
-from _post import build_post
+from facebook.graphql.records.parse import parse_story_nodes
+from facebook.graphql.records.post import build_post
 
 
 @pytest.mark.parametrize('kind', ['photo', 'shared'])

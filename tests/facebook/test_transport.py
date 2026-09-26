@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from _errors import FacebookError
+from facebook.errors import FacebookError
 
 HOME = {'status': 200, 'url': 'https://www.facebook.com/', 'body': '"USER_ID":"123" "DTSGInitialData",[],{"token":"test&+한"} "LSD",[],{"token":"test-lsd"} "__spin_r":456'}
 
@@ -35,8 +35,8 @@ def isolated(tmp_path, monkeypatch):
     (feed([]), 7),
 ])
 def test_response_classification_order(response, code, tmp_path):
-    from _transport import classify
-    from _registry import get_query
+    from facebook.graphql.transport import classify
+    from facebook.graphql.registry import get_query
     with pytest.raises(FacebookError) as error:
         classify(response, get_query('newsfeed'))
     assert error.value.code == code
@@ -46,7 +46,7 @@ def test_response_classification_order(response, code, tmp_path):
 
 @pytest.mark.parametrize('connection', [None, {}, [], {'edges': None}, {'edges': 'bad'}, {'edges': [None]}, {'edges': [{'node': None}]}, {'edges': [], 'page_info': {'has_next_page': 'false'}}])
 def test_connections_must_be_structural_not_just_present(connection):
-    from _transport import classify
+    from facebook.graphql.transport import classify
     with pytest.raises(FacebookError) as error:
         classify(envelope({'data': {'news_feed': connection}}), 'news_feed')
     assert error.value.code == 6
@@ -61,7 +61,7 @@ def queued(tmp_path, monkeypatch, responses):
 
 
 def test_lazy_start_html_query_share_budget_and_keep_tokens_in_memory(tmp_path, monkeypatch):
-    from _transport import Transport
+    from facebook.graphql.transport import Transport
     monkeypatch.setattr('time.sleep', lambda seconds: None)
     queued(tmp_path, monkeypatch, [HOME, envelope(body='<html>profile</html>'), feed()])
     transport = Transport(limit=3)
@@ -86,8 +86,8 @@ def test_lazy_start_html_query_share_budget_and_keep_tokens_in_memory(tmp_path, 
 
 @pytest.mark.parametrize('twice', [False, True])
 def test_1357054_gets_exactly_one_budgeted_retry_before_block(tmp_path, monkeypatch, twice):
-    from _transport import Transport
-    from _blocked import check_blocked
+    from facebook.graphql.transport import Transport
+    from facebook.account import check_blocked
     monkeypatch.setattr('time.sleep', lambda seconds: None)
     temporary_error = envelope({'errors': [{'code': 1357054}]})
     queued(tmp_path, monkeypatch, [HOME, temporary_error, temporary_error if twice else feed()])
@@ -110,7 +110,7 @@ def test_1357054_gets_exactly_one_budgeted_retry_before_block(tmp_path, monkeypa
 
 @pytest.mark.parametrize('surface', ['home', 'html'])
 def test_non_graphql_requests_persist_blocks(tmp_path, monkeypatch, surface):
-    from _transport import Transport
+    from facebook.graphql.transport import Transport
     monkeypatch.setattr('time.sleep', lambda seconds: None)
     responses = [envelope(body='rate limited', status=429)]
     queued(tmp_path, monkeypatch, responses)
@@ -126,14 +126,14 @@ def test_non_graphql_requests_persist_blocks(tmp_path, monkeypatch, surface):
 
 @pytest.mark.parametrize('key,value', [('newsfeed', {'news_feed': {'edges': [{'node': {'id': 'x'}}]}}), ('timeline', {'timeline_list_feed_units': {'edges': [{'node': {'id': 'x'}}]}}), ('group', {'group_feed': {'edges': [{'node': {'id': 'x'}}]}}), ('search', {'results': {'edges': [{'node': {'id': 'x'}}]}}), ('comments', {'comments': {'edges': [{'node': {'id': 'x'}}]}}), ('comments_page', {'comments': {'edges': [{'node': {'id': 'x'}}]}}), ('replies', {'replies_connection': {'edges': [{'node': {'id': 'x'}}]}}), ('about', {'about_app_sections': {'nodes': [{'id': 'x'}]}}), ('post', {'node': {'id': 'x', '__typename': 'Story'}})])
 def test_all_registry_queries_validate_their_structure(key, value):
-    from _registry import get_query
-    from _transport import classify
+    from facebook.graphql.registry import get_query
+    from facebook.graphql.transport import classify
     assert classify(envelope({'data': value}), get_query(key))
 
 
 @pytest.mark.parametrize('tail', ['\n{"errors":[{"severity":"CRITICAL"}],"data":{"x":1}}', '\n{"errors":[{"message":"failed"}]}', '\n{broken'])
 def test_later_chunk_failures_override_an_earlier_connection(tail):
-    from _transport import classify
+    from facebook.graphql.transport import classify
     with pytest.raises(FacebookError) as error:
         classify(envelope(body=feed()['body'] + tail), 'news_feed')
     assert error.value.code == 6
@@ -143,8 +143,8 @@ def test_pacing_and_blocking_are_shared_between_concurrent_cli_processes(tmp_pat
     import os
     import subprocess
     import sys
-    from _blocked import unblock
-    script = "from _transport import Transport; from _errors import FacebookError\nt = Transport()\ntry:\n t.html('https://www.facebook.com/synthetic')\nexcept FacebookError as e:\n raise SystemExit(e.code)"
+    from facebook.account import unblock
+    script = "from facebook.graphql.transport import Transport; from facebook.errors import FacebookError\nt = Transport()\ntry:\n t.html('https://www.facebook.com/synthetic')\nexcept FacebookError as e:\n raise SystemExit(e.code)"
     queued(tmp_path, monkeypatch, [envelope(body='first'), envelope(body='second')])
     environment = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[2] / '.claude/skills/facebook/scripts'))
     processes = [subprocess.Popen([sys.executable, '-c', script], env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE) for _ in range(2)]
@@ -166,7 +166,7 @@ def test_pacing_and_blocking_are_shared_between_concurrent_cli_processes(tmp_pat
 
 
 def test_budget_includes_failed_home_and_retry_and_caps_at_400(tmp_path, monkeypatch):
-    from _transport import Transport
+    from facebook.graphql.transport import Transport
     monkeypatch.setattr('time.sleep', lambda seconds: None)
     queued(tmp_path, monkeypatch, [HOME, envelope({'error': 1357054})])
     transport = Transport(limit=2)
@@ -180,7 +180,7 @@ def test_budget_includes_failed_home_and_retry_and_caps_at_400(tmp_path, monkeyp
 
 @pytest.mark.parametrize('url', ['https://facebook.com.evil.test/', 'http://www.facebook.com/', 'https://www.facebook.com:999/', 'https://u:p@www.facebook.com/', 'file:///etc/passwd'])
 def test_invalid_urls_fail_before_any_request(url):
-    from _transport import Transport
+    from facebook.graphql.transport import Transport
     transport = Transport()
     with pytest.raises(FacebookError) as error:
         transport.html(url)
@@ -189,7 +189,7 @@ def test_invalid_urls_fail_before_any_request(url):
 
 
 def test_html_query_error_is_classified_instead_of_being_treated_as_html(tmp_path, monkeypatch):
-    from _transport import Transport
+    from facebook.graphql.transport import Transport
     queued(tmp_path, monkeypatch, [envelope({'errors': [{'severity': 'CRITICAL', 'message': 'secret'}]})])
     with pytest.raises(FacebookError) as error:
         Transport().html('https://www.facebook.com/synthetic')
@@ -198,7 +198,7 @@ def test_html_query_error_is_classified_instead_of_being_treated_as_html(tmp_pat
 
 
 def test_home_failure_preserves_the_budget_and_cannot_start_a_query(tmp_path, monkeypatch):
-    from _transport import Transport
+    from facebook.graphql.transport import Transport
     queued(tmp_path, monkeypatch, [envelope(body='"USER_ID":"0"')])
     transport = Transport()
     with pytest.raises(FacebookError) as error:
@@ -210,7 +210,7 @@ def test_home_failure_preserves_the_budget_and_cannot_start_a_query(tmp_path, mo
 
 @pytest.mark.parametrize('edges,has_next,code', [([{'node': {'id': 'x'}}], False, None), ([], False, 7), ([], True, None), ([], None, None)])
 def test_inline_connection_and_deferred_page_info_are_classified_together(edges, has_next, code):
-    from _transport import classify
+    from facebook.graphql.transport import classify
     chunks = [{'data': {'viewer': {'news_feed': {'edges': edges}}}}]
     info = {'end_cursor': 'next'}
     if has_next is not None:
@@ -226,7 +226,7 @@ def test_inline_connection_and_deferred_page_info_are_classified_together(edges,
 
 
 def test_deferred_metadata_cannot_supply_edges_from_a_different_connection():
-    from _transport import classify
+    from facebook.graphql.transport import classify
     body = feed()['body'] + '\n' + json.dumps({'path': ['other', 'news_feed'], 'data': {'page_info': {'has_next_page': False}}})
     with pytest.raises(FacebookError) as error:
         classify(envelope(body=body), 'news_feed')
@@ -234,7 +234,7 @@ def test_deferred_metadata_cannot_supply_edges_from_a_different_connection():
 
 
 def test_empty_inline_connection_with_more_pages_returns_to_paginator():
-    from _transport import classify
+    from facebook.graphql.transport import classify
     for info in ({'has_next_page': True, 'end_cursor': 'next'}, {}):
         response = envelope({'data': {'news_feed': {'edges': [], 'page_info': info}}})
         assert classify(response, 'news_feed')
@@ -242,8 +242,8 @@ def test_empty_inline_connection_with_more_pages_returns_to_paginator():
 
 def test_candidate_replay_uses_supplied_spec_without_saving_it(tmp_path, monkeypatch):
     from dataclasses import replace
-    from _registry import get_query
-    from _transport import Transport
+    from facebook.graphql.registry import get_query
+    from facebook.graphql.transport import Transport
     monkeypatch.setattr('time.sleep', lambda seconds: None)
     original = get_query('newsfeed')
     candidate = replace(original, doc_id='999')
@@ -261,7 +261,7 @@ def test_candidate_replay_uses_supplied_spec_without_saving_it(tmp_path, monkeyp
 
 @pytest.mark.parametrize('response,code', [(envelope({'queries': [], 'missing': [], 'failed': None, 'request_count': 1, 'count_complete': True}), None), (envelope(body='limited', status=429), 5), (envelope({}, url='https://www.facebook.com/checkpoint/'), 5), (envelope({'queries': [], 'failed': 'capture_timeout'}), 6)])
 def test_capture_uses_the_same_budget_and_block_guard(tmp_path, monkeypatch, response, code):
-    from _transport import Transport
+    from facebook.graphql.transport import Transport
     monkeypatch.setattr('time.sleep', lambda seconds: None)
     queued(tmp_path, monkeypatch, [response])
     transport = Transport(limit=1)
@@ -280,8 +280,8 @@ def test_capture_uses_the_same_budget_and_block_guard(tmp_path, monkeypatch, res
 
 
 def test_candidate_replay_also_persists_checkpoint_blocks(tmp_path, monkeypatch):
-    from _registry import get_query
-    from _transport import Transport
+    from facebook.graphql.registry import get_query
+    from facebook.graphql.transport import Transport
     monkeypatch.setattr('time.sleep', lambda seconds: None)
     queued(tmp_path, monkeypatch, [HOME, envelope({'challenge_url': '/checkpoint/'})])
     transport = Transport()
@@ -295,7 +295,7 @@ def test_candidate_replay_also_persists_checkpoint_blocks(tmp_path, monkeypatch)
 
 
 def test_capture_reserves_remaining_budget_and_reconciles_actual_dispatches(tmp_path, monkeypatch):
-    from _transport import Transport
+    from facebook.graphql.transport import Transport
     monkeypatch.setattr('time.sleep', lambda seconds: None)
     monkeypatch.setenv('FAKE_ASIDE_EXPECTED_ARGS', json.dumps({'capture': {'request_budget': 4}}))
     captured = envelope({'queries': [], 'envelopes': [], 'failed': None, 'request_count': 3, 'count_complete': True})
@@ -309,8 +309,8 @@ def test_capture_reserves_remaining_budget_and_reconciles_actual_dispatches(tmp_
 
 @pytest.mark.parametrize('observed', [envelope(status=429), envelope({'checkpoint_url': '/checkpoint/'})])
 def test_capture_observed_response_persists_block_before_releasing_lock(tmp_path, monkeypatch, observed):
-    from _transport import Transport
-    from _blocked import check_blocked
+    from facebook.graphql.transport import Transport
+    from facebook.account import check_blocked
     captured = envelope({'queries': [], 'envelopes': [observed], 'failed': 'capture_blocked', 'request_count': 2, 'count_complete': True})
     queued(tmp_path, monkeypatch, [captured])
     transport = Transport(limit=4)
@@ -323,7 +323,7 @@ def test_capture_observed_response_persists_block_before_releasing_lock(tmp_path
 
 
 def test_capture_missing_count_keeps_whole_reservation(tmp_path, monkeypatch):
-    from _transport import Transport
+    from facebook.graphql.transport import Transport
     queued(tmp_path, monkeypatch, [envelope({'queries': [], 'envelopes': [], 'failed': 'capture_timeout', 'request_count': 1, 'count_complete': False})])
     transport = Transport(limit=4)
     with pytest.raises(FacebookError):
@@ -332,7 +332,7 @@ def test_capture_missing_count_keeps_whole_reservation(tmp_path, monkeypatch):
 
 
 def test_navigation_only_capture_exhausts_one_request_budget(tmp_path, monkeypatch):
-    from _transport import Transport
+    from facebook.graphql.transport import Transport
     monkeypatch.setenv('FAKE_ASIDE_EXPECTED_ARGS', json.dumps({'capture': {'request_budget': 1}}))
     queued(tmp_path, monkeypatch, [envelope({'queries': [], 'envelopes': [], 'failed': 'capture_budget', 'request_count': 1, 'count_complete': True})])
     transport = Transport(limit=1)

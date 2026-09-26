@@ -1,4 +1,4 @@
-from _errors import FacebookError, scrub
+from facebook.errors import FacebookError, scrub
 
 
 def test_scrub_removes_session_fields_and_signed_urls_from_diagnostics():

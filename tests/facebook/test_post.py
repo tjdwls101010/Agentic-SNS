@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from _post import build_post, json_schema
+from facebook.graphql.records.post import build_post, json_schema
 
 
 NOW = datetime(2026, 9, 5, tzinfo=UTC)
@@ -29,7 +29,7 @@ def test_shared_markers_never_leak_to_parent_and_media_links_survive():
     assert not post.sponsored and not post.pinned and not post.text_truncated
     assert post.shared_post.sponsored and post.shared_post.text_truncated
     from pathlib import Path
-    from _parse import parse_story_nodes
+    from facebook.graphql.records.parse import parse_story_nodes
     body = (Path(__file__).parent / 'fixtures/media_and_links.ndjson').read_bytes()
     story = parse_story_nodes([body]).stories['fb_006']
     media_post = build_post(story, captured_at=NOW, source='timeline')
@@ -65,7 +65,7 @@ def test_capability_keys_are_not_pinned_and_non_null_sponsored_data_is_an_ad():
 def test_shared_story_under_identity_free_wrapper_is_discovered_and_attached():
     import json
     from pathlib import Path
-    from _parse import parse_story_nodes
+    from facebook.graphql.records.parse import parse_story_nodes
     body = (Path(__file__).parent / 'fixtures/shared_without_intermediate_id.ndjson').read_bytes()
     parsed = parse_story_nodes([body])
     assert set(parsed.stories) == {'A', 'B'}

@@ -1,17 +1,25 @@
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 
 import pytest
 
-CLI = Path(__file__).resolve().parents[2] / '.claude/skills/facebook/scripts/facebook.py'
+CLI = Path(__file__).resolve().parents[2] / '.claude/skills/facebook/scripts/cli.py'
 
 
 def run_cli(*args, env=None):
     return subprocess.run([sys.executable, str(CLI), *args], capture_output=True, text=True,
                           env=env, timeout=30)
+
+
+def more_args(command):
+    """A more: command is this CLI's allowed-tools invocation; return the arguments after it."""
+    words = shlex.split(command)
+    assert words[:3] == ['uv', 'run', str(CLI)]
+    return words[3:]
 
 
 @pytest.mark.parametrize('args', [
@@ -68,8 +76,7 @@ def test_feed_midpage_resume_has_no_loss(tmp_path):
     assert first.returncode == 0, first.stderr + first.stdout
     result = json.loads(first.stdout)
     assert [r['id'] for r in result['results']] == ['p1']
-    import shlex
-    more = shlex.split(result['next'])[2:]
+    more = more_args(result['next'])
     env = fake_env(tmp_path, [login()])
     second = run_cli(*more, env=env)
     assert second.returncode == 0, second.stderr + second.stdout
@@ -104,9 +111,8 @@ def test_comments_limit_precedes_reply_expansion_and_resume_keeps_parent_handles
     data = json.loads(result.stdout)
     assert [r['id'] for r in data['results']] == ['c1', 'r1']
     assert '_reply_handle' not in result.stdout
-    import shlex
     env = fake_env(tmp_path, [login(), comment_page([comment_node('r2', 1, 'c2')], 'replies_connection')])
-    resumed = run_cli(*shlex.split(data['next'])[2:], env=env)
+    resumed = run_cli(*more_args(data['next']), env=env)
     assert resumed.returncode == 0, resumed.stderr + resumed.stdout
     assert [r['id'] for r in json.loads(resumed.stdout)['results']] == ['c2', 'r2']
 
@@ -177,8 +183,7 @@ def test_search_page_kind_and_context_mismatch(tmp_path):
     assert first.returncode == 0, first.stderr + first.stdout
     data = json.loads(first.stdout)
     assert data['results'][0]['kind'] == 'page'
-    import shlex
-    args = shlex.split(data['next'])[2:]
+    args = more_args(data['next'])
     args[args.index('pages')] = 'people'
     env = fake_env(tmp_path, [login()])
     resumed = run_cli(*args, env=env)
@@ -270,7 +275,6 @@ def test_post_keeps_deferred_updates_and_incomplete_marker_on_requested_root(tmp
 
 
 def test_failed_reply_at_end_can_retry_without_repeating_shown_records(tmp_path):
-    import shlex
     result = run_cli('comments', 'https://www.facebook.com/zuck/posts/123', '--limit', '2', '--replies', '--json',
         env=fake_env(tmp_path, [login(), envelope('"storyID":"story"'), post_response(),
             comment_page([comment_node('c1'), comment_node('c2')]),
@@ -280,7 +284,7 @@ def test_failed_reply_at_end_can_retry_without_repeating_shown_records(tmp_path)
     data = json.loads(result.stdout)
     assert [r['id'] for r in data['results']] == ['c1', 'r1', 'c2']
     assert data.get('next')
-    retried = run_cli(*shlex.split(data['next'])[2:], env=fake_env(tmp_path, [
+    retried = run_cli(*more_args(data['next']), env=fake_env(tmp_path, [
         login(), comment_page([comment_node('r2', 1, 'c2')], 'replies_connection')]))
     assert retried.returncode == 0, retried.stdout
     retry_data = json.loads(retried.stdout)
@@ -346,7 +350,6 @@ def test_comments_out_limit_counts_saved_parents_not_replies(tmp_path):
 
 
 def test_reply_retry_and_unshown_parent_tail_resume_independently(tmp_path):
-    import shlex
     first = run_cli('comments', 'https://www.facebook.com/zuck/posts/123', '--limit', '1', '--replies', '--json',
         env=fake_env(tmp_path, [login(), envelope('"storyID":"story"'), post_response(),
             comment_page([comment_node('c1'), comment_node('c2')]),
@@ -354,7 +357,7 @@ def test_reply_retry_and_unshown_parent_tail_resume_independently(tmp_path):
     assert first.returncode == 8, first.stdout
     data = json.loads(first.stdout)
     assert [r['id'] for r in data['results']] == ['c1']
-    second = run_cli(*shlex.split(data['next'])[2:], env=fake_env(tmp_path, [
+    second = run_cli(*more_args(data['next']), env=fake_env(tmp_path, [
         login(), comment_page([comment_node('r1', 1, 'c1')], 'replies_connection'),
         comment_page([comment_node('r2', 1, 'c2')], 'replies_connection')]))
     assert second.returncode == 0, second.stdout
@@ -363,7 +366,6 @@ def test_reply_retry_and_unshown_parent_tail_resume_independently(tmp_path):
 
 
 def test_post_continues_comments_with_the_measured_compatible_root_cursor(tmp_path):
-    import shlex
     url = 'https://www.facebook.com/zuck/posts/123'
     root = json.loads(comment_page([comment_node('c1')])['body'])
     root['data']['node']['comments']['page_info'] = {'has_next_page': True, 'end_cursor': 'page2'}
@@ -372,8 +374,7 @@ def test_post_continues_comments_with_the_measured_compatible_root_cursor(tmp_pa
     assert first.returncode == 0
     data = json.loads(first.stdout)
     assert '--after' in data['next']
-    command = shlex.split(data['next'])
-    next_page = run_cli(*command[2:], env=fake_env(tmp_path, [login(), comment_page([comment_node('c2')])]))
+    next_page = run_cli(*more_args(data['next']), env=fake_env(tmp_path, [login(), comment_page([comment_node('c2')])]))
     assert next_page.returncode == 0, next_page.stdout
     assert [r['id'] for r in json.loads(next_page.stdout)['results']] == ['c2']
 
@@ -415,3 +416,36 @@ def test_parent_fragments_merge_before_limit_and_reply_expansion(tmp_path):
     rows = json.loads(result.stdout)['results']
     assert [r['id'] for r in rows] == ['c1', 'r1']
     assert rows[0]['text'] == 'Synthetic comment c1'
+
+
+def allowed_tools_prefix(skill_dir):
+    """The SKILL.md allowed-tools pattern with the skill directory substituted, up to its trailing wildcard."""
+    import re
+    front = (skill_dir / 'SKILL.md').read_text(encoding='utf-8').split('---')[1]
+    pattern = re.search(r'(?m)^allowed-tools:\s*Bash\((.+) \*\)$', front)[1]
+    return pattern.replace('${CLAUDE_SKILL_DIR}', str(skill_dir))
+
+
+@pytest.mark.parametrize('directory', ['Agentic SNS 스킬', 'odd "$HOME" `x` \\ dir'])
+def test_more_is_the_allowed_tools_invocation_of_the_invoked_cli(tmp_path, directory):
+    import shutil
+    skill = tmp_path / directory / 'facebook'
+    shutil.copytree(CLI.parents[1], skill, ignore=shutil.ignore_patterns('__pycache__'))
+    cli = skill / 'scripts/cli.py'
+    result = subprocess.run([sys.executable, str(cli), 'feed', '--limit', '1'], capture_output=True, text=True,
+                            env=fake_env(tmp_path, [login(), feed_page(['p1', 'p2'])]), timeout=30)
+    assert result.returncode == 0, result.stdout + result.stderr
+    more = result.stdout.splitlines()[-1].removeprefix('more: ')
+    # A POSIX shell, not shlex, decides what the copied line means; this uv only prints its arguments.
+    parsed = subprocess.run(['sh', '-c', 'uv() { printf "%s\\n" "$@"; }\n' + more], capture_output=True, text=True)
+    assert parsed.stdout.splitlines() == ['run', str(cli), 'feed', '--sort', 'top', '--limit', '1', '--chars', '180',
+                                          '--after', '1']
+    if '"' not in directory:
+        assert more.startswith(allowed_tools_prefix(skill) + ' ')
+
+
+def test_root_help_lists_every_exit_code():
+    completed = run_cli('--help')
+    assert completed.returncode == 0
+    listed = {line.split()[0] for line in completed.stdout.split('exit codes:')[1].splitlines() if line.strip()}
+    assert listed == {'0', '2', '3', '4', '5', '6', '7', '8'}

@@ -1,47 +1,18 @@
 """Post-reading commands; one shared pagination path preserves server order."""
 from datetime import datetime, time, date
 
-from _errors import FacebookError
-from _paginate import paginate, find_page_info, connection_has_items
-from _parse import parse_story_nodes, iter_json_objects
-from _post import build_post
-from _registry import get_query, FEED_SORT_TOKENS, GROUP_SORT_TOKENS
-from _resolve import resolve_profile_id, resolve_group_id, resolve_story_id
-
-
-def posts_from_raw(raw, source):
-    parsed = parse_story_nodes([raw])
-    return [build_post(parsed.stories[key], source=source, captured_at=datetime.now().astimezone(),
-                       include_raw=False).to_dict() for key in parsed.top_level_ids()]
-
-
-def page_options(args, state, commit):
-    return dict(limit=args.limit, since=args.since, until=args.until,
-                cursor=state.get('cursor'), pending=state.get('pending'),
-                seen=state.get('seen'), commit=commit, page_limit=bool(args.out))
-
-
-def fetch_post_story(transport, url):
-    raw = transport.query('post', {'storyID': resolve_story_id(transport, url)}, referer=url)
-    parsed = parse_story_nodes([raw])
-    for chunk in iter_json_objects([raw]):
-        if chunk.get('path'):
-            continue
-        data = chunk.get('data')
-        if isinstance(data, dict):
-            root = data.get('node_v2') or data.get('node') or data.get('story')
-            if isinstance(root, dict):
-                identity = (root.get('feedback') or {}).get('id')
-                if identity is not None and str(identity) in parsed.stories:
-                    return parsed.stories[str(identity)]
-    raise FacebookError(6, 'The post response contains no readable post.', 'Run refresh, then retry the permalink.')
+from facebook.errors import FacebookError
+from facebook.graphql.records.connection import find_page_info, connection_has_items
+from facebook.graphql.records.post import build_post, posts_from_raw
+from facebook.graphql.registry import get_query, FEED_SORT_TOKENS, GROUP_SORT_TOKENS
+from facebook.graphql.resolve import resolve_profile_id, resolve_group_id
+from facebook.reading.comments import comments, fetch_post_story
+from facebook.reading.paging import in_window, page_options, paginate
 
 
 def run(args, transport, *, state=None, commit=None):
     state = state or {}
     if args.command == 'post':
-        from _cmds_people import comments
-        from _paginate import in_window
         story = fetch_post_story(transport, args.target)
         post = build_post(story, source='permalink', captured_at=datetime.now().astimezone(),
                           include_raw=False).to_dict()

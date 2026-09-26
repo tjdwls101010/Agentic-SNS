@@ -1,7 +1,7 @@
 """Synthetic structures derived from live responses, with no captured identities."""
 import json
 
-from _transport import classify
+from facebook.graphql.transport import classify
 
 
 def test_comment_connection_is_not_confused_with_its_count_only_preview():

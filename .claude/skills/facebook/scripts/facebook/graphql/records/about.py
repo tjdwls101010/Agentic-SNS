@@ -12,9 +12,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from _parse import iter_json_objects
-
-from _schema import _iso, build_json_schema, build_schema_fields
+from facebook.graphql.records.parse import iter_json_objects
+from facebook.graphql.records.fields import _iso, build_json_schema, build_schema_fields
 
 
 @dataclass

@@ -1,19 +1,44 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 """Read Facebook through the logged-in Aside browser."""
 import argparse
-import copy
 from datetime import date
 import json
-from pathlib import Path
+import os
+import re
 import shlex
 import sys
 
-from _errors import FacebookError
+from facebook.errors import FacebookError
+from facebook.reading import dispatch
+from facebook.render import render_results
+
+EXIT_CODES = {
+    0: 'success',
+    2: 'invalid arguments, or a continuation or output file from a different query',
+    3: 'Aside is unavailable or returned an invalid response',
+    4: 'Facebook login is required',
+    5: 'requests are blocked for this account (checkpoint, rate limit or unreadable protection state)',
+    6: 'the query failed before any record was read',
+    7: 'the query explicitly returned no results',
+    8: 'partial result: records plus a failure, or the request budget ran out',
+}
 
 
 class Parser(argparse.ArgumentParser):
     def error(self, message):
         raise FacebookError(2, message, 'Run the command with --help.')
+
+
+class EpilogFormatter(argparse.HelpFormatter):
+    """Fill prose paragraphs as usual but keep an indented table's rows on their own lines."""
+    def _fill_text(self, text, width, indent):
+        return '\n\n'.join(paragraph if paragraph.startswith('  ') or '\n  ' in paragraph
+                             else super(EpilogFormatter, self)._fill_text(paragraph, width, indent)
+                             for paragraph in text.split('\n\n'))
 
 
 def positive(value):
@@ -34,7 +59,10 @@ def day(value):
 
 
 def parser():
-    root = Parser(description=__doc__, epilog='Read-only. Default request budget: 25; explicit --limit, --since, or --out: up to 400. All requests share pacing and account block protection.')
+    table = '\n'.join(f'  {code}  {meaning}' for code, meaning in EXIT_CODES.items())
+    root = Parser(description=__doc__, formatter_class=EpilogFormatter,
+                  epilog='Read-only. Default request budget: 25; explicit --limit, --since, or --out: up to 400. All requests share pacing and account block protection.'
+                  + '\n\nexit codes:\n' + table)
     root.add_argument('--verbose', action='store_true', help='Write scrubbed request metadata to stderr')
     commands = root.add_subparsers(dest='command', required=True)
     descriptions = {
@@ -93,12 +121,9 @@ def parser():
 def validate(args):
     if args.command in ('doctor', 'schema'):
         return
-    from _resolve import normalize_group, normalize_post, normalize_profile
     if args.command == 'refresh':
         if bool(args.capture) != bool(args.post):
             raise FacebookError(2, '--capture and --post must be used together.')
-        if args.post:
-            args.post = normalize_post(args.post)
         return
     if args.since and args.until and args.since > args.until:
         raise FacebookError(2, '--since must not be later than --until.')
@@ -109,30 +134,40 @@ def validate(args):
     if (args.since or args.until) and (args.command == 'about' or
             args.command == 'search' and args.type != 'posts'):
         raise FacebookError(2, 'Date filters require dated results; use search --type posts or profile.')
-    if args.command in ('profile', 'about'):
-        args.target = normalize_profile(args.target)
-    elif args.command == 'group':
-        args.target = normalize_group(args.target)
-    elif args.command in ('post', 'comments'):
-        args.target = normalize_post(args.target)
-    elif args.command == 'search' and not args.target.strip():
+    if args.command == 'search' and not args.target.strip():
         raise FacebookError(2, 'Search text must not be empty.')
 
 
-def context_for(args, transport):
+def context_for(args):
+    """A query's identity; the account is filled in once the browser session is known."""
     context = {'command': args.command, 'target': getattr(args, 'target', None),
                'sort': getattr(args, 'sort', None),
                'window': {'since': args.since, 'until': args.until},
-               'account_id': transport.account_id}
+               'account_id': None}
     for key in ('type', 'section', 'replies'):
         if hasattr(args, key):
             context[key] = getattr(args, key)
     return context
 
 
+def continuation_args(args):
+    """post continues as comments on the same post, in top order without replies or a window."""
+    continued = argparse.Namespace(**vars(args))
+    continued.command, continued.sort = 'comments', 'top'
+    continued.replies = False
+    continued.since = continued.until = None
+    return continued
+
+
+def invocation():
+    """This file's path as it was invoked (links kept), double-quoted the way allowed-tools spells it."""
+    path = os.path.abspath(__file__)
+    return 'uv run "' + re.sub(r'([\\"$`])', r'\\\1', path) + '"'
+
+
 def next_command(args, number, command=None):
     name = command or args.command
-    words = ['python3', str(Path(__file__).resolve()), name]
+    words = [name]
     if getattr(args, 'target', None):
         words.append(args.target)
     if name == 'comments' and args.command == 'post':
@@ -146,93 +181,62 @@ def next_command(args, number, command=None):
     if getattr(args, 'json', False):
         words.append('--json')
     words += ['--after', str(number)]
-    return shlex.join(words)
+    return invocation() + ' ' + shlex.join(words)
 
 
-def read(args, transport):
-    from _output import CursorStore, OutFile
-    from _cmds_posts import run as posts
-    from _cmds_people import run as people
-    context = context_for(args, transport)
-    state = CursorStore().load(args.after, context) if args.after else {}
-    saved_cursor = state.get('cursor')
-    if isinstance(saved_cursor, dict) and 'resume_cursor' in saved_cursor:
-        state.update(cursor=saved_cursor['resume_cursor'], seen=saved_cursor.get('seen', []))
-    output = OutFile(args.out, context) if args.out else None
-    try:
-        if output and output.complete:
-            return {'ok': True, 'results': [], 'stop_reason': 'already_complete',
-                    'out': args.out, 'count': output.count, 'already_complete': True}
-        run_args = copy.copy(args)
-        if output:
-            state = {'cursor': output.cursor, 'pending': output.pending, 'seen': output.ids}
-            saved_count = output.parent_count if args.command == 'comments' else output.count
-            if args.limit is not None:
-                if saved_count >= args.limit:
-                    return {'ok': True, 'results': [], 'stop_reason': 'limit_reached',
-                            'out': args.out, 'count': output.count, 'request_count': transport.request_count}
-                run_args.limit = args.limit - saved_count
-        def commit_page(records, cursor, reason):
-            end = cursor.get('after') if isinstance(cursor, dict) and 'post_id' in cursor else cursor
-            if end == {'exhausted': True} and reason in ('limit_reached', 'exhausted', None):
-                reason = 'exhausted'
-            output.commit(records, cursor, reason)
-
-        handler = posts if args.command in ('feed', 'profile', 'group', 'post') else people
-        result = handler(run_args, transport, state=state, commit=commit_page if output else None)
-        continuation_args = args
-        if result.pop('continuation_command', None) == 'comments':
-            continuation_args = argparse.Namespace(**vars(args))
-            continuation_args.command, continuation_args.sort = 'comments', 'top'
-            continuation_args.replies = False
-            continuation_args.since = continuation_args.until = None
-            context = context_for(continuation_args, transport)
-        pending = result.get('pending')
-        cursor = result.get('cursor')
-        end = cursor.get('after') if isinstance(cursor, dict) and 'post_id' in cursor else cursor
-        retry_replies = cursor.get('reply_retries') if isinstance(cursor, dict) else None
-        if not output and (pending or retry_replies or cursor is not None and end != {'exhausted': True}):
-            seen = set(state.get('seen') or [])
-            seen.update(r['id'] for r in result['results'] if r.get('id') is not None)
-            number = CursorStore().save(context, {'resume_cursor': cursor, 'seen': sorted(seen)}, pending=pending)
-            result['next'] = next_command(continuation_args, number)
-        result.pop('pending', None)
-        result.pop('cursor', None)
-        if output:
-            result.update(out=args.out, count=output.count)
-        result['request_count'] = transport.request_count
-        return result
-    finally:
-        if output:
-            output.close()
+def emit(result, json_mode=False, chars=180, command='', sort=None):
+    """One stdout document on JSON/error paths; never mix diagnostics with data."""
+    result = dict(result)
+    records = result.setdefault('results', [])
+    code = result.pop('code', 0)
+    result.setdefault('ok', True)
+    result.setdefault('stop_reason', 'exhausted')
+    result['stop_reason'] = {'already_complete': 'exhausted', 'reply_batch_limit': 'query_failure'}.get(
+        result['stop_reason'], result['stop_reason'])
+    if not result['ok']:
+        code = code or (5 if result['stop_reason'] == 'blocked' else 8 if records else 6)
+        if records and code not in (4, 5):
+            code = 8
+        result.setdefault('error', 'partial' if records else 'query_failure')
+        result.setdefault('message', 'The request did not complete.')
+        result.setdefault('fix', 'Read stop_reason before continuing.')
+    elif not records and command not in ('schema', 'doctor', 'refresh') and not result.get('out'):
+        result.update(ok=False, error='empty', message='This query explicitly returned no results.',
+                      fix='Try a different target or date window; this is not a stale-query failure.')
+        code = 7
+    if json_mode or not result['ok']:
+        print(json.dumps(result, ensure_ascii=False))
+    elif result.get('out'):
+        print(f'{command} · {result.get("count", len(records))} saved · stopped={result["stop_reason"]} · '
+              + json.dumps(str(result['out']), ensure_ascii=False)
+              + (' · already complete' if result.get('already_complete') else ''))
+    elif command in ('schema', 'doctor', 'refresh'):
+        print(json.dumps(result, ensure_ascii=False))
+    else:
+        print(render_results(records, command=command, sort=sort, stop_reason=result['stop_reason'],
+                             more=result.get('next'), chars=chars))
+        if result.get('note'):
+            print(str(result['note']).replace('\n', ' '))
+    return code
 
 
 def main(argv=None):
     try:
         args = parser().parse_args(argv)
         validate(args)
-        from _blocked import check_blocked
-        if args.command == 'doctor' and args.unblock:
-            from _blocked import unblock
-            unblock()
-        check_blocked()
-        if args.command == 'schema':
-            from _cmds_maint import schema
-            result = schema()
-        else:
-            from _transport import Transport
-            # 성진: 400회 상한은 실계정 보호용, 일회용 계정으로 바꾸면 올려도 됨
-            budget = 400 if args.command == 'refresh' or any(
-                getattr(args, key, None) for key in ('limit', 'since', 'out')) else 25
-            transport = Transport(limit=budget)
-            transport.verbose = args.verbose
-            transport.start()
-            if args.command in ('doctor', 'refresh'):
-                from _cmds_maint import run
-                result = run(args, transport)
-            else:
-                result = read(args, transport)
-        from _output import emit
+        dispatch.prepare(args)
+        context = continuation = None
+        if args.command not in ('doctor', 'refresh', 'schema'):
+            context = context_for(args)
+            if args.command == 'post':
+                continuation = context_for(continuation_args(args))
+        result = dispatch.run(args, context=context, continuation=continuation)
+        handle = result.get('handle')
+        if handle:
+            continued = continuation_args(args) if handle['command'] != args.command else args
+            result = {('next' if key == 'handle' else key): (next_command(continued, handle['number'])
+                                                            if key == 'handle' else value)
+                      for key, value in result.items()}
         return emit(result, json_mode=args.json, chars=None if args.command == 'post' else getattr(args, 'chars', 180),
                     command=args.command, sort=getattr(args, 'sort', None))
     except FacebookError as error:

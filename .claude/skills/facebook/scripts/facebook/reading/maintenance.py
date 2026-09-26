@@ -1,21 +1,17 @@
 """Local schema and browser/registry diagnostics."""
 from datetime import date
 
-from _registry import load_registry
+from facebook.graphql.records import SCHEMAS
+from facebook.graphql.refresh import refresh
+from facebook.graphql.registry import load_registry
 
 
 def schema():
-    import _post
-    import _comment
-    import _entity
-    import _about
-    return {'ok': True, 'results': [module.json_schema() for module in (_post, _comment, _entity, _about)],
-            'stop_reason': 'complete'}
+    return {'ok': True, 'results': list(SCHEMAS.values()), 'stop_reason': 'complete'}
 
 
 def run(args, transport):
     if args.command == 'refresh':
-        from _refresh import refresh
         result = refresh(transport, capture=args.capture, post=args.post)
         required = set(load_registry()['queries'])
         if not args.capture:

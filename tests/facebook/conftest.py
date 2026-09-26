@@ -1,11 +1,5 @@
 """Isolate runtime state; only explicitly selected live tests use the account."""
-import sys
-from pathlib import Path
-
 import pytest
-
-SCRIPTS = Path(__file__).resolve().parents[2] / '.claude/skills/facebook/scripts'
-sys.path.insert(0, str(SCRIPTS))
 
 
 @pytest.fixture(autouse=True)

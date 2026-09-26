@@ -1,5 +1,5 @@
 import json
-import _parse as parse
+from facebook.graphql.records import parse
 from pathlib import Path
 import pytest
 
