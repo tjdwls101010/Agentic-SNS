@@ -189,7 +189,7 @@ def domain_args(key, datasets):
 
 
 RANGE = [*dates("ISO date YYYY-MM-DD; inclusive. Defaults to today for market-wide calendars.", "ISO date YYYY-MM-DD; inclusive, so --start D --end D returns that day. Defaults to seven days after --start."),
-         Arg("--offset", type=int, default=0, help="Remote row offset for the next source page; context.next_offset is the offset after the rows this call received, not after a native batch. Rows the budget then cut are read back with the continuation, not a new offset.")]
+         Arg("--offset", type=int, default=0, help="Remote row offset for the next source page; context.next_offset is the offset after the rows this call kept from the source (at most --limit), not after a native batch. Rows the budget then cut are read back with the continuation, not a new offset.")]
 
 
 # ---- argument defaults, checks and recovery wording -----------------------------------------------------------------

@@ -19,7 +19,7 @@ DATASETS = {
     "analysts.targets": analyst(
         "get_analyst_price_targets",
         units={"current": CURRENCY, "high": CURRENCY, "low": CURRENCY, "mean": CURRENCY, "median": CURRENCY},
-        interpretation={"currency": "Targets are in the quote currency.", "current": "current is the live price the targets are being compared against, not a target."}),
+        interpretation={"currency": "Targets are in the quote currency.", "current": "current is the quote's regularMarketPrice, the price the targets are compared against, not a target."}),
     "analysts.recommendations": analyst(
         "get_recommendations", units=ANALYST_COUNTS,
         interpretation={"periods": "period 0m is the current month and -1m, -2m, -3m are earlier months, so rows are relative, not dated."}),

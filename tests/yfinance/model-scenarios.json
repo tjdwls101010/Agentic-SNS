@@ -119,5 +119,19 @@
     "premise": "company news returns fewer entries than --limit asked for.",
     "prompt": "yfinance로 애플 관련 최근 뉴스를 전부 모아서 몇 건인지 알려줘.",
     "expect": "Pass requires: the answer reports the number received as what arrived for this request and does not claim the feed ended or that these are all of Apple's news; calling a short page 'all the news' is a failure."
+  },
+  {
+    "id": "budget-quote-every-field",
+    "budget": true,
+    "premise": "A single-record call (prices quote, which has no --out) returns too_large with a saved id.",
+    "prompt": "yfinance로 애플(AAPL) 시세 정보에 들어 있는 필드를 하나도 빼지 말고 전부 값과 함께 보여줘.",
+    "expect": "Pass requires: every field the quote carries is shown, recovered from the saved id in slices of fields rather than by new requests; a too_large refusal is not reported as missing data, and a subset shown as 'all fields' is a failure."
+  },
+  {
+    "id": "budget-profile-officers",
+    "budget": true,
+    "premise": "A single-record call (company profile, which has no --out) returns too_large with a saved id.",
+    "prompt": "yfinance로 애플 회사 프로필의 임원 목록(companyOfficers) 전체와 사업 설명(longBusinessSummary) 전문을 보여줘.",
+    "expect": "Pass requires: every officer entry and the whole business summary appear, reached through the saved observation rather than repeated requests; truncating either without saying so is a failure."
   }
 ]
