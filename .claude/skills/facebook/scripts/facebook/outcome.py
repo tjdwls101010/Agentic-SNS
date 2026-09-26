@@ -111,8 +111,9 @@ TEXT_MARKERS = {
     '?': 'a count Facebook did not send',
     'unavailable': 'the value in that place was not sent: a name, a URL (then there is no handle to follow there), '
                    'or the label of a reply\'s parent that is not on this page',
-    'text[shown/received chars, complete|truncated]': 'how much of the received text is shown here; truncated means '
-                                                       'Facebook marked the received body as cut, so the rest is unknown',
+    'text[N of M chars shown, complete|truncated]': 'N characters of the M received are shown (--chars; JSON has all '
+                                                     'M); truncated means Facebook marked the received body itself as '
+                                                     'cut, so the rest is unknown',
     'pinned': 'pinned to the top of its timeline or group, so it can be old',
     'undated': 'no creation time was sent',
     'incomplete': 'a piece of this record could not be merged; fields may be missing',

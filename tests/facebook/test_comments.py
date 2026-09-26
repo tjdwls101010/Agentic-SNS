@@ -176,7 +176,7 @@ def test_replies_render_indented_under_their_parent_label(tmp_path):
         comment_page([comment_node('r1', 1, 'c1', text='Reply\nline')], 'replies_connection')))
     assert result.code == 0
     assert '\n  [c2 reply-to=c1] Synthetic · ' in result.stdout
-    assert 'text[10/10 chars, complete]: "Reply⏎line"' in result.stdout
+    assert 'text[10 of 10 chars shown, complete]: "Reply⏎line"' in result.stdout
 
 
 def test_post_continuation_carries_only_the_comment_query_and_explicit_controls(tmp_path):

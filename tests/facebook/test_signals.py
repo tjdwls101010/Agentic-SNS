@@ -137,9 +137,9 @@ def test_attachment_only_comment_renders_its_kind(tmp_path):
         login(), story_id_page(), envelope({'data': {'node': story('post-feedback')}}),
         fixture_response('live_shape_comment_attachments.ndjson')])
     text_lines = [line.strip() for line in result.stdout.splitlines() if line.strip().startswith('text[')]
-    assert text_lines[0] == 'text[0/0 chars, complete]: "" · attachment=photo'
-    assert text_lines[1] == 'text[0/0 chars, complete]: "" · attachment=gif'
-    assert text_lines[4] == 'text[0/0 chars, complete]: ""'
+    assert text_lines[0] == 'text[0 of 0 chars shown, complete]: "" · attachment=photo'
+    assert text_lines[1] == 'text[0 of 0 chars shown, complete]: "" · attachment=gif'
+    assert text_lines[4] == 'text[0 of 0 chars shown, complete]: ""'
 
 
 def test_feed_with_real_video_patch_shapes_has_no_incomplete_marker(tmp_path):

@@ -158,7 +158,7 @@ def test_dense_post_text_separates_display_clipping_from_server_truncation(tmp_p
     assert result.code == 0
     assert result.stdout == ('feed · sort=top · 1 shown · sponsored_skipped=0 · stopped=exhausted · requests=2/25\n'
                              '[p1] Synthetic Author · 1970-01-01T09:00+09:00 · status · reactions=0 comments=? shares=?\n'
-                             '     text[7/12 chars, complete]: "One⏎Two…"\n'
+                             '     text[7 of 12 chars shown, complete]: "One⏎Two…"\n'
                              '     url: unavailable   author: unavailable\n')
 
 
@@ -174,9 +174,9 @@ def test_nested_shared_chain_renders_every_body_handle_and_truncation(tmp_path):
         envelope({'data': {'node': {'comments': {'edges': [], 'page_info': {'has_next_page': False}}}}})])
     assert result.code == 0, result.stdout
     text = result.stdout
-    assert 'text[11/11 chars, complete]: "Synthetic B"' in text
+    assert 'text[11 of 11 chars shown, complete]: "Synthetic B"' in text
     assert 'url: "https://example.test/posts/B"' in text
-    assert 'text[15/15 chars, truncated]: "Synthetic C cut"' in text
+    assert 'text[15 of 15 chars shown, truncated]: "Synthetic C cut"' in text
     assert 'url: "https://example.test/posts/C"' in text
     assert text.index('Synthetic B') < text.index('Synthetic C cut')
 
@@ -190,7 +190,7 @@ def test_deep_shared_chain_renders_the_tail(tmp_path):
     result = Account(tmp_path).run('feed', '--chars', '500', responses=[login(), feed_stories([node])])
     assert result.code == 0
     assert 'shared-from[30]: unavailable · undated · url: "https://example.test/tail" · ' \
-           'text[17/17 chars, complete]: "Deepest synthetic"' in result.stdout
+           'text[17 of 17 chars shown, complete]: "Deepest synthetic"' in result.stdout
     assert 'incomplete (cycle)' not in result.stdout
 
 

@@ -43,7 +43,7 @@ def test_result_schema_carries_the_declared_stop_reasons_exit_codes_and_window_t
     assert len(result['window_coverage']) == len(declared(outcome, 'COVERAGE').elts)
     kinds = {k.value for k in declared(outcome, 'KINDS').keys}
     assert {kind for row in result['exit_codes'] for kind in row['kinds']} == kinds
-    assert {'?', 'unavailable', 'text[shown/received chars, complete|truncated]', 'pinned', 'undated', 'incomplete',
+    assert {'?', 'unavailable', 'text[N of M chars shown, complete|truncated]', 'pinned', 'undated', 'incomplete',
             'sponsored', 'attachment='} <= set(result['text_markers'])
     assert result['text_header'].startswith('<command>')
     for value in [*result['fields'].values(), *result['stop_reasons'].values(), *result['text_markers'].values()]:

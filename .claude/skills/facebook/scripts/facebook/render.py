@@ -47,7 +47,7 @@ def _text(data, chars) -> str:
     shown = text if chars is None else text[:chars]
     state = 'truncated' if data.get('text_truncated') and not data.get('text_resolved') else 'complete'
     suffix = '…' if len(shown) < len(text) else ''
-    return f'text[{len(shown)}/{len(text)} chars, {state}]: {_quote(shown + suffix)}'
+    return f'text[{len(shown)} of {len(text)} chars shown, {state}]: {_quote(shown + suffix)}'
 
 
 def render_post(post, *, index=1, chars=180, timezone=None) -> str:
