@@ -1,0 +1,152 @@
+"""Parent comments first, then replies only for the selected parents."""
+from datetime import datetime
+
+from facebook.errors import FacebookError
+from facebook.graphql.records import comment as _comment
+from facebook.graphql.records.connection import find_page_info
+from facebook.graphql.records.post import requested_story
+from facebook.graphql.registry import COMMENT_SORT_TOKENS
+from facebook.graphql.resolve import resolve_story_id
+from facebook.reading.paging import page_options, paginate
+
+
+def fetch_post_story(transport, url):
+    raw = transport.query('post', {'storyID': resolve_story_id(transport, url)}, referer=url)
+    story = requested_story(raw)
+    if story is None:
+        raise FacebookError(6, 'The post response contains no readable post.', 'Run refresh, then retry the permalink.')
+    return story
+
+
+def _failure(result, error):
+    result.update(ok=False, error='partial' if result['results'] else 'query_failure',
+                  code=error.code, message=error.message, fix=error.fix)
+    result['stop_reason'] = 'blocked' if error.code == 5 else 'budget' if error.code == 8 else 'query_failure'
+
+
+def comments(args, transport, *, state, commit, story=None, first_batch=False):
+    # Pending parent records retain their expansion handles across --after.
+    pending = state.get('pending') or []
+    post_id = next((r.get('post_id') for r in pending if r.get('post_id')), None)
+    cursor = state.get('cursor')
+    retry_parents = cursor.get('reply_retries', []) if isinstance(cursor, dict) else []
+    if isinstance(cursor, dict) and 'post_id' in cursor:
+        post_id, cursor = cursor['post_id'], cursor['after']
+    if post_id is None:
+        story = story or fetch_post_story(transport, args.target)
+        post_id = (story.get('feedback') or {}).get('id')
+    if not post_id:
+        raise FacebookError(6, 'The post has no comment feedback handle.')
+    failures, expanded, retry_waiting = [], {}, []
+    shown = set(state.get('seen') or [])
+    fatal = None
+    sort = getattr(args, 'sort', 'top')
+    first_page_info = {}
+
+    def fetch(after):
+        if fatal:
+            raise fatal
+        key = 'comments' if after is None else 'comments_page'
+        variables = {'id': post_id, 'commentsIntentToken': COMMENT_SORT_TOKENS[sort]}
+        if after is not None:
+            variables['commentsAfterCursor'] = after
+        raw = transport.query(key, variables, referer=args.target)
+        parents = []
+        for node in _comment.iter_comment_nodes([raw]):
+            comment = _comment.build_comment(node, post_id=post_id, captured_at=datetime.now().astimezone())
+            if comment.depth != 0:
+                continue
+            record = comment.to_dict()
+            record['_reply_handle'] = {'id': _comment.feedback_id(node), 'token': _comment.expansion_token(node)}
+            parents.append(record)
+        info = find_page_info(raw, 'comments')
+        if first_batch and info:
+            first_page_info.update(info)
+            info = {'has_next_page': False, 'end_cursor': None}
+        return parents, info
+
+    def expand(parent):
+        nonlocal fatal
+        handle = parent.get('_reply_handle', {})
+        replies = []
+        if not getattr(args, 'replies', False) or not parent.get('reply_count'):
+            return replies
+        failure = {'parent_id': parent['id']}
+        if fatal:
+            failure.update(reason='request_failure', retryable=True,
+                           message='Skipped after a terminal request failure.')
+        elif not handle.get('id') or not handle.get('token'):
+            failure.update(reason='missing_handle', retryable=False,
+                           message='Reply expansion handle is unavailable.')
+        else:
+            try:
+                raw = transport.query('replies', {'id': handle['id'], 'expansionToken': handle['token']},
+                                      referer=args.target)
+                replies = [r.to_dict() for r in _comment.build_comments(
+                    [raw], post_id=post_id, captured_at=datetime.now().astimezone()) if r.depth > 0]
+                for reply in replies:
+                    if not reply.get('parent_id'):
+                        reply['parent_id'] = parent['id']
+                replies = [r for r in replies if r['parent_id'] == parent['id'] and r['id'] not in shown]
+                shown.update(r['id'] for r in replies)
+                info = find_page_info(raw, 'replies_connection')
+                if info and info.get('has_next_page') is False:
+                    return replies
+                failure.update(reason='batch_limit' if info and info.get('has_next_page') else 'missing_page_info',
+                               retryable=False, message='Only the first reply batch is available; it will not be retried.')
+            except FacebookError as error:
+                if error.code == 7:
+                    return []
+                failure.update(reason='request_failure', retryable=True, code=error.code, message=error.message)
+                if error.code in (4, 5, 8):
+                    fatal = error
+        failures.append(failure)
+        if failure['retryable']:
+            retry_waiting.append(dict(parent))
+        return replies
+
+    def finish_page(records, after, reason):
+        nonlocal fatal
+        output = []
+        for parent in records:
+            replies = expand(parent)
+            expanded[parent['id']] = replies
+            output.append({k: v for k, v in parent.items() if k != '_reply_handle'})
+            output.extend(replies)
+        if commit:
+            if retry_waiting:
+                # Retry the uncommitted page so failed reply expansions cannot disappear.
+                fatal = fatal or FacebookError(6, 'A reply page is incomplete; resume the same output file.')
+            else:
+                commit(output, {'post_id': post_id, 'after': after}, reason)
+
+    retried = []
+    for parent in retry_parents:
+        retried.extend(expand(parent))
+
+    options = page_options(args, {**state, 'cursor': cursor}, finish_page)
+    if first_batch:
+        # post returns only this root batch; --limit still selects parents within it.
+        options['page_limit'] = bool(args.out)
+        options['since'] = options['until'] = None
+    if fatal:
+        result = {'ok': True, 'results': [], 'cursor': cursor, 'pending': pending, 'stop_reason': 'query_failure'}
+    else:
+        result = paginate(fetch, **options)
+    if first_batch and first_page_info.get('has_next_page') is True:
+        result['cursor'] = first_page_info.get('end_cursor')
+        if result['stop_reason'] == 'exhausted':
+            result['stop_reason'] = 'limit_reached'
+    result['results'] = retried + [item for parent in result['results']
+        for item in [{k: v for k, v in parent.items() if k != '_reply_handle'},
+                     *expanded.get(parent['id'], [])]]
+    if result.get('cursor') is not None or retry_waiting:
+        result['cursor'] = {'post_id': post_id, 'after': result['cursor'], 'reply_retries': retry_waiting}
+    if failures:
+        result['replies_incomplete'] = failures
+        if result.get('code') not in (4, 5, 8):
+            query_failed = not result['ok']
+            _failure(result, fatal or FacebookError(6, 'Some replies could not be read completely.'))
+            if not query_failed and all(f['reason'] == 'batch_limit' for f in failures):
+                result['stop_reason'] = 'reply_batch_limit'
+    return result

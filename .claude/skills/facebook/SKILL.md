@@ -1,13 +1,13 @@
 ---
 name: facebook
-allowed-tools: Bash(python3 "${CLAUDE_SKILL_DIR}/scripts/facebook.py" *)
+allowed-tools: Bash(uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" *)
 description: >-
   Read content on facebook.com through the user's logged-in Aside browser: Facebook post URLs, home feed, profiles, About fields, comments, search, and groups. Use whenever the request is to read or explore something on Facebook, including 페이스북에서, 내 페이스북 피드, 이 페북 글 댓글, 페북에서 누가 올렸어. Facebook URLs belong here even when the user only says “read this” or “summarize these comments.” Not for other social networks, general web pages, news about the Facebook company, or writing posts, comments, or reactions.
 ---
 
 # Facebook through the user's own browser
 
-The browser supplies the already logged-in account; the bundled CLI supplies read-only Facebook queries and dense text. Start with `python3 "<base directory>/scripts/facebook.py" --help`. Below, `$FB` means that literal command with the absolute skill directory substituted. Write it as one line, with the path quoted; the directory may contain spaces. Each command's help describes its options, `schema` describes the returned objects, and errors carry their own recovery instruction in `fix`.
+The browser supplies the already logged-in account; the bundled CLI supplies read-only Facebook queries and dense text. Start with `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" --help`. Each command's help describes its options, `schema` describes the returned objects, and errors carry their own recovery instruction in `fix`.
 
 ## Every request is the person's real account
 

@@ -92,7 +92,7 @@ Run these from the clone's root. Every CLI provides `--help`, command-specific h
 |---|---|
 | X | `python3 .claude/skills/twitter/scripts/twitter.py --help` |
 | Reddit | `python3 .claude/skills/reddit/scripts/reddit.py --help` |
-| Facebook | `python3 .claude/skills/facebook/scripts/facebook.py --help` |
+| Facebook | `uv run .claude/skills/facebook/scripts/cli.py --help` |
 | Threads | `python3 .claude/skills/threads/scripts/threads.py --help` |
 | Naver Blog | `python3 .claude/skills/naver-blog/scripts/naver_blog.py --help` |
 
