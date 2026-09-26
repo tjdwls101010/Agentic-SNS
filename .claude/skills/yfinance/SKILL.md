@@ -10,9 +10,9 @@ Run `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" <command> …` on one line. `--
 
 ## When a result is short
 
-`partial` means part of what you asked for is missing: rows cut to fit the budget, or targets that failed while others succeeded. Rows that were cut are saved and reachable; a failed target is not. Either complete it or state the limitation in your answer — never describe a partial result as the whole.
+`partial` means part of what you asked for is missing: rows cut to fit the budget, or targets that failed or came back empty while others succeeded. Rows that were cut are saved and reachable; a result without an `id` has nothing saved, so its data needs a new request. Either complete it or state the limitation in your answer — never describe a partial result as the whole.
 
-`too_large` is a size condition, not an empty result, and it carries no partial table to summarize. A target that returned data is already saved under the `id` the result names, so recovering it costs no new request; a target that failed has no `id` and nothing saved.
+`too_large` is a size condition, not an empty result, and it carries no partial table to summarize. Each `id` it names is a saved observation you can read without a new request; when ids were left out to fit, the `fix` says how to reach them.
 
 Recover in a way that keeps the question: the same targets, fields and range, read from the store the `fix` names. A recovery that drops a target turns a comparison into a single-instrument question, and a narrower request answers a different question — say so if you take one. After rate limiting, stop rather than trying the remaining targets. State the coverage and limitations that affect the user's conclusion.
 
