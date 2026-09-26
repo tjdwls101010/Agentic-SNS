@@ -19,7 +19,7 @@ Captured September 8, 2026; request-budget header omitted. Live content and coun
 
 The [SEC skill](.claude/skills/sec/SKILL.md) also reads original EDGAR company filings and exhibits through direct HTTPS. It requires Python 3.11+, `uv`, and your SEC requester identity; Aside and an SNS account are unnecessary. [Set up SEC access](docs/usage.md#sec-edgar).
 
-The [yfinance skill](.claude/skills/yfinance/SKILL.md) reads Yahoo Finance prices, financial statements, estimates, holdings, options, screens and calendars through a CLI organized by the data you need. It uses its own locked `uv` environment and does not require Aside. [Set up market-data queries](docs/usage.md#yahoo-finance).
+The [yfinance skill](.claude/skills/yfinance/SKILL.md) reads Yahoo Finance prices, financial statements, estimates, holdings, options, screens and calendars through a CLI organized by the data you need. It runs with `uv`, which prepares the dependencies its script declares, and does not require Aside. [Set up market-data queries](docs/usage.md#yahoo-finance).
 
 The [Finviz skill](.claude/skills/finviz/SKILL.md) reads public screening, company and market data through Python, `uv` and system curl. It needs no Aside account and runs when you name Finviz or provide a Finviz URL. [Finviz setup](docs/usage.md#finviz).
 
@@ -49,7 +49,7 @@ git clone https://github.com/tjdwls101010/Agentic-SNS.git
 cd Agentic-SNS
 ```
 
-The SNS skills bundle their own scripts and use the Python standard library at runtime. SEC and yfinance have separate locked Python environments managed by `uv`; see [SEC setup](docs/usage.md#sec-edgar) or [Yahoo Finance setup](docs/usage.md#yahoo-finance). Git is needed for the clone command.
+The SNS skills bundle their own scripts and use the Python standard library at runtime. SEC has a separate locked Python environment and yfinance a script environment, both managed by `uv`; see [SEC setup](docs/usage.md#sec-edgar) or [Yahoo Finance setup](docs/usage.md#yahoo-finance). Git is needed for the clone command.
 
 Start `claude` or `codex` from this directory. Claude Code discovers `.claude/skills`; Codex discovers `.agents/skills`. This repository's `.agents` and `.codex` symlinks both point to `.claude`, so the two hosts share one source without copying skills. See the official [Claude Code](https://code.claude.com/docs/en/skills#where-skills-live) and [Codex](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) skill documentation. To use the skills from other working directories, see [individual skill installation](docs/usage.md#use-the-skills-in-other-projects).
 

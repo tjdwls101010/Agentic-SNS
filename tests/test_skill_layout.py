@@ -13,13 +13,21 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-INVOCATION = 'Bash(uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" *)'
+CALL = 'uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py"'
+INVOCATION = f'Bash({CALL} *)'
 SKILLS = {
     'facebook': ('facebook', {
         'errors': 'common', 'outcome': 'common',
         'aside': 'system', 'graphql': 'system',
         'account': 'store', 'cursors': 'store', 'collect': 'store',
         'reading': 'feature', 'render': 'feature',
+    }),
+    'yfinance': ('yfinance_skill', {
+        'envelope': 'common', 'shape': 'common', 'display': 'common', 'selection': 'common', 'budget': 'common',
+        'leaf': 'common',
+        'yahoo': 'system',
+        'store': 'store', 'export': 'store',
+        'querying': 'feature', 'schema': 'feature',
     }),
 }
 # What each kind of top-level child may import; features also import themselves, never another feature.
@@ -189,6 +197,8 @@ def violations(skill_dir, tests_dir, package, children, extra_scope=()):
         if module not in state:
             visit(module, [module])
 
+    if not tests_dir.is_dir():
+        found.append(f'tests/{tests_dir.name} is missing')
     for path in [*(python_files(tests_dir) if tests_dir.is_dir() else ()), *extra_scope]:
         tree = ast.parse(path.read_text(encoding='utf-8'))
         for edit in path_edits(tree):
@@ -201,14 +211,24 @@ def violations(skill_dir, tests_dir, package, children, extra_scope=()):
         found.append('cli.py lacks a PEP 723 block with requires-python and dependencies')
     if allowed_tools(skill_dir / 'SKILL.md') != INVOCATION:
         found.append('SKILL.md allowed-tools is not ' + INVOCATION)
+    body = re.sub(r'\A---\n.*?\n---\n', '', (skill_dir / 'SKILL.md').read_text(encoding='utf-8'), count=1, flags=re.S)
+    if CALL not in body:
+        found.append('SKILL.md body does not run ' + CALL)
     return found
+
+
+def check_skill(root, skill, package, children, extra_scope=()):
+    """One registered skill checked where it lives in a repository rooted at `root`. Its tests are named for the skill
+    (a hyphen becomes an underscore), not for the package, which may carry a suffix to avoid shadowing a library."""
+    tests = root / 'tests' / skill.replace('-', '_')
+    return violations(root / '.claude/skills' / skill, tests, package, children, extra_scope)
 
 
 @pytest.mark.parametrize('skill', sorted(SKILLS))
 def test_registered_skill_follows_the_layout(skill):
     package, children = SKILLS[skill]
     scope = [Path(__file__)] if skill == sorted(SKILLS)[0] else []
-    assert violations(ROOT / '.claude/skills' / skill, ROOT / 'tests' / package, package, children, scope) == []
+    assert check_skill(ROOT, skill, package, children, scope) == []
 
 
 # --- the checker itself, against small synthetic trees ---------------------------------------------------------
@@ -217,10 +237,8 @@ KINDS = {'errors': 'common', 'web': 'system', 'state': 'store', 'reading': 'feat
 CLI = '# /// script\n# requires-python = ">=3.11"\n# dependencies = []\n# ///\nfrom demo.reading import run\n'
 
 
-def tree(tmp_path, files):
-    skill = tmp_path / 'skill'
-    base = {
-        'SKILL.md': f'---\nname: demo\nallowed-tools: {INVOCATION}\n---\n',
+BASE = {
+    'SKILL.md': f'---\nname: demo\nallowed-tools: {INVOCATION}\n---\nRun `{CALL} <command>`.\n',
         'scripts/cli.py': CLI,
         'scripts/demo/__init__.py': '',
         'scripts/demo/errors.py': '',
@@ -231,16 +249,34 @@ def tree(tmp_path, files):
         'scripts/demo/reading/run.py': 'from demo.web.client import x\nfrom . import helpers\n',
         'scripts/demo/reading/helpers.py': '',
         'scripts/demo/render.py': 'import demo.errors\n',
-        'tests/test_demo.py': 'from demo.web import client\n',
-    }
-    for name, text in {**base, **files}.items():
+    'tests/test_demo.py': 'from demo.web import client\n',
+}
+
+
+def write(base, files):
+    for name, text in files.items():
         if text is None:
-            (skill / name).unlink(missing_ok=True)
+            (base / name).unlink(missing_ok=True)
             continue
-        path = skill / name
+        path = base / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
+
+
+def tree(tmp_path, files):
+    skill = tmp_path / 'skill'
+    write(skill, {**BASE, **files})
     return violations(skill, skill / 'tests', 'demo', KINDS)
+
+
+def repository(tmp_path, skill, files=None, tests=True):
+    """A repository holding one skill whose package (demo) is not named after the skill."""
+    root = tmp_path / 'repo'
+    write(root / '.claude/skills' / skill, {k: v for k, v in BASE.items() if not k.startswith('tests/')})
+    if tests:
+        write(root / 'tests' / skill.replace('-', '_'), {'test_demo.py': BASE['tests/test_demo.py']})
+    write(root, files or {})
+    return check_skill(root, skill, 'demo', KINDS)
 
 
 def test_conforming_tree_has_no_violations(tmp_path):
@@ -281,3 +317,20 @@ def test_standard_library_package_name_is_rejected(tmp_path):
     (skill / 'scripts/cli.py').write_text(CLI)
     (skill / 'SKILL.md').write_text(f'---\nallowed-tools: {INVOCATION}\n---\n')
     assert any('shadows a standard-library module' in line for line in violations(skill, skill / 'tests', 'json', {}))
+
+
+def test_the_tests_folder_is_named_for_the_skill_not_its_package(tmp_path):
+    """A package renamed so it does not shadow a library it imports keeps its tests under the skill's own name."""
+    found = repository(tmp_path, 'demo-kit', {'tests/demo_kit/test_demo.py': 'import sys\nsys.path.insert(0, "x")\n'})
+    assert any('test_demo.py edits the import path' in line for line in found), found
+
+
+def test_a_registered_skill_without_its_tests_folder_is_a_violation(tmp_path):
+    """Registering a skill must not quietly take its tests out of the checks."""
+    found = repository(tmp_path, 'demo-kit', tests=False)
+    assert any('tests/demo_kit is missing' in line for line in found), found
+
+
+def test_the_skill_body_runs_the_same_invocation_allowed_tools_approves(tmp_path):
+    found = tree(tmp_path, {'SKILL.md': f'---\nname: demo\nallowed-tools: {INVOCATION}\n---\nRun python3 scripts/cli.py.\n'})
+    assert any('SKILL.md body does not run' in line for line in found), found

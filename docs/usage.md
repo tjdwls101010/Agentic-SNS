@@ -24,7 +24,7 @@ Keep the requested scope bounded. A displayed item limit is not necessarily a li
 
 ## Use the skills in other projects
 
-Each skill is self-contained: copy its complete directory. For SEC and yfinance this includes `Scripts/` with its `pyproject.toml` and `uv.lock`; for SNS skills it includes `scripts/`. Keep the cloned repository if you link to it.
+Each skill is self-contained: copy its complete directory. For SEC this includes `Scripts/` with its `pyproject.toml` and `uv.lock`; for yfinance and the SNS skills it includes `scripts/`. Keep the cloned repository if you link to it.
 
 From the clone's root, install the Twitter skill for all your projects in the host you use. Before running a link command, check whether the destination already exists; keep any existing installation rather than creating a link inside it.
 
@@ -69,11 +69,11 @@ For example, ask: “Find Microsoft's latest annual filing and read the end of i
 
 ## Yahoo Finance
 
-Install `uv` and copy the complete yfinance skill directory if using it outside this clone. The first locked run prepares Python 3.12 from the skill's `.python-version` and installs its dependencies; no Aside setup or API key is required.
+Install `uv` and copy the complete yfinance skill directory if using it outside this clone. The first run prepares a Python 3.12 or 3.13 environment and installs the dependencies pinned in the header of `scripts/cli.py`; no Aside setup or API key is required.
 
 ```bash
-uv run --frozen --project .claude/skills/yfinance/Scripts python .claude/skills/yfinance/Scripts/yfinance_cli.py --help
-uv run --frozen --project .claude/skills/yfinance/Scripts python .claude/skills/yfinance/Scripts/yfinance_cli.py schema financials income
+uv run .claude/skills/yfinance/scripts/cli.py --help
+uv run .claude/skills/yfinance/scripts/cli.py schema financials income
 ```
 
 Ask, for example: “Find Apple's reported revenue for the latest four quarters and identify the reporting periods and currency.” The agent discovers the appropriate command and available fields, selects the query and reads its structured result. For another question it can follow returned tickers, option expirations or screener fields without writing Python integration code. Command help and scoped `schema` own the interface and each field's meaning — units, timing and known gotchas; [skill guidance](../.claude/skills/yfinance/SKILL.md) covers running the CLI and results that come back short.

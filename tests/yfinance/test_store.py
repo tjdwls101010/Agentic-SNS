@@ -1,6 +1,8 @@
 """Saved observations: a paid request survives a result that did not fit, and reading it back does not change it."""
 import json
 import os
+from pathlib import Path
+import shutil
 import time
 
 from test_budget import chart_routes, news_routes
@@ -127,3 +129,39 @@ def test_the_store_directory_is_selectable_so_ids_are_findable_again(cli, tmp_pa
     assert json.loads((other / f"{ident}.json").read_text())["command"] == "prices history"
     proc, missing = cli("read", ident, routes=[], store=tmp_path / "empty")
     assert proc.returncode == 2 and "rerun the original command" in missing["results"][0]["error"]["message"]
+
+
+# ---- observations saved by an earlier version -----------------------------------------------------------------------
+
+# Made by the CLI as it stood before the layout moved to scripts/cli.py (synthetic routes; the values below are the
+# ones those routes served). A store outlives the code that wrote it, so these ids must keep reading after any move.
+SAVED = Path(__file__).parent / "fixtures/store"
+OLD_HISTORY, OLD_QUOTE = "e9171c42d922e848", "c5f6574d8a9c834a"
+
+
+def old_store(tmp_path):
+    """A copy with fresh modification times: retention prunes by age, and a committed file is older than any window."""
+    store = tmp_path / "old"
+    store.mkdir()
+    for path in SAVED.glob("*.json"):
+        shutil.copy(path, store / path.name)
+    return store
+
+
+def test_an_observation_saved_by_an_earlier_version_is_still_read(cli, tmp_path):
+    store = old_store(tmp_path)
+    proc, doc = cli("read", OLD_HISTORY, "--fields", "Close", routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    r = doc["results"][0]
+    assert r["target"] == "AAPL" and r["id"] == OLD_HISTORY
+    assert r["data"]["columns"] == ["Close"]
+    assert r["data"]["data"] == [[101.25], [102.5], [103.75], [104], [105.5]]
+    assert r["data"]["index"] == ["2024-01-02", "2024-01-03", "2024-01-04", "2024-01-05", "2024-01-06"]
+
+
+def test_an_earlier_versions_quote_still_serves_the_sibling_profile(cli, tmp_path):
+    store = old_store(tmp_path)
+    proc, doc = cli("company", "profile", "AAPL", "--from", OLD_QUOTE, "--fields", "sector,country", routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert doc["results"][0]["data"] == {"sector": "Technology", "country": "United States"}
+    assert doc["results"][0]["id"] == OLD_QUOTE
