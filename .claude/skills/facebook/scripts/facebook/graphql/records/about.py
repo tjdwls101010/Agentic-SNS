@@ -9,11 +9,11 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from facebook.graphql.records.parse import iter_json_objects
-from facebook.graphql.records.fields import _iso, build_json_schema, build_schema_fields
+from facebook.graphql.records.fields import _iso
 
 
 @dataclass
@@ -38,55 +38,15 @@ class ProfileField:
         }
 
 
-FIELD_DESCRIPTIONS: dict[str, tuple[str, str]] = {
-    "profile_id": (
-        "string",
-        "Numeric id of the described profile — matches a Post's author_id for joins.",
-    ),
-    "section": (
-        "string",
-        "Locale-independent field_section_type, such as directory_work or directory_college.",
-    ),
-    "collection": (
-        "string | null",
-        "Localized About sub-tab label for humans; never a stable key to branch on.",
-    ),
-    "field_type": ("string | null", "The field node's own field_type, when present."),
-    "text": ("string", "The rendered About value."),
-    "url": (
-        "string | null",
-        "Facebook link_url when the value points to another object; a chainable handle.",
-    ),
-    "captured_at": (
-        "string",
-        "ISO-8601 UTC timestamp of when this tool captured the response.",
-    ),
+FIELDS = {
+    "profile_id": "string — numeric id of the profile; matches a post record's author_id",
+    "section": "string — locale-independent section such as directory_work; what --section takes",
+    "collection": "string | null — the About tab it was read from, in the viewer's language; null for the overview",
+    "field_type": "string | null — Facebook's own type of the field, when sent",
+    "text": "string — the value as shown",
+    "url": "string | null — a Facebook link the value points to, when there is one",
+    "captured_at": "string — ISO-8601 UTC time this tool received it; changes every run",
 }
-
-
-def _representative() -> ProfileField:
-    now = datetime(2026, 1, 1, tzinfo=UTC)
-    return ProfileField(
-        profile_id="1",
-        section="directory_bio",
-        collection=None,
-        field_type=None,
-        text="",
-        url=None,
-        captured_at=now,
-    )
-
-
-def schema_fields() -> list[dict]:
-    return build_schema_fields(_representative().to_dict(), FIELD_DESCRIPTIONS, optional=set())
-
-
-def json_schema() -> dict:
-    return build_json_schema(
-        "ProfileField",
-        "One element of the about output array (or one NDJSON line).",
-        schema_fields(),
-    )
 
 
 def iter_collections(bodies: Iterable[bytes]) -> list[dict[str, str]]:

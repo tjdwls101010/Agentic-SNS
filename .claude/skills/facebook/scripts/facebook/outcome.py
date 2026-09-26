@@ -77,6 +77,64 @@ COVERAGE = (
     ('filtered by Facebook (profile)', 'exhausted', 'no failure', 'closed (server-filtered)'),
 )
 
+ENVELOPE = {
+    'ok': 'boolean — false only for the kinds in exit_codes whose ok is false',
+    'command': 'string — the command that ran',
+    'sort, type, section': 'string — the query options that make this query what it is, when the command has them',
+    'stop_reason': 'string — why reading stopped; see stop_reasons (absent only for argument errors)',
+    'window': 'object — dated reads only: {since, until, coverage}; coverage follows window_coverage',
+    'sponsored_skipped': 'integer — feed only: advertisements left out of results and --limit, first seen here',
+    'request_count': 'integer — Facebook requests this invocation made, setup included',
+    'max_requests': 'integer — the budget it had',
+    'error': 'string — the kind of failure (see exit_codes); absent on success',
+    'message': 'string — what failed',
+    'fix': 'string — what to do next; a resumable budget stop carries one too',
+    'coverage': 'array<string> — what this result does not cover: unread replies or collections, response issues',
+    'next': 'string — the continuation command; run it as it is (text output prints it as more:)',
+    'out': 'string — the --out file',
+    'count': 'integer — records saved in the --out file so far',
+    'already_complete': 'boolean — the --out file was complete before this run; nothing was read',
+    'replies_incomplete': 'array<object> — replies that were not read, per parent comment, and whether more: retries them',
+    'failed_sections': 'array<object> — About collections that failed',
+    'updated, missing, failed': 'refresh only — query ids verified and saved, not found, and rejected with a reason',
+    'results': 'array<object> — the records: post, comment, entity or about (see schema <object>)',
+}
+TEXT_HEADER = ('<command>[ · sort=…][ · type=…][ · section=…] · <n> shown[ · sponsored_skipped=<n>] · stopped=<stop_reason> '
+               '· requests=<used>/<budget>; dated reads add "window <since>..<until> · <coverage>"; each coverage note '
+               'is a "coverage:" line; the last line is "more: <command>" when reading can continue. With --out the '
+               'whole result is one line: <command> · <n> saved to "<path>" · … [· already complete] '
+               '[· resume: <command>] [· error=<kind> fix=<fix>].')
+TEXT_MARKERS = {
+    '?': 'a count Facebook did not send',
+    'unavailable': 'no author name or URL was sent; there is no handle to follow',
+    'text[shown/received chars, complete|truncated]': 'how much of the received text is shown here; truncated means '
+                                                       'Facebook marked the received body as cut, so the rest is unknown',
+    'pinned': 'pinned to the top of its timeline or group, so it can be old',
+    'undated': 'no creation time was sent',
+    'incomplete': 'a piece of this record could not be merged; fields may be missing',
+    'sponsored': 'an advertisement (shown only with --include-sponsored, or when opened directly)',
+    'attachment=': 'what a comment carries besides text, e.g. attachment=photo on a comment with empty text',
+    'reply-to=cN': 'a reply to the comment labelled cN above it',
+    'shared-from': 'the post this one shares, nested once per level',
+}
+
+
+def describe_result(exit_codes):
+    """The result schema. `exit_codes` is cli.py's declaration: [(code, meaning, kinds)]."""
+    return {
+        'object': 'result',
+        'description': 'The JSON envelope every command prints with --json, and the text output built from it.',
+        'fields': ENVELOPE,
+        'stop_reasons': {reason: f'{meaning} Next: {action}' for reason, (meaning, action) in STOP_REASONS.items()},
+        'exit_codes': [{'exit': code, 'meaning': meaning, 'kinds': list(kinds),
+                        'ok': all(KINDS[kind][1] for kind in kinds)} for code, meaning, kinds in exit_codes],
+        'window_coverage': [{'order': order, 'stopped': stopped, 'failure': failure, 'window': label}
+                            for order, stopped, failure, label in COVERAGE],
+        'text_header': TEXT_HEADER,
+        'text_markers': TEXT_MARKERS,
+    }
+
+
 _ERROR_KINDS = {2: 'argument', 3: 'aside', 4: 'login', 5: 'blocked', 6: 'failed', 7: 'empty', 8: 'partial'}
 
 

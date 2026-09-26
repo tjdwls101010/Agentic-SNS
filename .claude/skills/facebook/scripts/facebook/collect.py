@@ -11,6 +11,25 @@ from facebook.errors import FacebookError
 FORMAT = 2
 
 
+def describe_out():
+    """The --out file schema."""
+    return {
+        'object': 'out',
+        'description': 'The NDJSON file --out writes: one header, then records, each page closed by a page line.',
+        'format': FORMAT,
+        'control_records': {
+            'header': 'first line: kind "header", format, the query identity (command, target, options, account_id), '
+                      'started_at',
+            'page': 'after each committed page: kind "page", cursor, ids and n of the records above it, stop_reason, '
+                    'skipped (sponsored ids left out); a line without "kind" is a record',
+        },
+        'resume': 'Rerun the same command with the same --out path: records after the last page line are dropped '
+                  'and re-read, ids already saved are skipped, --limit counts everything saved. A file for another '
+                  'query or an earlier format is refused before any byte changes; use a new path.',
+        'records': 'post, comment, entity or about records (see schema <object>)',
+    }
+
+
 def _line(value):
     return (json.dumps(value, ensure_ascii=False, separators=(',', ':')) + '\n').encode()
 

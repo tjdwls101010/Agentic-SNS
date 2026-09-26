@@ -42,10 +42,10 @@ def window_of(args):
     return {'order': order, 'since': args.since, 'until': args.until}
 
 
-def run(args, *, context=None, continuation=None, identity=None):
+def run(args, *, context=None, continuation=None, identity=None, exit_codes=()):
     """(kind, envelope) of one command. Only argument errors are raised; every other failure is finished."""
     if args.command == 'schema':
-        return finish(maintenance.schema(args.object), command='schema', requests=0, budget=0)
+        return finish(maintenance.schema(args.object, exit_codes), command='schema', requests=0, budget=0)
     # 성진: refresh의 400회는 실계정 보호 상한, 일회용 계정으로 바꾸면 올려도 됨
     budget = {'refresh': 400, 'doctor': 2}.get(args.command) or args.max_requests or 25
     transport = None

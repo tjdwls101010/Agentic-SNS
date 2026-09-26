@@ -278,7 +278,10 @@ def main(argv=None):
             if COMMANDS[args.command].continues_as:
                 continuation = context_for(continuation_args(args), COMMANDS[args.command].continues_as)
         identity = {key: getattr(args, key) for key in ('sort', 'type', 'section') if getattr(args, key) is not None}
-        kind, envelope = dispatch.run(args, context=context, continuation=continuation, identity=identity)
+        exit_codes = [(code, meaning, [kind for kind, number in KIND_EXIT.items() if number == code])
+                      for code, meaning in EXIT_CODES.items()]
+        kind, envelope = dispatch.run(args, context=context, continuation=continuation, identity=identity,
+                                      exit_codes=exit_codes)
         handle = envelope.pop('handle', None)
         if handle:
             continued = continuation_args(args) if handle['command'] != args.command else args

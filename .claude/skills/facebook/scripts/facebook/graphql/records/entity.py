@@ -1,8 +1,8 @@
-"""Search result shaping (plan §5).
+"""Search results that are people, pages or groups rather than posts.
 
 Search is the one surface that returns mixed result types: a "top" search
 interleaves posts with people, pages and groups, and only the post-shaped ones
-are story-shaped enough for ``parse.py`` (recon §4). Non-post hits become a
+are story-shaped enough for ``parse.py``. Non-post hits become a
 light :class:`Entity` instead. A requested vertical resolves Facebook's
 ambiguous ``User`` typename, but never overrides an unambiguous ``Group``:
 recursive payloads also contain authors, and relabeling one as a group invents
@@ -13,11 +13,11 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from facebook.graphql.records.parse import iter_json_objects
-from facebook.graphql.records.fields import _iso, build_json_schema, build_schema_fields
+from facebook.graphql.records.fields import _iso
 
 #: CLI ``--type`` -> the ``args.experience.type`` that selects that vertical.
 #: Captured live; the doc_id is identical across all five.
@@ -57,38 +57,14 @@ class Entity:
         }
 
 
-FIELD_DESCRIPTIONS: dict[str, tuple[str, str]] = {
-    "kind": (
-        "string",
-        "person | page | group. Its presence is also what distinguishes an entity from a "
-        "Post in mixed search output — Posts carry `source` instead.",
-    ),
-    "id": ("string", "Numeric id — the handle to chain into `profile` or `about` or `group`."),
-    "name": ("string | null", "Display name."),
-    "url": ("string | null", "Facebook URL for this person, page, or group."),
-    "verified": ("boolean | null", "Verified badge, or null when the payload omits it."),
-    "captured_at": (
-        "string",
-        "ISO-8601 UTC timestamp of when this tool captured the response.",
-    ),
+FIELDS = {
+    "kind": "string — person | page | group; an entity has kind, a post record has source",
+    "id": "string — numeric id; the profile, about or group command's argument",
+    "name": "string | null — display name",
+    "url": "string | null — the entity's Facebook URL",
+    "verified": "boolean | null — the verified badge; null when Facebook did not say",
+    "captured_at": "string — ISO-8601 UTC time this tool received it; changes every run",
 }
-
-
-def _representative() -> Entity:
-    now = datetime(2026, 1, 1, tzinfo=UTC)
-    return Entity(kind="person", id="1", name=None, url=None, verified=None, captured_at=now)
-
-
-def schema_fields() -> list[dict]:
-    return build_schema_fields(_representative().to_dict(), FIELD_DESCRIPTIONS, optional=set())
-
-
-def json_schema() -> dict:
-    return build_json_schema(
-        "Entity",
-        "A non-post search hit (person, page, or group).",
-        schema_fields(),
-    )
 
 
 _ENTITY_TYPENAMES = {"User", "Page", "Group"}

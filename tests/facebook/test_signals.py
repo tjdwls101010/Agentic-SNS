@@ -128,7 +128,7 @@ def test_attachment_only_comments_name_their_attachment_and_a_truly_empty_one_do
     rows = attachment_comments()
     assert [(r['text'] == '', [a['kind'] for a in r['attachments']]) for r in rows] == [
         (True, ['photo']), (True, ['gif']), (False, ['gif']), (False, []), (True, [])]
-    assert 'attachments' in SCHEMAS['comment']['properties']
+    assert 'attachments[].kind' in SCHEMAS['comment']['fields']
     assert all('url' not in a for r in rows for a in r['attachments'])
 
 

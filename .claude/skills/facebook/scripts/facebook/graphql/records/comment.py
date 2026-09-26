@@ -1,12 +1,11 @@
-"""Comment schema and extraction (plan §5).
+"""Comment records and their extraction.
 
 Comments need their own extraction path rather than reusing ``parse.py``:
 a comment node carries its own ``feedback`` object, so the story walker
 counts comments as top-level *posts*. The two shapes are told apart by the
 ``depth`` + ``author`` + ``body`` triple that only comments have.
 
-``depth`` maps exactly onto the agreed design (recon §3): ``0`` is a
-top-level comment, ``>= 1`` is a reply.
+``depth`` ``0`` is a comment on the post, ``>= 1`` a reply.
 """
 
 from __future__ import annotations
@@ -16,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from facebook.graphql.records.fields import _iso, build_json_schema, build_schema_fields, timestamp
+from facebook.graphql.records.fields import _iso, timestamp
 from facebook.graphql.records.parse import deep_merge, iter_json_objects
 
 
@@ -54,73 +53,23 @@ class Comment:
         }
 
 
-FIELD_DESCRIPTIONS: dict[str, tuple[str, str]] = {
-    "id": ("string", "Stable identity/dedup key for this comment."),
-    "post_id": (
-        "string",
-        "Feedback id of the post this comment belongs to — matches a Post's `id`, so "
-        "comments and posts can be joined.",
-    ),
-    "author_name": ("string | null", "Display name of the comment's author."),
-    "author_url": (
-        "string | null",
-        "Profile URL of the comment's author — the handle to chain into `profile` or `about`.",
-    ),
-    "author_id": ("string | null", "Numeric id of the comment's author."),
-    "text": (
-        "string",
-        "The comment body; empty string if it has none (e.g. a sticker-only reply).",
-    ),
-    "created_at": (
-        "string | null",
-        "ISO-8601 UTC timestamp with a 'Z' suffix; null if it could not be located.",
-    ),
-    "depth": ("integer", "0 for a top-level comment, 1 or more for a reply."),
-    "parent_id": ("string | null", "Id of the comment this one replies to; null at depth 0."),
-    "reaction_count": ("integer | null", "Reactions on this comment, or null if unavailable."),
-    "reply_count": ("integer | null", "Replies to this comment, or null if unavailable."),
-    "attachments": (
-        "array<object>",
-        "List of {kind}: photo | gif | sticker | video | link | other. A comment with empty text and an "
-        "attachment is that attachment, not an empty comment; media URLs are not included.",
-    ),
-    "captured_at": (
-        "string",
-        "ISO-8601 UTC timestamp of when this tool captured the response. Changes every "
-        "run — never a dedup key.",
-    ),
+FIELDS = {
+    "id": "string — stable identity of the comment",
+    "post_id": "string — id of the post it belongs to; matches that post record's id",
+    "author_name": "string | null — display name of the commenter",
+    "author_url": "string | null — the commenter's profile URL; the profile and about commands' argument",
+    "author_id": "string | null — numeric id of the commenter",
+    "text": "string — the comment body as received; empty for a comment that is only an attachment",
+    "created_at": "string | null — ISO-8601 UTC time the comment was made",
+    "depth": "integer — 0 for a comment on the post, 1 or more for a reply",
+    "parent_id": "string | null — id of the comment this one replies to; null at depth 0",
+    "reaction_count": "integer | null — reactions; null when not sent, never guessed from an abbreviation",
+    "reply_count": "integer | null — replies Facebook reports; null when not sent",
+    "attachments": "array<object> — what the comment carries besides text; empty text plus an attachment is that "
+                   "attachment, not an empty comment",
+    "attachments[].kind": "string — photo | gif | sticker | video | link | other; media URLs are not included",
+    "captured_at": "string — ISO-8601 UTC time this tool received it; changes every run",
 }
-
-
-def _representative() -> Comment:
-    now = datetime(2026, 1, 1, tzinfo=UTC)
-    return Comment(
-        id="1",
-        post_id="1",
-        author_name=None,
-        author_url=None,
-        author_id=None,
-        text="",
-        created_at=now,
-        depth=0,
-        parent_id=None,
-        reaction_count=None,
-        reply_count=None,
-        captured_at=now,
-        attachments=[],
-    )
-
-
-def schema_fields() -> list[dict]:
-    return build_schema_fields(_representative().to_dict(), FIELD_DESCRIPTIONS, optional=set())
-
-
-def json_schema() -> dict:
-    return build_json_schema(
-        "Comment",
-        "One element of the comments output array (or one NDJSON line).",
-        schema_fields(),
-    )
 
 
 # --- extraction ---------------------------------------------------------------

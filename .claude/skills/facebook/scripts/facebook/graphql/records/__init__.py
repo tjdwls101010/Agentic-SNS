@@ -88,5 +88,11 @@ def about_fields(bodies, *, profile_id, collection_names, captured_at):
                                                      collection_names=collection_names, captured_at=captured_at)]
 
 
-SCHEMAS = {'post': _post.json_schema(), 'comment': _comment.json_schema(),
-           'entity': _entity.json_schema(), 'about': _about.json_schema()}
+SCHEMAS = {
+    'post': {'object': 'post', 'description': 'A post from feed, profile, group, search or post.',
+             'fields': _post.FIELDS},
+    'comment': {'object': 'comment', 'description': 'A comment or reply from comments or post.',
+                'fields': _comment.FIELDS},
+    'entity': {'object': 'entity', 'description': 'A person, page or group from search.', 'fields': _entity.FIELDS},
+    'about': {'object': 'about', 'description': 'One visible About field from about.', 'fields': _about.FIELDS},
+}

@@ -44,7 +44,7 @@ def test_schema_is_local_and_doctor_checks_login(tmp_path):
     account = Account(tmp_path)
     schema = account.run('schema')
     assert schema.code == 0 and schema.calls == []
-    assert {row['title'] for row in schema.data['results']} == {'Post', 'Comment', 'Entity', 'ProfileField'}
+    assert [row['object'] for row in schema.data['results']] == ['result', 'out', 'post', 'comment', 'entity', 'about']
     doctor = account.run('doctor', responses=[login()])
     assert doctor.code == 0
     assert doctor.data['results'][0]['account_id'] == '100'

@@ -56,7 +56,7 @@ def render_post(post, *, index=1, chars=180, timezone=None) -> str:
     if data.get('created_at') or not data.get('sponsored'):
         labels.append(_time(data.get('created_at'), timezone))
     for flag in ('sponsored', 'pinned', 'incomplete'):
-        if data.get(flag) or (flag == 'pinned' and data.get('is_pinned')):
+        if data.get(flag):
             labels.append(flag)
     labels += [data.get('type', 'unknown'),
                f'reactions={_count(data.get("reaction_count"))} comments={_count(data.get("comment_count"))} shares={_count(data.get("share_count"))}']

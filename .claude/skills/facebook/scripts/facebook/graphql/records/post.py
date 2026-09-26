@@ -1,24 +1,21 @@
-"""Output schema (plan §6). Decided pre-1.0: additive fields later are a minor
-bump, but reinterpreting an existing field's meaning is a breaking change.
+"""Post records: every field decided explicitly by the builder, and described once in FIELDS.
 
-No field defaults except ``Post.raw`` (opt-in, PII-heavy) — the parser must
-decide every field explicitly rather than silently defaulting a forgotten one.
+Reinterpreting an existing field's meaning is a breaking change; adding one is not.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 
 from facebook.graphql.records import parse
-from facebook.graphql.records.fields import _iso, build_schema_fields, build_json_schema, timestamp
+from facebook.graphql.records.fields import _iso, timestamp
 
 
 @dataclass
 class Media:
     kind: str  # "image" | "video" | "unknown"
-    #: scontent/fbcdn URL — SIGNED, EXPIRES, viewer-scoped. Treat as sensitive
-    #: (plan §17 G-media-expiry, §21) — never printed unredacted in diagnostics.
+    #: scontent/fbcdn URL — signed, expiring, viewer-scoped; never printed in diagnostics.
     url: str
     width: int | None
     height: int | None
@@ -44,7 +41,7 @@ class Post:
     type: (
         str  # "status" | "photo" | "video" | "shared" | "link" | "reel" | "life_event" | "unknown"
     )
-    is_pinned: bool
+    pinned: bool
     author_name: str | None
     author_url: str | None
     author_id: str | None
@@ -66,13 +63,8 @@ class Post:
     #: URL: its original surface is genuinely unknown.
     source: str
     captured_at: datetime  # UTC, when this tool captured the response
-    raw: dict | None = None  # only populated when include_raw=True
     sponsored: bool = False
     incomplete: bool = False
-
-    @property
-    def pinned(self) -> bool:
-        return self.is_pinned
 
     @property
     def undated(self) -> bool:
@@ -83,7 +75,6 @@ class Post:
             "id": self.id,
             "url": self.url,
             "type": self.type,
-            "is_pinned": self.is_pinned,
             "pinned": self.pinned,
             "sponsored": self.sponsored,
             "undated": self.undated,
@@ -104,7 +95,6 @@ class Post:
             "shared_post": self.shared_post.to_dict() if self.shared_post is not None else None,
             "source": self.source,
             "captured_at": _iso(self.captured_at),
-            **({"raw": self.raw} if self.raw is not None else {}),
         }
 
 
@@ -177,142 +167,43 @@ def _classify_type(story: dict, media: list[dict], links: list[dict], has_shared
     return "unknown"
 
 
-#: One entry per key ``Post.to_dict()`` can emit: (JSON type, one-line meaning).
-#: Co-located with the dataclass so a field rename/addition is edited in the
-#: same file as the field itself, not in a separate skill repo (plan §10a).
-#: Types are the JSON shape a consumer of the output file sees, NOT the
-#: Python dataclass annotation — e.g. ``created_at`` is ``datetime | None``
-#: in Python but serializes to ``string | null`` via ``_iso()``.
-FIELD_DESCRIPTIONS: dict[str, tuple[str, str]] = {
-    "sponsored": ("boolean", "The post carries an explicit advertising marker."),
-    "pinned": ("boolean", "Pinned post; alias of is_pinned."),
-    "undated": ("boolean", "No usable creation timestamp was received."),
-    "incomplete": ("boolean", "A response fragment could not be merged or decoded."),
-    "id": (
-        "string",
-        "Stable identity/dedup key for this post — dedupe on this, never on captured_at.",
-    ),
-    "url": ("string | null", "Permalink to the post, or null if one could not be located."),
-    "type": (
-        "string",
-        "One of status | photo | video | shared | link | reel | life_event | unknown.",
-    ),
-    "is_pinned": (
-        "boolean",
-        "True for a pinned post; date-window handling belongs to the caller.",
-    ),
-    "author_name": ("string | null", "Display name of the post's author."),
-    "author_url": ("string | null", "Profile URL of the post's author."),
-    "author_id": ("string | null", "Numeric id of the post's author."),
-    "created_at": (
-        "string | null",
-        "ISO-8601 UTC timestamp with a 'Z' suffix; null if it could not be located.",
-    ),
-    "edited_at": (
-        "string | null",
-        "ISO-8601 UTC timestamp of the last edit; null if never edited.",
-    ),
-    "text": ("string", "Full post body, truncation-resolved when possible; empty string if none."),
-    "text_truncated": (
-        "boolean",
-        "The captured payload carried a truncation marker, regardless of whether it was resolved.",
-    ),
-    "text_resolved": ("boolean", "A follow-up permalink fetch recovered the full truncated text."),
-    "media": (
-        "array<object>",
-        "List of {kind, url, width, height}. url is a signed, expiring, viewer-scoped "
-        "fbcdn/scontent link — treat as sensitive, never print unredacted.",
-    ),
-    "links": ("array<object>", "List of {url, title, description} for shared external links."),
-    "reaction_count": ("integer | null", "Reaction count, or null if unavailable."),
-    "comment_count": ("integer | null", "Comment count, or null if unavailable."),
-    "share_count": ("integer | null", "Share count, or null if unavailable."),
-    "shared_post": (
-        "object | null",
-        "A nested post for an attached/shared story, or null. Can itself have a "
-        "non-null shared_post on a share-of-a-share — nesting isn't capped at one level.",
-    ),
-    "source": (
-        "string",
-        "Which surface this post came from: timeline | newsfeed | group | search | "
-        "permalink ('permalink' means it was addressed directly by URL, so its "
-        "original surface is unknown). Lets outputs from different commands be "
-        "merged without losing their provenance.",
-    ),
-    "captured_at": (
-        "string",
-        "ISO-8601 UTC timestamp of when this tool captured the response. Changes every "
-        "run — never a dedup key.",
-    ),
-    "raw": (
-        "object",
-        "Present only when include_raw=True. The unredacted captured story node.",
-    ),
+#: Every key a Post record can carry, as "JSON type — meaning". Nested shapes are listed as media[].kind and so on;
+#: shared_post is itself a Post. Kept beside the dataclass so a field change edits one file.
+FIELDS = {
+    "id": "string — stable identity of the post; dedupe on this, never on captured_at",
+    "url": "string | null — permalink; the post command's argument",
+    "type": "string — status | photo | video | shared | link | reel | life_event | unknown",
+    "pinned": "boolean — pinned to the top of its timeline or group, so it can be old; passes any date window",
+    "sponsored": "boolean — an advertisement; feed skips these unless --include-sponsored",
+    "undated": "boolean — Facebook sent no usable creation time; passes any date window",
+    "incomplete": "boolean — part of this post arrived in a piece that could not be merged; fields may be missing",
+    "author_name": "string | null — display name of the author",
+    "author_url": "string | null — the author's profile URL; the profile and about commands' argument",
+    "author_id": "string | null — numeric id of the author; matches about's profile_id",
+    "created_at": "string | null — ISO-8601 UTC time the post was created",
+    "edited_at": "string | null — ISO-8601 UTC time of the last edit; null if never edited",
+    "text": "string — the body as received; empty if the post has none",
+    "text_truncated": "boolean — Facebook marked the received body as cut; the rest is not known",
+    "text_resolved": "boolean — a later request recovered the full body of a cut post",
+    "media": "array<object> — photos and videos of the post itself, in order",
+    "media[].kind": "string — image | video",
+    "media[].url": "string — signed, expiring, viewer-scoped; share only when the user needs the media",
+    "media[].width": "integer | null — pixels",
+    "media[].height": "integer | null — pixels",
+    "links": "array<object> — external links the post shares",
+    "links[].url": "string — the link target",
+    "links[].title": "string | null — the link preview's title",
+    "links[].description": "string | null — the link preview's description",
+    "reaction_count": "integer | null — reactions; null when not sent",
+    "comment_count": "integer | null — comments; null when not sent",
+    "share_count": "integer | null — shares; null when not sent",
+    "shared_post": "object | null — the post this one shares, itself a post record; shares can nest",
+    "source": "string — where it was read: newsfeed | timeline | group | search | permalink",
+    "captured_at": "string — ISO-8601 UTC time this tool received it; changes every run",
 }
 
 
-def _schema_representative_post() -> Post:
-    """A fully-populated ``Post`` (including ``raw``) purely so ``to_dict()``
-    emits every possible key — the source of truth for ``schema_fields()``.
-
-    Deliberately NOT ``dataclasses.fields(Post)``: that returns 20 names
-    including ``raw`` unconditionally, but ``to_dict()`` only emits ``raw``
-    when it is populated (i.e. only under ``--raw``), so fields() would
-    mis-document it as always-present.
-    """
-    now = datetime(2026, 1, 1, tzinfo=UTC)
-    return Post(
-        id="1",
-        url=None,
-        type="status",
-        is_pinned=False,
-        author_name=None,
-        author_url=None,
-        author_id=None,
-        created_at=now,
-        edited_at=None,
-        text="",
-        text_truncated=False,
-        text_resolved=False,
-        media=[],
-        links=[],
-        reaction_count=None,
-        comment_count=None,
-        share_count=None,
-        shared_post=None,
-        source="timeline",
-        captured_at=now,
-        raw={},
-    )
-
-
-def schema_fields() -> list[dict]:
-    """Ordered field descriptors for every key ``Post.to_dict()`` can emit.
-
-    Each entry: ``name``, ``type`` (JSON type, not the Python annotation),
-    ``description``, and ``always_present`` (False only for ``raw``).
-    """
-    return build_schema_fields(
-        _schema_representative_post().to_dict(), FIELD_DESCRIPTIONS, optional={"raw"}
-    )
-
-
-#: Maps this module's JSON-type labels to JSON Schema (draft 2020-12) type
-#: constraints. Kept as an explicit table, not derived from the dataclass
-#: annotations, for the same reason ``schema_fields`` avoids ``dataclasses.
-#: fields`` — the Python type and the JSON type are not the same thing here.
-def json_schema() -> dict:
-    """The fetch output object as JSON Schema (draft 2020-12)."""
-    return build_json_schema(
-        "Post",
-        "One element of the fetch output array (or one NDJSON line).",
-        schema_fields(),
-    )
-
-
-def build_post(
-    story: dict, *, captured_at: datetime, source: str, include_raw: bool = False
-) -> Post:
+def build_post(story: dict, *, captured_at: datetime, source: str) -> Post:
     """Normalize one deep-merged story dict (from ``parse.parse_story_nodes``) into a ``Post``.
 
     The caller owns any follow-up request for truncated text and sets
@@ -329,7 +220,7 @@ def build_post(
     has_attached = isinstance(attached, dict)
     identifiable = has_attached and isinstance(attached.get("feedback"), dict) and attached["feedback"].get("id") is not None
     shared_post = (
-        build_post(attached, captured_at=captured_at, source=source, include_raw=include_raw)
+        build_post(attached, captured_at=captured_at, source=source)
         if identifiable
         else None
     )
@@ -341,7 +232,7 @@ def build_post(
         id=str(story["feedback"]["id"]),
         url=parse.find_permalink(story),
         type=_classify_type(story, raw_media, raw_links, has_attached),
-        is_pinned=_find_pinned(story),
+        pinned=_find_pinned(story),
         author_name=author.get("name") if isinstance(author.get("name"), str) else None,
         author_url=author.get("url") if isinstance(author.get("url"), str) else None,
         author_id=str(author_id) if author_id is not None else None,
@@ -369,7 +260,6 @@ def build_post(
         sponsored=_find_sponsored(story),
         incomplete=bool(story.get("incomplete")) or (has_attached and not identifiable)
         or bool(shared_post and shared_post.incomplete),
-        raw=story if include_raw else None,
     )
 
 
@@ -392,8 +282,8 @@ def _find_sponsored(story: dict) -> bool:
 
 def posts_from_raw(raw, source, captured_at=None):
     parsed = parse.parse_story_nodes([raw])
-    return [build_post(parsed.stories[key], source=source, captured_at=captured_at or datetime.now().astimezone(),
-                       include_raw=False).to_dict() for key in parsed.top_level_ids()]
+    return [build_post(parsed.stories[key], source=source, captured_at=captured_at or datetime.now().astimezone()
+                       ).to_dict() for key in parsed.top_level_ids()]
 
 
 def requested_story(raw):

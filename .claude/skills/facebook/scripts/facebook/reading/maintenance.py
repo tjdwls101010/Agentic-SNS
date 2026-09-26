@@ -1,14 +1,21 @@
 """Local schema and browser/registry diagnostics."""
 from datetime import date
 
+from facebook.collect import describe_out
 from facebook.errors import FacebookError
 from facebook.graphql.records import SCHEMAS
+from facebook.outcome import describe_result
 from facebook.graphql.refresh import refresh
 from facebook.graphql.registry import load_registry
 
 
-def schema(name=None):
-    return {'results': [SCHEMAS[name]] if name in SCHEMAS else list(SCHEMAS.values()), 'stop_reason': 'complete'}
+def schema(name, exit_codes):
+    """One object's schema, or every object named with one line."""
+    documents = {'result': describe_result(exit_codes), 'out': describe_out(), **SCHEMAS}
+    if name:
+        return {'results': [documents[name]], 'stop_reason': 'complete'}
+    return {'results': [{'object': key, 'description': doc['description']} for key, doc in documents.items()],
+            'stop_reason': 'complete'}
 
 
 def run(args, transport):

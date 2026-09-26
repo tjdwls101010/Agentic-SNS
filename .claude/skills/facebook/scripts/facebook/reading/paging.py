@@ -10,7 +10,7 @@ END = {'exhausted': True}
 
 
 def in_window(record, since=None, until=None):
-    if record.get('pinned') or record.get('is_pinned') or not record.get('created_at'):
+    if record.get('pinned') or not record.get('created_at'):
         return True
     stamp = record['created_at']
     moment = datetime.fromisoformat(stamp.replace('Z', '+00:00')) if isinstance(stamp, str) else stamp
