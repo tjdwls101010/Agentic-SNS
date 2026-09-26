@@ -102,8 +102,8 @@ def read(args, transport, context, continuation):
                 if saved_count >= args.limit:
                     return {'results': [], 'stop_reason': 'limit_reached', 'count': output.count}
                 run_args.limit = args.limit - saved_count
-        def commit_page(records, cursor, reason, skipped=()):
-            output.commit(records, cursor, reason, skipped)
+        def commit_page(records, cursor, reason, skipped=(), notes=()):
+            output.commit(records, cursor, reason, skipped, notes)
 
         commit = commit_page if output else None
         if args.command in ('feed', 'profile', 'group', 'post'):

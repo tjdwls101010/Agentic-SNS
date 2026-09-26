@@ -79,7 +79,7 @@ def _is_comment_shaped(obj: Any) -> bool:
     return (
         isinstance(obj, dict)
         and "depth" in obj
-        and isinstance(obj.get("author"), dict)
+        and "author" in obj and isinstance(obj.get("author"), dict | type(None))
         and isinstance(obj.get("body"), dict | type(None))
         and obj.get("id") is not None
     )

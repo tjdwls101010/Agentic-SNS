@@ -5,6 +5,7 @@ from facebook.errors import FacebookError
 from facebook.graphql.records import post_page, post_record
 from facebook.graphql.registry import get_query, FEED_SORT_TOKENS, GROUP_SORT_TOKENS
 from facebook.graphql.resolve import resolve_profile_id, resolve_group_id
+from facebook.outcome import ISSUES
 from facebook.reading.comments import comments, fetch_post_story
 from facebook.reading.paging import page_options, paginate
 
@@ -45,11 +46,18 @@ def run(args, transport, *, state=None, commit=None):
         if not page.records and page.has_items:
             raise FacebookError(6, 'A nonempty feed connection contains no readable posts.', 'Run refresh, then retry.')
         issues.extend(page.issues)
+        page_notes.extend(ISSUES.get(issue, issue) for issue in page.issues)
         return page.records, page.page_info
+
+    page_notes = []
+
+    def commit_with_notes(records, cursor, reason, skipped=()):
+        commit(records, cursor, reason, skipped, list(dict.fromkeys(page_notes)))
+        page_notes.clear()
 
     newest_first = args.command in ('feed', 'group') and args.sort == 'recent'
     skip_sponsored = args.command == 'feed' and not args.include_sponsored
-    result = paginate(fetch, **page_options(args, state, commit), newest_first=newest_first,
-                      skip_sponsored=skip_sponsored)
+    options = page_options(args, state, commit_with_notes if commit else None)
+    result = paginate(fetch, **options, newest_first=newest_first, skip_sponsored=skip_sponsored)
     result['issues'] = issues
     return result

@@ -86,8 +86,9 @@ OPTIONS = {
     'section': (('--section',), {'help': 'Only this locale-independent section, e.g. directory_work'}),
     'chars': (('--chars',), {'type': positive, 'help': 'Characters of each text shown (default 180); JSON keeps full text'}),
     'after': (('--after',), {'type': positive, 'help': 'Continue from the numbered handle a more: line printed'}),
-    'out': (('--out',), {'help': 'Collect into this NDJSON file, committed a whole page at a time; '
-                                 'rerun the same command to resume. --limit counts everything saved'}),
+    'out': (('--out',), {'help': 'Collect into this NDJSON file, committed a whole page at a time; rerun the same '
+                                 'command to resume. --limit then counts what is already saved (parent comments '
+                                 'for comments)'}),
     'json': (('--json',), {'action': 'store_true', 'help': 'Emit one complete JSON document'}),
     'max_requests': (('--max-requests',), {'type': budget,
                                            'help': 'Facebook requests this invocation may make, setup included '
@@ -125,14 +126,16 @@ COMMANDS = {
                         ('sort', 'replies', 'limit', 'chars', 'after', 'out', 'json', 'max_requests'),
                         target='Facebook post URL', identity=('sort', 'replies'),
                         overrides={'sort': {'choices': ['top', 'recent'], 'default': 'top', 'help': 'Comment order'},
-                                   'limit': {'type': positive, 'help': 'Parent comments to show; replies are extra'}}),
+                                   'limit': {'type': positive, 'help': 'Parent comments to show; replies are extra. '
+                                                                       'With --out it counts parent comments saved'}}),
     'search': Command('Search posts, people, pages or groups.', ('type', 'limit', 'chars', 'after', 'out', 'json',
                                                                 'max_requests'),
                       target='Search text', identity=('type',)),
     'about': Command('Read a profile\'s visible About fields.', ('section', 'json', 'max_requests'),
                      target='Facebook profile URL, vanity name or numeric id', identity=('section',),
-                     epilog='Reads the overview and every visible collection: 3 + collections requests '
-                            '(2 + collections for a numeric id).'),
+                     epilog='Without --section it reads the overview and every visible collection: 3 + collections '
+                            'requests (2 + collections for a numeric id). --section stops at the first place that '
+                            'shows that section, and reads every collection only when none does.'),
     'doctor': Command('Check Aside, login, block status and registry age; always JSON.', ('unblock',)),
     'refresh': Command('Replace stale query ids with verified ones from Facebook\'s own pages; always JSON.',
                        ('capture',), epilog='Up to 400 paced requests; this can take several minutes.'),
@@ -256,6 +259,8 @@ def emit(kind, envelope, args):
                   f'requests={envelope["request_count"]}/{envelope["max_requests"]}']
         if envelope.get('already_complete'):
             parts.append('already complete')
+        if envelope.get('coverage'):
+            parts.append('coverage: ' + '; '.join(envelope['coverage']))
         if envelope['stop_reason'] in ('budget', 'query_failure'):
             parts.append('resume: ' + resume_command(args))
         if envelope.get('error'):

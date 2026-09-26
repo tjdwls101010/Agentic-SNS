@@ -20,13 +20,15 @@ def describe_out():
         'control_records': {
             'header': 'first line: kind "header", format, the query identity (command, target, options, account_id), '
                       'started_at',
-            'page': 'after each committed page: kind "page", cursor, ids and n of the records above it, stop_reason, '
-                    'skipped (sponsored ids left out); a line without "kind" is a record',
+            'page': 'after each committed page: kind "page" with no "id", cursor, ids and n of the records above it, '
+                    'stop_reason, skipped (sponsored ids left out), coverage (notes for that page). Every other line '
+                    'after the header is a record; entities carry kind person, page or group together with an id',
         },
         'resume': 'Rerun the same command with the same --out path: records after the last page line are dropped '
-                  'and re-read, ids already saved are skipped, --limit counts everything saved. A file for another '
-                  'query or an earlier format is refused before any byte changes; use a new path.',
-        'records': 'post, comment, entity or about records (see schema <object>)',
+                  'and re-read, ids already saved are skipped, and --limit counts what is saved (parent comments for '
+                  'comments, where count still reports every saved record). A file for another query or an earlier '
+                  'format is refused before any byte changes; use a new path.',
+        'records': 'post, comment or entity records (see schema <object>)',
     }
 
 
@@ -99,7 +101,7 @@ class OutFile:
         self.stream.seek(boundary)
         self.stream.truncate()
 
-    def commit(self, records, cursor, stop_reason, skipped=()):
+    def commit(self, records, cursor, stop_reason, skipped=(), notes=()):
         page, new_ids = [], set()
         for record in records:
             identity = record.get('id')
@@ -115,6 +117,8 @@ class OutFile:
                           stop_reason=stop_reason)
             if skipped:
                 marker['skipped'] = list(skipped)
+            if notes:
+                marker['coverage'] = list(notes)
             self.stream.write(_line(marker))
             self.stream.flush()
             os.fsync(self.stream.fileno())

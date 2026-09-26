@@ -37,10 +37,11 @@ def about(args, transport, state, commit):
         else:
             bodies.append(raw)
             names.append(collection['name'])
-    result = {'results': fields(), 'stop_reason': 'exhausted'}
+    issues = records.about_issues(bodies)
+    result = {'results': fields(), 'stop_reason': 'exhausted', 'issues': issues}
     where = 'the section may be there' if args.section else 'its fields are missing'
     coverage = [f'collection {f["section"]} failed — {where}' for f in failures]
-    if args.section and not result['results'] and not failures:
+    if args.section and not result['results'] and not failures and not issues:
         coverage.append(f"section {args.section} is not in this profile's visible About")
     if failures:
         result['details'] = {'failed_sections': failures}

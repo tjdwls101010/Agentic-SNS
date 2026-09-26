@@ -7,6 +7,7 @@ from datetime import datetime
 from facebook.graphql.records import entity as _entity
 from facebook.graphql.records import search_page
 from facebook.graphql.registry import build_variables, get_query
+from facebook.outcome import ISSUES
 from facebook.reading.paging import page_options, paginate
 
 
@@ -26,8 +27,15 @@ def search(args, transport, state, commit):
         if not page.records and page.has_items:
             raise FacebookError(6, 'A nonempty search connection contains no readable results.', 'Run refresh, then retry.')
         issues.extend(page.issues)
+        page_notes.extend(ISSUES.get(issue, issue) for issue in page.issues)
         return page.records, page.page_info
 
-    result = paginate(fetch, **page_options(args, state, commit))
+    page_notes = []
+
+    def commit_with_notes(records, cursor, reason, skipped=()):
+        commit(records, cursor, reason, skipped, list(dict.fromkeys(page_notes)))
+        page_notes.clear()
+
+    result = paginate(fetch, **page_options(args, state, commit_with_notes if commit else None))
     result['issues'] = issues
     return result

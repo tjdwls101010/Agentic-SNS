@@ -97,7 +97,10 @@ ENVELOPE = {
     'replies_incomplete': 'array<object> — replies that were not read, per parent comment, and whether more: retries them',
     'failed_sections': 'array<object> — About collections that failed',
     'updated, missing, failed': 'refresh only — query ids verified and saved, not found, and rejected with a reason',
-    'results': 'array<object> — the records: post, comment, entity or about (see schema <object>)',
+    'cache_dir, protection_state, holds_personal_data': 'doctor only — the cache directory; files there that protect the '
+                                                        'account (never delete); what there holds other people\'s data',
+    'results': 'array<object> — post, comment, entity or about records (see schema <object>); doctor returns its '
+               'checks, schema its documents',
 }
 TEXT_HEADER = ('<command>[ · sort=…][ · type=…][ · section=…] · <n> shown[ · sponsored_skipped=<n>] · stopped=<stop_reason> '
                '· requests=<used>/<budget>; dated reads add "window <since>..<until> · <coverage>"; each coverage note '
@@ -106,13 +109,14 @@ TEXT_HEADER = ('<command>[ · sort=…][ · type=…][ · section=…] · <n> sh
                '[· resume: <command>] [· error=<kind> fix=<fix>].')
 TEXT_MARKERS = {
     '?': 'a count Facebook did not send',
-    'unavailable': 'no author name or URL was sent; there is no handle to follow',
+    'unavailable': 'the value in that place was not sent: a name, a URL (then there is no handle to follow there), '
+                   'or the label of a reply\'s parent that is not on this page',
     'text[shown/received chars, complete|truncated]': 'how much of the received text is shown here; truncated means '
                                                        'Facebook marked the received body as cut, so the rest is unknown',
     'pinned': 'pinned to the top of its timeline or group, so it can be old',
     'undated': 'no creation time was sent',
     'incomplete': 'a piece of this record could not be merged; fields may be missing',
-    'sponsored': 'an advertisement (shown only with --include-sponsored, or when opened directly)',
+    'sponsored': 'an advertisement; feed leaves these out unless --include-sponsored, other commands show them',
     'attachment=': 'what a comment carries besides text, e.g. attachment=photo on a comment with empty text',
     'reply-to=cN': 'a reply to the comment labelled cN above it',
     'shared-from': 'the post this one shares, nested once per level',
@@ -123,7 +127,8 @@ def describe_result(exit_codes):
     """The result schema. `exit_codes` is cli.py's declaration: [(code, meaning, kinds)]."""
     return {
         'object': 'result',
-        'description': 'The JSON envelope every command prints with --json, and the text output built from it.',
+        'description': 'The JSON envelope the reading commands print with --json (doctor, refresh and schema always '
+                       'print it), and the text output built from it.',
         'fields': ENVELOPE,
         'stop_reasons': {reason: f'{meaning} Next: {action}' for reason, (meaning, action) in STOP_REASONS.items()},
         'exit_codes': [{'exit': code, 'meaning': meaning, 'kinds': list(kinds),

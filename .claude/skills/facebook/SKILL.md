@@ -25,8 +25,8 @@ Search returns several people with the same name. When who someone is changes th
 
 ## What a partial result can support
 
-A truncated body says nothing about the rest of the post. When the rest could change your conclusion — a summary, a stance, a full quote — open the post; when you quote only what was received, say it is the beginning. If the opened post is still truncated, keep that qualification. Report `coverage:` lines (replies or collections not read, parts of a response that could not be placed) as limits, never as "there are none".
+A truncated body says nothing about the rest of the post. When the rest could change your conclusion — a summary, a stance, a full quote — open the post; when you quote only what was received, say it is the beginning. If the opened post is still truncated, keep that qualification. Report `coverage:` lines as limits, never as "there are none".
 
 ## Collections and personal data
 
-Collect into a file with `--out` when a result is too large to read in the conversation. Files and the cache hold other people's personal information: keep collections outside the repository and delete them when the task is done. Do not delete the account protection state; that removes block and pacing protection.
+Collect into a file with `--out` when a result is too large to read in the conversation. Files and the cache hold other people's personal information: keep collections outside the repository and delete them when the task is done. Do not delete the account protection state that `doctor` lists; that removes block and pacing protection.

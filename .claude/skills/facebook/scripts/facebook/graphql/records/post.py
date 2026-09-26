@@ -181,7 +181,7 @@ FIELDS = {
     "author_url": "string | null — the author's profile URL; the profile and about commands' argument",
     "author_id": "string | null — numeric id of the author; matches about's profile_id",
     "created_at": "string | null — ISO-8601 UTC time the post was created",
-    "edited_at": "string | null — ISO-8601 UTC time of the last edit; null if never edited",
+    "edited_at": "string | null — ISO-8601 UTC time of the last edit; null when Facebook sent none",
     "text": "string — the body as received; empty if the post has none",
     "text_truncated": "boolean — Facebook marked the received body as cut; the rest is not known",
     "text_resolved": "boolean — a later request recovered the full body of a cut post",

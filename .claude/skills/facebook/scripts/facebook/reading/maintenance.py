@@ -1,6 +1,7 @@
 """Local schema and browser/registry diagnostics."""
 from datetime import date
 
+from facebook.account import cache_dir
 from facebook.collect import describe_out
 from facebook.errors import FacebookError
 from facebook.graphql.records import SCHEMAS
@@ -38,5 +39,8 @@ def run(args, transport):
     except (ValueError, TypeError):
         age = None
     return {'results': [{'account_id': transport.account_id, 'aside': 'available', 'login': 'ready',
-                         'blocked': False, 'registry_age_days': age, 'queries': len(registry['queries'])}],
+                         'blocked': False, 'registry_age_days': age, 'queries': len(registry['queries']),
+                         'cache_dir': str(cache_dir()),
+                         'protection_state': ['blocked.json', 'pace.json', 'account.lock'],
+                         'holds_personal_data': ['cursors/']}],
             'stop_reason': 'ready'}

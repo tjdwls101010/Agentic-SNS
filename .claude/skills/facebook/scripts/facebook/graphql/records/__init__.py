@@ -10,7 +10,7 @@ from facebook.graphql.records import comment as _comment
 from facebook.graphql.records import entity as _entity
 from facebook.graphql.records import post as _post
 from facebook.graphql.records.connection import connection_has_items, find_page_info, search_records
-from facebook.graphql.records.parse import iter_json_objects, parse_story_nodes
+from facebook.graphql.records.parse import parse_story_nodes
 
 
 @dataclass
@@ -40,10 +40,15 @@ def post_record(story, *, source, captured_at):
     return _post.build_post(story, source=source, captured_at=captured_at).to_dict()
 
 
+def _problems(bodies):
+    """Every response issue, including those placed on one node: comment and About records carry no incomplete flag."""
+    parsed = parse_story_nodes(bodies)
+    return list(dict.fromkeys(parsed.incomplete_reasons + parsed.attributed_reasons))
+
+
 def comment_page(raw, *, post_id, captured_at, parents_only):
     """Comments of one page; with parents_only, depth-0 parents and their reply expansion handles."""
-    issues = []
-    list(iter_json_objects([raw], issues=issues))
+    issues = _problems([raw])
     if parents_only:
         records, handles = [], {}
         for node in _comment.iter_comment_nodes([raw]):
@@ -69,7 +74,8 @@ def reply_page(raw, *, post_id, parent_id, captured_at):
         data['parent_id'] = data['parent_id'] or parent_id
         if data['parent_id'] == parent_id:
             replies.append(data)
-    return Page(replies, find_page_info(raw, 'replies_connection'))
+    return Page(replies, find_page_info(raw, 'replies_connection'), connection_has_items(raw, 'replies_connection'),
+                _problems([raw]))
 
 
 def search_page(raw, *, search_type, captured_at, connection_key='results'):
@@ -86,6 +92,11 @@ def about_collections(raw):
 def about_fields(bodies, *, profile_id, collection_names, captured_at):
     return [f.to_dict() for f in _about.build_fields(bodies, profile_id=profile_id,
                                                      collection_names=collection_names, captured_at=captured_at)]
+
+
+def about_issues(bodies):
+    """Response issues of About responses; a section may hide behind one."""
+    return _problems(bodies)
 
 
 SCHEMAS = {

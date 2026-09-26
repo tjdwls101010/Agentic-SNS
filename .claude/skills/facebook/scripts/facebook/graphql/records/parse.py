@@ -139,6 +139,18 @@ def _carries_read_field(value: Any) -> bool:
     return False
 
 
+#: Objects whose own id a record reads (author_id, a post's or comment's identity, a reply's parent).
+ID_READERS = frozenset({"actors", "author", "feedback", "attached_story", "comment_direct_parent"})
+
+
+def _patch_is_read(path: list, data: Any) -> bool:
+    """Whether an unmerged patch can change a record: it carries a read field, or an id where ids are read."""
+    if _carries_read_field(data):
+        return True
+    names = [key for key in path if isinstance(key, str)]
+    return isinstance(data, dict) and "id" in data and bool(names) and names[-1] in ID_READERS
+
+
 def _story_at(anchors: list[tuple[list, Any]], path: list) -> str | None:
     """The innermost story a response path points into, from the chunk that delivered that part of the tree."""
     for prefix, data in sorted(anchors, key=lambda anchor: -len(anchor[0])):
@@ -221,6 +233,7 @@ class ParsedStories:
     incomplete_reasons: list[str] = field(default_factory=list)
 
     top_level_order: list[str] = field(default_factory=list)
+    attributed_reasons: list[str] = field(default_factory=list)
 
     def top_level_ids(self) -> list[str]:
         """IDs of stories ever seen outside someone else's ``attached_story``."""
@@ -242,6 +255,7 @@ def parse_story_nodes(bodies: Iterable[bytes]) -> ParsedStories:
     issues: list[str] = []
     anchors: list[tuple[list, Any]] = []  # (path, data) of every chunk: where each part of the tree arrived
     touched: set[str] = set()
+    attributed: list[str] = []  # problems placed on one story or comment; records without an incomplete flag need them
     for obj in iter_json_objects(bodies, issues=issues):
         for chunk in [obj, *(obj.get("incremental") or [])]:
             if not isinstance(chunk, dict):
@@ -251,10 +265,11 @@ def parse_story_nodes(bodies: Iterable[bytes]) -> ParsedStories:
             anchors.append((list(path or []), data))
             if path is not None and not _is_story_shaped(data) and not (
                 isinstance(data, dict) and _is_story_shaped(data.get("node"))
-            ) and _carries_read_field(data):
+            ) and _patch_is_read(path, data):
                 owner = _story_at(anchors, path)
                 if owner:
                     touched.add(owner)
+                    attributed.append("unsupported_path_patch")
                 else:
                     issues.append("unsupported_path_patch")
             for error in chunk.get("errors") or []:
@@ -264,6 +279,7 @@ def parse_story_nodes(bodies: Iterable[bytes]) -> ParsedStories:
                 owner = _story_at(anchors, where) if isinstance(where, list) and where else None
                 if owner:
                     touched.add(owner)
+                    attributed.append("graphql_errors")
                 else:
                     issues.append("graphql_errors")
             _walk({k: v for k, v in chunk.items() if k != "incremental"},
@@ -286,7 +302,7 @@ def parse_story_nodes(bodies: Iterable[bytes]) -> ParsedStories:
 
     stories = {key: linked(story, frozenset({key})) for key, story in stories.items()}
     return ParsedStories(stories, set(top_level_seen), bool(issues),
-                         list(dict.fromkeys(issues)), list(top_level_seen))
+                         list(dict.fromkeys(issues)), list(top_level_seen), list(dict.fromkeys(attributed)))
 
 
 # --- field extraction (best-effort — see module docstring) ---------------------
