@@ -377,3 +377,21 @@ def test_a_refusal_counts_only_the_targets_that_were_saved(cli, tmp_path, budget
     for row in doc["results"]:
         if row["target"] == "ZZZZ":
             assert row.get("id") is None and row["error"]["code"] == "upstream", row
+
+
+@pytest.mark.parametrize("interval,message,own,other", [
+    ("1m", "$AAPL: 1m data not available for startTime=1 and endTime=2. Only 8 days worth of 1m granularity data are allowed to be fetched per request.",
+     ["--period 8d", "per request"], ["within the last", "inside the last"]),
+    ("5m", "$AAPL: 5m data not available for startTime=1 and endTime=2. The requested range must be within the last 60 days.",
+     ["--period 60d", "last 60 days"], ["per request"]),
+])
+def test_each_upstream_range_constraint_is_answered_with_its_own_remedy(cli, tmp_path, interval, message, own, other):
+    """A span per request and a reach into the past are different limits: a shorter span does not reach older bars,
+    and a recent start does not make a long span legal. Neither is evidence that a coarser interval has no limit."""
+    routes = [{"path": "/v8/finance/chart/AAPL", "json": {"chart": {"result": None, "error": {"code": "Bad Request", "description": message}}}}] + fallback_routes("AAPL")
+    proc, doc = cli("prices", "history", "AAPL", "--period", "1y", "--interval", interval, routes=routes, store=tmp_path / "s")
+    assert proc.returncode == 6, proc.stdout[:300]
+    fix = doc["results"][0]["error"]["fix"]
+    assert all(phrase in fix for phrase in own), fix
+    assert not any(phrase in fix for phrase in other), fix
+    assert "no such limit" not in fix, fix
