@@ -3,7 +3,7 @@ import argparse
 import contextlib
 
 from yfinance_skill import registry
-from yfinance_skill.envelope import EXIT_CODES, STATUSES, InputError
+from yfinance_skill.envelope import STATUSES, InputError
 
 ENVELOPE = {
     "target": "the symbol, query or key this result answers",
@@ -78,7 +78,7 @@ def describe(parser, item):
     return {k: v for k, v in described.items() if v is not None}
 
 
-def schema_data(args, parsers, root):
+def schema_data(args, parsers, root, exit_codes):
     scope = tuple(args.scope)
     if len(scope) > 2 or (scope and scope[0] not in registry.GROUPS):
         raise InputError("schema expects an existing GROUP [LEAF]; run schema with no scope to list the groups.")
@@ -106,5 +106,5 @@ def schema_data(args, parsers, root):
     if not scope and not args.filter:
         # 성진: --filter를 준 호출은 명령을 찾는 중이다. 그때까지 봉투 설명을 함께 실으면 좁히려는 시도가 같은 예산에 다시 걸린다.
         described["common_arguments"] = shared_arguments(root, next(iter(parsers.values())), parsers["read"])
-        described["output"] = {"envelope": ENVELOPE, "statuses": STATUSES, "exit_codes": EXIT_CODES}
+        described["output"] = {"envelope": ENVELOPE, "statuses": STATUSES, "exit_codes": exit_codes}
     return described

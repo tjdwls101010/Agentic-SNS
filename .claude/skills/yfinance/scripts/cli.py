@@ -18,10 +18,24 @@ import yfinance as yf
 
 from yfinance_skill import budget, export, registry, store
 import yfinance_skill.yahoo  # noqa: F401  registers every leaf
-from yfinance_skill.encode import encode, is_empty, is_sided, is_table
+from yfinance_skill.shape import is_empty, is_sided, is_table
+from yfinance_skill.yahoo.encode import encode
 from yfinance_skill.envelope import InputError, error_info, now, ordered, result
 from yfinance_skill.schema import schema_data
 from yfinance_skill.selection import select, select_sides
+
+
+EXIT_CODES = {"ok": 0, "invalid": 2, "local_io": 4, "rate_limited": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}
+
+
+def exit_code(status, codes):
+    """A printed document's status as an exit code; a document with no usable result takes its most actionable error."""
+    if status in ("ok", "partial", "empty", "too_large"):
+        return EXIT_CODES[status]
+    for code in ("rate_limited", "invalid", "local_io"):
+        if code in codes:
+            return EXIT_CODES[code]
+    return EXIT_CODES["upstream"]
 
 
 class Parser(argparse.ArgumentParser):
@@ -308,23 +322,23 @@ def main():
         saved = store.Store(args.store)
         saved.prune(args.ttl_days)
         if args.group == "schema":
-            return budget.emit([ordered(result("schema", schema_data(args, parsers, parser)))], args, None, {"scope": args.scope}, scoped=bool(args.scope))
+            return exit_code(*budget.emit([ordered(result("schema", schema_data(args, parsers, parser, EXIT_CODES)))], args, None, {"scope": args.scope}, scoped=bool(args.scope)))
         if args.group == "read":
             results, item = read(args, saved)
-            return budget.emit(results, args, item, {"read": args.id})
+            return exit_code(*budget.emit(results, args, item, {"read": args.id}))
         item = registry.get(args.group, args.leaf)
         given = dict(vars(args))
         validate(args, item)
         yf.config.debug.hide_exceptions = False
         request = {k: v for k, v in vars(args).items() if k not in ("symbols", "store", "ttl_days", "max_chars", "list_fields")}
-        return budget.emit(run(args, item, saved, request), args, item, chosen(request, given, parsers[args.group, args.leaf]))
+        return exit_code(*budget.emit(run(args, item, saved, request), args, item, chosen(request, given, parsers[args.group, args.leaf])))
     except InputError as exc:
         fix = "Use --help for this command's arguments, or schema GROUP LEAF for its defaults, units and limits."
         results = [ordered(result("request", error=error_info("invalid", exc, fix)))]
         # 성진: 잘못된 --max-chars 자체가 입력 오류일 때 그 값으로 오류 문서를 재면 too_large가 invalid를 가린다 —
         # 무엇이 틀렸는지 말하는 문서는 틀린 예산의 적용 대상이 아니다.
         reporting = argparse.Namespace(max_chars=max(getattr(args, "max_chars", 0) or 0, registry.GLOBAL_DEFAULTS["max_chars"]))
-        return budget.emit(results, reporting, None, None)
+        return exit_code(*budget.emit(results, reporting, None, None))
 
 
 if __name__ == "__main__":

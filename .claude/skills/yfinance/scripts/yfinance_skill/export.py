@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import tempfile
 
-from yfinance_skill.encode import is_sided, is_table
+from yfinance_skill.shape import is_sided, is_table
 from yfinance_skill.envelope import InputError
 
 RESERVED = ("target", "side", "key", "value")

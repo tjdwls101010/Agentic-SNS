@@ -10,8 +10,9 @@ the whole answer.
 import re
 import shlex
 
-from yfinance_skill.encode import display, dump, is_empty, row_count
-from yfinance_skill.envelope import EXIT_CODES, error_info
+from yfinance_skill.display import display, dump
+from yfinance_skill.envelope import error_info
+from yfinance_skill.shape import is_empty, row_count
 from yfinance_skill.selection import select
 
 MIN_CHARS = 1000
@@ -179,12 +180,16 @@ def too_large_document(results, error, max_chars, request):
 
 
 def emit(results, args, item, request=None, scoped=False):
-    """Print one document, narrowing an oversized window before refusing and refusing before truncating silently."""
+    """Print one document, narrowing an oversized window before refusing and refusing before truncating silently.
+
+    Returns what the printed document says happened — its status and the error codes its results carry — for the
+    caller to turn into an exit code.
+    """
     max_chars = getattr(args, "max_chars", 20000)
     text = dump(document([strip(r, item) for r in results], overall(results), request))
     if len(text) <= max_chars:
         print(text)
-        return code(results, overall(results))
+        return outcome(results, overall(results))
     # 성진: fix가 이름 붙이는 --max-chars는 축소 전 문서가 필요로 한 크기다. 축소 후 크기를 실으면 그 값으로 다시 돌려도
     # 같은 결과가 다시 넘친다 — "이름 붙인 크기가 통과하는 크기"라는 계약이 바로 그 자리에서 깨진다.
     needed = len(text)
@@ -197,7 +202,7 @@ def emit(results, args, item, request=None, scoped=False):
         text = dump(document([strip(r, item) for r in results], overall(results), request))
         if len(text) <= max_chars:
             print(text)
-            return code(results, overall(results))
+            return outcome(results, overall(results))
 
     if item is not None:
         # 성진: 한 번의 축소는 봉투 고정비 때문에 자주 모자란다; 매번 방금 측정한 크기에서 다시 계산하면 몇 번 안에 수렴하고,
@@ -210,13 +215,13 @@ def emit(results, args, item, request=None, scoped=False):
             text = dump(document([strip(r, item) for r in results], status, request))
             if len(text) <= max_chars:
                 print(text)
-                return code(results, status)
+                return outcome(results, status)
 
     clean = [strip(r, item) for r in results]
     fix = schema_fix(needed, max_chars, scoped, bool(getattr(args, "filter", ""))) if item is None else too_large_fix(clean, item, len(text), max_chars, args, needed)
     error = error_info("too_large", f"Result requires {needed} characters; limit is {max_chars}.", fix)
     print(too_large_document(clean, error, max_chars, request))
-    return EXIT_CODES["too_large"]
+    return "too_large", {"too_large"}
 
 
 def strip(envelope, item=None):
@@ -228,17 +233,8 @@ def strip(envelope, item=None):
     return shown
 
 
-def code(results, status):
-    if status in ("ok", "partial", "empty"):
-        return EXIT_CODES[status]
-    codes = {r["error"]["code"] for r in results if r.get("error")}
-    if "rate_limited" in codes:
-        return EXIT_CODES["rate_limited"]
-    if "invalid" in codes:
-        return EXIT_CODES["invalid"]
-    if "local_io" in codes:
-        return EXIT_CODES["local_io"]
-    return EXIT_CODES["upstream"]
+def outcome(results, status):
+    return status, {r["error"]["code"] for r in results if r.get("error")}
 
 
 # ---- upstream failures -------------------------------------------------------------------------------------------
