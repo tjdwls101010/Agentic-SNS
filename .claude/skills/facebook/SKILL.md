@@ -7,28 +7,26 @@ description: >-
 
 # Facebook through the user's own browser
 
-The browser supplies the already logged-in account; the bundled CLI supplies read-only Facebook queries and dense text. Start with `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" --help`. Each command's help describes its options, `schema` describes the returned objects, and errors carry their own recovery instruction in `fix`.
+Run `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" <command> …` on one line. `--help` gives the commands and their arguments, `schema` what results, files and fields mean, and each error's `fix` how to recover.
 
 ## Every request is the person's real account
 
-A typical timeline page contains three posts, so reading 100 posts costs about 34 page requests plus setup. Decide how many people or groups to follow before branching: following every commenter multiplies those requests and a checkpoint affects the real account. A post gives the full received text and its first comment batch together; request more comments only when the question needs them.
+A checkpoint lands on the person's real account and only they can clear it, and every branch of a fan-out multiplies requests. Before following commenters, authors or group members, decide how many people or groups the question actually needs. Raise `--max-requests` only when the question needs more than one invocation reads.
 
-## Ranked order and recent order
+## Order decides what a window can prove
 
-Ranked results and chronological results answer different questions. Pair a date window with recent order.
+Newest-first reads (feed and group with `--sort recent`) are chronological, so a date window closes at its lower bound; ranked reads are samples that can miss anything in the window; a profile window is filtered by Facebook itself. For a question about a period, choose an order that can close.
 
-## Reaching a limit is a sample, not proof
+Even a closed window is what Facebook chose to show in that feed or group, not everything every friend posted there; describe the scope that way.
 
-Profile windows are filtered by the server; feed and group windows are filtered from the pages actually visited, so they cannot establish that every post in that period was found. Read `stop_reason` and any completeness fields before describing coverage.
+## Choosing whom to follow
 
-## Handles and URLs are the next command's arguments
+Search returns several people with the same name. When who someone is changes the answer, confirm the identity (verified badge, About) before choosing. Open an unfamiliar author's About only when their context matters; each collection is a request.
 
-The output's `url` and `author` handles are the next command's arguments. An unfamiliar author is a reason to read their About fields before choosing whose timeline to follow. Search can return several people with the same name; inspect their identities before selecting one. A `more:` line is a complete continuation command: copy it rather than reconstructing its query context.
+## What a partial result can support
 
-## What has actually bitten
+A truncated body says nothing about the rest of the post. When the rest could change your conclusion — a summary, a stance, a full quote — open the post; when you quote only what was received, say it is the beginning. If the opened post is still truncated, keep that qualification. Report `coverage:` lines (replies or collections not read, parts of a response that could not be placed) as limits, never as "there are none".
 
-Sponsored posts can have no date, an `unavailable` handle is a dead end, and `?` means an unknown count. Text previews show how many characters were displayed versus received. `truncated` means Facebook itself shortened the text; open the post before quoting it. If the opened post is still truncated, keep that qualification rather than repeatedly fetching it. Some secondary sections or replies may be incomplete; report that limitation instead of presenting them as empty.
+## Collections and personal data
 
-## Large collections and what the cache holds
-
-Use `--out` when the results are too large to read in the conversation. It commits complete pages and resumes the same query after an interruption; the terminal reports a summary. Use ordinary text output for exploration, and `--json` only when the full structured objects are useful. `~/.cache/facebook-skill` holds continuation cursors, the query registry, and the account protection state. Both that cache and an `--out` file contain other people's personal information, so prefer a collection path outside the repository and remove it when the task is finished.
+Collect into a file with `--out` when a result is too large to read in the conversation. Files and the cache hold other people's personal information: keep collections outside the repository and delete them when the task is done. Do not delete the account protection state; that removes block and pacing protection.
