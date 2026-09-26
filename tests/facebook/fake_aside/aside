@@ -2,6 +2,7 @@
 """Process-boundary fake. Never connects to Aside or Facebook."""
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -20,7 +21,9 @@ if mode == 'timeout':
 if mode == 'malformed':
     print('{broken')
     sys.exit(0)
-name = next((n for n in ('tokens', 'graphql', 'page', 'mine') if '// facebook-snippet: ' + n in code), None)
+# Snippets name themselves on a marker line; capture.js is also recognised by its source.
+marker = re.search(r'^// facebook-snippet: ([a-z]+)$', code, re.M)
+name = marker[1] if marker and marker[1] in ('tokens', 'graphql', 'page', 'mine', 'capture') else None
 if name is None and 'const actions = ARGS.actions' in code:
     name = 'capture'
 if name is None:
@@ -32,7 +35,9 @@ if any(arguments.get(key) != value for key, value in expected.items()):
 log = os.environ.get('FAKE_ASIDE_LOG')
 if log:
     with open(log, 'a') as f:
-        f.write(json.dumps({'name': name, 'time': time.time()}) + '\n')
+        # Session tokens stay out of the log; every other argument identifies the call.
+        f.write(json.dumps({'name': name, 'time': time.time(),
+                            'args': {k: v for k, v in arguments.items() if k != 'tokens'}}) + '\n')
 responses = os.environ.get('FAKE_ASIDE_RESPONSES')
 if responses:
     path = Path(responses)
@@ -41,6 +46,10 @@ if responses:
     path.write_text(json.dumps(records))
 else:
     response = {'status': 200, 'url': 'https://www.facebook.com/', 'body': 'synthetic'}
+if isinstance(response, dict) and 'raw_stdout' in response:
+    # Raw mode reproduces Aside's own stdout framing (chunks, footers, status lines).
+    sys.stdout.write(response['raw_stdout'])
+    sys.exit(response.get('exit', 0))
 print(json.dumps(response))
 if mode == 'duplicate':
     print(json.dumps(response))
