@@ -1,6 +1,7 @@
 """read: a saved observation, sliced again without a new request."""
-from yfinance_skill import budget, export, store, yahoo
+from yfinance_skill import budget, store, yahoo
 from yfinance_skill.envelope import InputError, ordered, result
+from yfinance_skill.querying.observe import check_out
 from yfinance_skill.querying.out import exported, write_out
 from yfinance_skill.selection import select, select_sides
 from yfinance_skill.shape import is_sided
@@ -42,7 +43,7 @@ def read(args, saved, commands):
     envelope["_full"] = record["data"]
     results = [ordered(envelope)]
     if getattr(args, "out", None):
-        export.check_path(args.out)
+        check_out(args, 1)
         write_out(results, {0: (args.id, *exported(record["data"], args, item))}, args)
         results[0].pop("continuation", None)
     return budget.emit(results, args, item, {"read": args.id})

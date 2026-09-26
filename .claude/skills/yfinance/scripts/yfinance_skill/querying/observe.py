@@ -22,7 +22,7 @@ def prepare(command, args):
     """Turn the parsed arguments into the ones in force: the file is refused before any request is paid for, then the
     command's own checks, its argument defaults, and what the dataset itself fixes for this call (a preset's sort)."""
     if getattr(args, "out", None):
-        export.check_path(args.out)
+        check_out(args, len(getattr(args, "symbols", None) or [None]))
     if command.check:
         command.check(args)
     if command.defaults:
@@ -33,6 +33,14 @@ def prepare(command, args):
 
 
 LOCAL_FIX = "Make the store directory (--store or $YF_STORE) and the --out directory writable, or choose other paths."
+
+
+def check_out(args, targets):
+    """Refused before any request: a file that exists, a directory that does not, or a path so long that even the
+    smallest receipt for it would not fit --max-chars, which would leave a written file no document could report."""
+    export.check_path(args.out)
+    if not budget.receipt_fits(args.out, targets, args.max_chars):
+        raise InputError(f"The receipt for --out {args.out} does not fit --max-chars {args.max_chars}; use a shorter path or raise --max-chars.")
 
 
 class DeadlineExpired(BaseException):

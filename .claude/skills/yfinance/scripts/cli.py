@@ -49,7 +49,8 @@ OUT_HELP = ("Write this observation's rows to a new CSV file and print only a su
             "other objects and lists as JSON cells, nulls as blank cells, and a name that would collide prefixed source. — read the returned columns. "
             "The screen's default window and projection do not apply; an explicit --fields or --limit does. Commands that ask the source for a set number of rows "
             "(news, screen, calendars) still ask for their default unless --limit raises it, and no further pages are fetched. "
-            "Targets with nothing selected add no rows and no file is made when none do, so check each target's status before comparing. An existing file is never overwritten.")
+            "Targets with nothing selected add no rows and no file is made when none do, so check each target's status before comparing. "
+            "When the summaries do not fit --max-chars, one receipt reports the path, the total rows and the targets the file lacks. An existing file is never overwritten.")
 
 # 성진: 공통 인자는 49개 리프 schema마다 반복되면 리프 고유 계약을 묻는다(prices history 4,094자 중 약 1.5k). 루트에 한 번.
 SHARED = {

@@ -203,6 +203,11 @@ def emit(results, args, item, request=None, scoped=False):
         if len(text) <= max_chars:
             print(text)
             return outcome(results, overall(results))
+        for receipt in receipts(results, filed, overall(results), request):
+            text = dump(receipt)
+            if len(text) <= max_chars:
+                print(text)
+                return outcome(results, overall(results))
 
     if item is not None:
         # 성진: 한 번의 축소는 봉투 고정비 때문에 자주 모자란다; 매번 방금 측정한 크기에서 다시 계산하면 몇 번 안에 수렴하고,
@@ -222,6 +227,37 @@ def emit(results, args, item, request=None, scoped=False):
     error = error_info("too_large", f"Result requires {needed} characters; limit is {max_chars}.", fix)
     print(too_large_document(clean, error, max_chars, request))
     return "too_large", {"too_large"}
+
+
+RECEIPT_NOTE = "Rows per target are in the file's target column; a target named under missing added no rows."
+FEWER = " Ask for fewer targets to see which."
+RECEIPT_STATUSES = ("ok", "empty", "partial", "error", "not_attempted")
+
+
+def receipts(results, filed, status, request):
+    """The document for a written file whose per-target summaries do not fit, from most to least detailed.
+
+    Each keeps the path and the total rows, because the file already exists, and says which targets the file does not
+    hold, because a target that failed or came back empty adds no rows and is otherwise indistinguishable from one
+    that did. The last form is fixed in size apart from the path, which is why receipt_fits can refuse the path first.
+    """
+    out, total = filed[0]["data"]["out"], sum(r["data"]["rows"] for r in filed)
+    missing = {}
+    for r in results:
+        if r not in filed:
+            missing.setdefault(r["status"], []).append(r["target"])
+    counts = [{"target": r["target"], "status": r["status"], "rows": r["data"]["rows"] if r in filed else 0} for r in results]
+    yield {"status": status, "request": request, "receipt": {"out": out, "rows": total, "targets": counts}}
+    yield {"status": status, "request": None, "receipt": {"out": out, "rows": total, "in_file": len(filed), "missing": missing, "note": RECEIPT_NOTE}}
+    yield {"status": status, "request": None, "receipt": {"out": out, "rows": total, "in_file": len(filed),
+                                                          "missing": {k: len(v) for k, v in missing.items()}, "note": RECEIPT_NOTE + FEWER}}
+
+
+def receipt_fits(path, targets, max_chars):
+    """Whether the smallest receipt for this path fits the budget, at the largest counts it could carry."""
+    widest = {"status": "partial", "request": None, "receipt": {"out": str(path), "rows": 10 ** 12, "in_file": targets,
+                                                                 "missing": dict.fromkeys(RECEIPT_STATUSES, targets), "note": RECEIPT_NOTE + FEWER}}
+    return len(dump(widest)) <= max_chars
 
 
 def strip(envelope, item=None):
