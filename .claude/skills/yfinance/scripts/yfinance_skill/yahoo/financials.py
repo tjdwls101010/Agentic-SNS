@@ -2,7 +2,7 @@
 from yfinance_skill.yahoo.datasets import CURRENCY, MULTIPLE, PER_SHARE, RATE, SHARES, Dataset
 from yfinance_skill.yahoo.refusals import is_rate_limited
 
-STATEMENT_DATES = "Column labels are fiscal period end dates, not announcement dates."
+STATEMENT_DATES = "Row labels (the index) are fiscal period end dates, not announcement dates."
 STATEMENT_INTERPRETATION = {
     "dates": STATEMENT_DATES,
     "currency": "The reported currency is in context.currency, read from the same company's financialCurrency. It can differ from the currency the share price is quoted in.",

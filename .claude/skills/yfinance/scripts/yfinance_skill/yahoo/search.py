@@ -24,5 +24,5 @@ DATASETS = {
                    "a short list does not show that nothing else matches."),
         interpretation={"identity": "Candidates are search matches, not a confirmed identity: an equity, its depositary receipt and a similarly named fund appear together.",
                         "coverage": "Only the first Lookup page is available; a symbol absent here is not proof it does not exist."},
-        gotchas=["--type filters --dataset quotes only; the other datasets ignore it."]),
+        gotchas=["--type filters --dataset quotes only; with any other dataset it is rejected."]),
 }

@@ -149,11 +149,8 @@ BAR_ARGS = [SYMBOLS, *dates("ISO date YYYY-MM-DD; inclusive.", "ISO date YYYY-MM
             Arg("--prepost", action="store_true", help="Include pre/post-market data where available.")]
 
 FREQUENCY_HELP = "trailing means TTM, a rolling twelve months rather than a completed fiscal period."
-PERIODS_HELP = "Maximum periods; valuation sends this upstream (0 = Current only), statements select locally."
-
-
-def periods(minimum):
-    return Arg("--periods", type=int, default=5, minimum=minimum, help=PERIODS_HELP)
+def periods(minimum, help):
+    return Arg("--periods", type=int, default=5, minimum=minimum, help=help)
 
 
 SEARCH_TYPES = ["all", "stock", "mutualfund", "etf", "index", "future", "currency", "cryptocurrency"]
@@ -281,7 +278,8 @@ def calendar_command(name, purpose, args=RANGE, **spec):
 def statement_command(name, what):
     frequencies = ["yearly", "quarterly"] if name == "balance" else ["yearly", "quarterly", "trailing"]
     return Command("financials", name, what + " line items by fiscal period, as reported.", f"financials.{name}",
-                   args=[SYMBOLS, Arg("--frequency", choices=frequencies, default="yearly", help=FREQUENCY_HELP), periods(1)],
+                   args=[SYMBOLS, Arg("--frequency", choices=frequencies, default="yearly", help=FREQUENCY_HELP),
+                         periods(1, "Maximum fiscal periods, newest first, selected locally from what the source returned.")],
                    narrow=["--fields", "--periods", "--frequency"])
 
 
@@ -315,7 +313,8 @@ COMMANDS = {command.path: command for command in [
     statement_command("balance", "Balance sheet"),
     statement_command("cashflow", "Cash flow statement"),
     Command("financials", "valuation", "Valuation multiples and market-size measures by period.", "financials.valuation",
-            args=[SYMBOLS, Arg("--frequency", choices=["yearly", "quarterly", "monthly", "trailing"], default="quarterly", help=FREQUENCY_HELP), periods(0)],
+            args=[SYMBOLS, Arg("--frequency", choices=["yearly", "quarterly", "monthly", "trailing"], default="quarterly", help=FREQUENCY_HELP),
+                  periods(0, "Maximum periods, sent upstream; 0 returns Current only.")],
             narrow=["--fields", "--periods", "--frequency"]),
 
     symbol_command("analysts", "targets", "Current analyst price target range.", ["--fields"], exportable=False),

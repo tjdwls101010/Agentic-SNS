@@ -80,6 +80,7 @@ def test_valuation_current_only_is_a_valid_period_selection(cli):
     ["screen", "run", "--preset", "unknown"],
     ["prices", "history", "AAPL", "--limit", "0"],
     ["options", "chain", "AAPL", "--date", "20240119"],
+    ["search", "apple", "--dataset", "news", "--type", "etf"],
 ])
 def test_invalid_inputs_fail_before_external_http(cli, argv):
     proc, doc = cli(*argv)
