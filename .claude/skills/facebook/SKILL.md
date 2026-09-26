@@ -13,15 +13,9 @@ Run `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" <command> …` on one line. `--
 
 A checkpoint lands on the person's real account and only they can clear it, and every branch of a fan-out multiplies requests. Before following commenters, authors or group members, decide how many people or groups the question actually needs. Raise `--max-requests` only when the question needs more than one invocation reads.
 
-## Order decides what a window can prove
-
-Newest-first reads (feed and group with `--sort recent`) are chronological, so a date window closes at its lower bound; ranked reads are samples that can miss anything in the window; a profile window is filtered by Facebook itself. For a question about a period, choose an order that can close.
+## What a window covers
 
 Even a closed window is what Facebook chose to show in that feed or group, not everything every friend posted there; describe the scope that way.
-
-## Choosing whom to follow
-
-Search returns several people with the same name. When who someone is changes the answer, confirm the identity (verified badge, About) before choosing. Open an unfamiliar author's About only when their context matters; each collection is a request.
 
 ## What a partial result can support
 
