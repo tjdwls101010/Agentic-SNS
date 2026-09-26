@@ -185,3 +185,38 @@ def test_a_rate_limit_met_while_reading_the_statement_currency_stops_the_remaini
     assert first["status"] == "ok" and first["data"]["data"] == [[120]]
     assert any("currency" in w for w in first["warnings"])
     assert second["status"] == "not_attempted"
+
+
+# ---- how many were asked for, next to how many arrived --------------------------------------------------------------
+
+
+def news_with_an_ad(count):
+    """`count` articles and one sponsored entry, which yfinance drops before the CLI sees it."""
+    stream = [{"id": f"n{i}", "content": {"title": f"Headline {i}"}} for i in range(count)] + [{"ad": ["sponsored"]}]
+    return [{"path": "/xhr/ncp", "json": {"data": {"tickerStream": {"stream": stream}}}}]
+
+
+def test_a_news_page_shorter_than_asked_says_both_numbers_and_claims_no_end(cli, tmp_path):
+    """--limit 300 answered with 196 articles was reported as the whole feed. The count asked for is the one number
+    that makes the shortfall visible; the source's own filtering is why the shortfall is not proof the feed ended."""
+    store = tmp_path / "s"
+    proc, doc = cli("company", "news", "AAPL", "--limit", "300", "--fields", "content.title", routes=news_with_an_ad(196), store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    r = doc["results"][0]
+    assert r["coverage"]["requested"] == 300 and r["coverage"]["received"] == 196
+    assert "exhaustive" not in r["coverage"]
+    assert any("196" in w and "300" in w for w in r["warnings"]), r["warnings"]
+
+    proc, cut = cli("company", "news", "AAPL", "--limit", "300", "--max-chars", "3000", routes=news_with_an_ad(196), store=store)
+    assert proc.returncode == 8, proc.stdout[:300]
+    assert cut["results"][0]["coverage"]["requested"] == 300, "a narrowing re-selects; it does not forget what was asked"
+
+    proc, filed = cli("company", "news", "AAPL", "--limit", "300", "--out", str(tmp_path / "news.csv"), routes=news_with_an_ad(196), store=store)
+    assert proc.returncode == 0, proc.stdout[:300]
+    assert filed["results"][0]["coverage"]["requested"] == 300
+
+    proc, back = cli("read", r["id"], "--limit", "5", routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:300]
+    assert back["results"][0]["coverage"]["requested"] == 300, "a slice of the observation does not change what was asked of the source"
+    assert any("196" in w for w in back["results"][0]["warnings"])
+    assert "exhaustive" not in proc.stdout

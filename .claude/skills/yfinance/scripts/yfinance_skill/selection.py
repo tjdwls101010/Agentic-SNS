@@ -147,7 +147,6 @@ def select(data, args, item, coverage=None, keep=None):
     shown = row_count(data)
     if shown is not None:
         coverage["shown"] = shown
-        coverage["exhaustive"] = shown == coverage.get("received")
     return data, coverage
 
 

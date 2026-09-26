@@ -1,7 +1,7 @@
 """read: a saved observation, sliced again without a new request."""
 from yfinance_skill import budget, store, yahoo
 from yfinance_skill.envelope import InputError, ordered, result
-from yfinance_skill.querying.observe import check_out
+from yfinance_skill.querying.observe import asked_for, check_out
 from yfinance_skill.querying.out import exported, write_out
 from yfinance_skill.selection import select, select_sides
 from yfinance_skill.shape import is_sided
@@ -31,6 +31,7 @@ def read(args, saved, commands):
     if is_sided(record["data"]):
         sides = [v for v in coverage.values() if isinstance(v, dict) and "received" in v]
         coverage = dict(coverage, received=sum(s["received"] for s in sides), shown=sum(s.get("shown", 0) for s in sides)) if sides else coverage
+    coverage = asked_for(coverage, record.get("requested"))
     shown, received, start = coverage.get("shown"), coverage.get("received"), coverage.get("start", 0)
     extra = {}
     if shown is not None and received is not None and start + shown < received:
@@ -44,6 +45,7 @@ def read(args, saved, commands):
     results = [ordered(envelope)]
     if getattr(args, "out", None):
         check_out(args, 1)
-        write_out(results, {0: (args.id, *exported(record["data"], args, item))}, args)
+        rows, covered = exported(record["data"], args, item)
+        write_out(results, {0: (args.id, rows, asked_for(covered, record.get("requested")))}, args)
         results[0].pop("continuation", None)
     return budget.emit(results, args, item, {"read": args.id})

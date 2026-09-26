@@ -45,6 +45,8 @@ def shrink(envelope, item, args, size, max_chars):
     data, coverage = select(full, args, item, keep=keep)
     if row_count(data) == shown:
         return False
+    if "requested" in (envelope.get("coverage") or {}):  # a narrowing re-selects the rows; what the source was asked for stays
+        coverage = {"requested": envelope["coverage"]["requested"], **coverage}
     envelope["data"], envelope["coverage"] = data, coverage
     envelope["status"] = "partial"
     notice = (f"The budget narrowed this result to {coverage.get('shown')} of {coverage.get('received')} rows, so it answers a smaller range than was asked for; "

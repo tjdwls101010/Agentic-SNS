@@ -125,6 +125,7 @@ def run(target, args, context, warnings):
     if args.sort and args.sort not in known_fields(catalog) and args.sort != "ticker":
         raise InputError("Unknown --sort field; use screen fields --filter TEXT")
     size = asked(args, DATASETS["screen.run"]) or 10
+    context["requested"] = size
     response = yf.screen(query, offset=args.offset, size=size, count=size, sortField=args.sort, sortAsc=args.ascending)
     if not isinstance(response, dict):
         raise ValueError("Malformed screen response: expected a result object")

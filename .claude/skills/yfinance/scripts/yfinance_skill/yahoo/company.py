@@ -16,8 +16,8 @@ NEWS_FIELDS = ("content.title", "content.pubDate", "content.provider.displayName
 
 
 def news(ticker, args, context, warnings):
-    context["upstream_requested"] = asked(args, DATASETS["company.news"]) or 10
-    return ticker.get_news(count=context["upstream_requested"], tab=args.tab)
+    context["requested"] = asked(args, DATASETS["company.news"]) or 10
+    return ticker.get_news(count=context["requested"], tab=args.tab)
 
 
 def filings(ticker, args, context, warnings):
@@ -37,6 +37,8 @@ DATASETS = {
                         "range": "An omitted --end means now and an omitted --start means about 18 months earlier."}),
     "company.news": Dataset(
         news, ticker=True, rows=10, fields=NEWS_FIELDS,
+        shortfall=("{received} usable entries arrived of the {requested} asked for. yfinance drops sponsored entries from what the feed sent, "
+                   "so a short page does not show that the feed ended, and these are not every article about the company."),
         interpretation={"payload": "Each entry nests its article under content, so a field path is dotted: content.title, content.provider.displayName.",
                         "not_the_article": "Entries locate sources; the text here is a summary, not the article. Read the article itself with a web reader."},
         gotchas=["The default projection leaves out thumbnail and storyline, which are most of the payload; name them to get them.",

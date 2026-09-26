@@ -7,7 +7,7 @@ from yfinance_skill import budget, export, store, yahoo
 from yfinance_skill.envelope import InputError, LocalFailure, error_info, now, ordered, result
 from yfinance_skill.querying.out import exported, write_out
 from yfinance_skill.selection import select, select_sides
-from yfinance_skill.shape import is_empty, is_sided
+from yfinance_skill.shape import is_empty, is_sided, row_count
 from yfinance_skill.yahoo.refusals import is_rate_limited, upstream_fix
 
 
@@ -61,12 +61,20 @@ def observe(target, args, item, saved, commands):
         sharing = {path for path, command in commands.items() if yahoo.DATASETS[command.dataset].shares_info}
         if record.get("command") not in sharing:
             raise InputError(f"Observation {args.from_id} came from {record.get('command')}, which does not hold this command's fields; drop --from to request it.")
-        return record["data"], record.get("context") or {}, list(record.get("warnings") or []), record.get("conditions") or {}, record.get("observed_at"), record.get("source_time"), args.from_id
+        return record["data"], record.get("context") or {}, list(record.get("warnings") or []), record.get("conditions") or {}, record.get("observed_at"), record.get("source_time"), args.from_id, record.get("requested")
 
     encoded = yahoo.fetch(item.command.dataset, target, args, context, warnings)
     conditions = item.conditions(encoded, args, context) if item.conditions else {}
     when = context.pop("source_time", None) or (item.source_time(encoded) if item.source_time else None)
-    return encoded, context, warnings, conditions, now(), when, None
+    requested, received = context.pop("requested", None), row_count(encoded)
+    if item.dataset.shortfall and requested and received is not None and received < requested:
+        warnings.append(item.dataset.shortfall.format(received=received, requested=requested))
+    return encoded, context, warnings, conditions, now(), when, None, requested
+
+
+def asked_for(coverage, requested):
+    """Coverage with the count the source was asked for in front, where the source was asked for one."""
+    return {"requested": requested, **coverage} if requested is not None else coverage
 
 
 def run(args, item, saved, request, commands):
@@ -80,15 +88,17 @@ def run(args, item, saved, request, commands):
             signal.signal(signal.SIGALRM, timed_out)
             signal.alarm(args.timeout)
             with contextlib.redirect_stdout(sys.stderr):
-                encoded, context, warnings, conditions, observed_at, when, reused = observe(target, args, item, saved, commands)
-                ident = reused or saved.save(store.record(item, target, request, encoded, context, warnings, "empty" if is_empty(encoded) else "ok", conditions, observed_at, when))
+                encoded, context, warnings, conditions, observed_at, when, reused, requested = observe(target, args, item, saved, commands)
+                ident = reused or saved.save(store.record(item, target, request, encoded, context, warnings, "empty" if is_empty(encoded) else "ok", conditions, observed_at, when, requested))
                 if getattr(args, "out", None):
-                    pending[position] = (ident, *exported(encoded, args, item))
+                    rows, covered = exported(encoded, args, item)
+                    pending[position] = (ident, rows, asked_for(covered, requested))
                 coverage = {}
                 if is_sided(encoded) and not args.list_fields:
                     data = select_sides(encoded, args, item, coverage)
                 else:
                     data, coverage = select(encoded, args, item, coverage)
+                coverage = asked_for(coverage, requested)
             envelope = result(target, data, context, warnings, conditions=conditions, coverage=coverage, ident=ident, observed_at=observed_at, source_time=when)
             envelope["_full"] = encoded
             results.append(ordered(envelope))

@@ -213,3 +213,10 @@ def test_an_unreadable_saved_observation_is_a_local_failure(cli, tmp_path):
     store = tmp_path / "s"
     (store / ("ab" * 8 + ".json")).mkdir(parents=True)  # the observation's name is taken by a directory
     assert_local_failure(cli("read", "ab" * 8, routes=[], store=store, raw=True))
+
+
+def test_an_earlier_observation_without_a_requested_count_reads_without_one(cli, tmp_path):
+    proc, doc = cli("read", "411a5a0389f4abb1", routes=[], store=old_store(tmp_path))
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert [row["content.title"] for row in doc["results"][0]["data"]] == ["Headline 0", "Headline 1", "Headline 2"]
+    assert "requested" not in doc["results"][0]["coverage"]

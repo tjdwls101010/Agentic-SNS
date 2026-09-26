@@ -31,7 +31,7 @@ def market_wide(args, context, warnings):
     native_end = (date.fromisoformat(args.end) + timedelta(days=1)).isoformat()
     native = yf.Calendars(start=args.start, end=native_end)
     requested = asked(args, DATASETS["calendar." + args.leaf]) or 10
-    context["upstream_requested"] = requested
+    context["requested"] = requested
     kwargs = {"limit": requested, "offset": args.offset}
     if args.leaf == "earnings":
         kwargs["filter_most_active"] = args.most_active
@@ -49,7 +49,7 @@ def one_company(args, context):
     requested = asked(args, DATASETS["calendar.earnings"]) or 10
     batch = 25 if requested <= 25 else 50 if requested <= 50 else 100
     context.update(native_batch_size=batch, scope="single_symbol")
-    context["upstream_requested"] = requested
+    context["requested"] = requested
     data = yf.Ticker(args.symbol).get_earnings_dates(limit=requested, offset=args.offset)
     if data is not None and data.index.hasnans:
         raise ValueError("Upstream earnings date/value alignment is unreliable after missing dates were parsed; use market earnings with a bounded date window instead.")

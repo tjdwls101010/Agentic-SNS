@@ -164,3 +164,22 @@ def test_the_sector_keys_market_sector_accepts_are_the_ones_market_sectors_lists
     assert proc.returncode == 0, proc.stdout[:300]
     proc, doc = cli("schema", "market", "sector")
     assert doc["results"][0]["data"]["arguments"]["key"]["choices"] == listed["results"][0]["data"]
+
+
+def test_a_calendar_carries_the_count_it_asked_for_without_a_shortfall_claim(cli):
+    columns = ["Symbol", "Company Name", "Market Cap (Intraday)", "Event Name", "Event Start Date", "EPS Estimate", "Reported EPS", "Surprise (%)"]
+    route = calendar_route("sp_earnings", columns, [["AAPL", "Apple", 100, "Earnings", "2024-01-25T21:00:00Z", 1, 2, 3]])
+    route["body"]["size"] = 12
+    proc, doc = cli("calendar", "earnings", "--start", "2024-01-25", "--end", "2024-01-25", routes=[route])
+    assert proc.returncode == 0, proc.stdout[:400]
+    r = doc["results"][0]
+    assert r["coverage"]["requested"] == 12 and r["coverage"]["received"] == 1
+    assert len(r["warnings"]) == 1 and "zero" in r["warnings"][0], "only the zero-loss warning: a short calendar page is complete when next_offset is absent"
+    assert "upstream_requested" not in r["context"] and "exhaustive" not in r["coverage"]
+
+
+def test_a_search_that_sends_no_count_reports_none(cli):
+    routes = [{"path": "/v1/finance/search", "json": {"quotes": [], "news": [], "lists": [], "researchReports": [{"id": "r1", "reportTitle": "t"}], "nav": []}}]
+    proc, doc = cli("search", "apple", "--dataset", "research", routes=routes)
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert "requested" not in doc["results"][0]["coverage"]

@@ -81,11 +81,18 @@ class Store:
         return removed
 
 
-def record(item, target, request, data, context, warnings, status, conditions, observed_at, source_time):
-    """Everything a later read needs to reproduce this observation's meaning, and nothing about how it was printed."""
-    return {"command": item.path, "target": target, "request": request, "data": data, "context": context,
-            "warnings": list(warnings), "status": status, "conditions": conditions,
-            "observed_at": observed_at, "source_time": source_time}
+def record(item, target, request, data, context, warnings, status, conditions, observed_at, source_time, requested=None):
+    """Everything a later read needs to reproduce this observation's meaning, and nothing about how it was printed.
+
+    `requested` is the row count the source was asked for, kept apart from the request because a read slices the
+    observation without changing what the source was asked; records from before it existed simply lack it.
+    """
+    found = {"command": item.path, "target": target, "request": request, "data": data, "context": context,
+             "warnings": list(warnings), "status": status, "conditions": conditions,
+             "observed_at": observed_at, "source_time": source_time}
+    if requested is not None:
+        found["requested"] = requested
+    return found
 
 
 def age_seconds(observed_at):
