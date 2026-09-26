@@ -118,7 +118,8 @@ def render_entities(entities) -> str:
 
 
 def render_about(fields) -> str:
-    return '\n'.join(f'{_line(data["section"])}: {_line(data["text"])} ({_handle(data.get("url"))})'
+    return '\n'.join(f'{_line(data["section"])}: {_line(data["text"])}'
+                     + (f' ({_quote(data["url"])})' if data.get('url') else '')
                      for field in fields for data in [_data(field)])
 
 
