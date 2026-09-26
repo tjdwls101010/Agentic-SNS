@@ -16,7 +16,7 @@ import os
 from pathlib import Path
 import time
 
-from yfinance_skill.envelope import InputError
+from yfinance_skill.envelope import InputError, LocalFailure
 
 ID_LENGTH = 16  # 성진: 64자 전체를 실으면 다종목 회복 문장이 id만으로 예산을 먹는다; 16자는 충돌 확률이 무시할 만하고 한 줄에 열 개가 들어간다.
 
@@ -28,7 +28,10 @@ def digest(data):
 class Store:
     def __init__(self, directory=None):
         self.root = Path(directory) if directory else Path(os.environ.get("YF_STORE") or (Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "yfinance-skill"))
-        self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        except OSError as exc:
+            raise LocalFailure(f"The store {self.root} could not be created: {exc}") from None
 
     def path(self, ident):
         if not ident or not all(c in "0123456789abcdef" for c in ident) or len(ident) != ID_LENGTH:
@@ -42,8 +45,11 @@ class Store:
         target = self.root / (ident + ".json")
         if not target.exists():
             temporary = target.with_suffix(".part")
-            temporary.write_bytes(data)
-            temporary.replace(target)
+            try:
+                temporary.write_bytes(data)
+                temporary.replace(target)
+            except OSError as exc:
+                raise LocalFailure(f"The observation could not be saved in {self.root}: {exc}") from None
         return ident
 
     def load(self, ident):
@@ -54,6 +60,8 @@ class Store:
             data = path.read_bytes()
         except FileNotFoundError:
             raise InputError(f"No saved observation {ident} in {self.root}. Observations are per store directory; rerun the original command to observe it again.") from None
+        except OSError as exc:
+            raise LocalFailure(f"Saved observation {ident} in {self.root} could not be read: {exc}") from None
         if digest(data)[:ID_LENGTH] != ident:
             raise InputError("Saved bytes do not match their identifier; use a fresh --store directory and rerun the original command.")
         return json.loads(data)

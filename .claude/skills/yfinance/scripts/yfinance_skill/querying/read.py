@@ -42,8 +42,6 @@ def read(args, saved, commands):
     envelope["_full"] = record["data"]
     results = [ordered(envelope)]
     if getattr(args, "out", None):
-        if args.list_fields:
-            raise InputError("--list-fields names columns and --out writes rows; use one of them.")
         export.check_path(args.out)
         write_out(results, {0: (args.id, *exported(record["data"], args, item))}, args)
         results[0].pop("continuation", None)

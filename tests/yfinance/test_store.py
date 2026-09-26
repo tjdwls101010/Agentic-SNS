@@ -5,6 +5,8 @@ from pathlib import Path
 import shutil
 import time
 
+import pytest
+
 from test_budget import chart_routes, news_routes
 
 
@@ -165,3 +167,49 @@ def test_an_earlier_versions_quote_still_serves_the_sibling_profile(cli, tmp_pat
     assert proc.returncode == 0, proc.stdout[:400]
     assert doc["results"][0]["data"] == {"sector": "Technology", "country": "United States"}
     assert doc["results"][0]["id"] == OLD_QUOTE
+
+
+# ---- the store's own contract: nothing lost to an argument, every failure a document -------------------------------
+
+
+def test_a_negative_retention_is_refused_before_anything_is_deleted(cli, tmp_path):
+    """-1 days put the cutoff in the future, so every saved observation counted as expired and was deleted."""
+    store = tmp_path / "s"
+    ident = observe(cli, store)
+    proc, doc = cli("--ttl-days", "-1", "schema", routes=[], store=store)
+    assert proc.returncode == 2, proc.stdout[:300]
+    assert "--ttl-days" in doc["results"][0]["error"]["message"]
+    proc, back = cli("read", ident, routes=[], store=store)
+    assert proc.returncode == 0, back["results"][0].get("error")
+
+
+@pytest.mark.parametrize("argv", [["--start", "-1"], ["--limit", "0"]])
+def test_read_checks_its_arguments_before_reading(cli, tmp_path, argv):
+    store = tmp_path / "s"
+    ident = observe(cli, store)
+    before = sorted(p.name for p in store.iterdir())
+    out = tmp_path / "slice.csv"
+    proc, doc = cli("read", ident, *argv, "--out", str(out), routes=[], store=store)
+    assert proc.returncode == 2, proc.stdout[:300]
+    assert doc["results"][0]["error"]["code"] == "invalid"
+    assert not out.exists() and sorted(p.name for p in store.iterdir()) == before
+
+
+def assert_local_failure(proc):
+    assert "Traceback" not in proc.stderr, proc.stderr[-800:]
+    assert proc.returncode == 4, proc.stdout[:300] + proc.stderr[-300:]
+    doc = json.loads(proc.stdout)
+    assert doc["results"][0]["error"]["code"] == "local_io"
+    return doc
+
+
+def test_a_store_path_under_a_regular_file_is_a_local_failure(cli, tmp_path):
+    blocker = tmp_path / "a-file"
+    blocker.write_text("not a directory\n")
+    assert_local_failure(cli("schema", routes=[], store=blocker / "store", raw=True))
+
+
+def test_an_unreadable_saved_observation_is_a_local_failure(cli, tmp_path):
+    store = tmp_path / "s"
+    (store / ("ab" * 8 + ".json")).mkdir(parents=True)  # the observation's name is taken by a directory
+    assert_local_failure(cli("read", "ab" * 8, routes=[], store=store, raw=True))

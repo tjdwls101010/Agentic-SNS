@@ -195,3 +195,17 @@ def test_listing_fields_into_a_file_is_refused(cli, tmp_path):
     proc, doc = cli("prices", "history", "AAPL", "--list-fields", "--out", str(tmp_path / "f.csv"), routes=[])
     assert proc.returncode == 2 and "--list-fields" in doc["results"][0]["error"]["message"]
     assert not (tmp_path / "f.csv").exists()
+
+
+def test_an_unwritable_directory_is_a_local_failure_that_keeps_the_rows_reachable(cli, tmp_path):
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o555)
+    try:
+        proc = cli("prices", "history", "AAPL", "--period", "1mo", "--out", str(locked / "p.csv"), routes=[chart("AAPL", [1.0, 2.0])], raw=True)
+    finally:
+        locked.chmod(0o755)
+    assert "Traceback" not in proc.stderr, proc.stderr[-800:]
+    assert proc.returncode == 4, proc.stdout[:300]
+    r = json.loads(proc.stdout)["results"][0]
+    assert r["error"]["code"] == "local_io" and f"read {r['id']}" in r["error"]["fix"]

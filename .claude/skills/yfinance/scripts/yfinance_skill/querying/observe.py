@@ -4,7 +4,7 @@ import signal
 import sys
 
 from yfinance_skill import budget, export, store, yahoo
-from yfinance_skill.envelope import InputError, error_info, now, ordered, result
+from yfinance_skill.envelope import InputError, LocalFailure, error_info, now, ordered, result
 from yfinance_skill.querying.out import exported, write_out
 from yfinance_skill.selection import select, select_sides
 from yfinance_skill.shape import is_empty, is_sided
@@ -30,6 +30,9 @@ def prepare(command, args):
     dataset = yahoo.DATASETS[command.dataset]
     if dataset.prepare:
         dataset.prepare(args)
+
+
+LOCAL_FIX = "Make the store directory (--store or $YF_STORE) and the --out directory writable, or choose other paths."
 
 
 class DeadlineExpired(BaseException):
@@ -83,9 +86,11 @@ def run(args, item, saved, request, commands):
             results.append(ordered(envelope))
             stopped = context.get("rate_limited", False)
         except (Exception, DeadlineExpired) as exc:
-            code = "invalid" if isinstance(exc, InputError) else "rate_limited" if is_rate_limited(exc) else "upstream"
+            code = ("invalid" if isinstance(exc, InputError) else "local_io" if isinstance(exc, LocalFailure)
+                    else "rate_limited" if is_rate_limited(exc) else "upstream")
             stopped = code == "rate_limited"
             fix = (f"Correct the arguments; schema {item.path} reports this command's choices and defaults." if code == "invalid"
+                   else LOCAL_FIX if code == "local_io"
                    else "Retry later with fewer targets; remaining targets were not attempted." if code == "rate_limited"
                    else upstream_fix(exc, item, args))
             results.append(ordered(result(target, error=error_info(code, exc, fix))))

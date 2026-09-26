@@ -16,7 +16,7 @@ from datetime import date, timedelta
 import re
 
 from yfinance_skill import budget, querying, schema
-from yfinance_skill.envelope import InputError, error_info, ordered, result
+from yfinance_skill.envelope import InputError, LocalFailure, error_info, ordered, result
 
 EXIT_CODES = {
     "ok": (0, "every target returned usable data"),
@@ -440,17 +440,17 @@ def build_parser():
     return parser, parsers
 
 
-def validate(args, command):
-    """What the arguments themselves must satisfy, before anything is looked up or paid for."""
+def validate(args, command=None):
+    """What the arguments themselves must satisfy, before anything is looked up or paid for. read has no command."""
     targets = []
-    for dest in command.positionals():
+    for dest in command.positionals() if command else []:
         value = getattr(args, dest, None)
         targets.extend(value if isinstance(value, list) else [value] if value is not None else [])
     if any(not target.strip() for target in targets):
         raise InputError("Target symbols, search text and domain keys must not be empty")
     if args.timeout <= 0:
         raise InputError("--timeout must be positive")
-    minimums = dict({"limit": 1}, **command.minimums())
+    minimums = dict({"limit": 1}, **(command.minimums() if command else {}))
     for name, minimum in minimums.items():
         if getattr(args, name, None) is not None and getattr(args, name) < minimum:
             raise InputError(f"--{name} must be >= {minimum}")
@@ -467,7 +467,7 @@ def validate(args, command):
             except ValueError:
                 raise InputError(f"--{name} expects YYYY-MM-DD") from None
     start, end = getattr(args, "start", None), getattr(args, "end", None)
-    if isinstance(start, str) and isinstance(end, str) and (start > end or (command.end_exclusive and start == end)):
+    if isinstance(start, str) and isinstance(end, str) and (start > end or (command and command.end_exclusive and start == end)):
         raise InputError("Invalid date range; a price --end is exclusive so it must be after --start, and a calendar --end is inclusive so it may equal --start")
     if hasattr(args, "period"):
         if args.period and (start or end):
@@ -494,11 +494,14 @@ def main():
         args = parser.parse_args()
         if args.max_chars < budget.MIN_CHARS:
             raise InputError(f"--max-chars must be >= {budget.MIN_CHARS} so recovery instructions remain readable")
+        if args.ttl_days < 0:
+            raise InputError("--ttl-days must be >= 0; 0 keeps every saved observation")
         saved = querying.open_store(args)
         if args.group == "schema":
             return exit_code(*schema.run(args, parsers, parser, groups=GROUPS, commands=COMMANDS, defaults=GLOBAL_DEFAULTS,
                                          applies=SHARED, pointer=POINTER, exit_codes={name: number for name, (number, _) in EXIT_CODES.items()}))
         if args.group == "read":
+            validate(args)
             return exit_code(*querying.read(args, saved, COMMANDS))
         command = COMMANDS[args.group + (" " + args.leaf if args.leaf else "")]
         given = dict(vars(args))  # a copy: prepare fills defaults in, and chosen() tells them apart from what was typed
@@ -515,6 +518,9 @@ def main():
         # 무엇이 틀렸는지 말하는 문서는 틀린 예산의 적용 대상이 아니다.
         reporting = argparse.Namespace(max_chars=max(getattr(args, "max_chars", 0) or 0, GLOBAL_DEFAULTS["max_chars"]))
         return exit_code(*budget.emit(results, reporting, None, None))
+    except LocalFailure as exc:
+        results = [ordered(result("request", error=error_info("local_io", exc, querying.LOCAL_FIX)))]
+        return exit_code(*budget.emit(results, args, None, None))
 
 
 if __name__ == "__main__":

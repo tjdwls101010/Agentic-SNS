@@ -15,6 +15,10 @@ class InputError(ValueError):
     pass
 
 
+class LocalFailure(Exception):
+    """The store or an --out file could not be read or written: a fault in a local path, not in the request."""
+
+
 # ---- conditions --------------------------------------------------------------------------------------------------
 
 
