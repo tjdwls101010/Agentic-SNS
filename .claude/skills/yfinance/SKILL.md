@@ -7,12 +7,3 @@ description: Read structured Yahoo Finance market and company data through a sel
 # Yahoo Finance data
 
 Run `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" <command> …` on one line. `--help` gives the commands, their arguments and the exit codes, `schema` what results, fields and units mean, and each error's `fix` how to recover.
-
-## When a result is short
-
-`partial` means part of what you asked for is missing: rows cut to fit the budget, or targets that failed or came back empty while others succeeded. Rows that were cut are saved and reachable through the result's `id`; a result without one gives nothing to read back, so follow its `fix`. Either complete it or state the limitation in your answer — never describe a partial result as the whole.
-
-`too_large` is a size condition, not an empty result, and it carries no partial table to summarize. Each `id` it names is a saved observation you can read without a new request; when ids were left out to fit, the `fix` says how to reach them.
-
-Recover in a way that keeps the question: the same targets, fields and range, read from the store the `fix` names. A recovery that drops a target turns a comparison into a single-instrument question, and a narrower request answers a different question — say so if you take one. After rate limiting, stop rather than trying the remaining targets. State the coverage and limitations that affect the user's conclusion.
-
