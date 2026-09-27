@@ -33,7 +33,7 @@ DATASETS = {
         gotchas=["companyOfficers and executiveTeam are omitted from the default projection because they are large; ask for them by name."]),
     "company.shares": Dataset(
         shares, ticker=True, recent=True, units={"value": SHARES},
-        interpretation={"dates": "Each row is a Yahoo observation timestamp rounded to a whole day, not a filing or record date.",
+        interpretation={"dates": "Each row is a share count dated to the day Yahoo reports it; dates come dozens a year and can repeat within a day, so they do not follow a quarterly filing calendar.",
                         "range": "An omitted --end means now and an omitted --start means about 18 months before the end."}),
     "company.news": Dataset(
         news, ticker=True, rows=10, fields=NEWS_FIELDS,

@@ -70,7 +70,8 @@ DATASETS = {
         interpretation={"sibling": "company profile selects the business side of this same assembled response; --from reuses the observation rather than requesting it again.",
                         "timing": QUOTE_TIME, "currency": CURRENCY_SPLIT,
                         "assembly": "yfinance assembles this response from several endpoints, so its fields do not all share one timestamp; where a field has its own time field, that one governs."},
-        gotchas=["An instrument that did not trade in the current session still returns regularMarket fields from the last session it did."]),
+        gotchas=["An instrument that did not trade in the current session still returns regularMarket fields from the last session it did.",
+                 "52WeekChange is a ratio for an equity but arrives on the percent scale for an index, where it equals fiftyTwoWeekChangePercent; compare instruments by fiftyTwoWeekChangePercent, a percent for both."]),
     "prices.history": Dataset(
         history, ticker=True, conditions=dates_applied, precise=PRICE_COLUMNS, recent=True,
         interpretation={"dates": "start is inclusive and end is exclusive. A naive date is read in the exchange's timezone.",
