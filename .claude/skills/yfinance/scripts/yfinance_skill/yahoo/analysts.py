@@ -19,7 +19,7 @@ DATASETS = {
     "analysts.targets": analyst(
         "get_analyst_price_targets",
         units={"current": CURRENCY, "high": CURRENCY, "low": CURRENCY, "mean": CURRENCY, "median": CURRENCY},
-        interpretation={"currency": "Targets are in the quote currency.", "current": "current is the live price the targets are being compared against, not a target."}),
+        interpretation={"currency": "Targets are in the quote currency.", "current": "current is the quote's regularMarketPrice, the price the targets are compared against, not a target."}),
     "analysts.recommendations": analyst(
         "get_recommendations", units=ANALYST_COUNTS,
         interpretation={"periods": "period 0m is the current month and -1m, -2m, -3m are earlier months, so rows are relative, not dated."}),
@@ -54,5 +54,5 @@ DATASETS = {
         interpretation={"periods": "Rows are relative periods and columns are how long ago the estimate was current."}),
     "analysts.growth": analyst(
         "get_growth_estimates", units={"stockTrend": RATE, "indexTrend": RATE},
-        interpretation={"periods": "0q, +1q, 0y, +1y and LTG are relative periods; LTG is a long-term annualised expectation."}),
+        interpretation={"periods": "0q, +1q, 0y, +1y and LTG are relative periods; LTG is the long-term growth estimate."}),
 }

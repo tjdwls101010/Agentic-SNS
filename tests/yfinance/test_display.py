@@ -176,3 +176,31 @@ def test_every_leaf_schema_lists_exactly_the_options_its_help_offers_beyond_the_
             proc, described = cli("schema", *scope)
             options = {k for k in described["results"][0]["data"]["arguments"] if k.startswith("--")}
             assert options == helped, scope
+
+
+# ---- the cheap signals come before the costly detail ----------------------------------------------------------------
+
+ENVELOPE_ORDER = ["target", "id", "observed_at", "source_time", "stored_age_seconds", "status", "context", "conditions",
+                  "coverage", "continuation", "warnings", "data", "error"]
+
+
+def assert_signals_first(result):
+    assert list(result) == [k for k in ENVELOPE_ORDER if k in result], list(result)
+    assert "warnings" in result
+
+
+def test_a_result_that_starts_with_a_warning_prints_it_before_its_data(cli):
+    proc, doc = cli("search", "missing", routes=[{"path": "/v1/finance/lookup", "json": {"finance": {"result": [{"documents": []}], "error": None}}}])
+    assert proc.returncode == 7, proc.stdout[:300]
+    assert_signals_first(doc["results"][0])
+
+
+def test_a_warning_the_budget_adds_is_printed_before_the_data_it_cut(cli, tmp_path):
+    from test_budget import chart_routes
+    proc, doc = cli("prices", "history", "AAPL", "--period", "1y", "--fields", "Close", "--max-chars", "3000", routes=chart_routes(), store=tmp_path / "s")
+    assert proc.returncode == 8, proc.stdout[:300]
+    assert_signals_first(doc["results"][0])
+    proc, back = cli("read", doc["results"][0]["id"], "--max-chars", "1500", routes=[], store=tmp_path / "s")
+    assert proc.returncode == 8, proc.stdout[:300]
+    assert "continuation" in back["results"][0]
+    assert_signals_first(back["results"][0])

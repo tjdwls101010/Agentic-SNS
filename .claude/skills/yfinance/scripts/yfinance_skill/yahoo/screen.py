@@ -93,8 +93,6 @@ def parse_query(text, kind):
 def preset_defaults(args):
     """A preset fixes its own universe and sort."""
     if args.preset:
-        if args.preset not in yf.PREDEFINED_SCREENER_QUERIES:
-            raise InputError("Unknown --preset; use screen presets --filter TEXT")
         preset = yf.PREDEFINED_SCREENER_QUERIES[args.preset]
         args.type = next(kind for kind, cls in QUERY_TYPES.items() if isinstance(preset["query"], cls))
         args.sort = args.sort or preset["sortField"]
@@ -127,6 +125,7 @@ def run(target, args, context, warnings):
     if args.sort and args.sort not in known_fields(catalog) and args.sort != "ticker":
         raise InputError("Unknown --sort field; use screen fields --filter TEXT")
     size = asked(args, DATASETS["screen.run"]) or 10
+    context["requested"] = size
     response = yf.screen(query, offset=args.offset, size=size, count=size, sortField=args.sort, sortAsc=args.ascending)
     if not isinstance(response, dict):
         raise ValueError("Malformed screen response: expected a result object")

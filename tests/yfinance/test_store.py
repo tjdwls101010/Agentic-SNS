@@ -5,6 +5,8 @@ from pathlib import Path
 import shutil
 import time
 
+import pytest
+
 from test_budget import chart_routes, news_routes
 
 
@@ -165,3 +167,82 @@ def test_an_earlier_versions_quote_still_serves_the_sibling_profile(cli, tmp_pat
     assert proc.returncode == 0, proc.stdout[:400]
     assert doc["results"][0]["data"] == {"sector": "Technology", "country": "United States"}
     assert doc["results"][0]["id"] == OLD_QUOTE
+
+
+# ---- the store's own contract: nothing lost to an argument, every failure a document -------------------------------
+
+
+def test_a_negative_retention_is_refused_before_anything_is_deleted(cli, tmp_path):
+    """-1 days put the cutoff in the future, so every saved observation counted as expired and was deleted."""
+    store = tmp_path / "s"
+    ident = observe(cli, store)
+    proc, doc = cli("--ttl-days", "-1", "schema", routes=[], store=store)
+    assert proc.returncode == 2, proc.stdout[:300]
+    assert "--ttl-days" in doc["results"][0]["error"]["message"]
+    proc, back = cli("read", ident, routes=[], store=store)
+    assert proc.returncode == 0, back["results"][0].get("error")
+
+
+@pytest.mark.parametrize("argv", [["--start", "-1"], ["--limit", "0"]])
+def test_read_checks_its_arguments_before_reading(cli, tmp_path, argv):
+    store = tmp_path / "s"
+    ident = observe(cli, store)
+    before = sorted(p.name for p in store.iterdir())
+    out = tmp_path / "slice.csv"
+    proc, doc = cli("read", ident, *argv, "--out", str(out), routes=[], store=store)
+    assert proc.returncode == 2, proc.stdout[:300]
+    assert doc["results"][0]["error"]["code"] == "invalid"
+    assert not out.exists() and sorted(p.name for p in store.iterdir()) == before
+
+
+def assert_local_failure(proc):
+    assert "Traceback" not in proc.stderr, proc.stderr[-800:]
+    assert proc.returncode == 4, proc.stdout[:300] + proc.stderr[-300:]
+    doc = json.loads(proc.stdout)
+    assert doc["results"][0]["error"]["code"] == "local_io"
+    return doc
+
+
+def test_a_store_path_under_a_regular_file_is_a_local_failure(cli, tmp_path):
+    blocker = tmp_path / "a-file"
+    blocker.write_text("not a directory\n")
+    assert_local_failure(cli("schema", routes=[], store=blocker / "store", raw=True))
+
+
+def test_an_unreadable_saved_observation_is_a_local_failure(cli, tmp_path):
+    store = tmp_path / "s"
+    (store / ("ab" * 8 + ".json")).mkdir(parents=True)  # the observation's name is taken by a directory
+    assert_local_failure(cli("read", "ab" * 8, routes=[], store=store, raw=True))
+
+
+def test_an_earlier_observation_without_a_requested_count_reads_without_one(cli, tmp_path):
+    proc, doc = cli("read", "411a5a0389f4abb1", routes=[], store=old_store(tmp_path))
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert [row["content.title"] for row in doc["results"][0]["data"]] == ["Headline 0", "Headline 1", "Headline 2"]
+    assert "requested" not in doc["results"][0]["coverage"]
+
+
+@pytest.mark.parametrize("argv", [["--start", "-1"], ["--limit", "0"]])
+def test_an_invalid_read_neither_prunes_nor_creates_a_store(cli, tmp_path, argv):
+    store = tmp_path / "s"
+    ident = observe(cli, store)
+    old = time.time() - 40 * 86400
+    os.utime(store / f"{ident}.json", (old, old))
+    proc, doc = cli("read", ident, *argv, routes=[], store=store)
+    assert proc.returncode == 2, proc.stdout[:300]
+    assert (store / f"{ident}.json").exists(), "an invalid call applied retention"
+    fresh = tmp_path / "never-created"
+    proc, doc = cli("read", ident, *argv, routes=[], store=fresh)
+    assert proc.returncode == 2 and not fresh.exists()
+
+
+def test_a_target_that_fails_after_its_response_was_saved_still_names_the_saved_id(cli, tmp_path):
+    """The response was paid for and saved before the projection was refused; without the id the only way back to it
+    is a second request, and a result without an id reads as nothing saved."""
+    store = tmp_path / "s"
+    proc, doc = cli("prices", "history", "AAPL", "--period", "1mo", "--fields", "NoSuchColumn", routes=chart_routes(), store=store)
+    r = doc["results"][0]
+    assert r["status"] == "error" and r["error"]["code"] == "invalid", proc.stdout[:300]
+    assert r.get("id") and (store / f"{r['id']}.json").exists(), r
+    proc, back = cli("read", r["id"], "--fields", "Close", "--limit", "2", routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:300]

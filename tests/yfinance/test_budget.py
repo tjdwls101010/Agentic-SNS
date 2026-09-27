@@ -352,3 +352,61 @@ def test_a_multi_target_recovery_keeps_the_store_it_saved_to(cli, tmp_path):
     proc, doc = cli("prices", "history", *symbols, "--period", "1y", "--store", str(store), "--max-chars", "4000", routes=routes, store=tmp_path / "unused")
     assert proc.returncode == 9, proc.stdout[:300]
     assert f"--store {store}" in doc["results"][0]["error"]["fix"]
+
+
+# ---- B8: a refusal promises only the saves that happened ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("budget", [1000, 1500, 3000])
+def test_a_refusal_counts_only_the_targets_that_were_saved(cli, tmp_path, budget):
+    """A target that failed has no saved response; counting it among the saved ones sends the reader after an id that
+    does not exist, and reporting it as refused for size hides the failure it actually had."""
+    store = tmp_path / "s"
+    symbols = ["S00", "S01", "S02", "S03", "ZZZZ", "S04", "S05", "S06", "S07", "S08"]
+    missing = [{"path": "/v8/finance/chart/ZZZZ", "json": {"chart": {"result": None, "error": {"code": "Not Found", "description": "No data found, symbol may be delisted"}}}}]
+    routes = [r for s in symbols if s != "ZZZZ" for r in chart_routes(s)] + missing + fallback_routes("ZZZZ")
+    proc, doc = cli("prices", "history", *symbols, "--period", "1y", "--max-chars", str(budget), routes=routes, store=store)
+    assert proc.returncode == 9, proc.stdout[:300]
+    saved = {p.stem for p in store.glob("*.json")}
+    assert len(saved) == 9
+    assert set(re.findall(r"\b[0-9a-f]{16}\b", proc.stdout)) <= saved
+    for found in re.findall(r"(\d+) further targets were saved", proc.stdout):
+        assert int(found) == 8, proc.stdout
+    for found in re.findall(r"all (\d+) targets were saved|(\d+) targets were saved and none", proc.stdout):
+        assert int(next(n for n in found if n)) == 9, proc.stdout
+    for row in doc["results"]:
+        if row["target"] == "ZZZZ":
+            assert row.get("id") is None and row["error"]["code"] == "upstream", row
+
+
+@pytest.mark.parametrize("interval,message,own,other", [
+    ("1m", "$AAPL: 1m data not available for startTime=1 and endTime=2. Only 8 days worth of 1m granularity data are allowed to be fetched per request.",
+     ["--period 8d", "per request"], ["within the last", "inside the last"]),
+    ("5m", "$AAPL: 5m data not available for startTime=1 and endTime=2. The requested range must be within the last 60 days.",
+     ["--period 60d", "last 60 days"], ["per request"]),
+])
+def test_each_upstream_range_constraint_is_answered_with_its_own_remedy(cli, tmp_path, interval, message, own, other):
+    """A span per request and a reach into the past are different limits: a shorter span does not reach older bars,
+    and a recent start does not make a long span legal. Neither is evidence that a coarser interval has no limit."""
+    routes = [{"path": "/v8/finance/chart/AAPL", "json": {"chart": {"result": None, "error": {"code": "Bad Request", "description": message}}}}] + fallback_routes("AAPL")
+    proc, doc = cli("prices", "history", "AAPL", "--period", "1y", "--interval", interval, routes=routes, store=tmp_path / "s")
+    assert proc.returncode == 6, proc.stdout[:300]
+    fix = doc["results"][0]["error"]["fix"]
+    assert all(phrase in fix for phrase in own), fix
+    assert not any(phrase in fix for phrase in other), fix
+    assert "no such limit" not in fix, fix
+
+
+def test_a_refusal_points_at_the_target_that_carries_the_recovery(cli, tmp_path):
+    """With the failed target first, "the fix on the first result" named a failure's advice instead of the recovery."""
+    def body(symbol):
+        return {"serviceConfig": {"snippetCount": 10, "s": [symbol]}}
+    huge = {"data": {"tickerStream": {"stream": [{"id": "x", "content": {"title": "t", "summary": "s" * 30000}}]}}}
+    routes = [{"path": "/xhr/ncp", "body": body("ZZZ"), "status": 500, "text": "Internal Server Error"},
+              {"path": "/xhr/ncp", "body": body("AAA"), "json": huge}, {"path": "/xhr/ncp", "body": body("BBB"), "json": huge}]
+    proc, doc = cli("company", "news", "ZZZ", "AAA", "BBB", "--fields", "content.summary", "--max-chars", "3000", routes=routes, store=tmp_path / "s")
+    assert proc.returncode == 9, proc.stdout[:300]
+    carrier = next(r for r in doc["results"] if r.get("error", {}).get("code") == "too_large" and "--max-chars" in r["error"]["fix"])
+    pointers = [r["error"]["fix"] for r in doc["results"] if r.get("error", {}).get("fix", "").startswith("Recover with the fix on")]
+    assert carrier["target"] == "AAA" and pointers, proc.stdout[:800]
+    assert all("AAA" in fix for fix in pointers), pointers

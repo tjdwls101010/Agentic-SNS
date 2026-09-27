@@ -1,5 +1,5 @@
 """ETF and mutual fund composition, weights and operations."""
-from yfinance_skill.yahoo.datasets import CURRENCY, MULTIPLE, RATE, WEIGHT, Dataset
+from yfinance_skill.yahoo.datasets import CURRENCY, MULTIPLE, PERCENT, RATE, WEIGHT, Dataset
 
 
 def fund(attribute, **spec):
@@ -14,7 +14,7 @@ DATASETS = {
     # 선언하면 fix가 그 인자를 권하고, 따라간 결과가 같은 크기로 다시 실패한다.
     "fund.description": fund(
         "description", sliceable=False,
-        interpretation={"shape": "One text value. It cannot be narrowed by fields or rows; raise --max-chars or read the saved observation."}),
+        interpretation={"shape": "One text value. It cannot be narrowed by fields or rows; raise --max-chars, or read the saved id again with a larger --max-chars, which costs no new request."}),
     "fund.holdings": fund(
         "top_holdings", rows=20, units={"Holding Percent": WEIGHT},
         interpretation={"coverage": "These are the top reported holdings only, so the weights do not sum to one and the rest of the portfolio is not described here."}),
@@ -29,9 +29,9 @@ DATASETS = {
         "equity_holdings",
         units={"Price/Earnings": dict(MULTIPLE, inverted=True), "Price/Book": dict(MULTIPLE, inverted=True),
                "Price/Sales": dict(MULTIPLE, inverted=True), "Price/Cashflow": dict(MULTIPLE, inverted=True),
-               "Median Market Cap": CURRENCY, "3 Year Earnings Growth": RATE},
+               "Median Market Cap": CURRENCY, "3 Year Earnings Growth": PERCENT},
         interpretation={"inverted": "All four price multiples arrive as their reciprocals: the Price/Earnings row holds an earnings yield, so the P/E is 1 divided by the value."},
-        gotchas=["The Category Average column is often empty, and where populated it can equal the fund's own value, so it is not a peer comparison."]),
+        gotchas=["The Category Average column is often empty, so a missing peer figure is the usual case rather than a failed call."]),
     "fund.operations": fund(
         "fund_operations",
         units={"Annual Report Expense Ratio": RATE, "Annual Holdings Turnover": RATE,

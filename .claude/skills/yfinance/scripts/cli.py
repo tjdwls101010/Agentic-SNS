@@ -16,19 +16,28 @@ from datetime import date, timedelta
 import re
 
 from yfinance_skill import budget, querying, schema
-from yfinance_skill.envelope import InputError, error_info, ordered, result
+from yfinance_skill.envelope import InputError, LocalFailure, error_info, ordered, result
 
-EXIT_CODES = {"ok": 0, "invalid": 2, "local_io": 4, "rate_limited": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}
+EXIT_CODES = {
+    "ok": (0, "every target returned usable data"),
+    "invalid": (2, "an argument, a saved id or an --out path was refused; the fix says what to change"),
+    "local_io": (4, "the store or the --out file could not be read or written"),
+    "rate_limited": (5, "Yahoo limited requests before any target returned data; the rest were not attempted"),
+    "upstream": (6, "the source failed or timed out for every target"),
+    "empty": (7, "the source answered with nothing usable, which does not prove the data does not exist"),
+    "partial": (8, "part of what was asked is missing: rows cut to fit the budget, or some targets failed or came back empty"),
+    "too_large": (9, "the result does not fit --max-chars; the fix names a narrowing or the saved id to read"),
+}
 
 
 def exit_code(status, codes):
     """A printed document's status as an exit code; a document with no usable result takes its most actionable error."""
     if status in ("ok", "partial", "empty", "too_large"):
-        return EXIT_CODES[status]
+        return EXIT_CODES[status][0]
     for code in ("rate_limited", "invalid", "local_io"):
         if code in codes:
-            return EXIT_CODES[code]
-    return EXIT_CODES["upstream"]
+            return EXIT_CODES[code][0]
+    return EXIT_CODES["upstream"][0]
 
 
 # ---- shared arguments and declaration tools -----------------------------------------------------------------------
@@ -39,8 +48,9 @@ OUT_HELP = ("Write this observation's rows to a new CSV file and print only a su
             "table indices as columns, option sides as side, mapping keys as key, lists of values as value, nested records as dotted columns, "
             "other objects and lists as JSON cells, nulls as blank cells, and a name that would collide prefixed source. — read the returned columns. "
             "The screen's default window and projection do not apply; an explicit --fields or --limit does. Commands that ask the source for a set number of rows "
-            "(news, screen, calendars) still ask for their default unless --limit raises it, and no further pages are fetched. "
-            "Targets with nothing selected add no rows and no file is made when none do, so check each target's status before comparing. An existing file is never overwritten.")
+            "(news, screen, calendars, search) ask for their default count, or for an explicit --limit instead, and fetch no further pages. "
+            "Targets with nothing selected add no rows and no file is made when none do, so check each target's status before comparing. "
+            "When the summaries do not fit --max-chars, one receipt reports the path, the total rows and the targets the file lacks. An existing file is never overwritten.")
 
 # 성진: 공통 인자는 49개 리프 schema마다 반복되면 리프 고유 계약을 묻는다(prices history 4,094자 중 약 1.5k). 루트에 한 번.
 SHARED = {
@@ -131,7 +141,7 @@ SYMBOLS = Arg("symbols", nargs="+", help="One or more Yahoo symbols; each is que
 FROM = Arg("--from", dest="from_id", help="Read this saved observation instead of making a new request. prices quote and company profile select different sides of the same assembled response, so the second one costs nothing.")
 
 INTERVALS = ["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"]
-BAR_ARGS = [SYMBOLS, *dates("ISO date YYYY-MM-DD; inclusive.", "ISO date YYYY-MM-DD; exclusive, so the last bar returned is the day before."),
+BAR_ARGS = [SYMBOLS, *dates("ISO date YYYY-MM-DD; inclusive.", "ISO date YYYY-MM-DD; exclusive: bars dated on or after it are not returned."),
             Arg("--period", help="Relative range such as 5d, 1mo, 1y, ytd or max; default 1mo only when start/end are absent."),
             Arg("--interval", choices=INTERVALS, default="1d", help="Bar size. Intraday intervals carry range limits the source enforces; schema prices history reports those limits."),
             Arg("--adjust", choices=["none", "auto", "back"], default="auto", help="none: unadjusted OHLC as supplied plus Adj Close; auto: Open/High/Low/Close scaled for splits and dividends, Adj Close removed; back: Close kept raw while Open/High/Low are scaled by the adjustment ratio, Adj Close removed."),
@@ -139,17 +149,20 @@ BAR_ARGS = [SYMBOLS, *dates("ISO date YYYY-MM-DD; inclusive.", "ISO date YYYY-MM
             Arg("--prepost", action="store_true", help="Include pre/post-market data where available.")]
 
 FREQUENCY_HELP = "trailing means TTM, a rolling twelve months rather than a completed fiscal period."
-PERIODS_HELP = "Maximum periods; valuation sends this upstream (0 = Current only), statements select locally."
-
-
-def periods(minimum):
-    return Arg("--periods", type=int, default=5, minimum=minimum, help=PERIODS_HELP)
+def periods(minimum, help):
+    return Arg("--periods", type=int, default=5, minimum=minimum, help=help)
 
 
 SEARCH_TYPES = ["all", "stock", "mutualfund", "etf", "index", "future", "currency", "cryptocurrency"]
 
 TYPE = Arg("--type", choices=["equity", "fund", "etf"], default="equity", help="Query universe; fields, values and presets differ per type.")
+# 성진: --field·--sort(equity만 93개, --type마다 다름)와 산업 키(약 145개)는 choices로 두면 --help를 덮는다. 발견 명령
+# (screen fields, market sector KEY --dataset industries)과 오류의 fix가 그 목록을 맡는다. 작은 닫힌 집합만 choices다.
 FIELD = Arg("--field", help="Exact query field, useful for allowed-value lookup.")
+PRESETS = ["aggressive_small_caps", "day_gainers", "day_losers", "growth_technology_stocks", "most_actives", "most_shorted_stocks",
+           "small_cap_gainers", "undervalued_growth_stocks", "undervalued_large_caps", "conservative_foreign_funds", "high_yield_bond",
+           "portfolio_anchors", "solid_large_growth_funds", "solid_midcap_growth_funds", "top_mutual_funds", "top_etfs_us",
+           "top_performing_etfs", "technology_etfs", "bond_etfs"]  # yf.PREDEFINED_SCREENER_QUERIES in yfinance 1.7.0
 QUERY_HELP = '''JSON query: {"operator":OP,"operands":[...]}; field names come from screen fields, enumerated values from screen values.
 EQ [field, string|finite number] (2 operands); IS-IN [field, value, ...] (2+ operands).
 BTWN [field, number, number] (3 operands, inclusive lower/upper); GT, LT, GTE, LTE [field, finite number] (2 operands).
@@ -164,15 +177,19 @@ MARKET_REGIONS = ["US", "GB", "ASIA", "EUROPE", "RATES", "COMMODITIES", "CURRENC
 DOMAIN_REGIONS = ["US", "AR", "AU", "BR", "CA", "CN", "DE", "DK", "ES", "FI", "FR", "GB", "GR", "HK", "IL", "IN", "IT", "JP", "KR", "MY", "NO", "PT", "QA", "RU", "SE", "SG", "TH", "TR", "TW"]
 
 
-def domain_args(datasets):
+SECTOR_KEYS = ["basic-materials", "communication-services", "consumer-cyclical", "consumer-defensive", "energy", "financial-services",
+               "healthcare", "industrials", "real-estate", "technology", "utilities"]  # what market sectors lists
+
+
+def domain_args(key, datasets):
     # 성진: 닫힌 선택지가 G1을 인터페이스 층에서 없앤다 — 서비스되지 않는 코드는 경고 없이 미국 데이터를 돌려줬다.
-    return [Arg("key", help="Sector key from market sectors, or industry key from market sector KEY --dataset industries."),
+    return [key,
             Arg("--region", choices=DOMAIN_REGIONS, default="US", help="Country code, restricted to the regions Yahoo serves; others return the United States result with no warning. Outside the US the name column arrives null."),
             Arg("--dataset", choices=["overview", "top-companies", "research-reports"] + datasets, default="overview", help="Part of the sector or industry to return.")]
 
 
 RANGE = [*dates("ISO date YYYY-MM-DD; inclusive. Defaults to today for market-wide calendars.", "ISO date YYYY-MM-DD; inclusive, so --start D --end D returns that day. Defaults to seven days after --start."),
-         Arg("--offset", type=int, default=0, help="Remote row offset; next_offset advances by displayed rows, not native batch size.")]
+         Arg("--offset", type=int, default=0, help="Remote row offset for the next source page; context.next_offset is the offset after the rows this call kept from the source (at most --limit), not after a native batch. Rows the budget then cut are read back with the continuation, not a new offset.")]
 
 
 # ---- argument defaults, checks and recovery wording -----------------------------------------------------------------
@@ -261,7 +278,9 @@ def calendar_command(name, purpose, args=RANGE, **spec):
 def statement_command(name, what):
     frequencies = ["yearly", "quarterly"] if name == "balance" else ["yearly", "quarterly", "trailing"]
     return Command("financials", name, what + " line items by fiscal period, as reported.", f"financials.{name}",
-                   args=[SYMBOLS, Arg("--frequency", choices=frequencies, default="yearly", help=FREQUENCY_HELP), periods(1)],
+                   args=[SYMBOLS, Arg("--frequency", choices=frequencies, default="yearly",
+                                      help="yearly or quarterly periods; a balance sheet has no trailing (TTM) form." if name == "balance" else FREQUENCY_HELP),
+                         periods(1, "Maximum fiscal periods, newest first, selected locally from what the source returned.")],
                    narrow=["--fields", "--periods", "--frequency"])
 
 
@@ -284,7 +303,7 @@ COMMANDS = {command.path: command for command in [
     Command("company", "profile", "Business description, sector, governance risk and headquarters for one company.", "company.profile",
             args=[SYMBOLS, FROM], narrow=["--fields"], exportable=False),
     Command("company", "shares", "Shares outstanding as Yahoo observed it over a date range.", "company.shares",
-            args=[SYMBOLS, *dates("ISO date YYYY-MM-DD; default is about 18 months ago.", "ISO date YYYY-MM-DD; default is now.")],
+            args=[SYMBOLS, *dates("ISO date YYYY-MM-DD; default is about 18 months before --end.", "ISO date YYYY-MM-DD; default is now.")],
             narrow=["--limit", "--start/--end"]),
     Command("company", "news", "Recent article and press-release entries referencing this company.", "company.news",
             args=[SYMBOLS, Arg("--tab", choices=["news", "all", "press releases"], default="news", help="Article source: news articles, press releases, or all.")],
@@ -295,7 +314,8 @@ COMMANDS = {command.path: command for command in [
     statement_command("balance", "Balance sheet"),
     statement_command("cashflow", "Cash flow statement"),
     Command("financials", "valuation", "Valuation multiples and market-size measures by period.", "financials.valuation",
-            args=[SYMBOLS, Arg("--frequency", choices=["yearly", "quarterly", "monthly", "trailing"], default="quarterly", help=FREQUENCY_HELP), periods(0)],
+            args=[SYMBOLS, Arg("--frequency", choices=["yearly", "quarterly", "monthly", "trailing"], default="quarterly", help=FREQUENCY_HELP),
+                  periods(0, "Maximum periods, sent upstream; 0 returns Current only.")],
             narrow=["--fields", "--periods", "--frequency"]),
 
     symbol_command("analysts", "targets", "Current analyst price target range.", ["--fields"], exportable=False),
@@ -338,7 +358,7 @@ COMMANDS = {command.path: command for command in [
             args=[TYPE, FIELD], check=screen_check, narrow=["--filter", "--field", "--type"], exportable=False),
     Command("screen", "run", "Run a preset or a JSON query and return matching instruments.", "screen.run",
             args=[TYPE, OneOf(Arg("--query", help="JSON operator/operands object; see examples below."),
-                              Arg("--preset", help="Preset name from screen presets. Its name does not state its condition: describe results by context.preset_query, the query it actually ran."), required=True),
+                              Arg("--preset", choices=PRESETS, help="Named screener; screen presets shows the query each runs. Its name does not state its condition: describe results by context.preset_query, the query it actually ran."), required=True),
                   Arg("--offset", type=int, default=0, help="Remote row offset for the next page; context.next_offset supplies it."),
                   Arg("--sort", help="Sort field from screen fields; custom query default ticker, preset uses its defined sort."),
                   Arg("--ascending", action=argparse.BooleanOptionalAction, default=None, help="Sort direction: --ascending or --no-ascending; omitted means the preset's own direction, or descending for a custom query.")],
@@ -349,9 +369,11 @@ COMMANDS = {command.path: command for command in [
             args=[Arg("--region", choices=MARKET_REGIONS, default="US", help="Yahoo market region.")], narrow=["--fields", "--region"]),
     Command("market", "sectors", "Sector keys accepted by market sector.", "market.sectors", narrow=["--filter"]),
     Command("market", "sector", "One sector's overview, industries, top companies, funds or research.", "market.sector",
-            args=domain_args(["industries", "top-etfs", "top-funds"]), narrow=["--fields", "--limit", "--dataset"]),
+            args=domain_args(Arg("key", choices=SECTOR_KEYS, help="Sector key."), ["industries", "top-etfs", "top-funds"]),
+            narrow=["--fields", "--limit", "--dataset"]),
     Command("market", "industry", "One industry's overview, companies or research.", "market.industry",
-            args=domain_args(["top-performing", "top-growth"]), narrow=["--fields", "--limit", "--dataset"]),
+            args=domain_args(Arg("key", help="Industry key from market sector KEY --dataset industries."), ["top-performing", "top-growth"]),
+            narrow=["--fields", "--limit", "--dataset"]),
 
     calendar_command("earnings", "Earnings events, market-wide over a date range or one company's history.",
                      args=[*RANGE, Arg("symbol", nargs="?", help="Optional single symbol; omit for market-wide US earnings."),
@@ -376,7 +398,8 @@ class Parser(argparse.ArgumentParser):
 
 
 def build_parser():
-    parser = Parser(description="Query Yahoo Finance data by purpose. stdout: one JSON document; diagnostics: stderr. Discover with schema [GROUP [LEAF]].")
+    parser = Parser(description="Query Yahoo Finance data by purpose. stdout: one JSON document; diagnostics: stderr. Discover with schema [GROUP [LEAF]].",
+                    epilog="exit codes:\n" + "\n".join(f"  {number}  {name}: {meaning}" for name, (number, meaning) in EXIT_CODES.items()))
     add_common(parser, False, root=True)
     parser.add_argument("--ttl-days", type=int, default=GLOBAL_DEFAULTS["ttl_days"], help="Delete saved observations older than this many days. Retention only: an observation inside the window is not therefore current, and source_time is what says whether a value is fresh.")
     groups_parser = parser.add_subparsers(dest="group", required=True)
@@ -390,6 +413,7 @@ def build_parser():
     reader.add_argument("--start", dest="row_start", type=int, default=0, help="Zero-based first row to return; each slice names the start of the next one.")
     add_common(reader)
     reader._option_string_actions["--limit"].help = "Maximum rows, counted forward from --start in saved order; unlike the first call, read does not keep the newest end. The same slice goes to --out."
+    reader._option_string_actions["--timeout"].help = "Unused by read, which makes no request."
     reader.add_argument("--out", help=OUT_HELP)
     reader.set_defaults(leaf="")
 
@@ -418,17 +442,17 @@ def build_parser():
     return parser, parsers
 
 
-def validate(args, command):
-    """What the arguments themselves must satisfy, before anything is looked up or paid for."""
+def validate(args, command=None):
+    """What the arguments themselves must satisfy, before anything is looked up or paid for. read has no command."""
     targets = []
-    for dest in command.positionals():
+    for dest in command.positionals() if command else []:
         value = getattr(args, dest, None)
         targets.extend(value if isinstance(value, list) else [value] if value is not None else [])
     if any(not target.strip() for target in targets):
         raise InputError("Target symbols, search text and domain keys must not be empty")
     if args.timeout <= 0:
         raise InputError("--timeout must be positive")
-    minimums = dict({"limit": 1}, **command.minimums())
+    minimums = dict({"limit": 1}, **(command.minimums() if command else {}))
     for name, minimum in minimums.items():
         if getattr(args, name, None) is not None and getattr(args, name) < minimum:
             raise InputError(f"--{name} must be >= {minimum}")
@@ -445,7 +469,7 @@ def validate(args, command):
             except ValueError:
                 raise InputError(f"--{name} expects YYYY-MM-DD") from None
     start, end = getattr(args, "start", None), getattr(args, "end", None)
-    if isinstance(start, str) and isinstance(end, str) and (start > end or (command.end_exclusive and start == end)):
+    if isinstance(start, str) and isinstance(end, str) and (start > end or (command and command.end_exclusive and start == end)):
         raise InputError("Invalid date range; a price --end is exclusive so it must be after --start, and a calendar --end is inclusive so it may equal --start")
     if hasattr(args, "period"):
         if args.period and (start or end):
@@ -472,18 +496,23 @@ def main():
         args = parser.parse_args()
         if args.max_chars < budget.MIN_CHARS:
             raise InputError(f"--max-chars must be >= {budget.MIN_CHARS} so recovery instructions remain readable")
-        saved = querying.open_store(args)
+        if args.ttl_days < 0:
+            raise InputError("--ttl-days must be >= 0; 0 keeps every saved observation")
         if args.group == "schema":
+            querying.open_store(args)  # retention runs on every command, schema included
             return exit_code(*schema.run(args, parsers, parser, groups=GROUPS, commands=COMMANDS, defaults=GLOBAL_DEFAULTS,
-                                         applies=SHARED, pointer=POINTER, exit_codes=EXIT_CODES))
+                                         applies=SHARED, pointer=POINTER, exit_codes={name: number for name, (number, _) in EXIT_CODES.items()}))
+        # 성진: 인자 검증은 저장소를 열기(생성·보존기간 정리) 전에 끝난다 — 거절될 호출이 관측을 지우거나 디렉터리를 만들면 안 된다.
         if args.group == "read":
-            return exit_code(*querying.read(args, saved, COMMANDS))
+            validate(args)
+            return exit_code(*querying.read(args, querying.open_store(args), COMMANDS))
         command = COMMANDS[args.group + (" " + args.leaf if args.leaf else "")]
         given = dict(vars(args))  # a copy: prepare fills defaults in, and chosen() tells them apart from what was typed
         validate(args, command)
         querying.prepare(command, args)
         if args.fields and any(not f for f in args.fields):
             raise InputError("--fields requires nonempty comma-separated field names")
+        saved = querying.open_store(args)
         request = {k: v for k, v in vars(args).items() if k not in ("symbols", "store", "ttl_days", "max_chars", "list_fields")}
         return exit_code(*querying.answer(args, command, COMMANDS, saved, request, chosen(request, given, parsers[args.group, args.leaf])))
     except InputError as exc:
@@ -493,6 +522,9 @@ def main():
         # 무엇이 틀렸는지 말하는 문서는 틀린 예산의 적용 대상이 아니다.
         reporting = argparse.Namespace(max_chars=max(getattr(args, "max_chars", 0) or 0, GLOBAL_DEFAULTS["max_chars"]))
         return exit_code(*budget.emit(results, reporting, None, None))
+    except LocalFailure as exc:
+        results = [ordered(result("request", error=error_info("local_io", exc, querying.LOCAL_FIX)))]
+        return exit_code(*budget.emit(results, args, None, None))
 
 
 if __name__ == "__main__":

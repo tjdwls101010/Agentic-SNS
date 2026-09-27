@@ -195,3 +195,75 @@ def test_listing_fields_into_a_file_is_refused(cli, tmp_path):
     proc, doc = cli("prices", "history", "AAPL", "--list-fields", "--out", str(tmp_path / "f.csv"), routes=[])
     assert proc.returncode == 2 and "--list-fields" in doc["results"][0]["error"]["message"]
     assert not (tmp_path / "f.csv").exists()
+
+
+def test_an_unwritable_directory_is_a_local_failure_that_keeps_the_rows_reachable(cli, tmp_path):
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o555)
+    try:
+        proc = cli("prices", "history", "AAPL", "--period", "1mo", "--out", str(locked / "p.csv"), routes=[chart("AAPL", [1.0, 2.0])], raw=True)
+    finally:
+        locked.chmod(0o755)
+    assert "Traceback" not in proc.stderr, proc.stderr[-800:]
+    assert proc.returncode == 4, proc.stdout[:300]
+    r = json.loads(proc.stdout)["results"][0]
+    assert r["error"]["code"] == "local_io" and f"read {r['id']}" in r["error"]["fix"]
+
+
+# ---- the file is written before the budget is judged, so the document never loses the fact of it --------------------
+
+
+def path_of_length(base, length):
+    """An --out path of exactly `length` characters whose directories exist."""
+    directory, name = base, "x.csv"
+    while True:
+        room = length - len(str(directory)) - 1 - len(name) - 1
+        if room <= 200:
+            break
+        directory = directory / ("d" * 200)
+    directory = directory / ("d" * room)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / name
+    assert len(str(path)) == length
+    return path
+
+
+def news_statuses():
+    """AAA ok, BBB empty, CCC failed, DDD rate limited, EEE therefore not attempted."""
+    def body(symbol):
+        return {"serviceConfig": {"snippetCount": 5, "s": [symbol]}}
+    return [{"path": "/xhr/ncp", "body": body("AAA"), "json": {"data": {"tickerStream": {"stream": [{"id": f"a{i}", "content": {"title": f"t{i}"}} for i in range(3)]}}}},
+            {"path": "/xhr/ncp", "body": body("BBB"), "json": {"data": {"tickerStream": {"stream": []}}}},
+            {"path": "/xhr/ncp", "body": body("CCC"), "status": 500, "text": "Internal Server Error"},
+            {"path": "/xhr/ncp", "body": body("DDD"), "status": 429, "text": "Too Many Requests"}]
+
+
+def test_a_written_file_survives_a_budget_its_summaries_do_not_fit(cli, tmp_path):
+    symbols = [f"S{i:02d}" for i in range(10)]
+    out = path_of_length(tmp_path, 132)
+    proc, doc = cli("prices", "history", *symbols, "--period", "1mo", "--out", str(out), "--max-chars", "1000",
+                    routes=[chart(s, [float(n) for n in range(30)]) for s in symbols])
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert len(proc.stdout.strip()) <= 1000
+    assert doc["receipt"]["out"] == str(out) and doc["receipt"]["rows"] == 300
+    assert len(rows(out)) == 300
+
+
+def test_the_receipt_names_every_target_the_file_does_not_hold(cli, tmp_path):
+    out = path_of_length(tmp_path, 400)
+    proc, doc = cli("company", "news", "AAA", "BBB", "CCC", "DDD", "EEE", "--limit", "5", "--out", str(out), "--max-chars", "1000", routes=news_statuses())
+    assert proc.returncode == 8, proc.stdout[:400]
+    assert doc["status"] == "partial" and len(proc.stdout.strip()) <= 1000
+    receipt = doc["receipt"]
+    assert receipt["out"] == str(out) and receipt["rows"] == 3 and receipt["in_file"] == 1
+    assert receipt["missing"] == {"empty": ["BBB"], "error": ["CCC", "DDD"], "not_attempted": ["EEE"]}
+    assert {r["target"] for r in rows(out)} == {"AAA"}
+
+
+def test_a_path_too_long_for_its_own_receipt_is_refused_before_any_request(cli, tmp_path):
+    out = path_of_length(tmp_path, 950)
+    proc, doc = cli("company", "news", "AAA", "--out", str(out), "--max-chars", "1000", routes=[])
+    assert proc.returncode == 2, proc.stdout[:400]
+    assert "--max-chars" in doc["results"][0]["error"]["message"] and not out.exists()
+    assert len(proc.stdout.strip()) <= 1000, "the refusal of a path too long to report cannot itself carry the path"

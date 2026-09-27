@@ -267,3 +267,16 @@ def test_a_growth_threshold_in_a_query_is_on_a_different_scale_from_the_same_fie
         f"the query bound 20..30 selected {symbols[0]}, whose quote reports {growth}; the two scales are 100x apart "
         "and the leaf's query_scale contract states it")
     assert "percentage points" in schema("screen", "run")["interpretation"]["query_scale"]
+
+
+@pytest.mark.live
+def test_52_week_change_changes_scale_with_the_instrument_type(tmp_path):
+    """The same field name is a ratio on a stock and a percent on an index; the gotcha that says so has to stay true."""
+    proc, index = run(["prices", "quote", "^GSPC", "--fields", "quoteType,52WeekChange,fiftyTwoWeekChangePercent"], tmp_path / "store")
+    assert proc.returncode == 0, proc.stdout[:300]
+    i = index["results"][0]["data"]
+    assert i["quoteType"] == "INDEX" and abs(i["52WeekChange"] - i["fiftyTwoWeekChangePercent"]) < 1e-6
+    proc, stock = run(["prices", "quote", "AAPL", "--fields", "52WeekChange,fiftyTwoWeekChangePercent"], tmp_path / "store")
+    s = stock["results"][0]["data"]
+    assert abs(s["52WeekChange"] * 100 - s["fiftyTwoWeekChangePercent"]) < 0.01
+    assert schema("prices", "quote")["units"]["52WeekChange"]["scale_by_quote_type"] == {"INDEX": "percent"}

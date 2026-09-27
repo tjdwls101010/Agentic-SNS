@@ -1,7 +1,8 @@
 """Statements and valuation measures by period."""
 from yfinance_skill.yahoo.datasets import CURRENCY, MULTIPLE, PER_SHARE, RATE, SHARES, Dataset
+from yfinance_skill.yahoo.refusals import is_rate_limited
 
-STATEMENT_DATES = "Column labels are fiscal period end dates, not announcement dates."
+STATEMENT_DATES = "Row labels (the index) are fiscal period end dates, not announcement dates."
 STATEMENT_INTERPRETATION = {
     "dates": STATEMENT_DATES,
     "currency": "The reported currency is in context.currency, read from the same company's financialCurrency. It can differ from the currency the share price is quoted in.",
@@ -24,6 +25,8 @@ def statement_currency(ticker, context, warnings):
     except Exception as exc:  # the statement is still the answer; the currency is what could not be confirmed
         warnings.append(f"Statement currency could not be read, so the reported figures carry no confirmed currency: {exc}")
         context["currency"] = None
+        if is_rate_limited(exc):
+            context["rate_limited"] = True  # a refused second request is still a rate limit: the next target must not spend another
         return
     context["currency"] = info.get("financialCurrency")
     context["quote_currency"] = info.get("currency")

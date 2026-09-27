@@ -21,18 +21,21 @@ class Dataset:
     fussiness — the direction differs inside `analysts` and inside `calendar`, and a single flip would silently break
     the other half.
 
-    `rows` and `fields` are the default window, what one screen shows. `prepare` fills in what the source itself fixes
+    `rows` and `fields` are the default window, what one screen shows. A fetch that sends the source a count records it
+    as context["requested"]; `shortfall` is what fewer rows than that means for this dataset, formatted with
+    {received} and {requested}, and a dataset without one makes no claim either way. `prepare` fills in what the source itself fixes
     for a call (a preset's universe and sort); it only sets values on the namespace, because schema runs it on a
     synthetic one to report defaults.
     """
 
     def __init__(self, fetch, *, ticker=False, rows=None, fields=(), recent=False, units=None, interpretation=None,
                  limits=None, gotchas=(), conditions=None, prepare=None, sliceable=True, shares_info=False,
-                 source_time=None, precise=()):
+                 source_time=None, precise=(), shortfall=None):
         self.fetch, self.ticker, self.rows, self.fields, self.recent = fetch, ticker, rows, tuple(fields), recent
         self.units, self.interpretation, self.limits = units or {}, interpretation or {}, limits or {}
         self.gotchas, self.conditions, self.prepare = tuple(gotchas), conditions, prepare
         self.sliceable, self.shares_info, self.source_time, self.precise = sliceable, shares_info, source_time, tuple(precise)
+        self.shortfall = shortfall
 
 
 def asked(args, dataset):

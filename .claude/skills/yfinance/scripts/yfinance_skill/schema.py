@@ -16,9 +16,9 @@ ENVELOPE = {
     "source_time": "the time the source itself put on this data, where it supplies one; after a close it can be hours before observed_at",
     "status": "see statuses",
     "conditions": "only the arguments this response carries evidence for: {requested, status: confirmed|not_applied|unverified, evidence}. A successful call is not evidence that a condition was applied",
-    "coverage": "received = rows the adapter returned, shown = rows printed (or written with --out), kept = which end a limit kept, truncated_by = leaf_default (this leaf's own window, status ok) or budget (your range did not fit, status partial), fields = how many of the available fields the projection kept",
-    "data": "the selected value; tables are {index, columns, data, index_names, column_names}. With --out: {out, rows, columns, first, last}, where rows is this target's share of the file and columns may become a count when the summary would not fit",
+    "coverage": "requested = rows asked of the source, present only for commands that send it a count (company news, screen run, calendars, search except research); fewer received than requested is not by itself proof the source has no more, and where a command knows what a shortfall means, a warning says so. received = rows the adapter returned, shown = rows printed (or written with --out), kept = which end a limit kept, truncated_by = leaf_default (this leaf's own window, status ok) or budget (your range did not fit, status partial), fields = how many of the available fields the projection kept",
     "warnings": "limitations that affect how this data can be used",
+    "data": "the selected value; tables are {index, columns, data, index_names, column_names}. With --out: {out, rows, columns, first, last}, where rows is this target's share of the file and columns may become a count when the summary would not fit. When even the summaries do not fit, the document carries one receipt in place of results: {out, rows (the file's total), and either each target's status and rows, or in_file and missing (targets the file holds no rows for, by status)}",
     "error": "{code, message, fix}",
 }
 

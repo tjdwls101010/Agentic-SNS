@@ -170,3 +170,63 @@ def test_analyst_targets_and_growth(cli):
     proc, doc = cli("analysts", "growth", "AAPL", "--fields", "stockTrend,industryTrend", routes=routes)
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert doc["results"][0]["data"]["data"] == [[0.2, 0.1]]
+
+
+def test_a_rate_limit_met_while_reading_the_statement_currency_stops_the_remaining_targets(cli):
+    """The currency lookup is a second request; a 429 there is still a rate limit, and going on to the next symbol
+    spends requests the source just refused."""
+    payload = {"timeseries": {"result": [{"meta": {"type": ["annualTotalRevenue"]}, "timestamp": [1735603200], "annualTotalRevenue": [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 120}}]}], "error": None}}
+    routes = [{"path": "/timeseries/AAPL", "json": payload},
+              {"path": "/quoteSummary/AAPL", "status": 429, "text": "Too Many Requests"},
+              {"path": "/v7/finance/quote", "status": 429, "text": "Too Many Requests"}]
+    proc, doc = cli("financials", "income", "AAPL", "MSFT", "--fields", "TotalRevenue", routes=routes)  # no MSFT route: any MSFT request fails the fixture
+    assert proc.returncode == 8, proc.stdout[:400]
+    first, second = doc["results"]
+    assert first["status"] == "ok" and first["data"]["data"] == [[120]]
+    assert any("currency" in w for w in first["warnings"])
+    assert second["status"] == "not_attempted"
+
+
+# ---- how many were asked for, next to how many arrived --------------------------------------------------------------
+
+
+def news_with_an_ad(count):
+    """`count` articles and one sponsored entry, which yfinance drops before the CLI sees it."""
+    stream = [{"id": f"n{i}", "content": {"title": f"Headline {i}"}} for i in range(count)] + [{"ad": ["sponsored"]}]
+    return [{"path": "/xhr/ncp", "json": {"data": {"tickerStream": {"stream": stream}}}}]
+
+
+def test_a_news_page_shorter_than_asked_says_both_numbers_and_claims_no_end(cli, tmp_path):
+    """--limit 300 answered with 196 articles was reported as the whole feed. The count asked for is the one number
+    that makes the shortfall visible; the source's own filtering is why the shortfall is not proof the feed ended."""
+    store = tmp_path / "s"
+    proc, doc = cli("company", "news", "AAPL", "--limit", "300", "--fields", "content.title", routes=news_with_an_ad(196), store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    r = doc["results"][0]
+    assert r["coverage"]["requested"] == 300 and r["coverage"]["received"] == 196
+    assert "exhaustive" not in r["coverage"]
+    assert any("196" in w and "300" in w for w in r["warnings"]), r["warnings"]
+
+    proc, cut = cli("company", "news", "AAPL", "--limit", "300", "--max-chars", "3000", routes=news_with_an_ad(196), store=store)
+    assert proc.returncode == 8, proc.stdout[:300]
+    assert cut["results"][0]["coverage"]["requested"] == 300, "a narrowing re-selects; it does not forget what was asked"
+
+    proc, filed = cli("company", "news", "AAPL", "--limit", "300", "--out", str(tmp_path / "news.csv"), routes=news_with_an_ad(196), store=store)
+    assert proc.returncode == 0, proc.stdout[:300]
+    assert filed["results"][0]["coverage"]["requested"] == 300
+
+    proc, back = cli("read", r["id"], "--limit", "5", routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:300]
+    assert back["results"][0]["coverage"]["requested"] == 300, "a slice of the observation does not change what was asked of the source"
+    assert any("196" in w for w in back["results"][0]["warnings"])
+    assert "exhaustive" not in proc.stdout
+
+
+def test_a_rate_limit_is_kept_when_the_same_target_then_fails_locally(cli):
+    """The rate limit was met while observing AAPL; a selection error on AAPL afterwards does not make MSFT safe to ask."""
+    payload = {"timeseries": {"result": [{"meta": {"type": ["annualTotalRevenue"]}, "timestamp": [1735603200], "annualTotalRevenue": [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 120}}]}], "error": None}}
+    routes = [{"path": "/timeseries/AAPL", "json": payload},
+              {"path": "/quoteSummary/AAPL", "status": 429, "text": "Too Many Requests"},
+              {"path": "/v7/finance/quote", "status": 429, "text": "Too Many Requests"}]
+    proc, doc = cli("financials", "income", "AAPL", "MSFT", "--fields", "NoSuchLineItem", routes=routes)
+    assert [r["status"] for r in doc["results"]] == ["error", "not_attempted"], proc.stdout[:400]

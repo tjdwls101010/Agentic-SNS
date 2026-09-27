@@ -11,7 +11,7 @@ import re
 import shlex
 
 from yfinance_skill.display import display, dump
-from yfinance_skill.envelope import error_info
+from yfinance_skill.envelope import error_info, ordered
 from yfinance_skill.shape import is_empty, row_count
 from yfinance_skill.selection import select
 
@@ -45,6 +45,8 @@ def shrink(envelope, item, args, size, max_chars):
     data, coverage = select(full, args, item, keep=keep)
     if row_count(data) == shown:
         return False
+    if "requested" in (envelope.get("coverage") or {}):  # a narrowing re-selects the rows; what the source was asked for stays
+        coverage = {"requested": envelope["coverage"]["requested"], **coverage}
     envelope["data"], envelope["coverage"] = data, coverage
     envelope["status"] = "partial"
     notice = (f"The budget narrowed this result to {coverage.get('shown')} of {coverage.get('received')} rows, so it answers a smaller range than was asked for; "
@@ -127,7 +129,8 @@ def too_large_fix(results, item, size, max_chars, args, needed=None):
         # 성진: 저장소도 함께 — 명시한 --store를 빠뜨리면 이름 붙인 id가 기본 캐시에 없다.
         kept = quoted(args, [("--store", getattr(args, "store", None)), ("--fields", ",".join(args.fields) if getattr(args, "fields", None) else None)])
         filed = ", rerun with --out FILE to write every target's rows to one file (a new request)" if item.exportable else ""
-        each = f" Each target was observed and saved separately: {listed}. Read one with read ID{kept}" + (f" --limit {keep}" if keep else "") + f", ask for fewer targets in one call{filed}, or rerun with --max-chars {needed}."
+        which = "Each target was observed and saved separately" if len(saved) == len(results) else f"The {len(saved)} targets that returned data were saved separately"
+        each = f" {which}: {listed}. Read one with read ID{kept}" + (f" --limit {keep}" if keep else "") + f", ask for fewer targets in one call{filed}, or rerun with --max-chars {needed}."
         return head + (f"Narrow with {narrow}." if narrow else "Ask for fewer targets.") + each
     if saved and keep is not None:
         if keep >= (shown or 0):
@@ -158,21 +161,36 @@ def too_large_document(results, error, max_chars, request):
 
     Dropping the recovery sentence to fit would keep the boundary and lose the only thing that makes the failure
     survivable, so the ladder sheds targets and then fields, and keeps the id and the size that would pass to the end.
+    Only a target with an id was saved: the refusal is carried by the first of those, and a target that failed keeps
+    its own error, since calling it too large or saved would send the reader after a response that does not exist.
     """
-    rest = error_info(error["code"], error["message"], "Recover with the fix on the first result; this target's own response is saved under the id here.")
-    rows = [{"target": r.get("target"), "id": r.get("id"), "status": "error", "error": error if i == 0 else rest} for i, r in enumerate(results)]
-    trimmed = [row if i == 0 else {k: v for k, v in row.items() if k != "error"} for i, row in enumerate(rows)]
-    dropped = dict(rows[0], error=error_info(error["code"], error["message"], error["fix"] + f" {len(results) - 1} further targets were saved but do not fit this document; ask for them in smaller groups."))
+    saved = [r for r in results if r.get("id")]
+    first = saved[0] if saved else results[0]
+    unsaved = len(results) - len(saved)
+    rest = error_info(error["code"], error["message"], f"Recover with the fix on {first.get('target')}'s result; this target's own response is saved under the id here.")
+
+    def row(r, whole):
+        if r is first:
+            return {"target": r.get("target"), "id": r.get("id"), "status": "error", "error": error}
+        if r.get("id"):
+            return {"target": r.get("target"), "id": r.get("id"), "status": "error", **({"error": rest} if whole else {})}
+        own = r.get("error") or {}
+        return {"target": r.get("target"), "status": r.get("status"), "error": own if whole else {"code": own.get("code")}}
+
+    rows, trimmed = [row(r, True) for r in results], [row(r, False) for r in results]
+    left = (f" {len(saved) - 1} further targets were saved but do not fit this document; ask for them in smaller groups." if len(saved) > 1 else "") \
+        + (f" Targets that failed have nothing saved: {unsaved}." if unsaved and len(results) > 1 else "")
+    dropped = dict(row(first, True), error=error_info(error["code"], error["message"], error["fix"] + left))
     for attempt in (rows, trimmed, [dropped] if len(results) > 1 else [rows[0]]):
         text = dump(document(attempt, "error", request))
         if attempt and len(text) <= max_chars:
             return text
     size = re.search(r"--max-chars (\d+)", error["fix"])
     # 성진: 가장 짧은 형태에도 복구에 필요한 셋은 남긴다 — 통과할 크기, 저장된 목표가 몇 개인지, 그것들이 여기 없다는 사실.
-    advice = (f"Rerun with --max-chars {size[1]}" if size else "Raise --max-chars") + (f"; all {len(results)} targets were saved and none of their ids fit this document, so rerun at that size or ask for fewer targets." if len(results) > 1 else ".")
-    smallest = [{k: v for k, v in {"id": results[0].get("id"), "status": "error",
+    advice = (f"Rerun with --max-chars {size[1]}" if size else "Raise --max-chars") + (f"; {len(saved)} targets were saved and none of their ids fit this document, so rerun at that size or ask for fewer targets." if len(saved) > 1 else ".")
+    smallest = [{k: v for k, v in {"id": first.get("id"), "status": "error",
                                    "error": error_info(error["code"], error["message"], advice)}.items() if v is not None}]
-    for attempt in ([rows[0]], smallest):
+    for attempt in ([row(first, True)], smallest):
         text = dump(document(attempt, "error", None))
         if len(text) <= max_chars:
             return text
@@ -203,6 +221,11 @@ def emit(results, args, item, request=None, scoped=False):
         if len(text) <= max_chars:
             print(text)
             return outcome(results, overall(results))
+        for receipt in receipts(results, filed, overall(results), request):
+            text = dump(receipt)
+            if len(text) <= max_chars:
+                print(text)
+                return outcome(results, overall(results))
 
     if item is not None:
         # 성진: 한 번의 축소는 봉투 고정비 때문에 자주 모자란다; 매번 방금 측정한 크기에서 다시 계산하면 몇 번 안에 수렴하고,
@@ -224,13 +247,45 @@ def emit(results, args, item, request=None, scoped=False):
     return "too_large", {"too_large"}
 
 
+RECEIPT_NOTE = "Rows per target are in the file's target column; a target named under missing added no rows."
+FEWER = " Ask for fewer targets to see which."
+RECEIPT_STATUSES = ("ok", "empty", "partial", "error", "not_attempted")
+
+
+def receipts(results, filed, status, request):
+    """The document for a written file whose per-target summaries do not fit, from most to least detailed.
+
+    Each keeps the path and the total rows, because the file already exists, and says which targets the file does not
+    hold, because a target that failed or came back empty adds no rows and is otherwise indistinguishable from one
+    that did. The last form is fixed in size apart from the path, which is why receipt_fits can refuse the path first.
+    """
+    out, total = filed[0]["data"]["out"], sum(r["data"]["rows"] for r in filed)
+    missing = {}
+    for r in results:
+        if r not in filed:
+            missing.setdefault(r["status"], []).append(r["target"])
+    counts = [{"target": r["target"], "status": r["status"], "rows": r["data"]["rows"] if r in filed else 0} for r in results]
+    yield {"status": status, "request": request, "receipt": {"out": out, "rows": total, "targets": counts}}
+    yield {"status": status, "request": None, "receipt": {"out": out, "rows": total, "in_file": len(filed), "missing": missing, "note": RECEIPT_NOTE}}
+    yield {"status": status, "request": None, "receipt": {"out": out, "rows": total, "in_file": len(filed),
+                                                          "missing": {k: len(v) for k, v in missing.items()}, "note": RECEIPT_NOTE + FEWER}}
+
+
+def receipt_fits(path, targets, max_chars):
+    """Whether the smallest receipt for this path fits the budget, at the largest counts it could carry."""
+    widest = {"status": "partial", "request": None, "receipt": {"out": str(path), "rows": 10 ** 12, "in_file": targets,
+                                                                 "missing": dict.fromkeys(RECEIPT_STATUSES, targets), "note": RECEIPT_NOTE + FEWER}}
+    return len(dump(widest)) <= max_chars
+
+
 def strip(envelope, item=None):
-    """The printed copy: private keys dropped, and the data shown at the precision the source had."""
+    """The printed copy: private keys dropped, the data shown at the precision the source had, and the keys in envelope
+    order — ordered here, at the last step, because a narrowing adds its warning after the result was first built."""
     shown = {k: v for k, v in envelope.items() if not k.startswith("_")}
     if item is not None and shown.get("data") is not None:
         zoned = bool((shown.get("context") or {}).get("timezone"))
         shown["data"] = display(shown["data"], envelope.get("_full"), item.precise, zoned)
-    return shown
+    return ordered(shown)
 
 
 def outcome(results, status):

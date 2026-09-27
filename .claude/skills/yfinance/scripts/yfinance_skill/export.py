@@ -128,9 +128,10 @@ def publish(path, parts):
     writer.writeheader()
     writer.writerows({k: cell(v) for k, v in line.items()} for line in lines)
     destination = Path(path)
-    handle, name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".part", dir=destination.parent)  # ours alone
-    temporary = Path(name)
+    temporary = None
     try:
+        handle, name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".part", dir=destination.parent)  # ours alone
+        temporary = Path(name)
         with os.fdopen(handle, "w", encoding="utf-8") as stream:
             stream.write(buffer.getvalue())
         os.link(temporary, destination)
@@ -139,7 +140,8 @@ def publish(path, parts):
     except OSError as exc:
         raise Unpublished("local_io", f"--out {path} could not be written: {exc}") from None
     finally:
-        temporary.unlink(missing_ok=True)
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
     return columns
 
 
