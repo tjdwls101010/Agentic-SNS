@@ -279,4 +279,4 @@ def test_52_week_change_changes_scale_with_the_instrument_type(tmp_path):
     proc, stock = run(["prices", "quote", "AAPL", "--fields", "52WeekChange,fiftyTwoWeekChangePercent"], tmp_path / "store")
     s = stock["results"][0]["data"]
     assert abs(s["52WeekChange"] * 100 - s["fiftyTwoWeekChangePercent"]) < 0.01
-    assert "percent scale for an index" in " ".join(schema("prices", "quote")["gotchas"])
+    assert schema("prices", "quote")["units"]["52WeekChange"]["scale_by_quote_type"] == {"INDEX": "percent"}

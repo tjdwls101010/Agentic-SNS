@@ -96,8 +96,9 @@ def test_units_use_only_the_declared_vocabulary(cli):
     for key in leaf_keys(cli):
         described = describe(cli, *key)
         for field, contract in (described.get("units") or {}).items():
-            assert set(contract) <= {"scale", "kind", "inverted", "as_of"}, (key, field)
+            assert set(contract) <= {"scale", "kind", "inverted", "as_of", "scale_by_quote_type"}, (key, field)
             assert contract.get("scale", "ratio") in allowed_scale, (key, field)
+            assert set((contract.get("scale_by_quote_type") or {}).values()) <= allowed_scale, (key, field)
             assert contract.get("kind") in allowed_kind, (key, field)
 
 

@@ -5,8 +5,9 @@ from yfinance_skill.yahoo.datasets import PERCENT, RATE
 # 사실은 싣지 않는다 — 그런 항목이 표를 키우면 정작 판정 불가능한 항목이 그 안에 묻힌다.
 # 첫 세 줄이 같은 리프 안의 100배 충돌이다(실측 AAPL: dividendYield 0.32 = 0.32%인데
 # trailingAnnualDividendYield 0.0031 = 0.31%, fiftyTwoWeekChangePercent 31.26 옆에 52WeekChange 0.3126).
+# 52WeekChange는 지수(quoteType INDEX)에서만 퍼센트로 온다(2026-09-27 실측: ^GSPC·^DJI·^IXIC·^N225 모두 fiftyTwoWeekChangePercent와 같은 값).
 INFO_UNITS = {"dividendYield": PERCENT, "fiveYearAvgDividendYield": PERCENT, "trailingAnnualDividendYield": RATE,
-              "fiftyTwoWeekChangePercent": PERCENT, "52WeekChange": RATE, "SandP52WeekChange": RATE,
+              "fiftyTwoWeekChangePercent": PERCENT, "52WeekChange": dict(RATE, scale_by_quote_type={"INDEX": "percent"}), "SandP52WeekChange": RATE,
               "regularMarketChangePercent": PERCENT, "postMarketChangePercent": PERCENT, "debtToEquity": PERCENT,
               "payoutRatio": RATE, "heldPercentInsiders": RATE, "heldPercentInstitutions": RATE,
               "profitMargins": RATE, "grossMargins": RATE, "operatingMargins": RATE, "ebitdaMargins": RATE,
