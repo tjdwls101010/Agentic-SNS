@@ -472,3 +472,68 @@ claude plugin validate --strict .claude/skills
 - in-process 테스트 seam, 회복 명령의 완전한 호출 형태, 의존성 섀도잉 검사, `pandas/`·`csv/` 시스템 폴더.
 - 새 기본값 대조(결정 15), `--sort`·`--field`·산업 키의 choices화(결정 13).
 - CI 재활성화, 텍스트 렌더러, 리프 추가·제거, sec·finviz 이행, Codex 호스트 지원.
+
+# 구현 기록 (2026-09-26~27, PR #25 `refactor/yfinance-cli-package`, PR #26 `fix/yfinance-contracts-signals`)
+
+## 계획을 따르지 않은 곳과 그 이유
+- **골든 기준선을 다시 떴다.** 첫 캡처 뒤 자정을 넘겨 달력 기본 날짜가 바뀌었다(계획의 "같은 날"). 이행 전 커밋(64df81a)의 워크트리에서 같은 날 기준선을 다시 뜨고 단계 2 이후를 거기에 대조했다.
+  - 골든 비교는 Python 3.12로 했다. 3.13에서는 stdlib json의 오류 문구 1건만 달랐다(trailing comma). 옛 잠금 환경이 3.12였기 때문이다.
+  - basetemp는 스크래치패드의 고정 경로다. 두 번 실행한 캡처가 정규화 뒤 동일했다.
+- **3b–3d를 한 커밋으로 냈다.** registry를 걷어내면 데이터셋·명령·기능이 동시에 바뀌어 중간 상태가 돌지 않는다. 3a와 3e(경계 테스트)는 따로 확인했다(골든 차이 0).
+- **B2·B3·B5를 한 커밋으로 냈다.** 세 수정이 cli.py main의 같은 흐름에 걸쳐 있다. 항목별 red는 `.tmp/yf-golden/red-b2-b5.txt`에 기록했다.
+- B6 사다리는 ④부터 request를 뺀다. 경로가 request에 한 번 더 들어가 ④가 경로 길이의 두 배가 되기 때문이다. ⑤ 크기 사전 검사도 request 없는 형태로 잰다.
+- B7: 0건(empty)에는 부족분 경고를 붙이지 않는다. empty 경고와 같은 사실이 두 번 나온다.
+- 계획에 없던 수정
+  - **저장 뒤 실패의 id**(코덱스 SKILL.md 검토에서 발견): 저장 뒤 선택이 실패하면 결과가 저장 id를 잃었다.
+  - **리뷰 ②의 major 4건**
+    - 긴 경로 거절이 예산 초과.
+    - 거절될 read가 보존기간 정리 실행.
+    - 레이트리밋 뒤 로컬 실패가 중단 신호를 덮음.
+    - 실패 대상이 맨 앞일 때의 회복 포인터.
+  - **리뷰 ③**: help·schema 문장 12건, 근거 없는 주장 26개(아래).
+- **리뷰 ③의 "근거 없는 주장 0"을 채우려고 live 실측을 세 번 했다**(`.tmp/yf-golden/evidence*.py|log`, 2026-09-27). 원천 문서는 ISS QualityScore 방법론(Harvard corpgov 요약)과 Vanguard VTI 요약투자설명서다. 실측이 뒤집은 것은 다섯 가지다.
+  - 기관·펀드 보유자의 Date Reported는 제출일이 아니라 기준 분기말이다.
+  - 뉴스 thumbnail·storyline은 payload의 대부분이 아니라 약 35%다.
+  - 한 달 actions가 "대부분" 비는 것이 아니다(8개 중 4개).
+  - fund equity의 3 Year Earnings Growth는 퍼센트다.
+  - 지수 quote의 52WeekChange는 퍼센트다(units `scale_by_quote_type`로 표현, 어휘 테스트 확장).
+- **SKILL.md는 첫 문단만 남았다**(성진 승인). 제거 시험이 세 문단 모두 행동을 바꾸지 않는다고 판정했다. 코덱스 SKILL.md 검토로 두 사실 오류를 먼저 고쳤다.
+  - "실패한 대상은 저장되지 않는다"는 --out 게시 실패처럼 저장된 실패가 있어 틀렸다.
+  - "결과가 이름 붙인 id"는 최소 형태가 첫 id만 남겨 틀렸다.
+- 시나리오 하네스(`.tmp/yf-golden/scenarios/run.py`)는 계획 형태를 따르되 두 가지를 더했다.
+  - **uv 환경을 미리 데운다.** 동시에 여러 차가운 `uv run`이 설치 직후 멈춰 모델의 Bash 120초 한도를 넘겼다. 하네스가 사본마다 순서대로 한 번 데운다.
+  - **cwd를 런 디렉터리로 둔다.** Read 도구가 cwd 밖 SKILL.md를 거절했다.
+  - 첫 실행의 결과는 이 두 결함 때문에 버리고 다시 돌렸다.
+- 예산 조건에서 T1·T2·M1은 모델이 먼저 `--out`을 써서 too_large 전제가 자주 성립하지 않았다. 계획대로 "과제를 바꿔" 단일 레코드 too_large 시나리오 두 개를 더했다: budget-quote-every-field, budget-profile-officers. `--out`이 없는 명령이다.
+
+## 문단 제거 시험 결과 (판정 모델 Claude Opus 5.5 `claude-opus-5-5`, 예산 조건 `--max-chars 3000`)
+전제가 성립하지 않은 런은 판정에 쓰지 않았다.
+
+| 문단 | 전제 성립 런 | 판정 |
+|---|---|---|
+| partial | P1 같음(1,255행 전부 read), news-all 같음(200건, "전부 아님") | 삭제 |
+| too_large | quote-every-field 같음(187필드, 저장본에서 나눠 읽음), profile-officers 같음(10명·전문) | 삭제 |
+| 회복이 질문을 보존 | P1 같음, quote-every-field 같음, profile-officers 같음 | 삭제 |
+| 세 문단 함께 | P1·news-all·quote-every-field·profile-officers 모두 합격 | 첫 문단만 |
+
+전체본 기준 12건은 전부 합격했고 스킬 원인 실패 호출은 0이다. 12건은 예산 5, news-all, 회귀 6(five-year-trend·toyota-pe·spy-pe·blackrock-position·mdd·date-close)이다. 단일 레코드 2건도 합격했다. 판단은 인터페이스가 맡는다: 부족분 경고, 저장 id와 fix, too_large의 저장 목록, 영수증. 모델이 바뀌면 같은 시나리오로 재검토한다.
+
+## 남은 실패와 알려진 한계
+- 가장자리 결함 ✓7(`market summary --fields`의 `--out` 의미 변화)과 ✓10(기본값 적용 뒤 날짜 범위 재검증)은 결정 7대로 남겼다.
+- screen run의 쿼리 조건은 결과로 판정하지 않는다(쿼리·결과 필드 이름 대응표가 먼저 필요).
+- 저장 파일 게시와 id 반환 사이에 SIGALRM이 오면 저장본은 남고 결과에 id가 없다. 마이크로초 창이라 일상 사용에서는 닿지 않는다.
+- 오류 문서는 20,000자 바닥을 둔다(invalid가 too_large에 가려지지 않게 한 기존 결정). 그래서 유효한 --max-chars보다 긴 invalid 문서가 나올 수 있다. 예: 매우 긴 --out 경로의 "already exists" 메시지.
+- `exclude-newer`는 해시를 고정하지 않는다(결정 5). 인덱스가 과거 릴리스를 바꾸지 않는다는 가정 위에 있다.
+- MSFT의 quote debtToEquity(29.1)는 재무상태표 TotalDebt/Equity(12.9)와 정의가 다르다(리스 포함 추정). 스케일은 퍼센트로 AAPL·KO에서 일치했다.
+- GitHub의 Social skill checks 워크플로(yfinance 잡 포함)는 꺼져 있어 검증은 로컬 실행이다. PR에서 돈 검사는 finviz·GitGuardian뿐이다.
+
+## 계약이 서로 물린 곳 (하나만 고치면 깨진다)
+- **명령·데이터셋 결합**: cli.py `COMMANDS`의 `dataset` 키 ↔ `yahoo.DATASETS` 키 ↔ `yahoo.bind` ↔ `test_discovery`의 49리프 schema 호출. 저장 레코드의 `command`(공백 구분 경로)는 `COMMANDS` 키이므로, 경로를 바꾸면 옛 관측이 read되지 않는다(`tests/yfinance/fixtures/store`가 잡는다).
+- **종료 코드**: cli.py `EXIT_CODES`(번호·뜻) ↔ `exit_code()`의 우선순위 ↔ `budget.emit`이 돌려주는 (status, codes) ↔ 루트 --help epilog·schema exit_codes 테스트.
+- **예산 사다리**
+  - `budget.receipts` ⑤의 고정 크기 ↔ `budget.receipt_fits`의 최악 크기(모든 상태 × 대상 수, rows 10^12) ↔ `querying.check_out`.
+  - 사다리에 필드를 더하면 최악 크기에도 더해야 stdout 예산 계약이 지켜진다.
+- **요청 개수**: 어댑터의 `context["requested"]` ↔ observe의 pop과 `Dataset.shortfall` ↔ 레코드 최상위 `requested` ↔ `asked_for`(첫 호출·--out·read) ↔ `budget.shrink`의 보존.
+- **닫힌 선택지 리터럴**: cli.py `MARKET_REGIONS`·`PRESETS` ↔ `yf.MarketRegion`·`yf.PREDEFINED_SCREENER_QUERIES`(`test_vocabulary.py`), `SECTOR_KEYS` ↔ `yahoo/market.SECTORS`(market sectors 출력 대조 테스트). yfinance를 올리면 셋 다 다시 본다.
+- **units 어휘**: `datasets.py`의 RATE·PERCENT… ↔ `test_units_use_only_the_declared_vocabulary`의 허용 키(`scale_by_quote_type` 포함) ↔ live의 52WeekChange 테스트.
+- **호출 형태**: SKILL.md allowed-tools·본문 호출문 ↔ `tests/test_skill_layout.py`(INVOCATION·CALL) ↔ `test_portability.py`의 `uv run` ↔ CONTRIBUTING·CI의 스크립트 파생 환경 명령.
