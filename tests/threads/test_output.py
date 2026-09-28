@@ -1,67 +1,91 @@
+"""Continuation handles and --out files through the CLI: bound to one query, never trusted when damaged."""
 import json
+import os
+from pathlib import Path
 
 import pytest
 
-from threads_skill._output import CursorStore, OutFile
-from threads_skill._errors import ThreadsError
+from .fixtures.builders import feed, envelope, listed_post, preloader, route
+from .helpers import calls, data, run_cli
 
 
-def test_cursor_binds_context_and_preserves_pending_without_credentials():
-    store = CursorStore()
-    context = {'command': 'home', 'feed': 'following', 'account': 'u0'}
-    number = store.save(context, {'after': 'A', 'pending': [{'id': '2'}], 'actor': '42'})
-    assert store.load(number, context)['cursor']['pending'] == [{'id': '2'}]
-    with pytest.raises(ThreadsError):
-        store.load(number, context | {'feed': 'foryou'})
-    with pytest.raises(ThreadsError):
-        store.load('../1', context)
-
-
-def test_corrupt_cursor_state_is_rejected_before_the_reader_uses_it():
-    store = CursorStore()
-    number = store.save({'command': 'home'}, {'after': 'A', 'pending': []})
-    path = store.directory / f'{number}.json'
-    record = json.loads(path.read_text())
-    record['cursor'] = 42
-    path.write_text(json.dumps(record))
-    with pytest.raises(ThreadsError) as error:
-        store.load(number, {'command': 'home'})
-    assert error.value.code == 2
-
-
-def test_output_discards_uncommitted_tail_and_does_not_claim_ssr_is_exhausted(tmp_path):
-    path = tmp_path / 'posts.ndjson'
-    file = OutFile(path, {'command': 'post'})
-    state = {'completeness': {'reported_direct': 10, 'received_direct': 2}}
-    file.commit([{'id': '1'}], state, 'ssr_complete')
-    file.close()
-    with path.open('a') as stream:
-        stream.write('{"id":"uncommitted"}\n')
-    file = OutFile(path, {'command': 'post'})
-    assert file.count == 1 and not file.complete
-    assert file.cursor['completeness']['received_direct'] == 2
-    file.close()
-    assert 'uncommitted' not in path.read_text()
-    assert json.loads(path.read_text().splitlines()[-1])['stop_reason'] == 'ssr_complete'
-
-
-def test_output_rejects_symlink_without_touching_target(tmp_path):
-    original = tmp_path / 'original'
-    original.write_text('valuable data')
-    link = tmp_path / 'link'
-    link.symlink_to(original)
-    with pytest.raises(ThreadsError):
-        OutFile(link, {})
-    assert original.read_text() == 'valuable data'
+def handles():
+    return Path(os.environ['THREADS_HOME']) / 'cursors'
 
 
 def test_file_continuation_keeps_path_and_rejects_a_handle_advanced_without_the_file(fake_aside, tmp_path):
-    from .test_cli import run_cli
     file = tmp_path / 'collection.ndjson'
-    first = json.loads(run_cli('home', '--limit', '1', '--out', str(file), '--json').stdout)
+    first = data(run_cli('home', '--limit', '1', '--out', str(file), '--json'))
     assert '--out' in first['next'] and str(file) in first['next']
-    second = json.loads(run_cli('home', '--limit', '1', '--after', str(first['next_handle']), '--json').stdout)
+    second = data(run_cli('home', '--limit', '1', '--after', str(first['next_handle']), '--json'))
     before = file.read_bytes()
     conflict = run_cli('home', '--after', str(second['next_handle']), '--out', str(file), '--json')
     assert conflict.returncode == 2, conflict.stdout + conflict.stderr
+    assert file.read_bytes() == before
+
+
+def test_a_handle_only_continues_the_query_that_made_it(routes):
+    routes.set('BarcelonaFeedDirectQuery', envelope(feed([listed_post(1), listed_post(2)], 'A'))).write()
+    handle = data(run_cli('home', '--feed', 'following', '--limit', '1', '--json'))['next_handle']
+    before = len(calls(routes.path.parent / 'requests.ndjson'))
+    other = run_cli('home', '--feed', 'foryou', '--after', str(handle), '--json')
+    assert other.returncode == 2
+    assert len(calls(routes.path.parent / 'requests.ndjson')) == before
+
+
+@pytest.mark.parametrize('handle', ['0', '../1', '999'])
+def test_a_handle_that_is_not_a_saved_number_is_refused(fake_aside, handle):
+    result = run_cli('home', '--after', handle, '--json')
+    assert result.returncode == 2
+    assert calls(fake_aside) == []
+
+
+def test_a_damaged_handle_is_refused_before_any_request(fake_aside):
+    handle = data(run_cli('home', '--limit', '1', '--json'))['next_handle']
+    path = handles() / f'{handle}.json'
+    record = json.loads(path.read_text())
+    record['cursor'] = 42
+    path.write_text(json.dumps(record))
+    before = len(calls(fake_aside))
+    result = run_cli('home', '--limit', '1', '--after', str(handle), '--json')
+    assert result.returncode == 2
+    assert len(calls(fake_aside)) == before
+
+
+def test_a_continuation_made_by_another_account_is_refused(routes):
+    handle = data(run_cli('home', '--limit', '1', '--json'))['next_handle']
+    routes.set('/', route([preloader('BarcelonaFeedDirectQuery', variant='for_you')], actor='200')).write()
+    result = run_cli('home', '--limit', '1', '--after', str(handle), '--json')
+    assert result.returncode == 2
+    assert 'different logged-in' in data(result)['message']
+
+
+def test_an_interrupted_page_is_dropped_and_read_again(fake_aside, tmp_path):
+    file = tmp_path / 'collection.ndjson'
+    run_cli('home', '--limit', '1', '--out', str(file), '--json')
+    with file.open('a') as stream:
+        stream.write('{"id":"uncommitted"}\n')
+    resumed = data(run_cli('home', '--limit', '1', '--out', str(file), '--json'))
+    assert 'uncommitted' not in file.read_text()
+    saved = [json.loads(line) for line in file.read_text().splitlines()]
+    assert [r['id'] for r in saved if 'id' in r and r.get('kind') != 'page'] == ['1', '2']
+    assert resumed['count'] == 2
+
+
+def test_output_refuses_a_symlink_without_touching_its_target(fake_aside, tmp_path):
+    original = tmp_path / 'original'
+    original.write_text('valuable data')
+    link = tmp_path / 'link.ndjson'
+    link.symlink_to(original)
+    result = run_cli('home', '--out', str(link), '--json')
+    assert result.returncode == 2
+    assert original.read_text() == 'valuable data'
+
+
+def test_an_output_file_of_another_query_is_refused(fake_aside, tmp_path):
+    file = tmp_path / 'collection.ndjson'
+    run_cli('home', '--limit', '1', '--out', str(file), '--json')
+    before = file.read_bytes()
+    result = run_cli('user', '@fixture_user', '--out', str(file), '--json')
+    assert result.returncode == 2
     assert file.read_bytes() == before

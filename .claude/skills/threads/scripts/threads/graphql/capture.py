@@ -1,0 +1,67 @@
+"""A capture reserves all possible observed dispatches before opening its tab."""
+import json
+import time
+
+from ..errors import ThreadsError
+from ..guard.blocked import check_blocked, set_blocked
+from ..guard.budget import WINDOW_LIMIT, history
+from ..guard.state import account_lock, cache_dir, write_state
+from .operations import OPERATIONS
+from .transport import classify, run_snippet
+
+
+# The operations only an app tab loads, in declaration order.
+CAPTURABLE = [op.id for op in OPERATIONS.values() if op.discovery == 'capture']
+
+
+def capture(transport, post, targets):
+    """Observe one app tab for `targets` (current names of capturable operations)."""
+    names = [transport.registry.name(operation) for operation in CAPTURABLE]
+    if not post.username or not targets or any(name not in names for name in targets):
+        raise ThreadsError(2, 'Capture requires a canonical post URL and supported read-query targets.')
+    with account_lock():
+        check_blocked()
+        times = history()
+        available = min(20, transport.budget.maximum - transport.budget.used - len(targets), WINDOW_LIMIT - len(times))
+        if available < 1:
+            raise ThreadsError(8, 'Not enough local budget for capture plus replay.', 'Wait for the local window to clear.', error='budget')
+        if times:
+            time.sleep(max(0, max(times) + 1.0 - time.time()))
+        write_state('capture-active.json', {'url': 'https://www.threads.com' + post.path,
+                                          'started_at': time.time(), 'note': 'Cleanup not yet confirmed; inspect Aside if this marker survives.'})
+        write_state('budget.json', {'requests': times + [time.time()] * available})
+        transport.budget.used += available
+        response = run_snippet('capture', {'url': 'https://www.threads.com' + post.path,
+                                          'targets': targets, 'request_budget': available})
+        transport.fetched_bytes += len(response['body'].encode())
+        try:
+            result = json.loads(response['body'])
+            if not isinstance(result, dict):
+                raise ValueError
+        except (ValueError, TypeError):
+            raise ThreadsError(6, 'Capture response is incomplete; its reservation and cleanup marker were retained.') from None
+        count = result.get('request_count')
+        complete = result.get('count_complete') is True and type(count) is int and 1 <= count <= available
+        if complete:
+            transport.budget.used -= available - count
+            write_state('budget.json', {'requests': times + [time.time()] * count})
+        if result.get('failed') != 'capture_cleanup_failed' and complete:
+            (cache_dir() / 'capture-active.json').unlink(missing_ok=True)
+        observations = result.get('envelopes', [])
+        if not isinstance(observations, list):
+            raise ThreadsError(6, 'Capture observations are malformed; no candidates were saved.')
+        try:
+            for envelope in observations:
+                classify(envelope, 'graphql')
+            classify(response, 'page')
+        except ThreadsError as error:
+            if error.code == 5:
+                set_blocked(error.error)
+            raise
+        if not complete or not isinstance(result.get('queries'), list):
+            raise ThreadsError(6, 'Capture count or candidates are incomplete; reservation retained.')
+        return {'queries': result['queries'], 'missing': {name: result.get('failed') or 'Not observed after bounded SPA actions; Relay may already cache this surface.'
+                for name in targets if not any(q.get('name') == name for q in result['queries'])},
+                'observed_requests': count - 1, 'bootstrap_count_known': False, 'app_mutations_possible': True,
+                'cleanup_confirmed': result.get('failed') != 'capture_cleanup_failed',
+                'attempts': result.get('attempts', []), 'failed': result.get('failed')}

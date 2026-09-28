@@ -1,1 +1,0 @@
-"""Self-contained Threads reader."""
