@@ -32,7 +32,7 @@ test('page sends navigation headers and leaves each redirect to the budgeted cal
 });
 
 test('graphql form has exactly two fields and credentials are headers only', async () => {
-  const {calls} = await run('graphql', {name: 'BarcelonaFeedDirectQuery', doc_id: '123', variables: {after: null}, csrf: 'fixture', referer: 'https://www.threads.com/'});
+  const {calls} = await run('graphql', {name: 'FixtureFeedQuery', admitted: ['FixtureFeedQuery'], doc_id: '123', variables: {after: null}, csrf: 'fixture', referer: 'https://www.threads.com/'});
   const form = new URLSearchParams(calls[0].options.body);
   assert.deepEqual([...form.keys()].sort(), ['doc_id', 'variables']);
   assert.equal(calls[0].options.headers['x-csrftoken'], 'fixture');
@@ -43,6 +43,16 @@ test('page and query reject out-of-scope traffic before fetch', async () => {
   await assert.rejects(run('page', {path: '//evil.test/'}));
   await assert.rejects(run('page', {path: '/activity'}));
   await assert.rejects(run('graphql', {name: 'WriteMutation', doc_id: '123', variables: {}}));
+});
+
+test('query admission comes from the caller and never admits a mutation or a non-query', async () => {
+  const query = {doc_id: '123', variables: {}, csrf: 'fixture', referer: 'https://www.threads.com/'};
+  await assert.rejects(run('graphql', {...query, name: 'OtherQuery', admitted: ['FixtureFeedQuery']}));
+  await assert.rejects(run('graphql', {...query, name: 'FixtureQuery'}));
+  await assert.rejects(run('graphql', {...query, name: 'LikeMutationQuery', admitted: ['LikeMutationQuery']}));
+  await assert.rejects(run('graphql', {...query, name: 'FixtureFeed', admitted: ['FixtureFeed']}));
+  const {calls} = await run('graphql', {...query, name: 'FixtureFeedQuery', admitted: ['FixtureFeedQuery']});
+  assert.equal(calls.length, 1);
 });
 
 test('large escaped response survives ordered chunk transfer', async () => {

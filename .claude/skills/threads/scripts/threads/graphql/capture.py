@@ -6,15 +6,18 @@ from ..errors import ThreadsError
 from ..guard.blocked import check_blocked, set_blocked
 from ..guard.budget import WINDOW_LIMIT, history
 from ..guard.state import account_lock, cache_dir, write_state
+from .operations import OPERATIONS
 from .transport import classify, run_snippet
 
-CAPTURE = ['useBarcelonaAccountSearchGraphQLDataSourceQuery', 'BarcelonaFriendshipsFollowersTabQuery',
-           'BarcelonaFriendshipsFollowingTabQuery', 'BarcelonaFriendshipsFollowingTabRefetchableQuery',
-           'BarcelonaLikedPageViewerQuery', 'BarcelonaSavedPageViewerQuery']
+
+# The operations only an app tab loads, in declaration order.
+CAPTURABLE = [op.id for op in OPERATIONS.values() if op.discovery == 'capture']
 
 
 def capture(transport, post, targets):
-    if not post.username or not targets or any(name not in CAPTURE for name in targets):
+    """Observe one app tab for `targets` (current names of capturable operations)."""
+    names = [transport.registry.name(operation) for operation in CAPTURABLE]
+    if not post.username or not targets or any(name not in names for name in targets):
         raise ThreadsError(2, 'Capture requires a canonical post URL and supported read-query targets.')
     with account_lock():
         check_blocked()

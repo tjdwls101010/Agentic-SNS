@@ -1,6 +1,7 @@
 """Anchored connection paths; a missing pagination contract is never exhaustion."""
 from ..errors import ThreadsError
 from ..model import Page
+from .operations import CAPPED, OFFSET, RELAY, SINGLE_BATCH
 from .normalize import build_post, build_user
 
 
@@ -17,44 +18,27 @@ def at(value, path):
 
 
 def read_page(response, operation):
+    """One page of a declared connection: its records grouped by edge, and its continuation."""
     data = response.get('data', response)
-    user_nodes = False
-    policy, item_path = 'relay', 'thread_items'
-    if operation == 'BarcelonaFeedDirectQuery':
-        root, item_path = 'feedData', 'text_post_app_thread.thread_items'
-    elif operation.startswith('BarcelonaProfile') and 'Tab' in operation:
-        root = 'mediaData'
-    elif operation == 'BarcelonaSearchResultsQuery':
-        root, item_path = 'searchResults', 'thread.thread_items'
-    elif operation == 'useBarcelonaAccountSearchGraphQLDataSourceQuery':
-        root, policy, user_nodes = 'xdt_api__v1__users__search_connection', 'single_batch', True
-    elif 'Friendships' in operation:
-        user_nodes = True
-        if 'Followers' in operation:
-            root, policy = 'user.followers', 'capped'
-        elif 'Refetchable' in operation:
-            root, policy = 'fetch__XDTUserDict.following', 'offset'
-        else:
-            root, policy = 'user.following', 'offset'
-    elif operation in ('BarcelonaLikedPageViewerQuery', 'BarcelonaSavedPageViewerQuery'):
-        root, policy = 'xdt_text_app_viewer.' + ('liked_media' if 'Liked' in operation else 'saved_media'), 'single_batch'
-    else:
-        raise drift('Unsupported connection operation: ' + operation)
+    if operation.connection is None:
+        raise drift('Unsupported connection operation: ' + operation.id)
+    root, item_path, policy = operation.connection, operation.items, operation.pagination
+    user_nodes = item_path is None
     connection = at(data, root)
     if not isinstance(connection, dict) or not isinstance(connection.get('edges'), list):
         raise drift('Expected explicit edges at ' + root)
-    page = Page(stop={'capped': 'server_capped', 'single_batch': 'not_paginable'}.get(policy, 'exhausted'))
-    if policy in ('relay', 'offset'):
+    page = Page(stop={CAPPED: 'server_capped', SINGLE_BATCH: 'not_paginable'}.get(policy, 'exhausted'))
+    if policy in (RELAY, OFFSET):
         info = connection.get('page_info')
         if not isinstance(info, dict) or type(info.get('has_next_page')) is not bool:
             raise drift('Expected page_info.has_next_page at ' + root)
         page.has_next, page.cursor = info['has_next_page'], info.get('end_cursor')
         if page.has_next and (not isinstance(page.cursor, str) or not page.cursor):
             raise drift('A continuing page must provide a cursor.')
-        if policy == 'offset' and page.has_next and not page.cursor.isdigit():
+        if policy == OFFSET and page.has_next and not page.cursor.isdigit():
             raise drift('Following cursor must be an offset string.')
     counts = data.get('counts') or {}
-    page.reported_total = counts.get('followers' if policy == 'capped' else 'following')
+    page.reported_total = counts.get('followers' if policy == CAPPED else 'following')
     for edge in connection['edges']:
         node = at(edge, 'node')
         if not isinstance(node, dict):

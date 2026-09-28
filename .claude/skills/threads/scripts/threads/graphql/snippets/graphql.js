@@ -1,7 +1,9 @@
 // threads-snippet: graphql
 await (async () => {
-  const operations = ["BarcelonaFeedDirectQuery", "BarcelonaProfilePageDirectQuery", "BarcelonaProfileThreadsTabDirectQuery", "BarcelonaProfileRepliesTabDirectQuery", "BarcelonaProfileRepostsTabDirectQuery", "BarcelonaProfileMediaTabDirectQuery", "BarcelonaSearchResultsQuery", "BarcelonaPostPageStrongIdTargetQuery", "BarcelonaPostPageStrongIdDownwardQuery", "BarcelonaPostPageStrongIdUpwardQuery", "useBarcelonaAccountSearchGraphQLDataSourceQuery", "BarcelonaFriendshipsFollowersTabQuery", "BarcelonaFriendshipsFollowingTabQuery", "BarcelonaFriendshipsFollowingTabRefetchableQuery", "BarcelonaLikedPageViewerQuery", "BarcelonaSavedPageViewerQuery"];
-  if (!operations.includes(ARGS.name) || !/^\d+$/.test(ARGS.doc_id)) throw new Error('Unsupported read query');
+  // Python sends the registry's current names as ARGS.admitted; this check stands on its own: only a named Query,
+  // never anything that names a mutation, and never a name the caller did not admit.
+  if (!Array.isArray(ARGS.admitted) || !ARGS.admitted.includes(ARGS.name) || !/^[A-Za-z0-9_]+Query$/.test(ARGS.name) ||
+      /Mutation/.test(ARGS.name) || !/^\d+$/.test(ARGS.doc_id)) throw new Error('Unsupported read query');
   const form = {doc_id: ARGS.doc_id, variables: JSON.stringify(ARGS.variables)};
   const body = Object.entries(form).map(([key, value]) => encodeURIComponent(key) + '=' + encodeURIComponent(value)).join('&');
   const response = await fetch('https://www.threads.com/graphql/query', {

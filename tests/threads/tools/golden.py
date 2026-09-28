@@ -157,7 +157,7 @@ def run_scenario(name, edit, commands, cli):
         except ValueError:
             last = None
     text = '\n'.join(lines) + '\n'
-    for path in {str(base), os.path.realpath(base)}:
+    for path in sorted({str(base), os.path.realpath(base)}, key=len, reverse=True):
         text = text.replace(path, '<TMP>')
     text = re.sub(r'"registry_age_days": \d+', '"registry_age_days": <AGE>', text)
     # Execution times are written with +00:00; a post's own time uses Z and is kept.

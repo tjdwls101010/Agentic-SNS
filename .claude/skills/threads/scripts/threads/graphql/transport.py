@@ -9,7 +9,8 @@ from ..errors import ThreadsError
 from ..guard.blocked import set_blocked
 from ..guard.budget import Budget
 from ..guard.state import cache_dir
-from .decode import at, drift, read_page
+from .decode import at, drift
+from .operations import OPERATIONS
 from .registry import Registry
 from .session import Session
 
@@ -139,24 +140,28 @@ class Transport:
             self.session = Session.from_html(html)
             self.route = path
             if re.fullmatch(r'/@[A-Za-z0-9_.]+/?', original):
-                if not any(p['name'] == 'BarcelonaProfilePageDirectQuery' for p in self.session.preloaders):
+                if not any(p['name'] == self.registry.name('profile.page') for p in self.session.preloaders):
                     raise ThreadsError(9, 'Authenticated route has no requested profile.')
             return html
         raise ThreadsError(6, 'Threads exceeded the three-redirect limit.')
 
-    def query(self, name, values, *, spec=None):
-        selected = self.registry.get(name)
-        if spec is not None:
-            selected = spec
+    def query(self, operation, values, *, entry=None):
+        """Send one declared read under its current registry name (or `entry`, a candidate refresh is verifying) and
+        return the classified payload. The caller decodes it; an operation that declares an identity is checked here."""
+        selected = entry if entry is not None else self.registry.entry(operation)
         if not self.session:
             self.page('/')
-        variables = self.registry.variables(name, values, selected)
-        _, data = self._request('graphql', {'name': name, 'doc_id': selected['doc_id'], 'variables': variables,
-                               'csrf': self.session.csrf, 'referer': ORIGIN + self.route})
-        if name == 'BarcelonaProfilePageDirectQuery':
-            user = at(data, 'data.user')
-            if not isinstance(user, dict) or str(user.get('pk')) != str(variables['userID']):
+        variables = self.registry.variables(operation, values, selected)
+        _, data = self._request('graphql', {'name': selected['name'], 'admitted': self.registry.admitted(),
+                                            'doc_id': selected['doc_id'], 'variables': variables,
+                                            'csrf': self.session.csrf, 'referer': ORIGIN + self.route})
+        path = OPERATIONS[operation].identity
+        if path is not None:
+            found = at(data, 'data.' + path)
+            if not isinstance(found, dict) or str(found.get('pk')) != str(variables['userID']):
                 raise drift('Profile response does not match the requested identity.')
-        else:
-            read_page(data, name)
         return data
+
+    def rendered(self, ssr, operation, identity=None):
+        """The route's own rendered result for a declared operation."""
+        return ssr.select(self.registry.name(operation), OPERATIONS[operation].ssr_shape, identity)

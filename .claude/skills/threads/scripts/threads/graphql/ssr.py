@@ -8,18 +8,6 @@ POST_PAGE_CHANGED = ('Threads changed the post page; refresh cannot repair it. '
                      'Tell the user the post reader needs an update.')
 
 
-def matches(data, operation):
-    if operation == 'BarcelonaFeedDirectQuery':
-        return 'feedData' in data
-    if operation == 'BarcelonaProfilePageDirectQuery':
-        return 'user' in data
-    if operation.startswith('BarcelonaProfile') and 'Tab' in operation:
-        return 'mediaData' in data
-    if operation == 'BarcelonaSearchResultsQuery':
-        return 'searchResults' in data
-    return False
-
-
 def media_identity(media):
     """A post payload's own id: pk, or the numeric head of the `<pk>_<author pk>` media id some payloads carry alone."""
     if media.get('pk') is not None:
@@ -48,10 +36,12 @@ class SSR:
         for document in Scripts(html).documents:
             walk(document)
 
-    def select(self, operation, identity=None):
+    def select(self, operation, shape, identity=None):
+        """The one rendered result of `operation` (its current name) marked by its declared `shape` key, and about
+        `identity` when given."""
         candidates = []
         for name, variables, data in self.results:
-            if name and name != operation or not matches(data, operation):
+            if name and name != operation or shape is None or shape not in data:
                 continue
             ids = set()
             if isinstance(variables, dict):

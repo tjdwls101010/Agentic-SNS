@@ -25,10 +25,14 @@ def test_refresh_keeps_unobserved_operations_and_never_saves_instance_variables(
     body = data(result)
     assert 'BarcelonaProfileThreadsTabDirectQuery' in body['updated']
     assert 'BarcelonaSavedPageViewerQuery' in body['missing']
+    # The home route's feed preloader lacks variables the feed query requires: it is reported, never sent incomplete.
+    assert body['missing']['BarcelonaFeedDirectQuery'] == 'arguments'
+    assert not [c for c in calls(routes.path.parent / 'requests.ndjson') if c['name'] == 'BarcelonaFeedDirectQuery']
     saved = json.loads((home() / 'registry.json').read_text())
     assert 'synthetic-csrf' not in json.dumps(saved)
-    assert saved['operations']['BarcelonaProfileThreadsTabDirectQuery']['variables_template']['userID'] == '<pk>'
-    assert saved['operations']['BarcelonaProfileThreadsTabDirectQuery']['doc_id'] == '1001'
+    threads_tab, = [e for e in saved['operations'].values() if e['name'] == 'BarcelonaProfileThreadsTabDirectQuery']
+    # The preloader's own variables (this profile's userID) are an instance, not the operation: only id and flags stay.
+    assert threads_tab['doc_id'] == '1001' and '42' not in json.dumps(threads_tab)
 
 
 def test_refresh_only_checks_that_a_post_route_still_decodes(routes):
@@ -88,3 +92,47 @@ def test_a_block_seen_during_capture_is_persisted_before_any_candidate_is_used(r
     assert run_cli(*CAPTURE).returncode == 5
     assert run_cli('home', '--json').returncode == 5
     assert data(run_cli('home', '--json'))['error'] == 'checkpoint'
+
+
+def legacy_override():
+    home().mkdir(parents=True, exist_ok=True)
+    legacy = Path(__file__).with_name('fixtures') / 'legacy' / 'registry.json'
+    (home() / 'registry.json').write_text(legacy.read_text())
+    return json.loads(legacy.read_text())
+
+
+def test_refresh_rewrites_an_old_override_in_the_current_format(routes):
+    old = legacy_override()
+    viewer_profile(routes).write()
+    run_cli('refresh', '--json')
+    saved = json.loads((home() / 'registry.json').read_text())
+    assert saved['version'] == 2
+    names = {entry['name'] for entry in saved['operations'].values()}
+    # Every entry the old file verified survives except the retired post-page queries, now read from the page itself.
+    assert names == {name for name in old['operations'] if 'PostPage' not in name}
+    assert not set(saved['operations']) & set(old['operations'])
+    for entry in saved['operations'].values():
+        assert set(entry) == {'name', 'doc_id', 'flags', 'captured_at'}
+    feed = next(e for e in saved['operations'].values() if e['name'] == 'BarcelonaFeedDirectQuery')
+    assert feed['doc_id'] == old['operations']['BarcelonaFeedDirectQuery']['doc_id']
+
+
+def test_an_override_naming_an_operation_this_skill_does_not_know_is_refused(fake_aside):
+    old = legacy_override()
+    old['operations']['BarcelonaSomethingNewQuery'] = dict(old['operations']['BarcelonaFeedDirectQuery'])
+    (home() / 'registry.json').write_text(json.dumps(old))
+    result = run_cli('home', '--json')
+    assert result.returncode == 6
+    assert 'registry.json' in data(result)['fix'] and 'Remove' in data(result)['fix']
+    assert calls(fake_aside) == []
+
+
+def test_an_old_override_entry_naming_only_a_new_doc_id_keeps_the_bundled_flags(fake_aside):
+    home().mkdir(parents=True, exist_ok=True)
+    (home() / 'registry.json').write_text(json.dumps(
+        {'operations': {'BarcelonaFeedDirectQuery': {'verified': True, 'doc_id': '4242'}}}))
+    result = run_cli('home', '--feed', 'following', '--json')
+    assert result.returncode == 0, result.stdout + result.stderr
+    sent = calls(fake_aside)[-1]
+    assert sent['doc_id'] == '4242'
+    assert any(key.startswith('__relay_internal__') for key in sent['variables'])

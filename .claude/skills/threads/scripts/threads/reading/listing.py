@@ -1,6 +1,7 @@
 """Home and profile activity share one continuation/commit path."""
 from ..errors import ThreadsError
 from ..graphql.decode import read_page
+from ..graphql.operations import OPERATIONS
 from ..graphql.ssr import SSR
 from ..graphql.transport import Transport
 from ..store import CursorStore, OutFile
@@ -34,21 +35,22 @@ def run(args, ctx):
             check_actor(state, transport)
         elif args.command in ('user', 'graph'):
             html = transport.page(args.target.path)
-            state['user_id'] = transport.session.identity('BarcelonaProfilePageDirectQuery', 'userID')
+            state['user_id'] = transport.session.identity(transport.registry.name('profile.page'), 'userID')
             ssr = SSR(html)
-            profile = ssr.select('BarcelonaProfilePageDirectQuery', state['user_id'])['user'] or {}
+            profile = transport.rendered(ssr, 'profile.page', state['user_id'])['user'] or {}
             if profile and profile.get('username', '').lower() != args.target.username:
                 raise ThreadsError(6, 'Profile identity differs from the requested handle.', 'Run refresh.', error='envelope_drift')
             state['private_unfollowed'] = bool(profile.get('text_post_app_is_private') and
                                                (profile.get('friendship_status') or {}).get('following') is False) if profile else None
             if args.command == 'user' and ctx['tab'] == 'threads':
-                initial = read_page(ssr.select('BarcelonaProfileThreadsTabDirectQuery', state['user_id']), 'BarcelonaProfileThreadsTabDirectQuery')
+                initial = read_page(transport.rendered(ssr, 'profile.threads', state['user_id']),
+                                    OPERATIONS['profile.threads'])
                 state['ssr_cursor'] = initial.cursor
                 check_access(initial, transport, state)
         else:
             html = transport.page('/')
             if args.command == 'home' and ctx['feed'] == 'foryou':
-                initial = read_page(SSR(html).select('BarcelonaFeedDirectQuery'), 'BarcelonaFeedDirectQuery')
+                initial = read_page(transport.rendered(SSR(html), 'feed'), OPERATIONS['feed'])
         check_actor(state, transport)
         operation, variables = query_for(ctx, state)
         def fetch(after):
@@ -58,19 +60,19 @@ def run(args, ctx):
                 if args.command == 'home':
                     values['data'] = values['data'] | {'reason': 'pagination'}
                 if args.command == 'graph' and ctx['relation'] == 'following':
-                    name, values = 'BarcelonaFriendshipsFollowingTabRefetchableQuery', {'id': state['user_id'], 'first': 10, 'after': after}
+                    name, values = 'graph.following_more', {'id': state['user_id'], 'first': 10, 'after': after}
             restarted = False
             try:
-                payload = transport.query(name, values)
+                page = read_page(transport.query(name, values), OPERATIONS[name])
             except ThreadsError as error:
                 if not (args.command == 'user' and after and after == state.get('ssr_cursor') and
                         error.error in ('operation_rotated', 'envelope_drift')):
                     raise
                 # The SSR cursor and Direct query are different sources; try the Direct first page once, retaining seen IDs.
                 state['ssr_cursor'] = None
-                payload = transport.query(name, {key: value for key, value in values.items() if key != 'after'})
+                page = read_page(transport.query(name, {key: value for key, value in values.items() if key != 'after'}),
+                                 OPERATIONS[name])
                 restarted = True
-            page = read_page(payload, name)
             page.restarted = restarted
             page.state_updates = {'ssr_cursor': None}
             if args.command == 'user':
@@ -78,7 +80,7 @@ def run(args, ctx):
             return page
         result = collect(fetch, limit=args.limit or 10, state=state, initial=initial,
                          since=ctx.get('since'), until=ctx.get('until'),
-                         monotonic=args.command == 'user' and ctx['tab'] in ('threads', 'replies'),
+                         monotonic=OPERATIONS[operation].chronological,
                          commit=output.commit if output else None)
         state = result.pop('state')
         result['context'] = ctx
@@ -101,15 +103,15 @@ def query_for(ctx, state):
     command = ctx['command']
     if command == 'home':
         following = ctx['feed'] == 'following'
-        return 'BarcelonaFeedDirectQuery', {'variant': 'following' if following else 'for_you',
+        return 'feed', {'variant': 'following' if following else 'for_you',
             'data': {'pagination_source': 'text_post_feed_following' if following else 'text_post_feed_threads', 'reason': 'cold_start_fetch'}}
     if command == 'user':
-        return 'BarcelonaProfile' + ctx['tab'].capitalize() + 'TabDirectQuery', {'userID': state['user_id'], 'first': 25}
+        return 'profile.' + ctx['tab'], {'userID': state['user_id'], 'first': 25}
     if command == 'graph':
-        return 'BarcelonaFriendships' + ctx['relation'].capitalize() + 'TabQuery', {'userID': state['user_id'], 'first': 20}
+        return 'graph.' + ctx['relation'], {'userID': state['user_id'], 'first': 20}
     if command == 'search':
         if ctx['type'] == 'users':
-            return 'useBarcelonaAccountSearchGraphQLDataSourceQuery', {'query': ctx['query']}
-        return 'BarcelonaSearchResultsQuery', {'query': ctx['query'], 'search_surface': 'tags' if ctx['tag'] else 'default',
+            return 'search.accounts', {'query': ctx['query']}
+        return 'search.posts', {'query': ctx['query'], 'search_surface': 'tags' if ctx['tag'] else 'default',
                                                'recent': int(ctx['sort'] == 'recent')}
-    return 'Barcelona' + ctx['collection'].capitalize() + 'PageViewerQuery', {}
+    return 'me.' + ctx['collection'], {}

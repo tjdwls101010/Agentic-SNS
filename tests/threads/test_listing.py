@@ -172,3 +172,10 @@ def test_the_profile_identity_comes_from_the_profile_preloader_not_another_user_
     result = run_cli('user', '@fixture_user', '--limit', '6', '--json')
     assert result.returncode == 0, result.stdout + result.stderr
     assert calls(routes.path.parent / 'requests.ndjson')[-1]['variables']['userID'] == '42'
+
+
+def test_search_text_is_sent_as_typed_even_when_it_looks_like_a_template(routes):
+    collections(routes).write()
+    result = run_cli('search', '<b>C|D', '--limit', '1', '--json')
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert calls(routes.path.parent / 'requests.ndjson')[-1]['variables']['query'] == '<b>C|D'

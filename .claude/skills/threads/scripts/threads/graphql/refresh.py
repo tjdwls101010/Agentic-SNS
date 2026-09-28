@@ -1,26 +1,14 @@
 """Discover metadata, verify through the same guarded transport, then merge atomically."""
-import json
 import re
 from datetime import date
 
 from ..errors import ThreadsError
-from ..guard.state import account_lock, cache_dir, write_state
-from .capture import CAPTURE, capture
+from .capture import CAPTURABLE, capture
 from .decode import read_page
-from .registry import SSR_ONLY
+from .operations import OPERATIONS
+from .registry import save
 from .ssr import SSR
 from .target import parse_target
-
-
-def save(updates):
-    with account_lock():
-        path = cache_dir() / 'registry.json'
-        try:
-            saved = json.loads(path.read_text()) if path.exists() else {'operations': {}}
-            saved['operations'].update(updates)
-            write_state('registry.json', saved)
-        except (ValueError, KeyError, AttributeError, OSError):
-            raise ThreadsError(6, 'Registry override cannot be merged; previous file preserved.') from None
 
 
 def flags(variables):
@@ -32,7 +20,9 @@ def flags(variables):
 def refresh(transport, capture_post=False, post_url=None):
     """Discover, verify and save; returns the system result, without the budget a command adds to it."""
     candidates, failed, updated = {}, {}, {}
-    wanted = set(CAPTURE if capture_post else transport.registry.operations.keys() - set(CAPTURE) - SSR_ONLY)
+    registry = transport.registry
+    wanted = set(CAPTURABLE if capture_post else [op.id for op in OPERATIONS.values() if op.discovery == 'route'])
+    by_name = {registry.name(operation): operation for operation in wanted}
     post_route = None
     post = parse_target(post_url, 'post') if post_url else None
     if capture_post and (not post or not post.username):
@@ -43,8 +33,8 @@ def refresh(transport, capture_post=False, post_url=None):
     def discover(html):
         ssr = SSR(html)
         for entry in ssr.preloaders:
-            if entry['name'] in wanted:
-                candidates[entry['name']] = entry
+            if entry['name'] in by_name:
+                candidates[by_name[entry['name']]] = entry
         return ssr
     if not capture_post:
         discover(html)
@@ -53,9 +43,9 @@ def refresh(transport, capture_post=False, post_url=None):
                 ssr = discover(transport.page(path))
                 if path == '/@' + viewer and not post:
                     try:
-                        data = ssr.select('BarcelonaProfileThreadsTabDirectQuery',
-                                          transport.session.identity('BarcelonaProfileThreadsTabDirectQuery', 'userID'))
-                        records = read_page(data, 'BarcelonaProfileThreadsTabDirectQuery').records
+                        user_id = transport.session.identity(registry.name('profile.threads'), 'userID')
+                        data = transport.rendered(ssr, 'profile.threads', user_id)
+                        records = read_page(data, OPERATIONS['profile.threads']).records
                         seed = next((p.get('url') for p in records if p.get('url')), None)
                         if seed:
                             post = parse_target(seed, 'post')
@@ -80,30 +70,32 @@ def refresh(transport, capture_post=False, post_url=None):
             post_route = 'not_checked'
             failed['post_route'] = 'No own post in SSR; supply --post URL to check that post pages still decode.'
     else:
-        observed = capture(transport, post, CAPTURE)
+        observed = capture(transport, post, [registry.name(operation) for operation in CAPTURABLE])
         for candidate in observed['queries']:
-            if candidate['name'] in wanted:
-                candidates[candidate['name']] = candidate
+            if candidate['name'] in by_name:
+                candidates[by_name[candidate['name']]] = candidate
         failed.update(observed.get('missing', {}))
-    for name, candidate in candidates.items():
-        spec = transport.registry.get(name)
-        spec.update(doc_id=candidate['doc_id'], flags=flags(candidate['variables']),
-                    captured_at=date.today().isoformat(), verified=True)
-        spec['flag_count'] = len(spec['flags'])
+    for operation, candidate in candidates.items():
+        entry = {'name': candidate['name'], 'doc_id': candidate['doc_id'], 'flags': flags(candidate['variables']),
+                 'captured_at': date.today().isoformat()}
         try:
             values = {key: value for key, value in candidate['variables'].items() if not key.startswith('__relay_internal__')}
-            transport.query(name, values, spec=spec)
-            updated[name] = spec
+            payload = transport.query(operation, values, entry=entry)
+            if OPERATIONS[operation].connection:
+                read_page(payload, OPERATIONS[operation])
+            updated[operation] = entry
         except ThreadsError as error:
             if error.code in (4, 5):
                 raise
-            failed[name] = error.error
+            failed[candidate['name']] = error.error
     if updated:
         save(updated)
-    missing = {name: failed.get(name, 'Not observed in this route/capture; previous registry entry retained.')
-               for name in transport.registry.operations if name not in updated and name not in SSR_ONLY}
+    missing = {registry.name(operation): failed.get(registry.name(operation),
+                                                    'Not observed in this route/capture; previous registry entry retained.')
+               for operation in registry.operations if operation not in updated}
     incomplete = wanted - updated.keys() or post_route == 'failed'
-    result = {'ok': not incomplete, 'updated': sorted(updated), 'missing': missing, 'failed': failed,
+    result = {'ok': not incomplete, 'updated': sorted(entry['name'] for entry in updated.values()), 'missing': missing,
+              'failed': failed,
               'stop_reason': 'query_failure' if incomplete else 'exhausted', 'code': 8 if incomplete else 0,
               'results': []}
     if post_route:

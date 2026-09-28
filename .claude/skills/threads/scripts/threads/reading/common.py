@@ -15,10 +15,9 @@ def check_actor(state, transport):
 
 
 def profile_from_route(ssr, transport, user_id):
-    name = 'BarcelonaProfilePageDirectQuery'
-    profile = ssr.select(name, user_id)['user']
+    profile = transport.rendered(ssr, 'profile.page', user_id)['user']
     if profile is None:
-        profile = transport.query(name, {'userID': user_id})['data']['user']
+        profile = transport.query('profile.page', {'userID': user_id})['data']['user']
     return profile
 
 
@@ -26,7 +25,7 @@ def check_access(page, transport, state):
     if page.records:
         return
     if state.get('private_unfollowed') is None:
-        profile = transport.query('BarcelonaProfilePageDirectQuery', {'userID': state['user_id']})['data']['user']
+        profile = transport.query('profile.page', {'userID': state['user_id']})['data']['user']
         state['private_unfollowed'] = bool(profile.get('text_post_app_is_private') and
                                           (profile.get('friendship_status') or {}).get('following') is False)
     if state['private_unfollowed']:
