@@ -4,7 +4,7 @@ import math
 import time
 
 from ..errors import ThreadsError
-from .state import account_lock, cache_dir, write_state
+from .state import cache_dir, write_state
 
 
 def check_blocked():
@@ -45,11 +45,3 @@ def set_blocked(reason):
     now = time.time()
     write_state('blocked.json', {'reason': reason, 'blocked_at': now,
                                 'expires_at': None if reason == 'checkpoint' else now + 1800})
-
-
-def unblock():
-    with account_lock():
-        try:
-            (cache_dir() / 'blocked.json').unlink(missing_ok=True)
-        except OSError:
-            raise ThreadsError(5, 'Account block could not be cleared.', 'Restore access to THREADS_HOME.') from None

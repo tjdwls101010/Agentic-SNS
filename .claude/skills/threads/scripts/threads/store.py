@@ -18,7 +18,6 @@ class OutFile:
     def __init__(self, path, context):
         self.path, self.context = Path(path).expanduser(), dict(context)
         self.ids, self.count, self.cursor, self.pending, self.complete = set(), 0, None, [], False
-        self.parent_count = 0
         self.stream = None
         try:
             fd = os.open(self.path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
@@ -64,7 +63,6 @@ class OutFile:
                     raise ThreadsError(2, 'Output page integrity check failed.', 'Preserve this file and use a new path.')
                 self.ids.update(x for x in page_ids if x is not None)
                 self.count += len(page)
-                self.parent_count += sum('post_id' in record and not record.get('depth') for record in page)
                 self.cursor = record.get('cursor')
                 self.complete = record.get('stop_reason') in ('exhausted', 'window_reached') or self.cursor == {'exhausted': True}
                 boundary, page = self.stream.tell(), []
@@ -94,7 +92,6 @@ class OutFile:
                                 'Free disk space and resume with the same command and file.') from None
         self.ids.update(new_ids)
         self.count += len(page)
-        self.parent_count += sum('post_id' in record and not record.get('depth') for record in page)
         self.cursor = cursor
         self.complete = stop_reason in ('exhausted', 'window_reached') or cursor == {'exhausted': True}
 

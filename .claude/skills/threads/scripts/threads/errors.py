@@ -1,8 +1,4 @@
-"""Public errors and the single scrub path for optional diagnostics."""
-import json
-import re
-import sys
-from urllib.parse import urlsplit, urlunsplit
+"""Public errors: a kind, a message, and the fix that says what to do next."""
 
 _FIXES = {
     2: 'Run this command with --help.',
@@ -20,11 +16,6 @@ CAPTURE = ('Ask the user first, because it opens a Threads tab in their browser;
            '`refresh --capture --post <public post URL>` and retry this command.')
 # {command} is filled in by the CLI with the command that failed.
 CHANGED = "Threads changed this response's shape; refresh cannot repair it. Tell the user the {command} reader needs an update."
-_SENSITIVE = {'fb_dtsg', 'lsd', 'jazoest', 'datr', 'sb', 'c_user', 'xs', 'token',
-              'csrf', 'csrf_token', 'sessionid', 'csrftoken', 'access_token', 'cookie', 'cookies', 'authorization'}
-_KEYS = '|'.join(re.escape(key) for key in sorted(_SENSITIVE))
-_JSON_SECRET = re.compile(r'"(' + _KEYS + r')"\s*:\s*"(?:\\.|[^"\\])*"', re.I)
-_FORM_SECRET = re.compile(r'\b(' + _KEYS + r')\s*[:=]\s*[^\s;&"\']+', re.I)
 
 
 class ThreadsError(Exception):
@@ -37,34 +28,6 @@ class ThreadsError(Exception):
 
     def as_dict(self):
         return {'ok': False, 'error': self.error, 'code': self.code, 'message': self.message, 'fix': self.fix}
-
-
-def scrub(value):
-    """Scrub cookie/token fields and bearer-like CDN query strings, without mutating input."""
-    if isinstance(value, dict):
-        return {key: '[REDACTED]' if str(key).lower() in _SENSITIVE else scrub(child)
-                for key, child in value.items()}
-    if isinstance(value, list):
-        return [scrub(child) for child in value]
-    if not isinstance(value, str):
-        return value
-    value = _JSON_SECRET.sub(lambda m: '"' + m[1] + '":"[REDACTED]"', value)
-    value = _FORM_SECRET.sub(lambda m: m[1] + '=[REDACTED]', value)
-    def url(match):
-        try:
-            parts = urlsplit(match[0])
-            host = (parts.hostname or '').lower()
-            if host == 'cdninstagram.com' or host.endswith('.cdninstagram.com') or host == 'fbcdn.net' or host.endswith('.fbcdn.net') or host == 'fbstatic-a.akamaihd.net':
-                return urlunsplit((parts.scheme, parts.netloc, parts.path, '', ''))
-        except ValueError:
-            return '[INVALID URL]'
-        return match[0]
-    return re.sub(r'https?://[^\s"\'<>]+', url, value)
-
-
-def diagnostic(stage, **details):
-    """Only caller-selected metadata belongs here; never source, ARGS, stdout or stderr."""
-    print(json.dumps(scrub({'stage': stage, **details}), ensure_ascii=False), file=sys.stderr)
 
 
 def rotated(message, capture=False):
