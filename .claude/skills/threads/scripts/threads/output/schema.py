@@ -37,10 +37,12 @@ MEANING = {
     ('Completeness', 'received_direct'): 'Readable direct replies in the one batch the page carries.',
     ('Completeness', 'shown_direct'): 'Received direct replies shown within --limit.',
     ('Completeness', 'shown_descendants'): 'Replies shown nested under the shown direct replies.',
-    ('Completeness', 'unshown_received'): 'Received but beyond --limit; a larger --limit shows them, no request needed.',
+    ('Completeness', 'unshown_received'): 'Received but beyond --limit; reading the post again with a larger --limit '
+                                          'shows them (one request).',
     ('Completeness', 'unavailable'): 'Direct replies received as tombstones.',
-    ('Completeness', 'unfetched'): 'About how many direct replies never arrived: reported minus received; null when '
-                                    'the counts disagree. Opening a reply does not fetch its missing siblings.',
+    ('Completeness', 'unfetched'): 'About how many direct replies never arrived: reported minus received minus '
+                                    'unavailable; null when that would be negative or nothing is reported. Opening a '
+                                    'reply does not fetch its missing siblings.',
     ('Completeness', 'unfetched_is_estimate'): 'True whenever unfetched is a number: it is arithmetic, not a count.',
 }
 STOPS = {
@@ -64,11 +66,12 @@ ERRORS = {
     'operation_rotated': 'Threads no longer answers this query as registered; fix names the refresh to run',
     'shape_changed': 'a response lacked what the reader reads; only a new version of the skill fixes it',
     'registry': 'the local query registry or its override cannot be read',
-    'budget': 'the request cap was spent before anything was read',
+    'budget': '--max-requests was reached; more: continues',
     'empty': 'Threads returned nothing for this target or window',
-    'partial': 'records were read, then something failed',
+    'partial': 'records were read, then something failed; for refresh, some queries were verified and others not',
     'unavailable': 'deleted, private and not followed, or redirected away from the post',
     'role_mismatch': 'refresh: a renamed query\'s replay was not the list it claimed to be',
+    'unverified': 'refresh verified no query; the previous registry is kept',
 }
 
 
@@ -108,7 +111,8 @@ def described(rule, description):
 STRING, INTEGER, BOOLEAN, OBJECT = {'type': 'string'}, {'type': 'integer'}, {'type': 'boolean'}, {'type': 'object'}
 NULLABLE_STRING = {'type': ['string', 'null']}
 FAILURE = {'error': {'$ref': '#/$defs/ErrorKind'}, 'message': STRING,
-           'fix': described(STRING, 'What to do next; a command in backticks runs as written.')}
+           'fix': described(STRING, 'What to do next. A command in backticks is this CLI invoked as more: writes it; '
+                                    'replace a <placeholder> with a real value first.')}
 
 
 def schema(exit_codes=None):
@@ -118,15 +122,19 @@ def schema(exit_codes=None):
     definitions['ErrorKind'] = {'enum': list(ERRORS), 'description': '; '.join(f'{k}: {v}' for k, v in ERRORS.items())}
     definitions['StopReason'] = {'enum': list(STOPS), 'description': '; '.join(f'{k}: {v}' for k, v in STOPS.items())}
     definitions['Budget'] = obj({
-        'kind': {'enum': ['local']}, 'used': described(INTEGER, 'Requests this command made.'),
+        'kind': {'enum': ['local']},
         'limit': described(INTEGER, 'This command\'s cap, --max-requests.'), 'remaining': INTEGER,
         'window_used': described(INTEGER, 'Requests every command on this account made in the last window_seconds.'),
+        'used': described(INTEGER, 'Requests this command made; with refresh --capture, the reservation for the tab, '
+                                   'not its uncounted start-up traffic.'),
         'window_limit': INTEGER, 'window_seconds': INTEGER},
         ['kind', 'used', 'limit', 'remaining', 'window_used', 'window_limit', 'window_seconds'],
         description='Counted locally: Threads sends no rate headers, so this is not a server allowance.')
     definitions['Error'] = obj({'ok': {'const': False}, 'code': described(INTEGER, 'The exit code.'), **FAILURE},
                                ['ok', 'error', 'code', 'message', 'fix'],
-                               description='What a command prints when it reads nothing.')
+                               description='What a command prints when it fails before it starts reading: arguments, '
+                                           'Aside, login, a block, an unreadable route. A failure while reading a '
+                                           'listing is a ReadResult with ok false and error, message and fix.')
     definitions['ReadResult'] = obj({
         'ok': described(BOOLEAN, 'False when something failed after records were read; error says what.'),
         'results': {'type': 'array', 'items': {'anyOf': [{'$ref': '#/$defs/Post'}, {'$ref': '#/$defs/User'}]},
@@ -139,7 +147,7 @@ def schema(exit_codes=None):
         'completeness': {'$ref': '#/$defs/Completeness'},
         'post_id': described(STRING, 'post: the numeric id of the post read.'),
         'reported_total': described({'type': ['integer', 'null']}, 'followers: the total Threads reports; the '
-                                                                    'sample is smaller.'),
+                                                                    'batch can hold fewer.'),
         'window': obj({'since': NULLABLE_STRING, 'until': NULLABLE_STRING,
                        'complete': described(BOOLEAN, 'The whole window was read: the surface ended, or a '
                                                       'newest-first tab passed its start.')},
@@ -167,7 +175,7 @@ def schema(exit_codes=None):
                                 'Whether a post page still decodes; refresh cannot repair a post page.'),
         'capture': described(OBJECT, 'refresh --capture: what the app tab did, including cleanup_confirmed.'),
         'stop_reason': {'$ref': '#/$defs/StopReason'}, 'next': {'type': 'null'},
-        'budget': {'$ref': '#/$defs/Budget'}, 'fetched_bytes': INTEGER},
+        'budget': {'$ref': '#/$defs/Budget'}, 'fetched_bytes': INTEGER, **FAILURE},
         ['ok', 'updated', 'renamed', 'missing', 'failed', 'stop_reason', 'budget', 'fetched_bytes'])
     definitions['OutHeader'] = obj({
         'kind': {'const': 'header'}, 'started_at': STRING, 'limit_unit': STRING, 'command': STRING,
@@ -183,6 +191,7 @@ def schema(exit_codes=None):
                     'dropped and read again.')
     return {'ok': True, '$schema': 'https://json-schema.org/draft/2020-12/schema', '$defs': definitions,
             'commands': {'home user about post graph search me': '#/$defs/ReadResult',
-                         'doctor': '#/$defs/Doctor', 'refresh': '#/$defs/Refresh', 'any failure': '#/$defs/Error',
+                         'doctor': '#/$defs/Doctor', 'refresh': '#/$defs/Refresh',
+                         'a failure before reading starts': '#/$defs/Error',
                          '--out file': 'OutHeader, then Post or User records, each page closed by OutPage'},
             'exit_codes': {str(code): meaning for code, meaning in (exit_codes or {}).items()}}

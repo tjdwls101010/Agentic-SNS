@@ -66,13 +66,15 @@ def classify(response, kind):
     if (re.match(r'^/(challenge|checkpoint)(/|$)', path) or codes & {368, 459} or challenge_html
             or any(x in message for x in ('checkpoint', 'challenge', 'consent_required'))):
         raise ThreadsError(5, 'Threads requires a checkpoint.',
-                           'Stop requests. Check Threads in Aside, then run `doctor --unblock`.', error='checkpoint')
+                           'Stop requests. Check Threads in Aside, then run `{cli} doctor --unblock`.', error='checkpoint')
     if status == 429 or codes & {4, 17, 613, 80004} or any(x in message for x in ('rate limit', 'too many request', 'try again later')):
         raise ThreadsError(5, 'Threads limited this account.', 'Stop requests for 30 minutes; the block expires automatically.', error='rate_limit')
     if (re.match(r'^/(accounts/login|login)(/|$)', path)
             or any(x in message for x in ('login_required', 'session expired', 'csrf'))
             or kind == 'page' and re.search(r'<form\b[^>]*action=["\'][^"\']*/accounts/login', body, re.I)):
         raise ThreadsError(4, 'Threads login is required.')
+    if kind == 'page' and status == 404:
+        raise ThreadsError(9, 'Threads has no page here (HTTP 404): deleted, or never existed.')
     if status >= 400:
         raise ThreadsError(6, f'Threads returned HTTP {status}.')
     if kind == 'page':
@@ -139,7 +141,12 @@ class Transport:
             self.session = Session.from_html(html)
             self.route = path
             if profile_check and re.fullmatch(r'/@[A-Za-z0-9_.]+/?', original):
-                if not any(p['name'] == self.registry.name('profile.page') for p in self.session.preloaders):
+                loaders = self.session.preloaders
+                if not any(p['name'] == self.registry.name('profile.page') for p in loaders):
+                    # A profile rendered under another query name is a rename refresh can find, not a missing profile.
+                    signature = OPERATIONS['profile.page'].signature
+                    if any(signature.fits(p['variables'], p['variables'].get('userID')) for p in loaders):
+                        raise rotated('The profile route renders its profile under another query name.')
                     raise ThreadsError(9, 'Authenticated route has no requested profile.')
             return html
         raise ThreadsError(6, 'Threads exceeded the three-redirect limit.')

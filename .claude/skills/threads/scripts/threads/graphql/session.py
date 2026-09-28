@@ -65,7 +65,7 @@ class Session:
             if 'DTSGInitialData' in html and not any((csrf, actor, viewer)):
                 raise ThreadsError(4, 'Threads login is required.')
             raise ThreadsError(6, 'Route HTML does not establish a logged-in session.',
-                               'Run `doctor` to check Aside and the route headers; a shell alone does not prove logout.')
+                               'Run `{cli} doctor` to check Aside and the route headers; a shell alone does not prove logout.')
         loaders = preloaders(html)
         if not loaders and '"__bbox"' not in html:
             raise changed('Authenticated HTML has no Relay payload structure.')

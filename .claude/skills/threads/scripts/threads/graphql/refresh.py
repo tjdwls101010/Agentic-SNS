@@ -61,7 +61,7 @@ def refresh(transport, capture_post=False, post_url=None):
     post = parse_target(post_url, 'post') if post_url else None
     if capture_post and (not post or not post.username):
         raise ThreadsError(2, 'Capture needs a canonical public post URL to start the SPA flow.',
-                           'Run `refresh --capture --post <public post URL>`.')
+                           'Run `{cli} refresh --capture --post <public post URL>` with a real post URL.')
     html = transport.page('/')
     viewer = transport.session.viewer
     if not capture_post:
@@ -140,8 +140,14 @@ def refresh(transport, capture_post=False, post_url=None):
     incomplete = wanted - updated.keys() or post_route == 'failed'
     result = {'ok': not incomplete, 'updated': sorted(entry['name'] for entry in updated.values()), 'renamed': renamed,
               'missing': missing, 'failed': failed,
-              'stop_reason': 'query_failure' if incomplete else 'exhausted', 'code': 8 if incomplete else 0,
-              'results': []}
+              'stop_reason': 'query_failure' if incomplete else 'exhausted', 'code': 0, 'results': []}
+    if incomplete and not updated:
+        result.update(code=6, error='unverified', message='refresh verified no query; the previous registry is kept.',
+                      fix='Tell the user the Threads reader could not recover; it may need an update.')
+    elif incomplete:
+        result.update(code=8, error='partial', message='Some queries were not verified; missing and failed say which.',
+                      fix='Retry the read that failed; if it fails again, tell the user the Threads reader needs an '
+                          'update.')
     if post_route:
         result['post_route'] = post_route
     if capture_post:

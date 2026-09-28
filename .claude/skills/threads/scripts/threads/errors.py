@@ -2,19 +2,19 @@
 
 _FIXES = {
     2: 'Run this command with --help.',
-    3: 'Check that Aside is running, then run `doctor`.',
-    4: 'Log in to Threads in Aside, then run `doctor`.',
-    5: 'Stop requests. Check Threads in Aside, then run `doctor --unblock`.',
+    3: 'Check that Aside is running, then run `{cli} doctor`.',
+    4: 'Log in to Threads in Aside, then run `{cli} doctor`.',
+    5: 'Stop requests. Check Threads in Aside, then run `{cli} doctor --unblock`.',
     6: 'Wait briefly before retrying; no automatic retry was made.',
     7: 'Try another target or date window; this is an explicitly empty result.',
     8: 'Run more: later, or rerun the same --out command.',
     9: 'This account cannot read it (deleted, private and not followed, or redirected away); tell the user rather '
        'than retrying.',
 }
-ROTATED = 'Run `refresh`, then retry this command.'
+ROTATED = 'Run `{cli} refresh`, then retry this command.'
 CAPTURE = ('Ask the user first, because it opens a Threads tab in their browser; then run '
-           '`refresh --capture --post <public post URL>` and retry this command.')
-# {command} is filled in by the CLI with the command that failed.
+           '`{cli} refresh --capture --post <public post URL>` with a real post URL, and retry this command.')
+# The CLI fills in {cli} (its own invocation, as more: writes it) and {command} (the command that failed).
 CHANGED = "Threads changed this response's shape; refresh cannot repair it. Tell the user the {command} reader needs an update."
 
 

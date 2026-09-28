@@ -25,9 +25,9 @@ def check_blocked():
     except FileNotFoundError:
         return None
     except (OSError, ValueError, TypeError, KeyError):
-        raise ThreadsError(5, 'Account protection state is unreadable.', 'Check Threads in Aside, then run `doctor --unblock`.') from None
+        raise ThreadsError(5, 'Account protection state is unreadable.', 'Check Threads in Aside, then run `{cli} doctor --unblock`.') from None
     raise ThreadsError(5, 'Threads requests are blocked for this account.',
-                       'Check Threads in Aside, then run `doctor --unblock`.' if reason == 'checkpoint'
+                       'Check Threads in Aside, then run `{cli} doctor --unblock`.' if reason == 'checkpoint'
                        else f'No retry before {expiry:.0f} (Unix time); the rate-limit block expires automatically.', error=reason)
 
 

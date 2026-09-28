@@ -5,13 +5,14 @@ import re
 import pytest
 
 from .fixtures.builders import ERRORS, envelope, feed, listed_post, null_profile, tab
-from .helpers import POST, calls, data, run_cli
+from .helpers import POST, calls, data, more_args, run_cli
 
 FOLLOWING = 'BarcelonaFeedDirectQuery'
 
 
 def commands(fix):
-    return re.findall(r'`([^`]+)`', fix)
+    """The commands a fix names, as the words after this CLI's invocation."""
+    return [' '.join(more_args(command)) for command in re.findall(r'`([^`]+)`', fix)]
 
 
 def test_a_rotated_route_query_is_refreshed_then_retried(routes):

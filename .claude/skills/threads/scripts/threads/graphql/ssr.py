@@ -57,9 +57,10 @@ class SSR:
             if data not in candidates:
                 candidates.append(data)
         if len(candidates) != 1:
-            # Rendered results are matched by their preloader's name, so a renamed operation lands here: refresh
-            # finds the new name. A missing payload is never an empty result.
-            raise rotated(f'The route has no unambiguous {operation} payload for this target.')
+            # A missing payload is never an empty result. With its preloader on the route, the payload itself
+            # changed; without it, the operation was renamed and refresh can find the new name.
+            message = f'The route has no unambiguous {operation} payload for this target.'
+            raise changed(message) if any(p['name'] == operation for p in self.preloaders) else rotated(message)
         return candidates[0]
 
     def post_page(self, code):
@@ -88,4 +89,11 @@ class SSR:
         for role, found in roles.items():
             if len(found) != 1:
                 raise changed(f'The post page has no unambiguous {role} payload for this post.')
-        return post_id, roles['post'][0], roles['parents'][0], roles['replies'][0]
+        parents, replies = roles['parents'][0], roles['replies'][0]
+        for data, path in ((parents, ('containing_thread', 'posts', 'edges')), (replies, ('direct_replies', 'edges'))):
+            value = data['media']['text_post_app_info']
+            for key in path:
+                value = value.get(key) if isinstance(value, dict) else None
+            if not isinstance(value, list):
+                raise changed('The post page has no ' + '.'.join(path) + ' list.')
+        return post_id, roles['post'][0], parents, replies

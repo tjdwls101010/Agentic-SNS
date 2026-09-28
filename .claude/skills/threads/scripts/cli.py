@@ -28,7 +28,8 @@ EXIT_CODES = {
     5: 'requests are blocked for this account (checkpoint, rate limit, full local window)',
     6: 'a request failed before any record was read',
     7: 'Threads returned nothing for this target or window',
-    8: 'partial: records were read, then a request failed or the request cap was reached',
+    8: 'stopped early: a request failed after some progress, or the request cap was reached; a listing\'s more: '
+       'resumes it, other commands are run again or follow their fix',
     9: 'the post or profile is unavailable (deleted, private, or a post that redirected away)',
 }
 MAX_REQUESTS = 40
@@ -106,11 +107,16 @@ OPTIONS = {
                                                                      'route page included (default 10, at most 40)'}),
     'unblock': (('--unblock',), {'action': 'store_true', 'help': 'After checking Threads in Aside yourself, make one '
                                                                 'login probe; a checkpoint is cleared only if it succeeds'}),
-    'capture': (('--capture',), {'action': 'store_true', 'help': 'Also open one Threads app tab to observe the queries '
-                                                                'only the app loads (ask the user first); needs --post'}),
-    'post': (('--post',), {'help': 'A public post URL: the page whose decoding is checked, and the tab --capture opens'}),
+    'capture': (('--capture',), {'action': 'store_true', 'help': 'Instead of reading routes, open one Threads app tab '
+                                                                'at --post to observe the queries only the app loads '
+                                                                '(ask the user first)'}),
+    'post': (('--post',), {'help': 'A public post URL: without --capture, the post page whose decoding refresh checks; '
+                                   'with --capture, the tab it opens'}),
 }
 READ = ('limit', 'chars', 'out', 'after', 'json', 'max_requests')
+# A listing's continuation reads its route page and one page of results, so it needs two requests at least.
+LISTING = {'max_requests': {'help': 'Threads requests this command may make, its route page included (default 10, '
+                                    'from 2 to 40)'}}
 # The order a query's identity is written in: continuation handles and --out headers compare it.
 IDENTITY = ('target', 'feed', 'tab', 'sort', 'query', 'type', 'tag', 'relation', 'collection', 'since', 'until')
 
@@ -139,18 +145,20 @@ def read_profile(args, ctx):
     return profile.run(args.target, max_requests=args.max_requests)
 
 
-TARGET = ('target', {'help': 'Threads @handle or profile URL (a tab URL such as /@name/replies reads that tab)'})
+TARGET = ('target', {'help': 'Threads @handle or profile URL'})
+TAB_TARGET = ('target', {'help': 'Threads @handle or profile URL; a tab URL such as /@name/replies reads that tab'})
 COMMANDS = {
     'home': Command('Read the for-you or following home feed.', read_listing,
                     ('feed', 'since', 'until', *READ), identity=('feed', 'since', 'until'),
-                    defaults={'feed': 'foryou'}, epilog='--since/--until need --feed following.'),
+                    defaults={'feed': 'foryou'}, epilog='--since/--until need --feed following.', overrides=LISTING),
     'user': Command('Read a profile tab: threads, replies, reposts or media.', read_listing,
-                    ('tab', 'since', 'until', *READ), (TARGET,), identity=('target', 'tab', 'since', 'until'),
+                    ('tab', 'since', 'until', *READ), (TAB_TARGET,), identity=('target', 'tab', 'since', 'until'),
                     defaults={'tab': 'threads'},
                     epilog='A date window is kept locally. Only the newest-first tabs (threads, replies) can prove '
-                           'that the window\'s start was passed; the result says whether the window was read whole.'),
-    'about': Command('Read a profile card: name, bio, links, privacy, follower count (one request). Threads '
-                     'publishes no following or mutual count; graph following lists the accounts.', read_profile, ('json', 'max_requests'), (TARGET,), identity=('target',)),
+                           'that the window\'s start was passed; the result says whether the window was read whole.', overrides=LISTING),
+    'about': Command('Read a profile card: name, bio, links, privacy, follower count (one request; two when the '
+                     'page renders no profile). Threads publishes no following or mutual count; graph following '
+                     'lists the accounts.', read_profile, ('json', 'max_requests'), (TARGET,), identity=('target',)),
     'post': Command('Read one post in full with its parent chain and first batch of replies (one page; replies do not '
                     'page further).', read_post, ('sort', 'limit', 'chars', 'json', 'max_requests'),
                     (('target', {'help': 'Post URL or shortcode (a shortcode costs a redirect request)'}),),
@@ -160,21 +168,23 @@ COMMANDS = {
                                                  'sub-replies; parents and the post are always shown'}}),
     'graph': Command('Read followers or following.', read_listing, READ[:1] + READ[2:],
                      (TARGET, ('relation', {'choices': ['followers', 'following'],
-                                            'help': 'followers: one server-chosen sample (the reported total is '
-                                                    'larger); following: pages on'})),
-                     identity=('target', 'relation')),
+                                            'help': 'followers: one batch Threads chooses, which can be fewer '
+                                                    'than the reported total; following: pages on'})),
+                     identity=('target', 'relation'), overrides=LISTING),
     'search': Command('Search posts, tags or accounts.', read_listing, ('type', 'sort', 'tag', *READ),
                       (('query', {'help': 'Search text'}),), identity=('sort', 'query', 'type', 'tag'),
                       defaults={'sort': 'top', 'type': 'posts'},
-                      epilog='--sort, --tag and --chars apply to post search only.'),
+                      epilog='--sort, --tag and --chars apply to post search only.', overrides=LISTING),
     'me': Command('Read your liked or saved posts (first batch only).', read_listing, READ,
                   (('collection', {'choices': ['liked', 'saved'], 'help': 'liked or saved'}),),
-                  identity=('collection',)),
+                  identity=('collection',), overrides=LISTING),
     'doctor': Command('Check Aside, login, account protection and registry age (one request; always JSON).',
                       lambda args, ctx: maintenance.doctor(args.unblock), ('unblock',)),
     'refresh': Command('Find rotated queries on Threads\' own pages, verify them by replay, and save an override '
                        '(always JSON).', lambda args, ctx: maintenance.refresh(args.capture, args.post),
-                       ('capture', 'post'), epilog='Up to 40 paced requests; --capture up to 60.'),
+                       ('capture', 'post'), epilog='Up to 40 paced requests. --capture reserves up to 60 for the '
+                                                  'tab it observes; the app\'s own start-up requests in that tab are '
+                                                  'neither counted nor paced.'),
     'schema': Command('Describe results, records, errors and --out files (no request; always JSON).',
                       lambda args, ctx: schema(EXIT_CODES)),
 }
@@ -202,9 +212,12 @@ def parser():
 def validate(args):
     """Combinations the parser cannot express, refused before any request."""
     if args.command == 'search' and args.type == 'users':
-        for flag, value in (('--sort', args.sort), ('--tag', args.tag), ('--chars', args.chars)):
-            if value not in (None, False):
+        for flag, given in (('--sort', args.sort is not None), ('--tag', args.tag is True), ('--chars', args.chars is not None)):
+            if given:
                 raise ThreadsError(2, f'{flag} applies to post search; account search returns one batch of cards.')
+    if COMMANDS[args.command].run is read_listing and args.max_requests == 1:
+        raise ThreadsError(2, '--max-requests must be at least 2 for a listing: a continuation reads its route page and '
+                              'one page of results.')
     if args.target is not None:
         args.target = resolve_target(args.target, 'post' if args.command == 'post' else 'user')
         if args.command == 'user' and args.target.tab:
@@ -264,6 +277,11 @@ def more_command(args, ctx, handle):
     return invocation() + ' ' + shlex.join(words + positionals)
 
 
+def filled(fix, args):
+    """A fix names this CLI as more: does, and the command that failed."""
+    return fix.replace('{cli}', invocation()).replace('{command}', args.command if args else 'this')
+
+
 def main(argv=None):
     args = None
     try:
@@ -275,15 +293,14 @@ def main(argv=None):
             result['next'] = more_command(args, ctx, result['next_handle'])
         code = result.pop('code', 0)
         if result.get('fix'):
-            result['fix'] = result['fix'].replace('{command}', args.command)
+            result['fix'] = filled(result['fix'], args)
         if args.json or args.command in ('doctor', 'refresh', 'schema'):
             print(json.dumps(result, ensure_ascii=False))
         else:
             print(render(result, args))
         return code
     except ThreadsError as error:
-        if args is not None:
-            error.fix = error.fix.replace('{command}', args.command)
+        error.fix = filled(error.fix, args)
         print(json.dumps(error.as_dict(), ensure_ascii=False))
         return error.code
     except (OSError, ValueError) as error:
