@@ -92,8 +92,10 @@ def fixtures(task, directory):
 
 
 def run(args):
-    runs = Path(args.runs)
+    runs = Path(args.runs).resolve()
     runs.mkdir(parents=True, exist_ok=True)
+    if args.snapshot:
+        args.snapshot = str(Path(args.snapshot).resolve())
     number = 1 + sum(1 for p in runs.glob(f'{args.task}-{args.arm}-*'))
     base = runs / f'{args.task}-{args.arm}-{number}'
     skill = base / 'skill' / 'threads'

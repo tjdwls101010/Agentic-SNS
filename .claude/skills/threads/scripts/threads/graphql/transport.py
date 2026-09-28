@@ -80,6 +80,9 @@ def classify(response, kind):
     if kind == 'page':
         return body
     if not isinstance(payload, dict):
+        if kind == 'graphql' and body.lstrip()[:15].lower().startswith(('<!doctype html', '<html')):
+            # The app shell instead of data: Threads no longer serves this query as the reader sends it.
+            raise changed('Threads answered the query with a web page instead of data.')
         raise ThreadsError(6, 'Threads returned incomplete or non-JSON data.')
     data = payload.get('data')
     useful = isinstance(data, dict) and any(value is not None for value in data.values())

@@ -64,9 +64,9 @@ class Operation:
     role: str | None = None             # what a replay must show: 'authored' posts by the profile, 'reposted' shares
 
 
-def _tab(name, legacy, route, chronological, role='authored', **variables):
+def _tab(name, legacy, route, chronological, role='authored', first=25, **variables):
     signature = Signature(frozenset({'userID', 'first', *variables}), frozenset({'after'}), (('userID', 'profile'),))
-    return Operation(name, (legacy,), 'route', route, {'userID': REQUIRED, 'first': 25, **variables, 'after': None},
+    return Operation(name, (legacy,), 'route', route, {'userID': REQUIRED, 'first': first, **variables, 'after': None},
                      'mediaData', 'thread_items', RELAY, 'mediaData', chronological=chronological,
                      signature=signature, role=role)
 
@@ -81,7 +81,8 @@ OPERATIONS = {op.id: op for op in [
               ssr_shape='user', identity='user', pagination=SINGLE_BATCH,
               signature=Signature(frozenset({'userID', 'canSeeFeedsTab', 'showLinkedIGStats'}),
                                   values=(('userID', 'profile'),))),
-    _tab('profile.threads', 'BarcelonaProfileThreadsTabDirectQuery', '/@{viewer}', True,
+    # Threads refuses this tab's query above ten posts a page (an execution error, as if rotated).
+    _tab('profile.threads', 'BarcelonaProfileThreadsTabDirectQuery', '/@{viewer}', True, first=10,
          allow_page_info_for_lox_user=False),
     _tab('profile.replies', 'BarcelonaProfileRepliesTabDirectQuery', '/@{viewer}/replies', True),
     _tab('profile.reposts', 'BarcelonaProfileRepostsTabDirectQuery', '/@{viewer}/reposts', False, role='reposted'),

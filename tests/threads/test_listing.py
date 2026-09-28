@@ -179,3 +179,10 @@ def test_search_text_is_sent_as_typed_even_when_it_looks_like_a_template(routes)
     result = run_cli('search', '<b>C|D', '--limit', '1', '--json')
     assert result.returncode == 0, result.stdout + result.stderr
     assert calls(routes.path.parent / 'requests.ndjson')[-1]['variables']['query'] == '<b>C|D'
+
+
+def test_the_threads_tab_asks_for_pages_threads_still_serves(fake_aside):
+    """Threads answers the threads tab's query with an execution error above ten posts a page (seen 2026-09-28)."""
+    run_cli('user', '@fixture_user', '--limit', '6', '--json')
+    sent = [c for c in calls(fake_aside) if c['name'] == 'BarcelonaProfileThreadsTabDirectQuery']
+    assert sent and all(c['variables']['first'] <= 10 for c in sent)

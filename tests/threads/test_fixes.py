@@ -79,3 +79,10 @@ def test_every_command_a_fix_or_continuation_names_runs_as_written(routes, setup
         words = command.replace('<public post URL>', POST).split()
         assert run_cli(*words).returncode != 2, command
     assert named or body.get('next')
+
+
+def test_a_query_answered_with_a_web_page_is_not_called_transient(routes):
+    """Threads answered the feed query with its app shell (seen 2026-09-28): retrying later does not help."""
+    routes.set(FOLLOWING, envelope('<!DOCTYPE html><html><head><title>Threads</title></head></html>')).write()
+    body = data(run_cli('home', '--feed', 'following', '--json'))
+    assert body['error'] == 'shape_changed' and 'home reader' in body['fix']

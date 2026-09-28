@@ -121,7 +121,7 @@ def query_for(ctx, state):
         return 'feed', {'variant': 'following' if following else 'for_you',
             'data': {'pagination_source': 'text_post_feed_following' if following else 'text_post_feed_threads', 'reason': 'cold_start_fetch'}}
     if command == 'user':
-        return 'profile.' + ctx['tab'], {'userID': state['user_id'], 'first': 25}
+        return 'profile.' + ctx['tab'], {'userID': state['user_id']}
     if command == 'graph':
         return 'graph.' + ctx['relation'], {'userID': state['user_id'], 'first': 20}
     if command == 'search':
