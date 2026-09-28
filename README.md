@@ -86,7 +86,7 @@ A successful read prints the profile row shown above, preceded by request and bu
 
 Each skill includes instructions for interpreting that platform's output. URLs and handles let the agent open the next relevant target; continuation commands let it read further when the question calls for it. `--json` supplies structured output, and `--out` supports larger local collections where available. yfinance returns JSON and writes the rows of a larger result to a CSV with `--out` for computation. [CLI reference and platform notes](docs/usage.md) cover the details.
 
-“Explore freely” means choosing a path through the implemented read operations. It does not mean every page or every reply is accessible. For example, X does not expand “More replies” branches or article bodies; Threads post reads do not paginate further sibling replies; Naver's neighbor feed has no further page. Commands report their stopping conditions so the agent can describe what it actually read.
+“Explore freely” means choosing a path through the implemented read operations. It does not mean every page or every reply is accessible. For example, X does not expand “More replies” branches or article bodies; Threads post reads do not paginate further sibling replies, and its feeds stop at the page Threads renders; Naver's neighbor feed has no further page. Commands report their stopping conditions so the agent can describe what it actually read.
 
 ## Why CLI and text?
 
