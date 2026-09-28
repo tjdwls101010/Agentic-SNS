@@ -50,3 +50,15 @@ def test_a_lost_connection_is_reported_as_the_bridge(routes):
     result = run_cli('doctor')
     assert result.returncode == 3
     assert 'lost its connection' in data(result)['message']
+
+
+# JSON escapes control characters below U+0020, so these are the line breaks that can arrive raw.
+@pytest.mark.parametrize('separator', ['\u2028', '\u2029', '\x85'])
+def test_post_text_with_a_unicode_line_separator_is_one_envelope(routes, separator):
+    """Aside prints JSON with raw characters; only a newline ends an envelope line (seen live 2026-09-28: U+2028)."""
+    body = routes.body('/').replace('Synthetic post 1', 'Synthetic post' + separator + 'one')
+    stdout = json.dumps({'status': 200, 'url': 'https://www.threads.com/', 'body': body}, ensure_ascii=False) + '\n'
+    routes.set('/', {'raw_stdout': stdout}).write()
+    result = run_cli('home', '--json')
+    assert result.returncode == 0, result.stdout
+    assert data(result)['results'][0]['text'] == 'Synthetic post' + separator + 'one'

@@ -35,7 +35,9 @@ def key(snippet, args):
 
 def load(snapshot):
     path = Path(snapshot) / 'responses.ndjson'
-    return {row['key']: row for row in map(json.loads, path.read_text().splitlines())} if path.exists() else {}
+    # Split on newlines only: str.splitlines() also breaks at U+2028 and others, which JSON keeps inside strings.
+    lines = path.read_text().split('\n') if path.exists() else []
+    return {row['key']: row for row in map(json.loads, filter(None, lines))}
 
 
 def serve(row):
@@ -84,7 +86,15 @@ def main():
         with open(log, 'a') as stream:
             stream.write(json.dumps({'snippet': snippet, 'key': key(snippet, args), 'name': args.get('name'),
                                      'path': args.get('path')}, ensure_ascii=False) + '\n')
-    return handle(sys.argv, snippet, args)
+    try:
+        return handle(sys.argv, snippet, args)
+    except Exception as error:  # the harness failing must invalidate the run, not pass for an Aside failure
+        log = os.environ.get('THREADS_HARNESS_LOG')
+        if log:
+            with open(log, 'a') as stream:
+                stream.write(json.dumps({'harness_error': repr(error)[:300]}) + '\n')
+        print('harness_error ' + repr(error)[:300], file=sys.stderr)
+        return MISS
 
 
 if __name__ == '__main__':

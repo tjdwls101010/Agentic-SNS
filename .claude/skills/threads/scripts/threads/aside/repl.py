@@ -34,7 +34,9 @@ def run(source, args):
         message = 'Aside request ended at the REPL time limit or lost its connection.' if timed_out else 'Aside request failed.'
         raise ThreadsError(3, message, 'Check Aside, then run `{cli} doctor`.')
     try:
-        lines = [re.sub(r'\x1b\[[0-9;]*m', '', line).strip() for line in result.stdout.splitlines()]
+        # Only a newline ends a line: post text inside the JSON can hold U+2028 and other characters
+        # str.splitlines() would also break at.
+        lines = [re.sub(r'\x1b\[[0-9;]*m', '', line).strip() for line in result.stdout.split('\n')]
         records = [json.loads(line) for line in lines if line.startswith('{')]
         if not records:
             raise ValueError

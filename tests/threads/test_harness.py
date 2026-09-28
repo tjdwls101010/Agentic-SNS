@@ -32,3 +32,24 @@ def test_offline_scenario_fixtures_are_synthetic(tmp_path):
                               capture_output=True, text=True)
         assert gate.returncode == 0, gate.stdout
     assert Routes  # the builders are the only source of these fixtures
+
+
+def test_a_recorded_text_with_a_line_separator_character_replays(fake_aside, tmp_path, routes):
+    """JSON keeps U+2028 inside strings; the snapshot is split on newlines only."""
+    body = routes.body('/').replace('Synthetic post 1', 'Synthetic post' + chr(0x2028) + 'one')
+    page = {'status': 200, 'url': 'https://www.threads.com/', 'body': body}
+    routes.set('/', {'raw_stdout': json.dumps(page, ensure_ascii=False) + '\n'}).write()  # Aside prints raw characters
+    snapshot = tmp_path / 'snapshot'
+    first = run_cli('home', '--json', env={'THREADS_RECORD': str(snapshot), 'THREADS_REAL_ASIDE': str(FAKE_ASIDE)})
+    replayed = run_cli('home', '--json', env={'THREADS_REPLAY': str(snapshot)})
+    assert replayed.returncode == 0, replayed.stdout + replayed.stderr
+    assert data(replayed)['results'] == data(first)['results']
+
+
+def test_a_harness_failure_invalidates_the_run_instead_of_looking_like_aside(fake_aside, tmp_path):
+    snapshot = tmp_path / 'snapshot'
+    snapshot.mkdir()
+    (snapshot / 'responses.ndjson').write_text('{broken\n')
+    log = tmp_path / 'misses.ndjson'
+    run_cli('home', '--json', env={'THREADS_REPLAY': str(snapshot), 'THREADS_HARNESS_LOG': str(log)})
+    assert 'harness_error' in log.read_text()

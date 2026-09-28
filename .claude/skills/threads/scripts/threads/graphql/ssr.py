@@ -59,7 +59,7 @@ class SSR:
         if len(candidates) != 1:
             # A missing payload is never an empty result. With its preloader on the route, the payload itself
             # changed; without it, the operation was renamed and refresh can find the new name.
-            message = f'The route has no unambiguous {operation} payload for this target.'
+            message = f'The route has no unambiguous {operation or shape} payload for this target.'
             known = operation is None or any(p['name'] == operation for p in self.preloaders)
             raise changed(message) if known else rotated(message)
         return candidates[0]
