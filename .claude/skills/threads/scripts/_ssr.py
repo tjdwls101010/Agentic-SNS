@@ -1,8 +1,11 @@
 """Read only Relay bbox results from JSON scripts, with operation/identity checks."""
+import re
 
 from ._errors import ThreadsError
 from ._session import Scripts, preloaders
 
+POST_PAGE_CHANGED = ('Threads changed the post page; refresh cannot repair it. '
+                     'Tell the user the post reader needs an update.')
 
 
 def matches(data, operation):
@@ -14,17 +17,15 @@ def matches(data, operation):
         return 'mediaData' in data
     if operation == 'BarcelonaSearchResultsQuery':
         return 'searchResults' in data
-    media = data.get('media')
-    if not isinstance(media, dict):
-        return False
-    info = media.get('text_post_app_info') or {}
-    if 'StrongIdTarget' in operation:
-        return 'code' in media
-    if 'StrongIdDownward' in operation:
-        return 'direct_replies' in info
-    if 'StrongIdUpward' in operation:
-        return 'containing_thread' in info
     return False
+
+
+def media_identity(media):
+    """A post payload's own id: pk, or the numeric head of the `<pk>_<author pk>` media id some payloads carry alone."""
+    if media.get('pk') is not None:
+        return str(media['pk'])
+    match = re.fullmatch(r'(\d+)_\d+', str(media.get('id') or ''))
+    return match[1] if match else None
 
 
 class SSR:
@@ -55,7 +56,7 @@ class SSR:
             ids = set()
             if isinstance(variables, dict):
                 ids.update(str(variables[k]) for k in ('postID', 'userID') if k in variables)
-            entity = data.get('media') if 'StrongId' in operation else data.get('user')
+            entity = data.get('user')
             if isinstance(entity, dict) and entity.get('pk') is not None:
                 ids.add(str(entity['pk']))
             if identity is not None:
@@ -71,3 +72,33 @@ class SSR:
             raise ThreadsError(6, f'The route has no unambiguous {operation} payload for this target.',
                                'Run refresh; do not treat a missing payload as an empty result.', error='envelope_drift')
         return candidates[0]
+
+    def post_page(self, code):
+        """The post a post route names, with its parent chain and first reply batch.
+
+        The route's preloaders all carry one postID. Each payload proves it is about that post by its own identity and
+        says what it is by its shape: the post itself has the requested shortcode, the parent chain has
+        containing_thread, the reply batch has direct_replies. Query names are never consulted, because Threads renames
+        them; a second payload claiming the same role is refused rather than guessed between.
+        """
+        ids = {str(p['variables']['postID']) for p in self.preloaders if 'postID' in p['variables']}
+        if len(ids) != 1 or not next(iter(ids)).isdigit():
+            raise ThreadsError(6, 'The post route does not name exactly one post.', POST_PAGE_CHANGED,
+                               error='envelope_drift')
+        post_id = ids.pop()
+        roles = {'post': [], 'parents': [], 'replies': []}
+        for _, _, data in self.results:
+            media = data.get('media')
+            if not isinstance(media, dict) or media_identity(media) != post_id:
+                continue
+            info = media.get('text_post_app_info')
+            info = info if isinstance(info, dict) else {}
+            for role, fits in (('post', media.get('code') == code), ('parents', 'containing_thread' in info),
+                               ('replies', 'direct_replies' in info)):
+                if fits and data not in roles[role]:
+                    roles[role].append(data)
+        for role, found in roles.items():
+            if len(found) != 1:
+                raise ThreadsError(6, f'The post page has no unambiguous {role} payload for this post.',
+                                   POST_PAGE_CHANGED, error='envelope_drift')
+        return post_id, roles['post'][0], roles['parents'][0], roles['replies'][0]

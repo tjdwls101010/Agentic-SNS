@@ -13,7 +13,7 @@ def run(args):
     html = transport.page(args.target.path + ('?sort_order=recent' if args.command == 'post' and args.sort == 'recent' else ''))
     if args.command == 'post':
         from ._thread import read_thread
-        return finish(read_thread(html, transport.session, args), transport)
+        return finish(read_thread(html, args), transport)
     user_id = transport.session.identity('BarcelonaProfilePageDirectQuery', 'userID')
     user = build_user(profile_from_route(SSR(html), transport, user_id))
     if not user or user.username.lower() != args.target.username:

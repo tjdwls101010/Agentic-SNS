@@ -7,8 +7,6 @@ from datetime import datetime
 def text(value, chars=180):
     value = str(value or '').replace('\r\n', '\n').replace('\r', '\n')
     value = re.sub(r'[\u200b-\u200d\ufeff]', '', value)
-    value = re.sub(r'\[([^]]+)\]\((https?://[^)]+)\)', r'\1 (\2)', value)
-    value = re.sub(r'\*\*|__|`', '', value)
     value = '⏎'.join(re.sub(r'\s+', ' ', line).strip() for line in value.splitlines()).strip('⏎ ')
     return value[:chars] + '…' if chars and len(value) > chars else value
 

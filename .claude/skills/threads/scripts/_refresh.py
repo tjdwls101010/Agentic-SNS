@@ -6,6 +6,7 @@ from datetime import date
 from ._blocked import account_lock, cache_dir, write_state
 from ._cmds_common import finish
 from ._errors import ThreadsError
+from ._registry import SSR_ONLY
 from ._ssr import SSR
 from ._target import parse_target
 from ._walk import read_page
@@ -33,8 +34,9 @@ def flags(variables):
 
 
 def refresh(transport, args):
-    candidates, documents, failed, updated = {}, {}, {}, {}
-    wanted = set(CAPTURE if args.capture else transport.registry.operations.keys() - set(CAPTURE))
+    candidates, failed, updated = {}, {}, {}
+    wanted = set(CAPTURE if args.capture else transport.registry.operations.keys() - set(CAPTURE) - SSR_ONLY)
+    post_route = None
     post = parse_target(args.post, 'post') if args.post else None
     if args.capture and (not post or not post.username):
         raise ThreadsError(2, 'Capture needs a canonical public post URL to start the SPA flow.',
@@ -46,7 +48,6 @@ def refresh(transport, args):
         for entry in ssr.preloaders:
             if entry['name'] in wanted:
                 candidates[entry['name']] = entry
-                documents[entry['name']] = ssr
         return ssr
     if not args.capture:
         discover(html)
@@ -67,15 +68,20 @@ def refresh(transport, args):
                 if error.code in (4, 5):
                     raise
                 failed[path] = error.error
+        # Post pages are read from the route itself, so refresh has nothing to update there; it only reports whether
+        # a post route still decodes into the post, its parents and its replies.
         if post:
             try:
-                discover(transport.page(post.path))
+                SSR(transport.page(post.path)).post_page(post.code)
+                post_route = 'decoded'
             except ThreadsError as error:
                 if error.code in (4, 5):
                     raise
-                failed['post_route'] = error.error
+                post_route = 'failed'
+                failed['post_route'] = error.message
         else:
-            failed['post_route'] = 'No own post in SSR; supply --post URL to verify the three post operations.'
+            post_route = 'not_checked'
+            failed['post_route'] = 'No own post in SSR; supply --post URL to check that post pages still decode.'
     else:
         capture = transport.capture(post, CAPTURE)
         for candidate in capture['queries']:
@@ -88,11 +94,8 @@ def refresh(transport, args):
                     captured_at=date.today().isoformat(), verified=True)
         spec['flag_count'] = len(spec['flags'])
         try:
-            if 'StrongId' in name:
-                documents[name].select(name, str(candidate['variables']['postID']))
-            else:
-                values = {key: value for key, value in candidate['variables'].items() if not key.startswith('__relay_internal__')}
-                transport.query(name, values, spec=spec)
+            values = {key: value for key, value in candidate['variables'].items() if not key.startswith('__relay_internal__')}
+            transport.query(name, values, spec=spec)
             updated[name] = spec
         except ThreadsError as error:
             if error.code in (4, 5):
@@ -101,11 +104,13 @@ def refresh(transport, args):
     if updated:
         save(updated)
     missing = {name: failed.get(name, 'Not observed in this route/capture; previous registry entry retained.')
-               for name in transport.registry.operations if name not in updated}
-    required_missing = wanted - updated.keys()
-    result = {'ok': not required_missing, 'updated': sorted(updated), 'missing': missing, 'failed': failed,
-              'stop_reason': 'query_failure' if required_missing else 'exhausted', 'code': 8 if required_missing else 0,
+               for name in transport.registry.operations if name not in updated and name not in SSR_ONLY}
+    incomplete = wanted - updated.keys() or post_route == 'failed'
+    result = {'ok': not incomplete, 'updated': sorted(updated), 'missing': missing, 'failed': failed,
+              'stop_reason': 'query_failure' if incomplete else 'exhausted', 'code': 8 if incomplete else 0,
               'results': []}
+    if post_route:
+        result['post_route'] = post_route
     if args.capture:
         result['capture'] = {key: value for key, value in capture.items() if key != 'queries'}
     return finish(result, transport)

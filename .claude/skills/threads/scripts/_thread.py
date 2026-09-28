@@ -23,17 +23,11 @@ class Completeness:
         return asdict(self)
 
 
-def read_thread(html, session, args):
-    ssr = SSR(html)
-    target_id = session.identity('BarcelonaPostPageStrongIdTargetQuery', 'postID')
-    raw = ssr.select('BarcelonaPostPageStrongIdTargetQuery', target_id)['media']
-    if str(raw.get('pk')) != target_id or raw.get('code') != args.target.code:
-        raise drift('The SSR post identity or shortcode differs from the requested post.')
-    post = build_post(raw)
+def read_thread(html, args):
+    target_id, target, upward, downward = SSR(html).post_page(args.target.code)
+    post = build_post(target['media'])
     if post is None or post.unavailable:
         raise ThreadsError(9, 'This post is unavailable.')
-    upward = ssr.select('BarcelonaPostPageStrongIdUpwardQuery', target_id)
-    downward = ssr.select('BarcelonaPostPageStrongIdDownwardQuery', target_id)
     parents = at(upward, 'media.text_post_app_info.containing_thread.posts.edges')
     threads = at(downward, 'media.text_post_app_info.direct_replies.edges')
     if not isinstance(parents, list) or not isinstance(threads, list):
