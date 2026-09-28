@@ -1,12 +1,13 @@
 """Pure contracts, tested in-process: response classification, record normalization, target parsing."""
 import json
+from pathlib import Path
 
 import pytest
 
 from threads.errors import ThreadsError
 from threads.graphql.normalize import build_counts, build_post, build_user
 from threads.graphql.target import parse_target
-from threads.graphql.transport import classify
+from threads.graphql.transport import classify, safe_path
 
 from .fixtures.builders import raw_post
 
@@ -118,3 +119,20 @@ def test_short_post_code_uses_budgeted_redirect_and_numeric_user_stays_a_name():
     assert parse_target('ABC_12-z', 'post').path == '/t/ABC_12-z'
     assert parse_target('https://threads.net/@alice/post/ABC/?x=1', 'post').code == 'ABC'
     assert parse_target('123', 'user').username == '123'
+
+
+# --- route parity: the transport and the browser snippet refuse the same routes ---------------------------------
+
+ROUTES = json.loads((Path(__file__).with_name('fixtures') / 'route_cases.json').read_text())
+
+
+@pytest.mark.parametrize('path', ROUTES['allowed'])
+def test_a_reading_route_is_allowed(path):
+    assert safe_path(path) == path
+
+
+@pytest.mark.parametrize('path', ROUTES['refused'])
+def test_a_route_outside_the_reading_surface_is_refused(path):
+    with pytest.raises(ThreadsError) as error:
+        safe_path(path)
+    assert error.value.code == 2

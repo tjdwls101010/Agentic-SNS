@@ -10,6 +10,9 @@ from .operations import OPERATIONS
 from .transport import classify, run_snippet
 
 
+# An operation the tab did not load: refresh never adopts a new name for these, so a rename needs a new version.
+UNSEEN_IN_TAB = ('Not observed in the app tab: it may be renamed — the skill needs an update — or the app served it '
+                 'from its cache.')
 # The operations only an app tab loads, in declaration order.
 CAPTURABLE = [op.id for op in OPERATIONS.values() if op.discovery == 'capture']
 
@@ -60,7 +63,7 @@ def capture(transport, post, targets):
             raise
         if not complete or not isinstance(result.get('queries'), list):
             raise ThreadsError(6, 'Capture count or candidates are incomplete; reservation retained.')
-        return {'queries': result['queries'], 'missing': {name: result.get('failed') or 'Not observed after bounded SPA actions; Relay may already cache this surface.'
+        return {'queries': result['queries'], 'missing': {name: result.get('failed') or UNSEEN_IN_TAB
                 for name in targets if not any(q.get('name') == name for q in result['queries'])},
                 'observed_requests': count - 1, 'bootstrap_count_known': False, 'app_mutations_possible': True,
                 'cleanup_confirmed': result.get('failed') != 'capture_cleanup_failed',

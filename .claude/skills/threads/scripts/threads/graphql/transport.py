@@ -90,7 +90,7 @@ def classify(response, kind):
 
 def safe_path(path):
     parsed = urlsplit(path)
-    if parsed.scheme or parsed.netloc or not path.startswith('/') or path.startswith('//') or '\\' in path:
+    if parsed.scheme or parsed.netloc or not path.startswith('/') or path.startswith('//') or '\\' in path or '#' in path:
         raise ThreadsError(2, 'Route must be a local Threads path.')
     if not re.fullmatch(r'/(?:|search|liked/?|saved/?|@[A-Za-z0-9_.]+(?:/(?:threads|replies|reposts|media|post/[A-Za-z0-9_-]+))?/?|t/[A-Za-z0-9_-]+/?)', parsed.path):
         raise ThreadsError(2, 'This Threads route is outside the read-only surface.')
@@ -120,7 +120,7 @@ class Transport:
                 raise
             return response, data
 
-    def page(self, path='/', *, unblock=False):
+    def page(self, path='/', *, unblock=False, profile_check=True):
         path = safe_path(path)
         original = path
         for _ in range(4):
@@ -138,21 +138,30 @@ class Transport:
                 continue
             self.session = Session.from_html(html)
             self.route = path
-            if re.fullmatch(r'/@[A-Za-z0-9_.]+/?', original):
+            if profile_check and re.fullmatch(r'/@[A-Za-z0-9_.]+/?', original):
                 if not any(p['name'] == self.registry.name('profile.page') for p in self.session.preloaders):
                     raise ThreadsError(9, 'Authenticated route has no requested profile.')
             return html
         raise ThreadsError(6, 'Threads exceeded the three-redirect limit.')
 
-    def query(self, operation, values, *, entry=None):
-        """Send one declared read under its current registry name (or `entry`, a candidate refresh is verifying) and
-        return the classified payload. The caller decodes it; an operation that declares an identity is checked here."""
+    def query(self, operation, values, *, entry=None, provisional=False):
+        """Send one declared read and return the classified payload; the caller decodes it, and an operation that
+        declares an identity is checked here.
+
+        The name sent is the registry's. `entry` carries a candidate id and flags refresh is verifying under that
+        name; only refresh may pass `provisional=True`, for one replay of a renamed preloader the route itself proved,
+        and even then the name must be a query that names no mutation."""
         selected = entry if entry is not None else self.registry.entry(operation)
+        admitted = self.registry.admitted()
+        if selected['name'] != self.registry.name(operation):
+            if not provisional or not re.fullmatch(r'[A-Za-z0-9_]+Query', selected['name']) or 'Mutation' in selected['name']:
+                raise ThreadsError(2, 'Only the registered read-only operations can be sent.')
+            admitted = admitted + [selected['name']]
         if not self.session:
             self.page('/')
         variables = self.registry.variables(operation, values, selected)
         try:
-            _, data = self._request('graphql', {'name': selected['name'], 'admitted': self.registry.admitted(),
+            _, data = self._request('graphql', {'name': selected['name'], 'admitted': admitted,
                                                 'doc_id': selected['doc_id'], 'variables': variables,
                                                 'csrf': self.session.csrf, 'referer': ORIGIN + self.route})
         except ThreadsError as error:

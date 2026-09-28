@@ -12,19 +12,5 @@ await (async () => {
     }
   });
   const received = await response.text();
-  const envelope = {status: response.status, url: response.url, body: received, location: response.headers.get('location')};
-  // Keep each log line below the measured 12 MiB ceiling without writing personal data to disk.
-  if (received.length > 1000000 && Buffer.byteLength(JSON.stringify(envelope)) > 8 * 1024 * 1024) {
-    let index = 0;
-    for (let offset = 0; offset < received.length;) {
-      let end = Math.min(offset + 512 * 1024, received.length);
-      const last = received.charCodeAt(end - 1);
-      if (end < received.length && last >= 0xD800 && last <= 0xDBFF) end--;
-      console.log(JSON.stringify({kind: 'body_chunk', index: index++, body: received.slice(offset, end)}));
-      offset = end;
-    }
-    envelope.body = '';
-    envelope.body_chunks = index;
-  }
-  console.log(JSON.stringify(envelope));
+  emitEnvelope({status: response.status, url: response.url, body: received, location: response.headers.get('location')});
 })();

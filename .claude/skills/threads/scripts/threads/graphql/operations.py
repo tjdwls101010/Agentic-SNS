@@ -31,6 +31,23 @@ SSR_ONLY = 'ssr_only'           # read from the route's own rendered payloads, n
 
 
 @dataclass(frozen=True)
+class Signature:
+    """How a route's preloader for this operation looks, flags aside: `required` <= its variable names <= `required`
+    plus `optional`, and each of `values` pinned: 'profile' is the one userID the route's preloaders share, 'query' the
+    route's own q parameter."""
+    required: frozenset
+    optional: frozenset = frozenset()
+    values: tuple = ()
+
+    def fits(self, variables, profile=None, query=None):
+        keys = {key for key in variables if not key.startswith('__relay_internal__')}
+        if not self.required <= keys <= self.required | self.optional:
+            return False
+        pinned = {'profile': profile, 'query': query}
+        return all(pinned[kind] is not None and str(variables.get(key)) == str(pinned[kind]) for key, kind in self.values)
+
+
+@dataclass(frozen=True)
 class Operation:
     id: str
     legacy_names: tuple        # Meta names it has had; a cache override written before the catalogue is keyed by them
@@ -43,29 +60,39 @@ class Operation:
     ssr_shape: str | None = None    # the data key that marks this operation's server-rendered result
     identity: str | None = None     # dotted path from data to the object whose pk must equal the userID variable
     chronological: bool = False     # newest first by writing time, so passing a window's start ends the read
+    signature: Signature | None = None  # route operations only: how a renamed preloader is recognised
+    role: str | None = None             # what a replay must show: 'authored' posts by the profile, 'reposted' shares
 
 
-def _tab(name, legacy, route, chronological, **variables):
+def _tab(name, legacy, route, chronological, role='authored', **variables):
+    signature = Signature(frozenset({'userID', 'first', *variables}), frozenset({'after'}), (('userID', 'profile'),))
     return Operation(name, (legacy,), 'route', route, {'userID': REQUIRED, 'first': 25, **variables, 'after': None},
-                     'mediaData', 'thread_items', RELAY, 'mediaData', chronological=chronological)
+                     'mediaData', 'thread_items', RELAY, 'mediaData', chronological=chronological,
+                     signature=signature, role=role)
 
 
 OPERATIONS = {op.id: op for op in [
     Operation('feed', ('BarcelonaFeedDirectQuery',), 'route', '/',
               {'data': {'pagination_source': REQUIRED, 'reason': REQUIRED}, 'variant': REQUIRED, 'after': None},
-              'feedData', 'text_post_app_thread.thread_items', RELAY, 'feedData'),
+              'feedData', 'text_post_app_thread.thread_items', RELAY, 'feedData',
+              signature=Signature(frozenset({'data', 'variant'}), frozenset({'after'}))),
     Operation('profile.page', ('BarcelonaProfilePageDirectQuery',), 'route', '/@{viewer}',
               {'userID': REQUIRED, 'canSeeFeedsTab': True, 'showLinkedIGStats': False},
-              ssr_shape='user', identity='user', pagination=SINGLE_BATCH),
+              ssr_shape='user', identity='user', pagination=SINGLE_BATCH,
+              signature=Signature(frozenset({'userID', 'canSeeFeedsTab', 'showLinkedIGStats'}),
+                                  values=(('userID', 'profile'),))),
     _tab('profile.threads', 'BarcelonaProfileThreadsTabDirectQuery', '/@{viewer}', True,
          allow_page_info_for_lox_user=False),
     _tab('profile.replies', 'BarcelonaProfileRepliesTabDirectQuery', '/@{viewer}/replies', True),
-    _tab('profile.reposts', 'BarcelonaProfileRepostsTabDirectQuery', '/@{viewer}/reposts', False),
+    _tab('profile.reposts', 'BarcelonaProfileRepostsTabDirectQuery', '/@{viewer}/reposts', False, role='reposted'),
     _tab('profile.media', 'BarcelonaProfileMediaTabDirectQuery', '/@{viewer}/media', False),
     Operation('search.posts', ('BarcelonaSearchResultsQuery',), 'route', '/search?q=a&serp_type=default',
               {'query': REQUIRED, 'search_surface': REQUIRED, 'recent': REQUIRED, 'tagID': None, 'meta_place_id': None,
                'power_search_info': None, 'trend_fbid': None, 'after': None},
-              'searchResults', 'thread.thread_items', RELAY, 'searchResults'),
+              'searchResults', 'thread.thread_items', RELAY, 'searchResults',
+              signature=Signature(frozenset({'query', 'search_surface', 'recent'}),
+                                  frozenset({'tagID', 'meta_place_id', 'power_search_info', 'trend_fbid', 'after'}),
+                                  (('query', 'query'),))),
     Operation('post.target', ('BarcelonaPostPageStrongIdTargetQuery',), 'ssr', pagination=SSR_ONLY),
     Operation('post.downward', ('BarcelonaPostPageStrongIdDownwardQuery',), 'ssr', pagination=SSR_ONLY),
     Operation('post.upward', ('BarcelonaPostPageStrongIdUpwardQuery',), 'ssr', pagination=SSR_ONLY),

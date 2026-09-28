@@ -3,7 +3,9 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const test = require('node:test');
-const source = fs.readFileSync(path.resolve(__dirname, '../../../.claude/skills/threads/scripts/threads/graphql/snippets/capture.js'), 'utf8');
+const scripts = path.resolve(__dirname, '../../../.claude/skills/threads/scripts/threads');
+const source = fs.readFileSync(path.join(scripts, 'aside/envelope.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(scripts, 'graphql/snippets/capture.js'), 'utf8');
 
 async function capture({budget = 4, kind = 'fetch', status = 200, checkpoint = false, responseBody} = {}) {
   const sent = [], output = [], pending = [];
@@ -46,7 +48,7 @@ async function capture({budget = 4, kind = 'fetch', status = 200, checkpoint = f
   }};
   const context = vm.createContext({ARGS: {url: 'https://www.threads.com/@fixture/post/FIX',
     targets: ['BarcelonaFriendshipsFollowersTabQuery'], actions: ['followers'], request_budget: budget},
-    Date, sleep: ms => new Promise(resolve => timer(resolve, ms)),
+    Date, Buffer, sleep: ms => new Promise(resolve => timer(resolve, ms)),
     openTab: async () => page, closeTab: async () => {closed++;}, console: {log: text => output.push(JSON.parse(text))}});
   try {
     const AsyncFunction = vm.runInContext('(async function(){}).constructor', context);
@@ -118,7 +120,7 @@ test('stalled capture stops by 59 seconds, closes the tab, and marks its count i
   const output = [];
   const context = vm.createContext({ARGS: {url: 'https://www.threads.com/@fixture/post/FIX',
     targets: ['BarcelonaFriendshipsFollowersTabQuery'], request_budget: 3},
-    Date: {now: () => now},
+    Date: {now: () => now}, Buffer,
     openTab: async () => ({evaluate: () => new Promise(() => {})}),
     closeTab: async () => {closed++;},
     sleep: ms => ms === 58000 ? new Promise(resolve => {expire = () => {now = 58000; resolve();};})

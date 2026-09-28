@@ -4,15 +4,20 @@ import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
 
 from ..errors import ThreadsError
 
 
+ENVELOPE = Path(__file__).with_name('envelope.js')
+
+
 def run(source, args):
-    """Run one browser snippet in the u0 account with ARGS bound, and return its single response envelope."""
+    """Run one browser snippet in the u0 account with ARGS and the shared envelope printer bound, and return its
+    single response envelope."""
     try:
-        code = 'const ARGS = ' + json.dumps(args, ensure_ascii=True) + ';\n' + source
-    except (ValueError, TypeError):
+        code = 'const ARGS = ' + json.dumps(args, ensure_ascii=True) + ';\n' + ENVELOPE.read_text(encoding='utf-8') + '\n' + source
+    except (OSError, ValueError, TypeError):
         raise ThreadsError(3, 'Browser snippet is missing or invalid.', 'Reinstall the Threads skill.') from None
     binary = os.environ.get('THREADS_ASIDE_BIN') or shutil.which('aside')
     if not binary:
