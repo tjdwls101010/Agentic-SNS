@@ -144,10 +144,6 @@ class Transport:
             user = at(data, 'data.user')
             if not isinstance(user, dict) or str(user.get('pk')) != str(variables['userID']):
                 raise drift('Profile response does not match the requested identity.')
-        elif 'StrongId' in name:
-            media = at(data, 'data.media')
-            if not isinstance(media, dict) or str(media.get('pk')) != str(variables['postID']):
-                raise drift('Post response does not match the requested identity.')
         else:
             read_page(data, name)
         return data

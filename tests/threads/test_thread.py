@@ -4,7 +4,6 @@ from argparse import Namespace
 import pytest
 
 from threads_skill._thread import read_thread
-from threads_skill._session import Session
 from threads_skill._target import parse_target
 from threads_skill._errors import ThreadsError
 from .test_models import raw_post
@@ -30,7 +29,7 @@ def thread_html():
 def test_thread_coverage_counts_direct_and_descendants_separately(tmp_path):
     html = thread_html()
     args = Namespace(target=parse_target('/@fixture_user/post/FIX_2', 'post'), limit=1, sort='top', out=None, command='post')
-    result = read_thread(html, Session.from_html(html), args)
+    result = read_thread(html, args)
     assert [p['id'] for p in result['results']] == ['1', '2', '3', '4']
     assert result['completeness'] == {'reported_direct': 12, 'received_direct': 2, 'shown_direct': 1,
         'shown_descendants': 1, 'unshown_received': 1, 'unavailable': 0, 'unfetched': 10, 'unfetched_is_estimate': True}
@@ -38,7 +37,7 @@ def test_thread_coverage_counts_direct_and_descendants_separately(tmp_path):
     assert result['results'][-1]['reply_to_id'] == '3'
     assert result['results'][-1]['depth'] == 1
     args.limit = 2
-    result = read_thread(html, Session.from_html(html), args)
+    result = read_thread(html, args)
     assert result['results'][-1]['relation'] == 'thread continuation'
     assert result['results'][-1]['reply_to_id'] is None
 
@@ -47,13 +46,13 @@ def test_post_code_mismatch_is_never_rendered():
     html = thread_html()
     args = Namespace(target=parse_target('/@fixture_user/post/WRONG', 'post'), limit=1, sort='top', out=None)
     with pytest.raises(ThreadsError):
-        read_thread(html, Session.from_html(html), args)
+        read_thread(html, args)
 
 
 def test_tombstone_does_not_discard_its_received_descendants():
     html = thread_html().replace(json.dumps(raw_post('3')), json.dumps({'pk': '3', 'is_post_unavailable': True}))
     args = Namespace(target=parse_target('/@fixture_user/post/FIX_2', 'post'), limit=10, sort='top', out=None)
-    result = read_thread(html, Session.from_html(html), args)
+    result = read_thread(html, args)
     assert '4' in [item['id'] for item in result['results']]
     assert result['completeness']['unavailable'] == 1
     assert result['completeness']['shown_descendants'] == 2

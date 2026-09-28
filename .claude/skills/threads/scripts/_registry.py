@@ -7,6 +7,10 @@ from ._blocked import cache_dir
 from ._errors import ThreadsError
 
 BUNDLED = Path(__file__).with_name('registry.json')
+# Post pages are read from the route's own server-rendered payloads, never queried; these entries remain only so that
+# existing cache overrides naming them still load.
+SSR_ONLY = frozenset({'BarcelonaPostPageStrongIdTargetQuery', 'BarcelonaPostPageStrongIdUpwardQuery',
+                      'BarcelonaPostPageStrongIdDownwardQuery'})
 
 
 class Registry:
@@ -27,7 +31,7 @@ class Registry:
                                error='envelope_drift') from None
 
     def get(self, name):
-        if name not in self.operations:
+        if name not in self.operations or name in SSR_ONLY:
             raise ThreadsError(2, 'Only the bundled read-only operations are available.')
         return copy.deepcopy(self.operations[name])
 

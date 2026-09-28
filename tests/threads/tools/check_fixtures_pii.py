@@ -26,9 +26,11 @@ def problems(value, key=''):
     elif value is not None:
         string = str(value)
         synthetic = string.lower().startswith(('synthetic', 'fixture', 'fix_'))
+        # A registry template placeholder such as <pk> names a slot, not a value.
+        placeholder = bool(re.fullmatch(r'<[a-z_ ]+>', string))
         if key in SECRETS and not synthetic:
             found.append('non-synthetic credential field')
-        if key in IDENTITIES and not re.fullmatch(r'\d{1,6}', string):
+        if key in IDENTITIES and not placeholder and not re.fullmatch(r'\d{1,6}(?:_\d{1,6})?', string):
             found.append('non-synthetic identity')
         if key in TEXT and string and not synthetic:
             found.append('non-synthetic text or name')
