@@ -1,34 +1,29 @@
 """Listings (home, profile tabs, search, the viewer's collections) through the CLI: pages, continuation and failure."""
 import pytest
 
-from .fixtures.builders import ERRORS, PROFILE, bbox, envelope, feed, listed_post, null_profile, collections, preloader, route, tab
+from .fixtures.builders import ERRORS, PROFILE, bbox, envelope, listed_post, null_profile, collections, preloader, route, tab
 from .helpers import calls, data, run_cli, run_more
 
-FOLLOWING = 'BarcelonaFeedDirectQuery'
+REPLIES = 'BarcelonaProfileRepliesTabDirectQuery'
 
 
-def test_home_reuses_the_rendered_first_page_and_continues_from_the_unshown_tail(fake_aside):
+def test_home_reads_the_rendered_first_page_and_never_a_feed_query(fake_aside):
+    """Threads refuses feed queries from outside its app tab (2026-09-28): a feed is its route's rendered page."""
     first = run_cli('home', '--limit', '3', '--json')
     assert first.returncode == 0, first.stdout + first.stderr
     result = data(first)
     assert [p['id'] for p in result['results']] == ['1', '2', '3']
-    assert result['budget']['used'] == 1
-    second = run_cli('home', '--limit', '3', '--after', str(result['next_handle']), '--json')
-    assert second.returncode == 0, second.stdout + second.stderr
-    continuation = data(second)
-    assert [p['id'] for p in continuation['results']] == ['4', '5', '6']
-    assert continuation['budget']['used'] == 2
-    last = data(run_more(continuation['next']))
-    assert [p['id'] for p in last['results']] == ['7'] and last['stop_reason'] == 'exhausted' and last['next'] is None
+    assert result['stop_reason'] == 'not_paginable' and result['budget']['used'] == 1
+    rest = data(run_more(result['next']))
+    assert [p['id'] for p in rest['results']] == ['4'] and rest['next'] is None
+    assert [c['snippet'] for c in calls(fake_aside)] == ['page', 'page']
 
 
-def test_following_feed_does_not_reuse_for_you_ssr(fake_aside):
-    result = run_cli('home', '--feed', 'following', '--limit', '3', '--json')
+def test_the_following_feed_is_the_following_route(fake_aside):
+    result = run_cli('home', '--feed', 'following', '--json')
     assert result.returncode == 0, result.stdout + result.stderr
-    made = calls(fake_aside)
-    assert len(made) == 2
-    assert made[-1]['variables']['variant'] == 'following'
-    assert made[-1]['variables']['data']['pagination_source'] == 'text_post_feed_following'
+    assert data(result)['results'][0]['text'] == 'Synthetic followed post 1'
+    assert [c['path'] for c in calls(fake_aside)] == ['/following']
 
 
 def test_profile_continues_from_the_rendered_page_cursor(fake_aside):
@@ -61,44 +56,44 @@ def test_private_tabs_are_unavailable_even_when_profile_ssr_is_null(routes, tab_
 
 
 def test_an_empty_page_advances_and_a_failed_page_resumes_from_the_last_good_cursor(routes):
-    routes.set(FOLLOWING, envelope(feed([], 'A')))
-    routes.set(FOLLOWING + ':after=A', envelope(feed([listed_post(1)], 'B')))
-    routes.set(FOLLOWING + ':after=B', ERRORS['http'], envelope(feed([listed_post(2), listed_post(3)])))
+    routes.set(REPLIES, envelope(tab([], 'A')))
+    routes.set(REPLIES + ':after=A', envelope(tab([listed_post(1)], 'B')))
+    routes.set(REPLIES + ':after=B', ERRORS['http'], envelope(tab([listed_post(2), listed_post(3)])))
     routes.write()
-    partial = run_cli('home', '--feed', 'following', '--limit', '4', '--json')
+    partial = run_cli('user', '@fixture_user', '--tab', 'replies', '--limit', '4', '--json')
     assert partial.returncode == 8, partial.stdout + partial.stderr
     body = data(partial)
     assert [p['id'] for p in body['results']] == ['1'] and body['stop_reason'] == 'query_failure'
     resumed = run_more(body['next'])
     assert resumed.returncode == 0, resumed.stdout + resumed.stderr
     assert [p['id'] for p in data(resumed)['results']] == ['2', '3']
-    assert [c['key'] for c in calls(routes.path.parent / 'requests.ndjson')][-1] == FOLLOWING + ':after=B'
+    assert [c['key'] for c in calls(routes.path.parent / 'requests.ndjson')][-1] == REPLIES + ':after=B'
 
 
 def test_a_repeated_cursor_stops_with_what_was_read_instead_of_looping(routes):
-    routes.set(FOLLOWING, envelope(feed([listed_post(1)], 'A')))
-    routes.set(FOLLOWING + ':after=A', envelope(feed([listed_post(2)], 'A')))
+    routes.set(REPLIES, envelope(tab([listed_post(1)], 'A')))
+    routes.set(REPLIES + ':after=A', envelope(tab([listed_post(2)], 'A')))
     routes.write()
-    result = run_cli('home', '--feed', 'following', '--limit', '5', '--json')
+    result = run_cli('user', '@fixture_user', '--tab', 'replies', '--limit', '5', '--json')
     assert result.returncode == 8, result.stdout + result.stderr
     assert data(result)['stop_reason'] == 'query_failure'
     assert [p['id'] for p in data(result)['results']] == ['1']
 
 
 def test_a_page_without_its_pagination_contract_is_drift_not_the_end(routes):
-    routes.set(FOLLOWING, envelope({'data': {'feedData': {'edges': []}}}))
+    routes.set(REPLIES, envelope({'data': {'feedData': {'edges': []}}}))
     routes.write()
-    result = run_cli('home', '--feed', 'following', '--json')
+    result = run_cli('user', '@fixture_user', '--tab', 'replies', '--json')
     assert result.returncode == 6
-    assert data(result)['error'] == 'envelope_drift'
+    assert data(result)['error'] == 'shape_changed'
 
 
 def test_a_response_of_another_shape_is_drift(routes):
-    routes.set(FOLLOWING, envelope({'data': {'unexpected': True}}))
+    routes.set(REPLIES, envelope({'data': {'unexpected': True}}))
     routes.write()
-    result = run_cli('home', '--feed', 'following', '--json')
+    result = run_cli('user', '@fixture_user', '--tab', 'replies', '--json')
     assert result.returncode == 6
-    assert data(result)['error'] == 'envelope_drift'
+    assert data(result)['error'] == 'shape_changed'
 
 
 def test_a_rendered_tab_for_another_profile_is_not_read_as_this_one(routes):
@@ -143,7 +138,7 @@ def test_unknown_saved_shape_is_not_claimed_to_be_empty(routes):
     collections(routes).write()
     result = run_cli('me', 'saved', '--json')
     assert result.returncode == 6
-    assert data(result)['error'] == 'envelope_drift'
+    assert data(result)['error'] == 'shape_changed'
 
 
 def test_date_window_file_completion_is_zero_request_on_repeat(fake_aside, tmp_path):
@@ -156,9 +151,9 @@ def test_date_window_file_completion_is_zero_request_on_repeat(fake_aside, tmp_p
 
 
 def test_a_date_window_keeps_only_posts_written_inside_it(routes):
-    routes.set(FOLLOWING, envelope(feed([listed_post(1, taken_at=1790000000), listed_post(2, taken_at=1780000000)])))
+    routes.set(REPLIES, envelope(tab([listed_post(1, taken_at=1790000000), listed_post(2, taken_at=1780000000)])))
     routes.write()
-    result = run_cli('home', '--feed', 'following', '--since', '2026-09-01', '--json')
+    result = run_cli('user', '@fixture_user', '--tab', 'replies', '--since', '2026-09-01', '--json')
     assert result.returncode == 0, result.stdout + result.stderr
     # 1790000000 is 2026-09-21; 1780000000 is 2026-05-28.
     assert [p['id'] for p in data(result)['results']] == ['1']
@@ -179,3 +174,10 @@ def test_search_text_is_sent_as_typed_even_when_it_looks_like_a_template(routes)
     result = run_cli('search', '<b>C|D', '--limit', '1', '--json')
     assert result.returncode == 0, result.stdout + result.stderr
     assert calls(routes.path.parent / 'requests.ndjson')[-1]['variables']['query'] == '<b>C|D'
+
+
+def test_the_threads_tab_asks_for_pages_threads_still_serves(fake_aside):
+    """Threads answers the threads tab's query with an execution error above ten posts a page (seen 2026-09-28)."""
+    run_cli('user', '@fixture_user', '--limit', '6', '--json')
+    sent = [c for c in calls(fake_aside) if c['name'] == 'BarcelonaProfileThreadsTabDirectQuery']
+    assert sent and all(c['variables']['first'] <= 10 for c in sent)

@@ -54,22 +54,26 @@ def post_lines(post, label, chars, full=False):
 
 
 def render(result, args):
+    chars = 180 if args.chars is None else args.chars
     budget = result.get('budget', {})
     header = f'{args.command} · {len(result.get("results", []))} shown · stopped={result.get("stop_reason")} · '
     ctx = result.get('context', {})
-    header += ''.join(f'{key}={ctx[key]} · ' for key in ('feed', 'tab', 'sort') if key in ctx)
-    header += f'fetched {result.get("fetched_bytes", 0) / 1000000:.1f}MB · local budget {budget.get("remaining", 0)} of {budget.get("limit", 0)} (window {budget.get("window_used", 0)}/{budget.get("window_limit", 120)})'
+    header += ''.join(f'{key}={ctx[key]} · ' for key in ('feed', 'tab', 'sort', 'relation') if key in ctx)
+    header += (f'requests {budget.get("used", 0)} of {budget.get("limit", 0)} · window '
+               f'{budget.get("window_used", 0)}/{budget.get("window_limit", 120)} per 10 min · '
+               f'fetched {result.get("fetched_bytes", 0) / 1000000:.1f}MB')
     lines = [header]
     completeness = result.get('completeness')
     if completeness:
         c = completeness
         estimate = f'≈{c["unfetched"]}, estimate' if c.get('unfetched') is not None else 'unknown'
-        lines.append(f'replies: {c["received_direct"]} of ~{c["reported_direct"]} direct received (unfetched {estimate}) · '
+        reported = 'unknown' if c.get('reported_direct') is None else f'~{c["reported_direct"]}'
+        lines.append(f'replies: {c["received_direct"]} of {reported} direct received (unfetched {estimate}) · '
                      f'{c["shown_direct"]} shown · +{c["shown_descendants"]} descendants · {c["unshown_received"]} received but not shown · {c["unavailable"]} unavailable')
     for index, record in enumerate(result.get('results', []), 1):
         if 'author' in record:
             label = 'parent' if record.get('role') == 'parent' else ('r' if record.get('role') == 'reply' else 'p') + str(index)
-            lines.extend(post_lines(record, label, args.chars, full=args.command == 'post' and record.get('role') == 'post'))
+            lines.extend(post_lines(record, label, chars, full=args.command == 'post' and record.get('role') == 'post'))
         else:
             counts = record.get('counts') or {'followers': record.get('follower_count')}
             fields = [person(record)] + [f'{key}={"unknown" if value is None else value}' for key, value in counts.items()]
@@ -90,4 +94,19 @@ def render(result, args):
         lines.append('open: post <url> · person: user @name / about @name / graph @name followers')
     if result.get('message'):
         lines.append(text(result['message'], 0) + ' · fix: ' + text(result.get('fix'), 0))
+    if result.get('window'):
+        lines.append(window_line(result['window'], result.get('stop_reason'), bool(result.get('next'))))
     return '\n'.join(lines)
+
+
+def window_line(window, stop, more):
+    bounds = ' · '.join(f'{key} {window[key]}' for key in ('since', 'until') if window.get(key))
+    if stop == 'window_reached':
+        coverage = "complete: passed the window's start in newest-first order"
+    elif window.get('complete'):
+        coverage = 'complete: read to the end of this surface'
+    else:
+        coverage = f'partial: stopped at {stop} before the window was read' + ('; more: reads on' if more else '')
+    undated = window.get('undated') or 0
+    left_out = f' · {undated} undated post{"" if undated == 1 else "s"} left out' if undated else ''
+    return f'window: {bounds} · {coverage}{left_out}'

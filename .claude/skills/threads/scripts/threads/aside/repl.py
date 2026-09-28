@@ -4,15 +4,20 @@ import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
 
 from ..errors import ThreadsError
 
 
+ENVELOPE = Path(__file__).with_name('envelope.js')
+
+
 def run(source, args):
-    """Run one browser snippet in the u0 account with ARGS bound, and return its single response envelope."""
+    """Run one browser snippet in the u0 account with ARGS and the shared envelope printer bound, and return its
+    single response envelope."""
     try:
-        code = 'const ARGS = ' + json.dumps(args, ensure_ascii=True) + ';\n' + source
-    except (ValueError, TypeError):
+        code = 'const ARGS = ' + json.dumps(args, ensure_ascii=True) + ';\n' + ENVELOPE.read_text(encoding='utf-8') + '\n' + source
+    except (OSError, ValueError, TypeError):
         raise ThreadsError(3, 'Browser snippet is missing or invalid.', 'Reinstall the Threads skill.') from None
     binary = os.environ.get('THREADS_ASIDE_BIN') or shutil.which('aside')
     if not binary:
@@ -20,16 +25,19 @@ def run(source, args):
     try:
         result = subprocess.run([binary, '--account', 'u0', 'repl', code], capture_output=True, text=True, timeout=125)
     except subprocess.TimeoutExpired:
-        raise ThreadsError(3, 'Aside request exceeded its 120-second time limit.', 'Reduce the request size.') from None
+        raise ThreadsError(3, 'Aside request exceeded its 120-second time limit.',
+                           'Check Aside with `{cli} doctor`, then retry once; if the same read times out again, tell the user.') from None
     except (OSError, UnicodeError):
-        raise ThreadsError(3, 'Aside could not run.', 'Start Aside, then run doctor.') from None
+        raise ThreadsError(3, 'Aside could not run.', 'Start Aside, then run `{cli} doctor`.') from None
     if result.returncode:
         timed_out = any(s in (result.stderr + result.stdout).lower()
                         for s in ('other side closed', 'daemon is not reachable'))
         message = 'Aside request ended at the REPL time limit or lost its connection.' if timed_out else 'Aside request failed.'
-        raise ThreadsError(3, message, 'Check Aside, then run doctor.')
+        raise ThreadsError(3, message, 'Check Aside, then run `{cli} doctor`.')
     try:
-        lines = [re.sub(r'\x1b\[[0-9;]*m', '', line).strip() for line in result.stdout.splitlines()]
+        # Only a newline ends a line: post text inside the JSON can hold U+2028 and other characters
+        # str.splitlines() would also break at.
+        lines = [re.sub(r'\x1b\[[0-9;]*m', '', line).strip() for line in result.stdout.split('\n')]
         records = [json.loads(line) for line in lines if line.startswith('{')]
         if not records:
             raise ValueError
@@ -54,4 +62,4 @@ def run(source, args):
             raise ValueError
         return envelope
     except (ValueError, TypeError, OSError, UnicodeError):
-        raise ThreadsError(3, 'Aside returned an invalid response envelope.', 'Run doctor to check the browser bridge.') from None
+        raise ThreadsError(3, 'Aside returned an invalid response envelope.', 'Run `{cli} doctor` to check the browser bridge.') from None

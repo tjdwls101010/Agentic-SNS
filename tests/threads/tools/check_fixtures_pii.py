@@ -51,7 +51,7 @@ def problems(value, key=''):
                 parsed = urlsplit(value)
                 allowed = (parsed.hostname or '').endswith(('.invalid', '.test')) or parsed.hostname == 'example.com'
                 if parsed.hostname == 'www.threads.com':
-                    allowed = parsed.path in ('/', '/graphql/query') or parsed.path.startswith('/@fixture')
+                    allowed = parsed.path in ('/', '/following', '/graphql/query') or parsed.path.startswith('/@fixture')
                 if not allowed or parsed.query:
                     found.append('non-synthetic URL or signature')
             if re.search(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', value) and '@example.' not in value:

@@ -37,4 +37,4 @@ def test_a_following_cursor_that_is_not_an_offset_is_drift(routes):
     routes.write()
     result = run_cli('graph', '@fixture_user', 'following', '--json')
     assert result.returncode == 6
-    assert data(result)['error'] == 'envelope_drift'
+    assert data(result)['error'] == 'shape_changed'

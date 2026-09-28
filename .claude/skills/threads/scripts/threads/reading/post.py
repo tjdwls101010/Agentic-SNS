@@ -7,23 +7,13 @@ from ..graphql.normalize import build_post
 from ..graphql.ssr import SSR
 from ..graphql.transport import Transport
 from ..model import Completeness
-from ..store import OutFile
 from .common import finish
 
 
-def run(target, *, sort, limit, out, ctx):
-    transport = Transport(40 if limit or out else 10)
+def run(target, *, sort, limit, max_requests=None):
+    transport = Transport(max_requests or 10)
     html = transport.page(target.path + ('?sort_order=recent' if sort == 'recent' else ''))
-    result = read_thread(html, target.code, sort=sort, limit=limit)
-    if out:
-        output = OutFile(out, ctx)
-        try:
-            output.commit(result['results'], {'completeness': result['completeness'], 'terminal': 'not_paginable'},
-                          'ssr_complete')
-            result.update(out=str(output.path), count=output.count, results=[])
-        finally:
-            output.close()
-    return finish(result, transport)
+    return finish(read_thread(html, target.code, sort=sort, limit=limit), transport)
 
 
 def read_thread(html, code, *, sort, limit):

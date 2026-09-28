@@ -4,10 +4,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const root = path.resolve(__dirname, '../../../.claude/skills/threads/scripts/threads/graphql/snippets');
+const envelope = fs.readFileSync(path.resolve(root, '../../aside/envelope.js'), 'utf8');
 
 async function run(name, args, response = {}) {
   const calls = [], logs = [];
-  const source = fs.readFileSync(path.join(root, name + '.js'), 'utf8');
+  const source = envelope + '\n' + fs.readFileSync(path.join(root, name + '.js'), 'utf8');
   await vm.runInNewContext('(async()=>{' + source + '})()', {
     ARGS: args, Buffer,
     console: {log: text => logs.push(JSON.parse(text))},
@@ -53,12 +54,4 @@ test('query admission comes from the caller and never admits a mutation or a non
   await assert.rejects(run('graphql', {...query, name: 'FixtureFeed', admitted: ['FixtureFeed']}));
   const {calls} = await run('graphql', {...query, name: 'FixtureFeedQuery', admitted: ['FixtureFeedQuery']});
   assert.equal(calls.length, 1);
-});
-
-test('large escaped response survives ordered chunk transfer', async () => {
-  const body = '"😀'.repeat(1600000);
-  const {logs} = await run('page', {path: '/'}, {body});
-  const envelope = logs.pop();
-  assert.equal(envelope.body_chunks, logs.length);
-  assert.equal(logs.map((r, i) => {assert.equal(r.index, i); return r.body;}).join(''), body);
 });

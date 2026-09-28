@@ -251,4 +251,4 @@ if (!Number.isInteger(ARGS.request_budget) || ARGS.request_budget < 1 || ARGS.re
 }
 const blocked = result.envelopes[0];
 if (blocked) Object.assign(result, JSON.parse(blocked.body));
-console.log(JSON.stringify({status: blocked ? blocked.status : 200, url: blocked ? blocked.url : result.page_url || ARGS.url || '', body: JSON.stringify(result)}));
+emitEnvelope({status: blocked ? blocked.status : 200, url: blocked ? blocked.url : result.page_url || ARGS.url || '', body: JSON.stringify(result)});

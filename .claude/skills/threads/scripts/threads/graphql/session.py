@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
 
-from ..errors import ThreadsError
+from ..errors import ThreadsError, changed, rotated
 
 
 class Scripts(HTMLParser):
@@ -65,15 +65,15 @@ class Session:
             if 'DTSGInitialData' in html and not any((csrf, actor, viewer)):
                 raise ThreadsError(4, 'Threads login is required.')
             raise ThreadsError(6, 'Route HTML does not establish a logged-in session.',
-                               'Run doctor to check Aside and the route headers; a shell alone does not prove logout.')
+                               'Run `{cli} doctor` to check Aside and the route headers; a shell alone does not prove logout.')
         loaders = preloaders(html)
         if not loaders and '"__bbox"' not in html:
-            raise ThreadsError(6, 'Authenticated HTML has no Relay payload structure.', 'Run refresh.', error='envelope_drift')
+            raise changed('Authenticated HTML has no Relay payload structure.')
         return cls(csrf, actor, viewer, loaders)
 
     def identity(self, operation, field):
         values = {str(p['variables'][field]) for p in self.preloaders
                   if p['name'] == operation and field in p['variables']}
         if len(values) != 1 or not next(iter(values)).isdigit():
-            raise ThreadsError(6, 'Route identity is missing or ambiguous.', 'Run refresh.', error='envelope_drift')
+            raise rotated('Route identity is missing or ambiguous.')
         return values.pop()

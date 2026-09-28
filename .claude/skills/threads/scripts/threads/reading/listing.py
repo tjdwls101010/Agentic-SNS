@@ -1,23 +1,20 @@
 """Home and profile activity share one continuation/commit path."""
-from ..errors import ThreadsError
+from ..errors import ThreadsError, changed
 from ..graphql.decode import read_page
 from ..graphql.operations import OPERATIONS
 from ..graphql.ssr import SSR
 from ..graphql.transport import Transport
 from ..store import CursorStore, OutFile
-from .collect import collect, date_bound
+from .collect import collect
 from .common import check_access, check_actor, finish
+from .window import Window
 
 
 def run(args, ctx):
     """Read a listing for the query `ctx` identifies. A continuation is returned as next_handle; the caller writes the
     command that resumes it into `next`."""
-    if (getattr(args, 'since', None) or getattr(args, 'until', None)) and args.command == 'home' and ctx['feed'] != 'following':
-        raise ThreadsError(2, 'Date windows apply only to the following feed and profile activity tabs.')
-    lower, upper = date_bound(ctx.get('since')), date_bound(ctx.get('until'))
-    if lower is not None and upper is not None and lower >= upper:
-        raise ThreadsError(2, '--since must be earlier than --until.')
-    transport = Transport(40 if args.limit or ctx.get('since') or args.out else 10)
+    window = Window(ctx.get('since'), ctx.get('until'), OPERATIONS[operation_of(ctx)].chronological)
+    transport = Transport(args.max_requests or 10)
     output = OutFile(args.out, ctx) if args.out else None
     try:
         handle_state = CursorStore().load(args.after, ctx)['cursor'] if args.after else None
@@ -25,8 +22,12 @@ def run(args, ctx):
             raise ThreadsError(2, 'The file and continuation handle describe different committed progress.',
                                'Resume the same output file without --after; its committed cursor is authoritative.')
         if output and output.complete:
-            return finish({'ok': True, 'results': [], 'stop_reason': output.cursor.get('terminal', 'exhausted'),
-                           'out': str(output.path), 'count': output.count, 'already_complete': True}, transport)
+            stop = output.cursor.get('terminal', 'exhausted')
+            done = {'ok': True, 'results': [], 'stop_reason': stop, 'out': str(output.path), 'count': output.count,
+                    'already_complete': True}
+            if window.active:
+                done['window'] = window.report(stop, output.cursor)
+            return finish(done, transport)
         state = handle_state if handle_state is not None else (output.cursor if output else None)
         state = state or {}
         initial = None
@@ -39,7 +40,7 @@ def run(args, ctx):
             ssr = SSR(html)
             profile = transport.rendered(ssr, 'profile.page', state['user_id'])['user'] or {}
             if profile and profile.get('username', '').lower() != args.target.username:
-                raise ThreadsError(6, 'Profile identity differs from the requested handle.', 'Run refresh.', error='envelope_drift')
+                raise changed('Profile identity differs from the requested handle.')
             state['private_unfollowed'] = bool(profile.get('text_post_app_is_private') and
                                                (profile.get('friendship_status') or {}).get('following') is False) if profile else None
             if args.command == 'user' and ctx['tab'] == 'threads':
@@ -48,8 +49,8 @@ def run(args, ctx):
                 state['ssr_cursor'] = initial.cursor
                 check_access(initial, transport, state)
         else:
-            html = transport.page('/')
-            if args.command == 'home' and ctx['feed'] == 'foryou':
+            html = transport.page('/following' if args.command == 'home' and ctx['feed'] == 'following' else '/')
+            if args.command == 'home':
                 initial = read_page(transport.rendered(SSR(html), 'feed'), OPERATIONS['feed'])
         check_actor(state, transport)
         operation, variables = query_for(ctx, state)
@@ -66,7 +67,7 @@ def run(args, ctx):
                 page = read_page(transport.query(name, values), OPERATIONS[name])
             except ThreadsError as error:
                 if not (args.command == 'user' and after and after == state.get('ssr_cursor') and
-                        error.error in ('operation_rotated', 'envelope_drift')):
+                        error.error in ('operation_rotated', 'shape_changed')):
                     raise
                 # The SSR cursor and Direct query are different sources; try the Direct first page once, retaining seen IDs.
                 state['ssr_cursor'] = None
@@ -79,11 +80,11 @@ def run(args, ctx):
                 check_access(page, transport, state)
             return page
         result = collect(fetch, limit=args.limit or 10, state=state, initial=initial,
-                         since=ctx.get('since'), until=ctx.get('until'),
-                         monotonic=OPERATIONS[operation].chronological,
-                         commit=output.commit if output else None)
+                         window=window, commit=output.commit if output else None)
         state = result.pop('state')
         result['context'] = ctx
+        if window.active:
+            result['window'] = window.report(result['stop_reason'], state)
         if args.command == 'graph' and ctx['relation'] == 'followers':
             result['reported_total'] = state.get('reported_total')
         if state['pending'] or not state['done']:
@@ -99,6 +100,20 @@ def run(args, ctx):
             output.close()
 
 
+def operation_of(ctx):
+    """The declared operation a listing query reads."""
+    command = ctx['command']
+    if command == 'home':
+        return 'feed'
+    if command == 'user':
+        return 'profile.' + ctx['tab']
+    if command == 'graph':
+        return 'graph.' + ctx['relation']
+    if command == 'search':
+        return 'search.accounts' if ctx['type'] == 'users' else 'search.posts'
+    return 'me.' + ctx['collection']
+
+
 def query_for(ctx, state):
     command = ctx['command']
     if command == 'home':
@@ -106,7 +121,7 @@ def query_for(ctx, state):
         return 'feed', {'variant': 'following' if following else 'for_you',
             'data': {'pagination_source': 'text_post_feed_following' if following else 'text_post_feed_threads', 'reason': 'cold_start_fetch'}}
     if command == 'user':
-        return 'profile.' + ctx['tab'], {'userID': state['user_id'], 'first': 25}
+        return 'profile.' + ctx['tab'], {'userID': state['user_id']}
     if command == 'graph':
         return 'graph.' + ctx['relation'], {'userID': state['user_id'], 'first': 20}
     if command == 'search':

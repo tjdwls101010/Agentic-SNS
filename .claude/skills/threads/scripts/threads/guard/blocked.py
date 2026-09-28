@@ -4,7 +4,7 @@ import math
 import time
 
 from ..errors import ThreadsError
-from .state import account_lock, cache_dir, write_state
+from .state import cache_dir, write_state
 
 
 def check_blocked():
@@ -25,9 +25,9 @@ def check_blocked():
     except FileNotFoundError:
         return None
     except (OSError, ValueError, TypeError, KeyError):
-        raise ThreadsError(5, 'Account protection state is unreadable.', 'Check Threads in Aside, then run doctor --unblock.') from None
+        raise ThreadsError(5, 'Account protection state is unreadable.', 'Check Threads in Aside, then run `{cli} doctor --unblock`.') from None
     raise ThreadsError(5, 'Threads requests are blocked for this account.',
-                       'Check Threads in Aside, then run doctor --unblock.' if reason == 'checkpoint'
+                       'Check Threads in Aside, then run `{cli} doctor --unblock`.' if reason == 'checkpoint'
                        else f'No retry before {expiry:.0f} (Unix time); the rate-limit block expires automatically.', error=reason)
 
 
@@ -45,11 +45,3 @@ def set_blocked(reason):
     now = time.time()
     write_state('blocked.json', {'reason': reason, 'blocked_at': now,
                                 'expires_at': None if reason == 'checkpoint' else now + 1800})
-
-
-def unblock():
-    with account_lock():
-        try:
-            (cache_dir() / 'blocked.json').unlink(missing_ok=True)
-        except OSError:
-            raise ThreadsError(5, 'Account block could not be cleared.', 'Restore access to THREADS_HOME.') from None

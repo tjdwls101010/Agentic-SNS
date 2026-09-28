@@ -111,7 +111,9 @@ class Routes:
         return self
 
     def copy(self, key, new):
-        self.rows += [dict(row, key=new) for row in self.rows if row['key'] == key]
+        """Serve `new` exactly as `key`, replacing whatever `new` answered before."""
+        copies = [dict(row, key=new) for row in self.rows if row['key'] == key]
+        self.rows = [row for row in self.rows if row['key'] != new] + copies
         return self
 
     def write(self):

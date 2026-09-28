@@ -3,13 +3,14 @@
 # requires-python = ">=3.11"
 # dependencies = []
 # ///
-"""Argument parsing and dispatch for the self-contained Threads reader."""
+"""Read Threads through the account logged in to Aside (u0); read-only, cookies stay in the browser."""
 import argparse
 import json
 import os
 import re
 import shlex
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from threads.errors import ThreadsError
@@ -17,11 +18,34 @@ from threads.output.render import render
 from threads.output.schema import schema
 from threads.reading import listing, maintenance, post, profile
 from threads.reading.common import resolve_target
+from threads.reading.window import MESSAGE as DATE_MESSAGE, moment
+
+EXIT_CODES = {
+    0: 'success, including a stop that more: resumes and an --out file already complete',
+    2: 'invalid arguments, or a continuation or --out file that belongs to another query',
+    3: 'Aside is unavailable or returned an invalid response',
+    4: 'Threads login is required',
+    5: 'requests are blocked for this account (checkpoint, rate limit, full local window)',
+    6: 'a request failed before any record was read',
+    7: 'Threads returned nothing for this target or window',
+    8: 'stopped early: a request failed after some progress, or the request cap was reached; a listing\'s more: '
+       'resumes it, other commands are run again or follow their fix',
+    9: 'the post or profile is unavailable (deleted, private, or a post that redirected away)',
+}
+MAX_REQUESTS = 40
 
 
 class Parser(argparse.ArgumentParser):
     def error(self, message):
         raise ThreadsError(2, message)
+
+
+class EpilogFormatter(argparse.HelpFormatter):
+    """Fill prose paragraphs as usual but keep an indented table's rows on their own lines."""
+    def _fill_text(self, text, width, indent):
+        return '\n\n'.join(paragraph if '\n  ' in paragraph or paragraph.startswith('  ')
+                           else super(EpilogFormatter, self)._fill_text(paragraph, width, indent)
+                           for paragraph in text.split('\n\n'))
 
 
 def positive(value):
@@ -31,71 +55,197 @@ def positive(value):
             return number
     except ValueError:
         pass
-    raise argparse.ArgumentTypeError('Expected a positive integer.')
+    raise argparse.ArgumentTypeError('expected a positive integer')
+
+
+def chars(value):
+    try:
+        number = int(value)
+        if number >= 0:
+            return number
+    except ValueError:
+        pass
+    raise argparse.ArgumentTypeError('expected 0 (full text) or a positive integer')
+
+
+def requests(value):
+    number = positive(value)
+    # 성진: 40 per command protects the real account; the shared 10-minute window (120) still applies across commands.
+    if number > MAX_REQUESTS:
+        raise argparse.ArgumentTypeError(f'at most {MAX_REQUESTS} requests per command')
+    return number
+
+
+def when(value):
+    try:
+        moment(value)
+    except (ValueError, AttributeError):
+        raise argparse.ArgumentTypeError(DATE_MESSAGE) from None
+    return value
+
+
+# Every option a command may declare: flags and argparse settings, with help a command can override.
+OPTIONS = {
+    'feed': (('--feed',), {'choices': ['foryou', 'following'], 'help': 'foryou (default) or following'}),
+    'tab': (('--tab',), {'choices': ['threads', 'replies', 'reposts', 'media'],
+                         'help': 'Profile tab (default: the tab in the URL, else threads)'}),
+    'sort': (('--sort',), {'choices': ['top', 'recent'], 'help': 'Post ranking (default top)'}),
+    'type': (('--type',), {'choices': ['posts', 'users'], 'help': 'posts (default) or users: one batch of account cards'}),
+    'tag': (('--tag',), {'action': 'store_true', 'help': 'Search posts under this tag instead of by text'}),
+    'since': (('--since',), {'type': when, 'help': 'Keep posts written at or after this ISO date/time (UTC unless an '
+                                                    'offset is given). Filtered locally'}),
+    'until': (('--until',), {'type': when, 'help': 'Keep posts written before this ISO date/time. Filtered locally'}),
+    'limit': (('--limit',), {'type': positive, 'help': 'Records to show (default 10); the request cap stays '
+                                                       '--max-requests'}),
+    'chars': (('--chars',), {'type': chars, 'help': 'Text output only: preview length of each text (default 180, '
+                                                    '0 = full). JSON always has full text'}),
+    'out': (('--out',), {'help': 'Collect into this private NDJSON file, committed a page at a time; rerun the same '
+                                 'command with the same file to resume'}),
+    'after': (('--after',), {'type': positive, 'help': 'Continue from the numbered handle a more: line printed'}),
+    'json': (('--json',), {'action': 'store_true', 'help': 'Emit one JSON document instead of text'}),
+    'max_requests': (('--max-requests',), {'type': requests, 'help': 'Threads requests this command may make, its '
+                                                                     'route page included (default 10, at most 40)'}),
+    'unblock': (('--unblock',), {'action': 'store_true', 'help': 'After checking Threads in Aside yourself, make one '
+                                                                'login probe; a checkpoint is cleared only if it succeeds'}),
+    'capture': (('--capture',), {'action': 'store_true', 'help': 'Instead of reading routes, open one Threads app tab '
+                                                                'at --post to observe the queries only the app loads. '
+                                                                'The app in that tab may record views or seen state, '
+                                                                'which this reader\'s read-only guarantee does not cover: '
+                                                                'ask the user first'}),
+    'post': (('--post',), {'help': 'A public post URL: without --capture, the post page whose decoding refresh checks; '
+                                   'with --capture, the tab it opens'}),
+}
+READ = ('limit', 'chars', 'out', 'after', 'json', 'max_requests')
+# A listing's continuation reads its route page and one page of results, so it needs two requests at least.
+LISTING = {'max_requests': {'help': 'Threads requests this command may make, its route page included (default 10, '
+                                    'from 2 to 40)'}}
+# The order a query's identity is written in: continuation handles and --out headers compare it.
+IDENTITY = ('target', 'feed', 'tab', 'sort', 'query', 'type', 'tag', 'relation', 'collection', 'since', 'until')
+
+
+@dataclass(frozen=True)
+class Command:
+    help: str
+    run: object                 # the feature function: run(args, ctx) -> result
+    options: tuple = ()
+    positionals: tuple = ()     # (dest, argparse settings) in order
+    identity: tuple = ()        # what makes two invocations the same query
+    defaults: dict = field(default_factory=dict)
+    epilog: str | None = None
+    overrides: dict = field(default_factory=dict)
+
+
+def read_listing(args, ctx):
+    return listing.run(args, ctx)
+
+
+def read_post(args, ctx):
+    return post.run(args.target, sort=args.sort, limit=args.limit, max_requests=args.max_requests)
+
+
+def read_profile(args, ctx):
+    return profile.run(args.target, max_requests=args.max_requests)
+
+
+TARGET = ('target', {'help': 'Threads @handle or profile URL'})
+TAB_TARGET = ('target', {'help': 'Threads @handle or profile URL; a tab URL such as /@name/replies reads that tab'})
+COMMANDS = {
+    'home': Command('Read the first page of the for-you or following feed as Threads renders it (one request); '
+                    'Threads does not let this reader page a feed further.', read_listing,
+                    ('feed', 'since', 'until', *READ), identity=('feed', 'since', 'until'),
+                    defaults={'feed': 'foryou'}, epilog='--since/--until need --feed following.', overrides=LISTING),
+    'user': Command('Read a profile tab: threads, replies, reposts or media.', read_listing,
+                    ('tab', 'since', 'until', *READ), (TAB_TARGET,), identity=('target', 'tab', 'since', 'until'),
+                    defaults={'tab': 'threads'},
+                    epilog='A date window is kept locally. Only the newest-first tabs (threads, replies) can prove '
+                           'that the window\'s start was passed; the result says whether the window was read whole.', overrides=LISTING),
+    'about': Command('Read a profile card: name, bio, links, privacy, follower count (one request; two when the '
+                     'page renders no profile). Threads publishes no following or mutual count; graph following '
+                     'lists the accounts.', read_profile, ('json', 'max_requests'), (TARGET,), identity=('target',)),
+    'post': Command('Read one post in full with its parent chain and first batch of replies (one page; replies do not '
+                    'page further).', read_post, ('sort', 'limit', 'chars', 'json', 'max_requests'),
+                    (('target', {'help': 'Post URL or shortcode (a shortcode costs a redirect request)'}),),
+                    identity=('target', 'sort'), defaults={'sort': 'top'},
+                    overrides={'sort': {'help': 'Reply order (default top); recent may repeat top replies'},
+                               'chars': {'help': 'Text output only: preview length of each parent and reply (default '
+                                                 '180, 0 = full); the post itself is always shown in full'},
+                               'limit': {'help': 'Direct replies shown (default 10), each with its received '
+                                                 'sub-replies; parents and the post are always shown'}}),
+    'graph': Command('Read followers or following.', read_listing, READ[:1] + READ[2:],
+                     (TARGET, ('relation', {'choices': ['followers', 'following'],
+                                            'help': 'followers: one batch Threads chooses, which can be fewer '
+                                                    'than the reported total; following: pages on'})),
+                     identity=('target', 'relation'), overrides=LISTING),
+    'search': Command('Search posts, tags or accounts.', read_listing, ('type', 'sort', 'tag', *READ),
+                      (('query', {'help': 'Search text'}),), identity=('sort', 'query', 'type', 'tag'),
+                      defaults={'sort': 'top', 'type': 'posts'},
+                      epilog='--sort, --tag and --chars apply to post search only.', overrides=LISTING),
+    'me': Command('Read your liked or saved posts (first batch only).', read_listing, READ,
+                  (('collection', {'choices': ['liked', 'saved'], 'help': 'liked or saved'}),),
+                  identity=('collection',), overrides=LISTING),
+    'doctor': Command('Check Aside, login, account protection and registry age (one request; always JSON).',
+                      lambda args, ctx: maintenance.doctor(args.unblock), ('unblock',)),
+    'refresh': Command('Find rotated queries on Threads\' own pages, verify them by replay, and save an override '
+                       '(always JSON).', lambda args, ctx: maintenance.refresh(args.capture, args.post),
+                       ('capture', 'post'), epilog='Up to 40 paced requests. --capture reserves up to 60 for the '
+                                                  'tab it observes; the app\'s own start-up requests in that tab are '
+                                                  'neither counted nor paced.'),
+    'schema': Command('Describe results, records, errors and --out files (no request; always JSON).',
+                      lambda args, ctx: schema(EXIT_CODES)),
+}
+DESTS = sorted({*OPTIONS, 'target', 'query', 'relation', 'collection'})
 
 
 def parser():
-    root = Parser(description="Read Threads through the logged-in Aside account; local budgets are not server allowances.",
-        epilog='Exit: 0 success; 2 arguments; 3 Aside; 4 login; 5 blocked; 6 query/transport; 7 empty; 8 partial; 9 unavailable. Each error includes its fix.')
-    subs = root.add_subparsers(dest='command', required=True, help='The Threads surface to read')
-    descriptions = {
-        'home': 'Read the for-you or following home feed.', 'user': 'Read a profile activity tab.',
-        'about': 'Read a profile and relationship counts (two requests).',
-        'post': 'Read the full post, parent chain and first reply batch (one page; no further sibling pagination).',
-        'graph': 'Read followers (server sample) or following (paginated).',
-        'search': 'Search posts, tags or accounts.', 'me': 'Read the first batch of your liked or saved posts.',
-        'doctor': 'Check Aside, login, local protection and registry age (one request).',
-        'refresh': 'Discover and verify rotated queries before saving an override.',
-        'schema': 'Describe the output objects without making any requests.'}
-    for command, description in descriptions.items():
-        p = subs.add_parser(command, help=description, description=description)
-        p.add_argument('--json', action='store_true', help='Emit one JSON document including completeness and local budget')
-        if command in ('user', 'about', 'post', 'graph'):
-            p.add_argument('target', help='Threads @handle or URL' if command != 'post' else 'Post URL or shortcode (shortcode resolution costs an extra request)')
-        if command not in ('doctor', 'refresh', 'schema'):
-            p.add_argument('--limit', type=positive, default=None, help='Maximum displayed records; explicit collection allows up to 40 local requests')
-            p.add_argument('--chars', type=int, default=180, help='Text preview length; 0 means full text, post body is always full')
-            p.add_argument('--out', default=None, help='Private NDJSON file with page commits; repeat the same command and file to resume')
-            if command not in ('post', 'about'):
-                p.add_argument('--after', type=positive, default=None, help='Opaque local handle from the complete more: command; retains undisplayed records')
-        if command == 'home':
-            p.add_argument('--feed', choices=['foryou', 'following'], default=None, help='Home algorithm; default foryou')
-        if command == 'user':
-            p.add_argument('--tab', choices=['threads', 'replies', 'reposts', 'media'], default=None, help='Profile activity tab; default threads')
-        if command in ('home', 'user'):
-            p.add_argument('--since', default=None, help='Inclusive ISO date/time lower bound, filtered locally; chronological surfaces only')
-            p.add_argument('--until', default=None, help='Exclusive ISO date/time upper bound, filtered locally; no server-side filtering')
-        if command in ('post', 'search'):
-            p.add_argument('--sort', choices=['top', 'recent'], default=None,
-                           help='Post search ranking; default top; unavailable for --type users' if command == 'search'
-                           else 'Reply ordering; default top; recent may overlap with top replies')
-        if command == 'graph':
-            p.add_argument('relation', choices=['followers', 'following'], help='Followers is a server-capped sample whose batch size can vary; following can continue')
-        if command == 'search':
-            p.add_argument('query', help='Search text')
-            p.add_argument('--type', choices=['posts', 'users'], default=None, help='Result kind; default posts; users has one batch only')
-            p.add_argument('--tag', action='store_true', help='Search tagged posts instead of the default surface')
-        if command == 'me':
-            p.add_argument('collection', choices=['liked', 'saved'], help='Personal collection; only the first batch can be requested')
-        if command == 'doctor':
-            p.add_argument('--unblock', action='store_true', help='After checking Threads in Aside, make one login probe; clear a checkpoint only if it succeeds')
-        if command == 'refresh':
-            p.add_argument('--capture', action='store_true', help='Observe one app tab for six lazy queries; bootstrap requests and app mutations are outside CLI control')
-            p.add_argument('--post', default=None, help='Canonical public post URL; required for --capture, optional SSR seed when your own profile has no posts')
+    table = '\n'.join(f'  {code}  {meaning}' for code, meaning in EXIT_CODES.items())
+    root = Parser(description=__doc__, formatter_class=EpilogFormatter,
+                  epilog='Each error carries its fix. Every command shares account pacing and block protection.'
+                         '\n\nexit codes:\n' + table)
+    commands = root.add_subparsers(dest='command', required=True, help='The Threads surface to read')
+    for name, command in COMMANDS.items():
+        sub = commands.add_parser(name, help=command.help, description=command.help, epilog=command.epilog)
+        for dest, settings in command.positionals:
+            sub.add_argument(dest, **settings)
+        for option in command.options:
+            flags, settings = OPTIONS[option]
+            sub.add_argument(*flags, **{**settings, **command.overrides.get(option, {})})
+        taken = {dest for dest, _ in command.positionals} | set(command.options)
+        sub.set_defaults(**{dest: None for dest in DESTS if dest not in taken})
     return root
+
+
+def validate(args):
+    """Combinations the parser cannot express, refused before any request."""
+    if args.command == 'search' and args.type == 'users':
+        for flag, given in (('--sort', args.sort is not None), ('--tag', args.tag is True), ('--chars', args.chars is not None)):
+            if given:
+                raise ThreadsError(2, f'{flag} applies to post search; account search returns one batch of cards.')
+    if COMMANDS[args.command].run is read_listing and args.max_requests == 1:
+        raise ThreadsError(2, '--max-requests must be at least 2 for a listing: a continuation reads its route page and '
+                              'one page of results.')
+    if args.target is not None:
+        args.target = resolve_target(args.target, 'post' if args.command == 'post' else 'user')
+        if args.command == 'user' and args.target.tab:
+            if args.tab and args.tab != args.target.tab:
+                raise ThreadsError(2, f'The URL is the {args.target.tab} tab but --tab asks for {args.tab}.',
+                                   'Give one of them.')
+            args.tab = args.target.tab
+    if (args.since or args.until) and args.command == 'home' and args.feed != 'following':
+        raise ThreadsError(2, 'Date windows apply only to the following feed and profile tabs.',
+                           'Add --feed following, or read a profile with user.')
+    if args.since and args.until and moment(args.since) >= moment(args.until):
+        raise ThreadsError(2, '--since must be earlier than --until.')
 
 
 def context(args):
     """The query's identity: what a continuation handle or --out file must match to resume it."""
+    command = COMMANDS[args.command]
     result = {'command': args.command, 'account': 'u0'}
-    for key in ('target', 'feed', 'tab', 'sort', 'query', 'type', 'tag', 'relation', 'collection', 'since', 'until'):
-        if hasattr(args, key):
+    for key in IDENTITY:
+        if key in command.identity:
             value = getattr(args, key)
-            result[key] = value.path if key == 'target' else value
-    for key, value in {'feed': 'foryou', 'tab': 'threads', 'sort': 'top', 'type': 'posts'}.items():
-        if key in result and result[key] is None:
-            result[key] = value
-    if result['command'] == 'search' and result.get('type') == 'users':
+            result[key] = value.path if key == 'target' else command.defaults.get(key) if value is None else value
+    if args.command == 'search' and result.get('type') == 'users':
         result.pop('sort', None)
     return result
 
@@ -106,64 +256,61 @@ def invocation():
     return 'uv run "' + re.sub(r'([\\"$`])', r'\\\1', path) + '"'
 
 
-def more_command(ctx, handle, output=None, json_mode=False):
-    parts = [ctx['command']]
-    for key in ('target', 'query', 'relation', 'collection'):
-        if key in ctx:
-            parts.append(ctx[key])
-    for key in ('feed', 'tab', 'sort', 'type', 'since', 'until'):
-        if ctx.get(key) is not None:
-            parts.extend(['--' + key, str(ctx[key])])
-    if ctx.get('tag'):
-        parts.append('--tag')
-    parts.extend(['--after', str(handle)])
-    if output is not None:
-        parts.extend(['--out', str(Path(output).expanduser().resolve())])
-    if json_mode:
-        parts.append('--json')
-    return invocation() + ' ' + shlex.join(parts)
+def more_command(args, ctx, handle):
+    """The same query from the numbered handle, keeping what the caller chose to see and to spend."""
+    command = COMMANDS[args.command]
+    positionals = []
+    for dest, _ in command.positionals:
+        positionals.append('@' + args.target.username if dest == 'target' else ctx[dest])
+    words = [args.command]
+    for key in IDENTITY:
+        if key in ctx and key not in dict(command.positionals):
+            if ctx[key] is True:
+                words.append('--' + key)
+            elif ctx[key] not in (None, False):
+                words += ['--' + key, str(ctx[key])]
+    words += ['--after', str(handle)]
+    if args.out is not None:
+        words += ['--out', str(Path(args.out).expanduser().resolve())]
+    for key in ('limit', 'chars', 'max_requests'):
+        if getattr(args, key) is not None:
+            words += ['--' + key.replace('_', '-'), str(getattr(args, key))]
+    if args.json:
+        words.append('--json')
+    if any(str(word).startswith('-') for word in positionals):
+        words.append('--')
+    return invocation() + ' ' + shlex.join(words + positionals)
 
 
-def dispatch(args):
-    if args.command == 'schema':
-        return schema()
-    if args.command == 'doctor':
-        return maintenance.doctor(args.unblock)
-    if args.command == 'refresh':
-        return maintenance.refresh(args.capture, args.post)
-    ctx = context(args)
-    if args.command == 'post':
-        return post.run(args.target, sort=args.sort, limit=args.limit, out=args.out, ctx=ctx)
-    if args.command == 'about':
-        return profile.run(args.target, limit=args.limit, out=args.out, ctx=ctx)
-    result = listing.run(args, ctx)
-    if result.get('next_handle') is not None:
-        result['next'] = more_command(ctx, result['next_handle'], args.out, args.json)
-    return result
+def filled(fix, args):
+    """A fix names this CLI as more: does, and the command that failed."""
+    return fix.replace('{cli}', invocation()).replace('{command}', args.command if args else 'this')
 
 
 def main(argv=None):
+    args = None
     try:
         args = parser().parse_args(argv)
-        if getattr(args, 'chars', 0) < 0:
-            raise ThreadsError(2, '--chars cannot be negative.')
-        if args.command == 'search' and args.type == 'users' and (args.tag or args.sort is not None):
-            raise ThreadsError(2, '--tag and --sort apply to post search; account search has one unsorted batch.')
-        if hasattr(args, 'target'):
-            args.target = resolve_target(args.target, 'post' if args.command == 'post' else 'user')
-        result = dispatch(args)
+        validate(args)
+        ctx = context(args)
+        result = COMMANDS[args.command].run(args, ctx)
+        if result.get('next_handle') is not None:
+            result['next'] = more_command(args, ctx, result['next_handle'])
         code = result.pop('code', 0)
+        if result.get('fix'):
+            result['fix'] = filled(result['fix'], args)
         if args.json or args.command in ('doctor', 'refresh', 'schema'):
             print(json.dumps(result, ensure_ascii=False))
         else:
             print(render(result, args))
         return code
     except ThreadsError as error:
+        error.fix = filled(error.fix, args)
         print(json.dumps(error.as_dict(), ensure_ascii=False))
         return error.code
     except (OSError, ValueError) as error:
         print(json.dumps(ThreadsError(6, f'Local operation failed ({type(error).__name__}).',
-                                    'Check local storage and command arguments.').as_dict()))
+                                      'Check local storage and command arguments.').as_dict()))
         return 6
 
 

@@ -3,7 +3,7 @@
 
 A call is looked up by key: the route path for page, `capture` for capture, and for graphql the query name, then
 `<name>:after=<cursor>` or `<name>:after` when it continues. Rows sharing a key answer successive calls in order, the
-last one repeating. An envelope may instead carry `raw_stdout` (printed as is, Aside's own framing) or `mode`
+last one repeating (THREADS_RECORD / THREADS_REPLAY hand the call to tools/replay.py instead). An envelope may instead carry `raw_stdout` (printed as is, Aside's own framing) or `mode`
 (`fail`, `timeout`) for a bridge failure. An unknown key fails the call.
 """
 import json
@@ -14,6 +14,10 @@ import sys
 
 if len(sys.argv) != 5 or sys.argv[1:4] != ['--account', 'u0', 'repl']:
     sys.exit(2)
+if os.environ.get('THREADS_RECORD') or os.environ.get('THREADS_REPLAY'):
+    # Scenario runs record or replay real responses instead of fixtures (tools/replay.py).
+    replay = Path(__file__).resolve().parents[1] / 'tools' / 'replay.py'
+    os.execv(sys.executable, [sys.executable, str(replay), *sys.argv[1:]])
 source = sys.argv[-1]
 args = json.JSONDecoder().raw_decode(source.removeprefix('const ARGS = '))[0]
 snippet = re.search(r'// threads-snippet: (\w+)', source)[1]

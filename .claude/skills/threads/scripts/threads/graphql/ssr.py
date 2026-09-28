@@ -1,11 +1,9 @@
 """Read only Relay bbox results from JSON scripts, with operation/identity checks."""
 import re
 
-from ..errors import ThreadsError
+from ..errors import changed, rotated
 from .session import Scripts, preloaders
 
-POST_PAGE_CHANGED = ('Threads changed the post page; refresh cannot repair it. '
-                     'Tell the user the post reader needs an update.')
 
 
 def media_identity(media):
@@ -59,8 +57,11 @@ class SSR:
             if data not in candidates:
                 candidates.append(data)
         if len(candidates) != 1:
-            raise ThreadsError(6, f'The route has no unambiguous {operation} payload for this target.',
-                               'Run refresh; do not treat a missing payload as an empty result.', error='envelope_drift')
+            # A missing payload is never an empty result. With its preloader on the route, the payload itself
+            # changed; without it, the operation was renamed and refresh can find the new name.
+            message = f'The route has no unambiguous {operation or shape} payload for this target.'
+            known = operation is None or any(p['name'] == operation for p in self.preloaders)
+            raise changed(message) if known else rotated(message)
         return candidates[0]
 
     def post_page(self, code):
@@ -73,8 +74,7 @@ class SSR:
         """
         ids = {str(p['variables']['postID']) for p in self.preloaders if 'postID' in p['variables']}
         if len(ids) != 1 or not next(iter(ids)).isdigit():
-            raise ThreadsError(6, 'The post route does not name exactly one post.', POST_PAGE_CHANGED,
-                               error='envelope_drift')
+            raise changed('The post route does not name exactly one post.')
         post_id = ids.pop()
         roles = {'post': [], 'parents': [], 'replies': []}
         for _, _, data in self.results:
@@ -89,6 +89,12 @@ class SSR:
                     roles[role].append(data)
         for role, found in roles.items():
             if len(found) != 1:
-                raise ThreadsError(6, f'The post page has no unambiguous {role} payload for this post.',
-                                   POST_PAGE_CHANGED, error='envelope_drift')
-        return post_id, roles['post'][0], roles['parents'][0], roles['replies'][0]
+                raise changed(f'The post page has no unambiguous {role} payload for this post.')
+        parents, replies = roles['parents'][0], roles['replies'][0]
+        for data, path in ((parents, ('containing_thread', 'posts', 'edges')), (replies, ('direct_replies', 'edges'))):
+            value = data['media']['text_post_app_info']
+            for key in path:
+                value = value.get(key) if isinstance(value, dict) else None
+            if not isinstance(value, list):
+                raise changed('The post page has no ' + '.'.join(path) + ' list.')
+        return post_id, roles['post'][0], parents, replies

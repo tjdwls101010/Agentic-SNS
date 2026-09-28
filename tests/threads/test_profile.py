@@ -1,21 +1,15 @@
-"""Profile cards through the CLI."""
-import json
-
+"""Profile cards through the CLI: one request, and counts Threads does not publish stay unknown."""
 from .fixtures.builders import null_profile
 from .helpers import calls, data, run_cli
 
 
-def test_about_reports_zero_following_as_a_count(fake_aside):
+def test_about_is_one_request_and_leaves_unpublished_counts_unknown(fake_aside):
     about = run_cli('about', '@fixture_user', '--json')
     assert about.returncode == 0, about.stdout + about.stderr
-    assert data(about)['results'][0]['counts'] == {'followers': 1000, 'following': 0, 'mutuals': 0}
-
-
-def test_about_output_file_stores_the_actual_card(fake_aside, tmp_path):
-    path = tmp_path / 'about.ndjson'
-    result = run_cli('about', '@fixture_user', '--out', str(path), '--json')
-    assert result.returncode == 0, result.stdout + result.stderr
-    assert json.loads(path.read_text().splitlines()[1])['counts']['following'] == 0
+    assert data(about)['results'][0]['counts'] == {'followers': 1000, 'following': None, 'mutuals': None}
+    assert [c['key'] for c in calls(fake_aside)] == ['/@fixture_user']
+    text = run_cli('about', '@fixture_user').stdout
+    assert 'followers=1000 · following=unknown · mutuals=unknown' in text
 
 
 def test_null_ssr_profile_uses_the_profile_query(routes):
@@ -24,4 +18,4 @@ def test_null_ssr_profile_uses_the_profile_query(routes):
     assert result.returncode == 0, result.stdout + result.stderr
     assert data(result)['results'][0]['username'] == 'fixture_user'
     assert [c['key'] for c in calls(routes.path.parent / 'requests.ndjson')] == \
-        ['/@fixture_user', 'BarcelonaProfilePageDirectQuery', 'BarcelonaFriendshipsFollowingTabQuery']
+        ['/@fixture_user', 'BarcelonaProfilePageDirectQuery']
