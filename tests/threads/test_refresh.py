@@ -6,7 +6,7 @@ from pathlib import Path
 from .fixtures.builders import envelope, person, users
 from .helpers import POST, calls, data, run_cli
 
-CAPTURE = ['refresh', '--capture', '--post', POST, '--json']
+CAPTURE = ['refresh', '--capture', '--post', POST]
 
 
 def home():
@@ -20,7 +20,7 @@ def viewer_profile(routes):
 
 def test_refresh_keeps_unobserved_operations_and_never_saves_instance_variables(routes):
     viewer_profile(routes).write()
-    result = run_cli('refresh', '--json')
+    result = run_cli('refresh')
     assert result.returncode == 8, result.stdout + result.stderr
     body = data(result)
     assert 'BarcelonaProfileThreadsTabDirectQuery' in body['updated']
@@ -37,18 +37,18 @@ def test_refresh_keeps_unobserved_operations_and_never_saves_instance_variables(
 
 def test_refresh_only_checks_that_a_post_route_still_decodes(routes):
     viewer_profile(routes).write()
-    body = data(run_cli('refresh', '--post', POST, '--json'))
+    body = data(run_cli('refresh', '--post', POST))
     assert body['post_route'] == 'decoded'
     assert 'post_route' not in body['failed']
     assert not [name for name in [*body['missing'], *body['updated']] if name.startswith('BarcelonaPostPage')]
     routes.edit('/@fixture_user/post/FIX_2', lambda html: html.replace('direct_replies', 'x')).write()
-    result = run_cli('refresh', '--post', POST, '--json')
+    result = run_cli('refresh', '--post', POST)
     assert result.returncode == 8
     assert data(result)['post_route'] == 'failed'
 
 
 def test_capture_requires_its_seed_before_spending_a_request(fake_aside):
-    result = run_cli('refresh', '--capture', '--json')
+    result = run_cli('refresh', '--capture')
     assert result.returncode == 2
     assert calls(fake_aside) == []
 
@@ -104,7 +104,7 @@ def legacy_override():
 def test_refresh_rewrites_an_old_override_in_the_current_format(routes):
     old = legacy_override()
     viewer_profile(routes).write()
-    run_cli('refresh', '--json')
+    run_cli('refresh')
     saved = json.loads((home() / 'registry.json').read_text())
     assert saved['version'] == 2
     names = {entry['name'] for entry in saved['operations'].values()}

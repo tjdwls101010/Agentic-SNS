@@ -18,7 +18,7 @@ def field_type(annotation):
     return {'type': {str: 'string', int: 'integer', bool: 'boolean', type(None): 'null'}[annotation]}
 
 
-def schema():
+def schema(exit_codes=None):
     classes = {'Post': Post, 'User': User, 'Counts': Counts, 'Media': Media, 'Completeness': Completeness}
     samples = {name: cls().to_dict() if name != 'Media' else Media('image', '').to_dict() for name, cls in classes.items()}
     notes = {'id': 'Stable numeric Threads identity, not the display handle.',
@@ -51,4 +51,5 @@ def schema():
             'fetched_bytes': {'type': 'integer'}, 'completeness': {'$ref': '#/$defs/Completeness'},
             'context': {'type': 'object', 'properties': {'sort': {'enum': ['top', 'recent'], 'description': 'Post reply or post search ordering; recent reply batches may overlap top.'}}}}}
     return {'ok': True, '$schema': 'https://json-schema.org/draft/2020-12/schema', '$defs': definitions,
+            'exit_codes': {str(code): meaning for code, meaning in (exit_codes or {}).items()},
             'coverage': 'Post reads expose reported_direct, received_direct, shown_direct, shown_descendants, unshown_received, unavailable and estimated unfetched; not_paginable is not exhaustion.'}

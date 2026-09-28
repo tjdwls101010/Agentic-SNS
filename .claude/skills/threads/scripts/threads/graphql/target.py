@@ -17,6 +17,7 @@ class Target:
     code: str = ''
     user_id: str = ''
     post_id: str = ''
+    tab: str = ''           # a profile URL's tab suffix (/replies, /reposts, /media); the path stays the profile's
 
     @property
     def path(self):
@@ -41,7 +42,7 @@ def parse_target(value, kind):
     if kind == 'user':
         match = re.fullmatch(r'/?@?(' + NAME + r')(?:/(threads|replies|reposts|media))?', text)
         if match and not text.startswith('//') and match[1] not in ('activity', 'settings', 'search', 'liked', 'saved'):
-            return Target('user', username=match[1].lower())
+            return Target('user', username=match[1].lower(), tab=match[2] or '')
     if kind == 'post':
         match = re.fullmatch(r'/@(' + NAME + r')/post/(' + CODE + ')', text)
         if match:

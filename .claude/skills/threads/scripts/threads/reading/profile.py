@@ -5,12 +5,11 @@ from ..graphql.normalize import build_counts, build_user
 from ..graphql.operations import OPERATIONS
 from ..graphql.ssr import SSR
 from ..graphql.transport import Transport
-from ..store import OutFile
 from .common import finish, profile_from_route
 
 
-def run(target, *, limit, out, ctx):
-    transport = Transport(40 if limit or out else 10)
+def run(target, *, max_requests=None):
+    transport = Transport(max_requests or 10)
     html = transport.page(target.path)
     user_id = transport.session.identity(transport.registry.name('profile.page'), 'userID')
     user = build_user(profile_from_route(SSR(html), transport, user_id))
@@ -29,11 +28,4 @@ def run(target, *, limit, out, ctx):
         result.update(ok=False, code=error.code if error.code in (4, 5) else 8,
                       stop_reason='blocked' if error.code in (4, 5) else 'query_failure',
                       error=error.error, message=error.message, fix=error.fix)
-    if out:
-        output = OutFile(out, ctx)
-        try:
-            output.commit(result['results'], {'terminal': result['stop_reason']}, result['stop_reason'])
-            result.update(out=str(output.path), count=output.count, results=[])
-        finally:
-            output.close()
     return finish(result, transport)

@@ -5,19 +5,16 @@ from ..graphql.operations import OPERATIONS
 from ..graphql.ssr import SSR
 from ..graphql.transport import Transport
 from ..store import CursorStore, OutFile
-from .collect import collect, date_bound
+from .collect import collect
 from .common import check_access, check_actor, finish
+from .window import Window
 
 
 def run(args, ctx):
     """Read a listing for the query `ctx` identifies. A continuation is returned as next_handle; the caller writes the
     command that resumes it into `next`."""
-    if (getattr(args, 'since', None) or getattr(args, 'until', None)) and args.command == 'home' and ctx['feed'] != 'following':
-        raise ThreadsError(2, 'Date windows apply only to the following feed and profile activity tabs.')
-    lower, upper = date_bound(ctx.get('since')), date_bound(ctx.get('until'))
-    if lower is not None and upper is not None and lower >= upper:
-        raise ThreadsError(2, '--since must be earlier than --until.')
-    transport = Transport(40 if args.limit or ctx.get('since') or args.out else 10)
+    window = Window(ctx.get('since'), ctx.get('until'), OPERATIONS[operation_of(ctx)].chronological)
+    transport = Transport(args.max_requests or 10)
     output = OutFile(args.out, ctx) if args.out else None
     try:
         handle_state = CursorStore().load(args.after, ctx)['cursor'] if args.after else None
@@ -25,8 +22,12 @@ def run(args, ctx):
             raise ThreadsError(2, 'The file and continuation handle describe different committed progress.',
                                'Resume the same output file without --after; its committed cursor is authoritative.')
         if output and output.complete:
-            return finish({'ok': True, 'results': [], 'stop_reason': output.cursor.get('terminal', 'exhausted'),
-                           'out': str(output.path), 'count': output.count, 'already_complete': True}, transport)
+            stop = output.cursor.get('terminal', 'exhausted')
+            done = {'ok': True, 'results': [], 'stop_reason': stop, 'out': str(output.path), 'count': output.count,
+                    'already_complete': True}
+            if window.active:
+                done['window'] = window.report(stop)
+            return finish(done, transport)
         state = handle_state if handle_state is not None else (output.cursor if output else None)
         state = state or {}
         initial = None
@@ -79,11 +80,11 @@ def run(args, ctx):
                 check_access(page, transport, state)
             return page
         result = collect(fetch, limit=args.limit or 10, state=state, initial=initial,
-                         since=ctx.get('since'), until=ctx.get('until'),
-                         monotonic=OPERATIONS[operation].chronological,
-                         commit=output.commit if output else None)
+                         window=window, commit=output.commit if output else None)
         state = result.pop('state')
         result['context'] = ctx
+        if window.active:
+            result['window'] = window.report(result['stop_reason'])
         if args.command == 'graph' and ctx['relation'] == 'followers':
             result['reported_total'] = state.get('reported_total')
         if state['pending'] or not state['done']:
@@ -97,6 +98,20 @@ def run(args, ctx):
     finally:
         if output:
             output.close()
+
+
+def operation_of(ctx):
+    """The declared operation a listing query reads."""
+    command = ctx['command']
+    if command == 'home':
+        return 'feed'
+    if command == 'user':
+        return 'profile.' + ctx['tab']
+    if command == 'graph':
+        return 'graph.' + ctx['relation']
+    if command == 'search':
+        return 'search.accounts' if ctx['type'] == 'users' else 'search.posts'
+    return 'me.' + ctx['collection']
 
 
 def query_for(ctx, state):

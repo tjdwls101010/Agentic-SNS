@@ -52,7 +52,7 @@ def test_doctor_through_a_separate_aside_process(tmp_path, monkeypatch):
     binary.write_text('#!' + sys.executable + '\nimport json\nprint(' + repr(json.dumps(page)) + ')\n')
     binary.chmod(0o700)
     monkeypatch.setenv('THREADS_ASIDE_BIN', str(binary))
-    result = run_cli('doctor', '--json')
+    result = run_cli('doctor')
     assert result.returncode == 0, result.stdout + result.stderr
     body = data(result)
     assert body['viewer'] == 'fixture_viewer' and body['budget']['used'] == 1
@@ -77,7 +77,8 @@ def test_account_search_more_command_is_executable(routes):
     first = data(run_cli('search', 'python', '--type', 'users', '--limit', '1', '--json'))
     next_page = run_more(first['next'])
     assert next_page.returncode == 0, next_page.stdout + next_page.stderr
-    assert [u['id'] for u in data(next_page)['results']] == ['43', '44']
+    assert [u['id'] for u in data(next_page)['results']] == ['43']
+    assert [u['id'] for u in data(run_more(data(next_page)['next']))['results']] == ['44']
 
 
 def test_schema_describes_every_field_a_post_read_returns(fake_aside):
