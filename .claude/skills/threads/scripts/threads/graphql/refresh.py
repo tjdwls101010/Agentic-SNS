@@ -3,17 +3,13 @@ import json
 import re
 from datetime import date
 
-from ._blocked import account_lock, cache_dir, write_state
-from ._cmds_common import finish
-from ._errors import ThreadsError
-from ._registry import SSR_ONLY
-from ._ssr import SSR
-from ._target import parse_target
-from ._walk import read_page
-
-CAPTURE = ['useBarcelonaAccountSearchGraphQLDataSourceQuery', 'BarcelonaFriendshipsFollowersTabQuery',
-           'BarcelonaFriendshipsFollowingTabQuery', 'BarcelonaFriendshipsFollowingTabRefetchableQuery',
-           'BarcelonaLikedPageViewerQuery', 'BarcelonaSavedPageViewerQuery']
+from ..errors import ThreadsError
+from ..guard.state import account_lock, cache_dir, write_state
+from .capture import CAPTURE, capture
+from .decode import read_page
+from .registry import SSR_ONLY
+from .ssr import SSR
+from .target import parse_target
 
 
 def save(updates):
@@ -33,12 +29,13 @@ def flags(variables):
             and (type(value) in (bool, int) or isinstance(value, str) and re.fullmatch(r'[A-Z_]{1,80}', value))}
 
 
-def refresh(transport, args):
+def refresh(transport, capture_post=False, post_url=None):
+    """Discover, verify and save; returns the system result, without the budget a command adds to it."""
     candidates, failed, updated = {}, {}, {}
-    wanted = set(CAPTURE if args.capture else transport.registry.operations.keys() - set(CAPTURE) - SSR_ONLY)
+    wanted = set(CAPTURE if capture_post else transport.registry.operations.keys() - set(CAPTURE) - SSR_ONLY)
     post_route = None
-    post = parse_target(args.post, 'post') if args.post else None
-    if args.capture and (not post or not post.username):
+    post = parse_target(post_url, 'post') if post_url else None
+    if capture_post and (not post or not post.username):
         raise ThreadsError(2, 'Capture needs a canonical public post URL to start the SPA flow.',
                            'Run refresh --capture --post <post URL>.')
     html = transport.page('/')
@@ -49,7 +46,7 @@ def refresh(transport, args):
             if entry['name'] in wanted:
                 candidates[entry['name']] = entry
         return ssr
-    if not args.capture:
+    if not capture_post:
         discover(html)
         for path in ['/@' + viewer, *['/@' + viewer + '/' + tab for tab in ('replies', 'reposts', 'media')], '/search?q=a&serp_type=default']:
             try:
@@ -83,11 +80,11 @@ def refresh(transport, args):
             post_route = 'not_checked'
             failed['post_route'] = 'No own post in SSR; supply --post URL to check that post pages still decode.'
     else:
-        capture = transport.capture(post, CAPTURE)
-        for candidate in capture['queries']:
+        observed = capture(transport, post, CAPTURE)
+        for candidate in observed['queries']:
             if candidate['name'] in wanted:
                 candidates[candidate['name']] = candidate
-        failed.update(capture.get('missing', {}))
+        failed.update(observed.get('missing', {}))
     for name, candidate in candidates.items():
         spec = transport.registry.get(name)
         spec.update(doc_id=candidate['doc_id'], flags=flags(candidate['variables']),
@@ -111,6 +108,6 @@ def refresh(transport, args):
               'results': []}
     if post_route:
         result['post_route'] = post_route
-    if args.capture:
-        result['capture'] = {key: value for key, value in capture.items() if key != 'queries'}
-    return finish(result, transport)
+    if capture_post:
+        result['capture'] = {key: value for key, value in observed.items() if key != 'queries'}
+    return result

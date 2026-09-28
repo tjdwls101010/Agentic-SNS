@@ -2,15 +2,18 @@
 import json
 import time
 
-from ._aside import run_snippet
-from ._blocked import account_lock, cache_dir, check_blocked, set_blocked, write_state
-from ._budget import WINDOW_LIMIT, history
-from ._errors import ThreadsError
+from ..errors import ThreadsError
+from ..guard.blocked import check_blocked, set_blocked
+from ..guard.budget import WINDOW_LIMIT, history
+from ..guard.state import account_lock, cache_dir, write_state
+from .transport import classify, run_snippet
+
+CAPTURE = ['useBarcelonaAccountSearchGraphQLDataSourceQuery', 'BarcelonaFriendshipsFollowersTabQuery',
+           'BarcelonaFriendshipsFollowingTabQuery', 'BarcelonaFriendshipsFollowingTabRefetchableQuery',
+           'BarcelonaLikedPageViewerQuery', 'BarcelonaSavedPageViewerQuery']
 
 
 def capture(transport, post, targets):
-    from ._refresh import CAPTURE
-    from ._transport import classify
     if not post.username or not targets or any(name not in CAPTURE for name in targets):
         raise ThreadsError(2, 'Capture requires a canonical post URL and supported read-query targets.')
     with account_lock():

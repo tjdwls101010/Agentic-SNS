@@ -3,11 +3,10 @@ import json
 
 import pytest
 
-from threads_skill._entities import build_counts, build_user
-from threads_skill._errors import ThreadsError
-from threads_skill._models import build_post
-from threads_skill._target import parse_target
-from threads_skill._transport import classify
+from threads.errors import ThreadsError
+from threads.graphql.normalize import build_counts, build_post, build_user
+from threads.graphql.target import parse_target
+from threads.graphql.transport import classify
 
 from .fixtures.builders import raw_post
 

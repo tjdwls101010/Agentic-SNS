@@ -22,6 +22,12 @@ SKILLS = {
         'account': 'store', 'cursors': 'store', 'collect': 'store',
         'reading': 'feature', 'render': 'feature',
     }),
+    'threads': ('threads', {
+        'model': 'common', 'errors': 'common',
+        'aside': 'system', 'graphql': 'system',
+        'guard': 'store', 'store': 'store',
+        'reading': 'feature', 'output': 'feature',
+    }),
     'yfinance': ('yfinance_skill', {
         'envelope': 'common', 'shape': 'common', 'display': 'common', 'selection': 'common', 'budget': 'common',
         'leaf': 'common',

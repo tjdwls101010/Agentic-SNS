@@ -1,12 +1,12 @@
 ---
 name: threads
-allowed-tools: Bash(python3 "${CLAUDE_SKILL_DIR}/scripts/threads.py" *)
+allowed-tools: Bash(uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" *)
 description: Read Threads through the user's logged-in Aside browser: the home feed (for you / following), a post with its parent chain and replies, profile threads, replies, reposts and media, followers and following, post or account search, and the user's liked and saved posts. Use whenever the request is to read or explore Threads — 스레드에서, 쓰레드 피드, 이 스레드 글 답글, 스레드 검색 — including a bare threads.com or threads.net URL. Not for Instagram, Facebook, X/Twitter, Reddit, programming threads, general web pages, or posting, replying, liking, saving and following.
 ---
 
 # Threads through the user's own browser
 
-The bundled CLI reads through the account already logged in to Aside u0; cookies stay in the browser. It exposes read-only queries and dense text with reusable handles. Below, `$TH` means `python3 "${CLAUDE_SKILL_DIR}/scripts/threads.py"`: expand it to the quoted absolute path on one shell line. Start with `$TH --help`; `schema` describes objects and errors carry their own `fix`.
+The bundled CLI reads through the account already logged in to Aside u0; cookies stay in the browser. It exposes read-only queries and dense text with reusable handles. Below, `$TH` means `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py"`, written out on one shell line. Start with `$TH --help`; `schema` describes objects and errors carry their own `fix`.
 
 ## Every request is the person's account, and Threads does not say how many are left
 

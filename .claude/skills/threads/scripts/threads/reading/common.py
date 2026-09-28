@@ -1,40 +1,11 @@
-"""Shared query context and output completion at the CLI boundary."""
-import shlex
-from pathlib import Path
-
-from ._errors import ThreadsError
+"""Access checks and result completion shared by the reading commands."""
+from ..errors import ThreadsError
+from ..graphql.target import parse_target
 
 
-def context(args):
-    result = {'command': args.command, 'account': 'u0'}
-    for key in ('target', 'feed', 'tab', 'sort', 'query', 'type', 'tag', 'relation', 'collection', 'since', 'until'):
-        if hasattr(args, key):
-            value = getattr(args, key)
-            result[key] = value.path if key == 'target' else value
-    for key, value in {'feed': 'foryou', 'tab': 'threads', 'sort': 'top', 'type': 'posts'}.items():
-        if key in result and result[key] is None:
-            result[key] = value
-    if result['command'] == 'search' and result.get('type') == 'users':
-        result.pop('sort', None)
-    return result
-
-
-def more_command(ctx, handle, output=None, json_mode=False):
-    parts = ['python3', str(Path(__file__).with_name('threads.py').resolve()), ctx['command']]
-    for key in ('target', 'query', 'relation', 'collection'):
-        if key in ctx:
-            parts.append(ctx[key])
-    for key in ('feed', 'tab', 'sort', 'type', 'since', 'until'):
-        if ctx.get(key) is not None:
-            parts.extend(['--' + key, str(ctx[key])])
-    if ctx.get('tag'):
-        parts.append('--tag')
-    parts.extend(['--after', str(handle)])
-    if output is not None:
-        parts.extend(['--out', str(Path(output).resolve())])
-    if json_mode:
-        parts.append('--json')
-    return shlex.join(parts)
+def resolve_target(value, kind):
+    """A command's target as a Threads route, refused before any request when it is not one."""
+    return parse_target(value, kind)
 
 
 def check_actor(state, transport):

@@ -5,8 +5,9 @@ import random
 import time
 from contextlib import contextmanager
 
-from ._blocked import account_lock, cache_dir, check_blocked, write_state
-from ._errors import ThreadsError
+from ..errors import ThreadsError
+from .blocked import check_blocked
+from .state import account_lock, cache_dir, write_state
 
 # 성진: 120 requests/10 minutes and a 1-second floor are estimates protecting a real account without rate headers; lower them if checkpoints appear.
 WINDOW, WINDOW_LIMIT, MIN_GAP = 600, 120, 1.0

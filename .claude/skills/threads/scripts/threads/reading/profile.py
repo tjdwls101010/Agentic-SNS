@@ -1,22 +1,18 @@
-"""Profile cards and single-page post reads."""
-from ._cmds_common import finish, profile_from_route
-from ._entities import build_counts, build_user
-from ._errors import ThreadsError
-from ._output import OutFile
-from ._cmds_common import context
-from ._ssr import SSR
-from ._transport import Transport
+"""Profile cards: the profile and its relationship counts."""
+from ..errors import ThreadsError
+from ..graphql.normalize import build_counts, build_user
+from ..graphql.ssr import SSR
+from ..graphql.transport import Transport
+from ..store import OutFile
+from .common import finish, profile_from_route
 
 
-def run(args):
-    transport = Transport(40 if args.limit or args.out else 10)
-    html = transport.page(args.target.path + ('?sort_order=recent' if args.command == 'post' and args.sort == 'recent' else ''))
-    if args.command == 'post':
-        from ._thread import read_thread
-        return finish(read_thread(html, args), transport)
+def run(target, *, limit, out, ctx):
+    transport = Transport(40 if limit or out else 10)
+    html = transport.page(target.path)
     user_id = transport.session.identity('BarcelonaProfilePageDirectQuery', 'userID')
     user = build_user(profile_from_route(SSR(html), transport, user_id))
-    if not user or user.username.lower() != args.target.username:
+    if not user or user.username.lower() != target.username:
         raise ThreadsError(6, 'Profile identity differs from the request.', 'Run refresh.', error='envelope_drift')
     result = {'ok': True, 'results': [user.to_dict()], 'stop_reason': 'exhausted'}
     try:
@@ -29,8 +25,8 @@ def run(args):
         result.update(ok=False, code=error.code if error.code in (4, 5) else 8,
                       stop_reason='blocked' if error.code in (4, 5) else 'query_failure',
                       error=error.error, message=error.message, fix=error.fix)
-    if args.out:
-        output = OutFile(args.out, context(args))
+    if out:
+        output = OutFile(out, ctx)
         try:
             output.commit(result['results'], {'terminal': result['stop_reason']}, result['stop_reason'])
             result.update(out=str(output.path), count=output.count, results=[])

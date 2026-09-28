@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILL = ROOT / '.claude/skills/threads'
-CLI = SKILL / 'scripts/threads.py'
+CLI = SKILL / 'scripts/cli.py'
 PROCESS_DOUBLES = Path(__file__).with_name('process_doubles')
 FAKE_ASIDE = Path(__file__).with_name('fake_aside') / 'aside'
 POST = 'https://www.threads.com/@fixture_user/post/FIX_2'
@@ -37,10 +37,10 @@ def calls(log):
 
 
 def more_args(command):
-    """A more: command re-runs this CLI; return the arguments after the CLI path."""
+    """A more: command is this CLI's allowed-tools invocation; return the arguments after it."""
     words = shlex.split(command)
-    assert words[:2] == ['python3', str(CLI)]
-    return words[2:]
+    assert words[:3] == ['uv', 'run', str(CLI)]
+    return words[3:]
 
 
 def run_more(command, **kwargs):

@@ -1,16 +1,34 @@
 """Single classification path for route reads, queries, and refresh verification."""
 import json
 import re
+from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
-from ._aside import run_snippet
-from ._blocked import cache_dir, set_blocked
-from ._budget import Budget
-from ._errors import ThreadsError
-from ._registry import Registry
-from ._session import Session
+from ..aside.repl import run
+from ..errors import ThreadsError
+from ..guard.blocked import set_blocked
+from ..guard.budget import Budget
+from ..guard.state import cache_dir
+from .decode import at, drift, read_page
+from .registry import Registry
+from .session import Session
 
 ORIGIN = 'https://www.threads.com'
+SNIPPETS = Path(__file__).resolve().parent / 'snippets'
+
+
+def run_snippet(name, args):
+    """Run one of this system's browser snippets (page, graphql, capture) through Aside."""
+    if not isinstance(name, str) or Path(name).name != name:
+        raise ThreadsError(3, 'Invalid browser snippet.', 'Reinstall the Threads skill.')
+    name = name if name.endswith('.js') else name + '.js'
+    try:
+        source = (SNIPPETS / name).read_text(encoding='utf-8')
+        if not source.strip():
+            raise ValueError
+    except (OSError, ValueError):
+        raise ThreadsError(3, 'Browser snippet is missing or invalid.', 'Reinstall the Threads skill.') from None
+    return run(source, args)
 
 
 def classify(response, kind):
@@ -87,10 +105,6 @@ class Transport:
         self.fetched_bytes = 0
         self.route = '/'
 
-    def capture(self, post, targets):
-        from ._capture import capture
-        return capture(self, post, targets)
-
     def _request(self, snippet, args, *, unblock=False):
         with self.budget.request(unblock=unblock):
             response = run_snippet(snippet, args)
@@ -139,7 +153,6 @@ class Transport:
         variables = self.registry.variables(name, values, selected)
         _, data = self._request('graphql', {'name': name, 'doc_id': selected['doc_id'], 'variables': variables,
                                'csrf': self.session.csrf, 'referer': ORIGIN + self.route})
-        from ._walk import at, drift, read_page
         if name == 'BarcelonaProfilePageDirectQuery':
             user = at(data, 'data.user')
             if not isinstance(user, dict) or str(user.get('pk')) != str(variables['userID']):

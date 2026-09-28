@@ -1,9 +1,7 @@
 """Anchored connection paths; a missing pagination contract is never exhaustion."""
-from dataclasses import dataclass, field
-
-from ._entities import build_user
-from ._errors import ThreadsError
-from ._models import build_post
+from ..errors import ThreadsError
+from ..model import Page
+from .normalize import build_post, build_user
 
 
 def drift(message):
@@ -16,18 +14,6 @@ def at(value, path):
             raise drift('Missing response path: ' + path)
         value = value[key]
     return value
-
-
-@dataclass
-class Page:
-    records: list = field(default_factory=list)
-    cursor: str | None = None
-    has_next: bool = False
-    stop: str = 'exhausted'
-    groups: list = field(default_factory=list)
-    reported_total: int | None = None
-    restarted: bool = False
-    state_updates: dict = field(default_factory=dict)
 
 
 def read_page(response, operation):

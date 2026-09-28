@@ -173,8 +173,12 @@ def capture(directory, cli):
 
 
 RELOCATION = [
-    (re.compile(r'(?:python3 \S*threads\.py|uv run "[^"]*/cli\.py")'), '<CLI>'),
-    (re.compile(r'usage: (?:threads|cli)\.py'), 'usage: <PROG>'),
+    # The CLI in a more: command: shlex-quoted threads.py before, the double-quoted allowed-tools form after (escaped
+    # once more inside JSON).
+    (re.compile(r"python3 (?:'[^']*/threads\.py'|\S*/threads\.py)"), '<CLI>'),
+    (re.compile(r'uv run (?:"[^"]*/cli\.py"|\\"[^"\\]*/cli\.py\\")'), '<CLI>'),
+    # argparse's usage block, re-wrapped when the program name changes length.
+    (re.compile(r'usage: (?:threads|cli)\.py(.*?)(?=\n\n|\Z)', re.S), lambda m: 'usage: <PROG>' + ' '.join(m[1].split())),
 ]
 
 

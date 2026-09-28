@@ -1,17 +1,9 @@
-"""Pure media/identity normalization ported from agentic-threads; no I/O."""
-from dataclasses import dataclass, asdict
+"""Pure normalization of Threads' raw objects into the model's records; nested unavailability stays at its own post."""
+from datetime import datetime, timezone
 from typing import Any
 
-@dataclass
-class Media:
-    kind: str
-    url: str
-    width: int | None = None
-    height: int | None = None
-    alt_text: str | None = None
+from ..model import Counts, Media, Post, User
 
-    def to_dict(self):
-        return asdict(self)
 
 def _identifier(value: object) -> str | None:
     """Return an ASCII-decimal identifier string, or ``None`` for any other value."""
@@ -138,3 +130,53 @@ def _post_media(raw_post: dict[str, Any]) -> list[Media]:
     else:
         raw_items = []
     return [media for media in (build_media(item) for item in raw_items) if media.url]
+
+
+def build_user(raw):
+    if not isinstance(raw, dict) or _node_identifier(raw) is None:
+        return None
+    name = raw.get('username') or ''
+    return User(id=_node_identifier(raw), username=name, full_name=raw.get('full_name'),
+        is_verified=raw.get('is_verified', raw.get('text_post_app_is_verified')),
+        private=raw.get('text_post_app_is_private'), follower_count=_integer(raw.get('follower_count')),
+        bio=raw.get('biography'), bio_links=[x['url'] for x in raw.get('bio_links') or [] if isinstance(x, dict) and x.get('url')],
+        friendship_status=raw.get('friendship_status') or {}, profile_pic_url=raw.get('profile_pic_url'),
+        url='https://www.threads.com/@' + name if name else None)
+
+
+def build_counts(raw):
+    raw = raw if isinstance(raw, dict) else {}
+    return Counts(*(_integer(raw.get(key)) for key in ('followers', 'following', 'mutuals')))
+
+
+def build_post(raw, ancestors=()):
+    if not isinstance(raw, dict):
+        return None
+    identity = _node_identifier(raw)
+    if raw.get('is_post_unavailable') or raw.get('attachment_tombstone_info') or identity is None:
+        return Post(id=identity, unavailable=True, unavailable_reason='Post unavailable')
+    # 성진: Eight nested shares bound hostile/cyclic payload work; raise only if real Threads payloads need deeper chains.
+    if identity in ancestors or len(ancestors) >= 8:
+        return Post(id=identity, unavailable=True, unavailable_reason='Nested share cycle or depth limit')
+    author = build_user(raw.get('user'))
+    info = raw.get('text_post_app_info') or {}
+    share = info.get('share_info') or {}
+    code = raw.get('code')
+    created = None
+    stamp = raw.get('taken_at')
+    if type(stamp) in (int, float) or isinstance(stamp, str) and stamp.isdigit():
+        try:
+            created = datetime.fromtimestamp(float(stamp), timezone.utc).isoformat().replace('+00:00', 'Z')
+        except (ValueError, OSError, OverflowError):
+            pass
+    url = f'https://www.threads.com/@{author.username}/post/{code}' if author and code else f'https://www.threads.com/t/{code}' if code else None
+    return Post(id=identity, code=code, url=url, created_at=created,
+        text=(raw.get('caption') or {}).get('text') or '', author=author,
+        like_count=None if raw.get('like_and_view_counts_disabled') else _integer(raw.get('like_count')),
+        reply_count=_integer(info.get('direct_reply_count')), repost_count=_integer(info.get('repost_count')),
+        quote_count=_integer(info.get('quote_count')), media_type={1: 'image', 2: 'video', 8: 'carousel', 19: 'text'}.get(raw.get('media_type'), 'text'),
+        media=_post_media(raw), is_reply=bool(info.get('is_reply', info.get('reply_to_author') is not None)),
+        reply_to_id=_identifier(info.get('reply_to_id')), root_post_id=_identifier(info.get('root_post_id')),
+        quoted_post=build_post(share.get('quoted_post'), ancestors + (identity,)),
+        reposted_post=build_post(share.get('reposted_post'), ancestors + (identity,)),
+        link_preview=_link_preview(info), is_pinned=bool((info.get('pinned_post_info') or {}).get('is_pinned_to_profile')))

@@ -1,15 +1,16 @@
 """Home and profile activity share one continuation/commit path."""
-from ._cmds_common import check_access, check_actor, context, finish, more_command
-from ._errors import ThreadsError
-from ._listing import collect, date_bound
-from ._output import CursorStore, OutFile
-from ._ssr import SSR
-from ._transport import Transport
-from ._walk import read_page
+from ..errors import ThreadsError
+from ..graphql.decode import read_page
+from ..graphql.ssr import SSR
+from ..graphql.transport import Transport
+from ..store import CursorStore, OutFile
+from .collect import collect, date_bound
+from .common import check_access, check_actor, finish
 
 
-def run(args):
-    ctx = context(args)
+def run(args, ctx):
+    """Read a listing for the query `ctx` identifies. A continuation is returned as next_handle; the caller writes the
+    command that resumes it into `next`."""
     if (getattr(args, 'since', None) or getattr(args, 'until', None)) and args.command == 'home' and ctx['feed'] != 'following':
         raise ThreadsError(2, 'Date windows apply only to the following feed and profile activity tabs.')
     lower, upper = date_bound(ctx.get('since')), date_bound(ctx.get('until'))
@@ -85,7 +86,7 @@ def run(args):
             result['reported_total'] = state.get('reported_total')
         if state['pending'] or not state['done']:
             handle = CursorStore().save(ctx, state)
-            result.update(next_handle=handle, next=more_command(ctx, handle, output.path if output else None, args.json))
+            result.update(next_handle=handle, next=None)
         if output:
             result.update(out=str(output.path), count=output.count, results=[])
             if result['code'] == 7 and output.count:

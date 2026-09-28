@@ -2,7 +2,7 @@
 import copy
 from datetime import datetime, timezone
 
-from ._errors import ThreadsError
+from ..errors import ThreadsError
 
 
 def date_bound(value):

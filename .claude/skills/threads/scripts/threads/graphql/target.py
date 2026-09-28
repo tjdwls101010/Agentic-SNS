@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
-from ._errors import ThreadsError
+from ..errors import ThreadsError
 
 HOSTS = {'threads.com', 'www.threads.com', 'threads.net', 'www.threads.net'}
 NAME = r'[A-Za-z0-9_.]{1,30}'

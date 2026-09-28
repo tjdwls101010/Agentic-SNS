@@ -4,23 +4,15 @@ import os
 import re
 import shutil
 import subprocess
-from pathlib import Path
 
-from ._errors import ThreadsError
-
-SNIPPETS = Path(__file__).resolve().parent / 'browser'
+from ..errors import ThreadsError
 
 
-def run_snippet(name, args):
-    if not isinstance(name, str) or Path(name).name != name:
-        raise ThreadsError(3, 'Invalid browser snippet.', 'Reinstall the Threads skill.')
-    name = name if name.endswith('.js') else name + '.js'
+def run(source, args):
+    """Run one browser snippet in the u0 account with ARGS bound, and return its single response envelope."""
     try:
-        source = (SNIPPETS / name).read_text(encoding='utf-8')
-        if not source.strip():
-            raise ValueError
         code = 'const ARGS = ' + json.dumps(args, ensure_ascii=True) + ';\n' + source
-    except (OSError, ValueError, TypeError):
+    except (ValueError, TypeError):
         raise ThreadsError(3, 'Browser snippet is missing or invalid.', 'Reinstall the Threads skill.') from None
     binary = os.environ.get('THREADS_ASIDE_BIN') or shutil.which('aside')
     if not binary:

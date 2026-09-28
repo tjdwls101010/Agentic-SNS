@@ -1,9 +1,8 @@
 """Field inventory comes from serialized objects, including nested contracts."""
-from ._entities import Counts, User
-from ._models import Media, Post
-from ._thread import Completeness
 from types import UnionType
 from typing import Union, get_args, get_origin, get_type_hints
+
+from ..model import Completeness, Counts, Media, Post, User
 
 
 def field_type(annotation):

@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from html.parser import HTMLParser
 
-from ._errors import ThreadsError
+from ..errors import ThreadsError
 
 
 class Scripts(HTMLParser):

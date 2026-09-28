@@ -1,21 +1,22 @@
+#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 """Argument parsing and dispatch for the self-contained Threads reader."""
 import argparse
-import importlib.util
 import json
-from pathlib import Path
+import os
+import re
+import shlex
 import sys
+from pathlib import Path
 
-if not __package__:
-    directory = Path(__file__).resolve().parent
-    spec = importlib.util.spec_from_file_location('threads_skill', directory / '__init__.py',
-                                                submodule_search_locations=[str(directory)])
-    package = importlib.util.module_from_spec(spec)
-    sys.modules['threads_skill'] = package
-    spec.loader.exec_module(package)
-    __package__ = 'threads_skill'
-
-from ._errors import ThreadsError
-from ._target import parse_target
+from threads.errors import ThreadsError
+from threads.output.render import render
+from threads.output.schema import schema
+from threads.reading import listing, maintenance, post, profile
+from threads.reading.common import resolve_target
 
 
 class Parser(argparse.ArgumentParser):
@@ -84,6 +85,63 @@ def parser():
     return root
 
 
+def context(args):
+    """The query's identity: what a continuation handle or --out file must match to resume it."""
+    result = {'command': args.command, 'account': 'u0'}
+    for key in ('target', 'feed', 'tab', 'sort', 'query', 'type', 'tag', 'relation', 'collection', 'since', 'until'):
+        if hasattr(args, key):
+            value = getattr(args, key)
+            result[key] = value.path if key == 'target' else value
+    for key, value in {'feed': 'foryou', 'tab': 'threads', 'sort': 'top', 'type': 'posts'}.items():
+        if key in result and result[key] is None:
+            result[key] = value
+    if result['command'] == 'search' and result.get('type') == 'users':
+        result.pop('sort', None)
+    return result
+
+
+def invocation():
+    """This file's path as it was invoked (links kept), double-quoted the way allowed-tools spells it."""
+    path = os.path.abspath(__file__)
+    return 'uv run "' + re.sub(r'([\\"$`])', r'\\\1', path) + '"'
+
+
+def more_command(ctx, handle, output=None, json_mode=False):
+    parts = [ctx['command']]
+    for key in ('target', 'query', 'relation', 'collection'):
+        if key in ctx:
+            parts.append(ctx[key])
+    for key in ('feed', 'tab', 'sort', 'type', 'since', 'until'):
+        if ctx.get(key) is not None:
+            parts.extend(['--' + key, str(ctx[key])])
+    if ctx.get('tag'):
+        parts.append('--tag')
+    parts.extend(['--after', str(handle)])
+    if output is not None:
+        parts.extend(['--out', str(Path(output).expanduser().resolve())])
+    if json_mode:
+        parts.append('--json')
+    return invocation() + ' ' + shlex.join(parts)
+
+
+def dispatch(args):
+    if args.command == 'schema':
+        return schema()
+    if args.command == 'doctor':
+        return maintenance.doctor(args.unblock)
+    if args.command == 'refresh':
+        return maintenance.refresh(args.capture, args.post)
+    ctx = context(args)
+    if args.command == 'post':
+        return post.run(args.target, sort=args.sort, limit=args.limit, out=args.out, ctx=ctx)
+    if args.command == 'about':
+        return profile.run(args.target, limit=args.limit, out=args.out, ctx=ctx)
+    result = listing.run(args, ctx)
+    if result.get('next_handle') is not None:
+        result['next'] = more_command(ctx, result['next_handle'], args.out, args.json)
+    return result
+
+
 def main(argv=None):
     try:
         args = parser().parse_args(argv)
@@ -92,19 +150,12 @@ def main(argv=None):
         if args.command == 'search' and args.type == 'users' and (args.tag or args.sort is not None):
             raise ThreadsError(2, '--tag and --sort apply to post search; account search has one unsorted batch.')
         if hasattr(args, 'target'):
-            args.target = parse_target(args.target, 'post' if args.command == 'post' else 'user')
-        if args.command in ('doctor', 'refresh', 'schema'):
-            from ._cmds_meta import run
-        elif args.command in ('post', 'about'):
-            from ._cmds_post import run
-        else:
-            from ._cmds_browse import run
-        result = run(args)
+            args.target = resolve_target(args.target, 'post' if args.command == 'post' else 'user')
+        result = dispatch(args)
         code = result.pop('code', 0)
         if args.json or args.command in ('doctor', 'refresh', 'schema'):
             print(json.dumps(result, ensure_ascii=False))
         else:
-            from ._render import render
             print(render(result, args))
         return code
     except ThreadsError as error:

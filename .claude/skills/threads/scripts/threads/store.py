@@ -5,7 +5,8 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ._errors import ThreadsError
+from .errors import ThreadsError
+from .guard.state import cache_dir
 
 
 def _line(value):
@@ -106,7 +107,6 @@ class OutFile:
 class CursorStore:
     """Opaque monotonically increasing handles bind cursors to one query context."""
     def __init__(self):
-        from ._blocked import cache_dir
         self.directory = cache_dir() / 'cursors'
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
 

@@ -1,8 +1,8 @@
 """Read only Relay bbox results from JSON scripts, with operation/identity checks."""
 import re
 
-from ._errors import ThreadsError
-from ._session import Scripts, preloaders
+from ..errors import ThreadsError
+from .session import Scripts, preloaders
 
 POST_PAGE_CHANGED = ('Threads changed the post page; refresh cannot repair it. '
                      'Tell the user the post reader needs an update.')

@@ -1,13 +1,15 @@
 """The command surface: help, argument refusals before any request, doctor, schema against real results."""
 import json
 import os
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
 from .fixtures.builders import collections, envelope, preloader, route
-from .helpers import POST, calls, data, run_cli, run_more
+from .helpers import POST, SKILL, calls, data, run_cli, run_more
 
 COMMANDS = ('home', 'user', 'about', 'post', 'graph', 'search', 'me', 'doctor', 'refresh', 'schema')
 
@@ -83,3 +85,29 @@ def test_schema_describes_every_field_a_post_read_returns(fake_aside):
     for post in data(run_cli('post', POST, '--json'))['results']:
         assert set(post) <= schema['properties'].keys()
     assert schema['properties']['reply_to_id']['anyOf'] == [{'type': 'string'}, {'type': 'null'}]
+
+
+def allowed_prefix(skill_dir):
+    """What SKILL.md's allowed-tools pattern matches, with the skill directory filled in."""
+    line = next(line for line in (SKILL / 'SKILL.md').read_text().splitlines() if line.startswith('allowed-tools:'))
+    pattern = line.split('Bash(', 1)[1].rsplit(' *)', 1)[0]
+    return pattern.replace('${CLAUDE_SKILL_DIR}', str(skill_dir)) + ' '
+
+
+def test_more_is_the_invocation_allowed_tools_approves(fake_aside):
+    more = data(run_cli('home', '--limit', '1', '--json'))['next']
+    assert more.startswith(allowed_prefix(SKILL))
+
+
+def test_more_survives_the_shell_from_an_awkward_install_path(fake_aside, tmp_path):
+    copy = tmp_path / 'skills 한글 $HOME "q" `x`' / 'threads'
+    shutil.copytree(SKILL, copy, ignore=shutil.ignore_patterns('__pycache__'))
+    first = run_cli('home', '--limit', '1', '--json', cli=copy / 'scripts/cli.py')
+    more = data(first)['next']
+    assert more.startswith('uv run "')
+    # The shell, not a Python tokenizer, is what reads the command: let it split the words.
+    words = subprocess.run(['sh', '-c', 'printf "%s\\n" ' + more.removeprefix('uv run ')], capture_output=True,
+                           text=True).stdout.splitlines()
+    assert words[0] == str(copy / 'scripts/cli.py')
+    resumed = run_cli(*words[1:], cli=copy / 'scripts/cli.py')
+    assert resumed.returncode == 0, resumed.stdout + resumed.stderr

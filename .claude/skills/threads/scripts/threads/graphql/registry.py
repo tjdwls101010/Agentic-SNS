@@ -3,8 +3,8 @@ import copy
 import json
 from pathlib import Path
 
-from ._blocked import cache_dir
-from ._errors import ThreadsError
+from ..errors import ThreadsError
+from ..guard.state import cache_dir
 
 BUNDLED = Path(__file__).with_name('registry.json')
 # Post pages are read from the route's own server-rendered payloads, never queried; these entries remain only so that
