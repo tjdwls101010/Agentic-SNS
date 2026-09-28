@@ -6,13 +6,20 @@ from urllib.parse import urlsplit, urlunsplit
 
 _FIXES = {
     2: 'Run this command with --help.',
-    3: 'Check that Aside is running, then run doctor.',
-    4: 'Log in to Threads in Aside, then run doctor.',
-    5: 'Stop requests. Check Threads in Aside before doctor --unblock.',
+    3: 'Check that Aside is running, then run `doctor`.',
+    4: 'Log in to Threads in Aside, then run `doctor`.',
+    5: 'Stop requests. Check Threads in Aside, then run `doctor --unblock`.',
     6: 'Wait briefly before retrying; no automatic retry was made.',
-    7: 'Try a different target or window; this is an explicitly empty result.',
-    8: 'Use the continuation command or resume the same output file later.',
+    7: 'Try another target or date window; this is an explicitly empty result.',
+    8: 'Run more: later, or rerun the same --out command.',
+    9: 'This account cannot read it (deleted, private and not followed, or redirected away); tell the user rather '
+       'than retrying.',
 }
+ROTATED = 'Run `refresh`, then retry this command.'
+CAPTURE = ('Ask the user first, because it opens a Threads tab in their browser; then run '
+           '`refresh --capture --post <public post URL>` and retry this command.')
+# {command} is filled in by the CLI with the command that failed.
+CHANGED = "Threads changed this response's shape; refresh cannot repair it. Tell the user the {command} reader needs an update."
 _SENSITIVE = {'fb_dtsg', 'lsd', 'jazoest', 'datr', 'sb', 'c_user', 'xs', 'token',
               'csrf', 'csrf_token', 'sessionid', 'csrftoken', 'access_token', 'cookie', 'cookies', 'authorization'}
 _KEYS = '|'.join(re.escape(key) for key in sorted(_SENSITIVE))
@@ -58,3 +65,13 @@ def scrub(value):
 def diagnostic(stage, **details):
     """Only caller-selected metadata belongs here; never source, ARGS, stdout or stderr."""
     print(json.dumps(scrub({'stage': stage, **details}), ensure_ascii=False), file=sys.stderr)
+
+
+def rotated(message, capture=False):
+    """A query Threads no longer answers under its registered id or name: refresh can find the new one."""
+    return ThreadsError(6, message, CAPTURE if capture else ROTATED, error='operation_rotated')
+
+
+def changed(message):
+    """A response that arrived without what its declaration reads: only a new version of the reader can fix it."""
+    return ThreadsError(6, message, CHANGED, error='shape_changed')

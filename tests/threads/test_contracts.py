@@ -30,7 +30,7 @@ def envelope(body, status=200, url='https://www.threads.com/graphql/query'):
     ('bad gateway', 502, '', 6, 'transient'),
     ('{"data":', 200, '', 6, 'transient'),
     ({'errors': [{'message': 'execution error', 'severity': 'CRITICAL'}], 'data': None}, 200, '', 6, 'operation_rotated'),
-    ({'data': {'user': None}}, 200, '', 6, 'envelope_drift'),
+    ({'data': {'user': None}}, 200, '', 6, 'shape_changed'),
 ])
 def test_error_contract(body, status, url, code, kind):
     with pytest.raises(ThreadsError) as error:

@@ -64,7 +64,7 @@ def test_doctor_through_a_separate_aside_process(tmp_path, monkeypatch):
     ('<html><title>Threads</title></html>', 6, 'transient'),
     ('<script>"DTSGInitialData",[],{}</script>', 4, 'login'),
     ('<script>"DTSGInitialData",[],{"csrf_token":"fixture","NON_FACEBOOK_USER_ID":"42","username":"fixture"}</script>',
-     6, 'envelope_drift'),
+     6, 'shape_changed'),
 ], ids=['shell', 'logged-out', 'no-relay'])
 def test_doctor_tells_a_logged_out_page_from_an_unrecognised_one(routes, body, code, error):
     routes.set('/', envelope(body, url='https://www.threads.com/')).write()

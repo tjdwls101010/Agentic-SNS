@@ -60,10 +60,10 @@ class Registry:
         except Unknown:
             raise ThreadsError(6, 'The query registry override names an operation this skill does not know.',
                                f'Remove {override}; it holds entries this skill no longer knows.',
-                               error='envelope_drift') from None
+                               error='registry') from None
         except (OSError, ValueError, KeyError, TypeError, AttributeError):
             raise ThreadsError(6, 'The query registry is unreadable.', 'Restore the bundled registry or remove the invalid cache override.',
-                               error='envelope_drift') from None
+                               error='registry') from None
 
     def entry(self, operation):
         if operation not in self.operations:

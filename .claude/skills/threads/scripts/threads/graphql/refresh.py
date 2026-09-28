@@ -27,7 +27,7 @@ def refresh(transport, capture_post=False, post_url=None):
     post = parse_target(post_url, 'post') if post_url else None
     if capture_post and (not post or not post.username):
         raise ThreadsError(2, 'Capture needs a canonical public post URL to start the SPA flow.',
-                           'Run refresh --capture --post <post URL>.')
+                           'Run `refresh --capture --post <public post URL>`.')
     html = transport.page('/')
     viewer = transport.session.viewer
     def discover(html):

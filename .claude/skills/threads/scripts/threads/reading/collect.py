@@ -1,7 +1,7 @@
 """Cursor progress and pending tails are independent from the request mechanism."""
 import copy
 
-from ..errors import ThreadsError
+from ..errors import ThreadsError, changed
 
 
 def collect(fetch, *, limit, window, state=None, initial=None, commit=None):
@@ -37,7 +37,7 @@ def collect(fetch, *, limit, window, state=None, initial=None, commit=None):
             page = initial if initial is not None else fetch(state['after'])
             initial = None
             if page.has_next and not page.restarted and (page.cursor == state['after'] or page.cursor in cursors):
-                raise ThreadsError(6, 'The server repeated a continuation cursor.', 'Run refresh.', error='envelope_drift')
+                raise changed('The server repeated a continuation cursor.')
             if page.cursor:
                 cursors.add(page.cursor)
             records, window_reached = window.keep(page, state)

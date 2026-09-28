@@ -265,6 +265,7 @@ def more_command(args, ctx, handle):
 
 
 def main(argv=None):
+    args = None
     try:
         args = parser().parse_args(argv)
         validate(args)
@@ -273,12 +274,16 @@ def main(argv=None):
         if result.get('next_handle') is not None:
             result['next'] = more_command(args, ctx, result['next_handle'])
         code = result.pop('code', 0)
+        if result.get('fix'):
+            result['fix'] = result['fix'].replace('{command}', args.command)
         if args.json or args.command in ('doctor', 'refresh', 'schema'):
             print(json.dumps(result, ensure_ascii=False))
         else:
             print(render(result, args))
         return code
     except ThreadsError as error:
+        if args is not None:
+            error.fix = error.fix.replace('{command}', args.command)
         print(json.dumps(error.as_dict(), ensure_ascii=False))
         return error.code
     except (OSError, ValueError) as error:

@@ -90,7 +90,7 @@ def test_a_page_without_its_pagination_contract_is_drift_not_the_end(routes):
     routes.write()
     result = run_cli('home', '--feed', 'following', '--json')
     assert result.returncode == 6
-    assert data(result)['error'] == 'envelope_drift'
+    assert data(result)['error'] == 'shape_changed'
 
 
 def test_a_response_of_another_shape_is_drift(routes):
@@ -98,7 +98,7 @@ def test_a_response_of_another_shape_is_drift(routes):
     routes.write()
     result = run_cli('home', '--feed', 'following', '--json')
     assert result.returncode == 6
-    assert data(result)['error'] == 'envelope_drift'
+    assert data(result)['error'] == 'shape_changed'
 
 
 def test_a_rendered_tab_for_another_profile_is_not_read_as_this_one(routes):
@@ -143,7 +143,7 @@ def test_unknown_saved_shape_is_not_claimed_to_be_empty(routes):
     collections(routes).write()
     result = run_cli('me', 'saved', '--json')
     assert result.returncode == 6
-    assert data(result)['error'] == 'envelope_drift'
+    assert data(result)['error'] == 'shape_changed'
 
 
 def test_date_window_file_completion_is_zero_request_on_repeat(fake_aside, tmp_path):

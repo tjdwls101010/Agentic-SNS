@@ -22,12 +22,12 @@ def run(source, args):
     except subprocess.TimeoutExpired:
         raise ThreadsError(3, 'Aside request exceeded its 120-second time limit.', 'Reduce the request size.') from None
     except (OSError, UnicodeError):
-        raise ThreadsError(3, 'Aside could not run.', 'Start Aside, then run doctor.') from None
+        raise ThreadsError(3, 'Aside could not run.', 'Start Aside, then run `doctor`.') from None
     if result.returncode:
         timed_out = any(s in (result.stderr + result.stdout).lower()
                         for s in ('other side closed', 'daemon is not reachable'))
         message = 'Aside request ended at the REPL time limit or lost its connection.' if timed_out else 'Aside request failed.'
-        raise ThreadsError(3, message, 'Check Aside, then run doctor.')
+        raise ThreadsError(3, message, 'Check Aside, then run `doctor`.')
     try:
         lines = [re.sub(r'\x1b\[[0-9;]*m', '', line).strip() for line in result.stdout.splitlines()]
         records = [json.loads(line) for line in lines if line.startswith('{')]
@@ -54,4 +54,4 @@ def run(source, args):
             raise ValueError
         return envelope
     except (ValueError, TypeError, OSError, UnicodeError):
-        raise ThreadsError(3, 'Aside returned an invalid response envelope.', 'Run doctor to check the browser bridge.') from None
+        raise ThreadsError(3, 'Aside returned an invalid response envelope.', 'Run `doctor` to check the browser bridge.') from None

@@ -5,7 +5,7 @@ from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
 from ..aside.repl import run
-from ..errors import ThreadsError
+from ..errors import CAPTURE, ThreadsError, changed, rotated
 from ..guard.blocked import set_blocked
 from ..guard.budget import Budget
 from ..guard.state import cache_dir
@@ -66,7 +66,7 @@ def classify(response, kind):
     if (re.match(r'^/(challenge|checkpoint)(/|$)', path) or codes & {368, 459} or challenge_html
             or any(x in message for x in ('checkpoint', 'challenge', 'consent_required'))):
         raise ThreadsError(5, 'Threads requires a checkpoint.',
-                           'Stop requests. Check Threads in Aside, then run doctor --unblock.', error='checkpoint')
+                           'Stop requests. Check Threads in Aside, then run `doctor --unblock`.', error='checkpoint')
     if status == 429 or codes & {4, 17, 613, 80004} or any(x in message for x in ('rate limit', 'too many request', 'try again later')):
         raise ThreadsError(5, 'Threads limited this account.', 'Stop requests for 30 minutes; the block expires automatically.', error='rate_limit')
     if (re.match(r'^/(accounts/login|login)(/|$)', path)
@@ -82,10 +82,9 @@ def classify(response, kind):
     data = payload.get('data')
     useful = isinstance(data, dict) and any(value is not None for value in data.values())
     if not useful:
-        rotated = 'critical' in message or 'execution error' in message
-        raise ThreadsError(6, 'The query did not return its expected data.',
-                           'Run refresh, or refresh --capture for lazy operations.',
-                           error='operation_rotated' if rotated else 'envelope_drift')
+        if 'critical' in message or 'execution error' in message:
+            raise rotated('Threads no longer runs this query as registered.')
+        raise changed('The query did not return its expected data.')
     return payload
 
 
@@ -152,9 +151,15 @@ class Transport:
         if not self.session:
             self.page('/')
         variables = self.registry.variables(operation, values, selected)
-        _, data = self._request('graphql', {'name': selected['name'], 'admitted': self.registry.admitted(),
-                                            'doc_id': selected['doc_id'], 'variables': variables,
-                                            'csrf': self.session.csrf, 'referer': ORIGIN + self.route})
+        try:
+            _, data = self._request('graphql', {'name': selected['name'], 'admitted': self.registry.admitted(),
+                                                'doc_id': selected['doc_id'], 'variables': variables,
+                                                'csrf': self.session.csrf, 'referer': ORIGIN + self.route})
+        except ThreadsError as error:
+            # Only an app tab loads these operations, so only a capture can find their new ids.
+            if error.error == 'operation_rotated' and OPERATIONS[operation].discovery == 'capture':
+                error.fix = CAPTURE
+            raise
         path = OPERATIONS[operation].identity
         if path is not None:
             found = at(data, 'data.' + path)

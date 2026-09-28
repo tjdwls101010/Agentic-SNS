@@ -1,11 +1,9 @@
 """Read only Relay bbox results from JSON scripts, with operation/identity checks."""
 import re
 
-from ..errors import ThreadsError
+from ..errors import changed, rotated
 from .session import Scripts, preloaders
 
-POST_PAGE_CHANGED = ('Threads changed the post page; refresh cannot repair it. '
-                     'Tell the user the post reader needs an update.')
 
 
 def media_identity(media):
@@ -59,8 +57,9 @@ class SSR:
             if data not in candidates:
                 candidates.append(data)
         if len(candidates) != 1:
-            raise ThreadsError(6, f'The route has no unambiguous {operation} payload for this target.',
-                               'Run refresh; do not treat a missing payload as an empty result.', error='envelope_drift')
+            # Rendered results are matched by their preloader's name, so a renamed operation lands here: refresh
+            # finds the new name. A missing payload is never an empty result.
+            raise rotated(f'The route has no unambiguous {operation} payload for this target.')
         return candidates[0]
 
     def post_page(self, code):
@@ -73,8 +72,7 @@ class SSR:
         """
         ids = {str(p['variables']['postID']) for p in self.preloaders if 'postID' in p['variables']}
         if len(ids) != 1 or not next(iter(ids)).isdigit():
-            raise ThreadsError(6, 'The post route does not name exactly one post.', POST_PAGE_CHANGED,
-                               error='envelope_drift')
+            raise changed('The post route does not name exactly one post.')
         post_id = ids.pop()
         roles = {'post': [], 'parents': [], 'replies': []}
         for _, _, data in self.results:
@@ -89,6 +87,5 @@ class SSR:
                     roles[role].append(data)
         for role, found in roles.items():
             if len(found) != 1:
-                raise ThreadsError(6, f'The post page has no unambiguous {role} payload for this post.',
-                                   POST_PAGE_CHANGED, error='envelope_drift')
+                raise changed(f'The post page has no unambiguous {role} payload for this post.')
         return post_id, roles['post'][0], roles['parents'][0], roles['replies'][0]

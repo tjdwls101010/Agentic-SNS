@@ -1,5 +1,5 @@
 """Home and profile activity share one continuation/commit path."""
-from ..errors import ThreadsError
+from ..errors import ThreadsError, changed
 from ..graphql.decode import read_page
 from ..graphql.operations import OPERATIONS
 from ..graphql.ssr import SSR
@@ -40,7 +40,7 @@ def run(args, ctx):
             ssr = SSR(html)
             profile = transport.rendered(ssr, 'profile.page', state['user_id'])['user'] or {}
             if profile and profile.get('username', '').lower() != args.target.username:
-                raise ThreadsError(6, 'Profile identity differs from the requested handle.', 'Run refresh.', error='envelope_drift')
+                raise changed('Profile identity differs from the requested handle.')
             state['private_unfollowed'] = bool(profile.get('text_post_app_is_private') and
                                                (profile.get('friendship_status') or {}).get('following') is False) if profile else None
             if args.command == 'user' and ctx['tab'] == 'threads':
@@ -67,7 +67,7 @@ def run(args, ctx):
                 page = read_page(transport.query(name, values), OPERATIONS[name])
             except ThreadsError as error:
                 if not (args.command == 'user' and after and after == state.get('ssr_cursor') and
-                        error.error in ('operation_rotated', 'envelope_drift')):
+                        error.error in ('operation_rotated', 'shape_changed')):
                     raise
                 # The SSR cursor and Direct query are different sources; try the Direct first page once, retaining seen IDs.
                 state['ssr_cursor'] = None

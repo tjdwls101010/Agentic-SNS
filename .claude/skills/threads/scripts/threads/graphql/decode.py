@@ -1,12 +1,12 @@
 """Anchored connection paths; a missing pagination contract is never exhaustion."""
-from ..errors import ThreadsError
+from ..errors import changed
 from ..model import Page
 from .operations import CAPPED, OFFSET, RELAY, SINGLE_BATCH
 from .normalize import build_post, build_user
 
 
 def drift(message):
-    return ThreadsError(6, message, 'Run refresh; the expected response shape changed.', error='envelope_drift')
+    return changed(message)
 
 
 def at(value, path):
