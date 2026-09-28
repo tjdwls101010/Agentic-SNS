@@ -58,14 +58,17 @@ def render(result, args):
     budget = result.get('budget', {})
     header = f'{args.command} · {len(result.get("results", []))} shown · stopped={result.get("stop_reason")} · '
     ctx = result.get('context', {})
-    header += ''.join(f'{key}={ctx[key]} · ' for key in ('feed', 'tab', 'sort') if key in ctx)
-    header += f'fetched {result.get("fetched_bytes", 0) / 1000000:.1f}MB · local budget {budget.get("remaining", 0)} of {budget.get("limit", 0)} (window {budget.get("window_used", 0)}/{budget.get("window_limit", 120)})'
+    header += ''.join(f'{key}={ctx[key]} · ' for key in ('feed', 'tab', 'sort', 'relation') if key in ctx)
+    header += (f'requests {budget.get("used", 0)} of {budget.get("limit", 0)} · window '
+               f'{budget.get("window_used", 0)}/{budget.get("window_limit", 120)} per 10 min · '
+               f'fetched {result.get("fetched_bytes", 0) / 1000000:.1f}MB')
     lines = [header]
     completeness = result.get('completeness')
     if completeness:
         c = completeness
         estimate = f'≈{c["unfetched"]}, estimate' if c.get('unfetched') is not None else 'unknown'
-        lines.append(f'replies: {c["received_direct"]} of ~{c["reported_direct"]} direct received (unfetched {estimate}) · '
+        reported = 'unknown' if c.get('reported_direct') is None else f'~{c["reported_direct"]}'
+        lines.append(f'replies: {c["received_direct"]} of {reported} direct received (unfetched {estimate}) · '
                      f'{c["shown_direct"]} shown · +{c["shown_descendants"]} descendants · {c["unshown_received"]} received but not shown · {c["unavailable"]} unavailable')
     for index, record in enumerate(result.get('results', []), 1):
         if 'author' in record:

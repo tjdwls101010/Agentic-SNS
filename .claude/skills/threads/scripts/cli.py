@@ -149,7 +149,8 @@ COMMANDS = {
                     defaults={'tab': 'threads'},
                     epilog='A date window is kept locally. Only the newest-first tabs (threads, replies) can prove '
                            'that the window\'s start was passed; the result says whether the window was read whole.'),
-    'about': Command('Read a profile card.', read_profile, ('json', 'max_requests'), (TARGET,), identity=('target',)),
+    'about': Command('Read a profile card: name, bio, links, privacy, follower count (one request). Threads '
+                     'publishes no following or mutual count; graph following lists the accounts.', read_profile, ('json', 'max_requests'), (TARGET,), identity=('target',)),
     'post': Command('Read one post in full with its parent chain and first batch of replies (one page; replies do not '
                     'page further).', read_post, ('sort', 'limit', 'chars', 'json', 'max_requests'),
                     (('target', {'help': 'Post URL or shortcode (a shortcode costs a redirect request)'}),),

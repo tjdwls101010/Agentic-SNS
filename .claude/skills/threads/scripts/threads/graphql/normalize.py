@@ -1,6 +1,7 @@
 """Pure normalization of Threads' raw objects into the model's records; nested unavailability stays at its own post."""
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 from ..model import Counts, Media, Post, User
 
@@ -106,11 +107,23 @@ def build_media(raw_media_item: dict[str, Any]) -> Media:
     )
 
 
+def _unwrap(url: object) -> object:
+    """Threads routes outbound links through l.threads.com/?u=<destination>&e=<tracking>; keep the destination."""
+    if not isinstance(url, str):
+        return url
+    parts = urlsplit(url)
+    if parts.hostname == "l.threads.com":
+        destination = parse_qs(parts.query).get("u", [None])[0]
+        if destination and urlsplit(destination).scheme in ("http", "https"):
+            return destination
+    return url
+
+
 def _link_preview(text_post_app_info: dict[str, Any]) -> dict[str, str | None] | None:
     attachment = text_post_app_info.get("link_preview_attachment")
     if not isinstance(attachment, dict):
         return None
-    url = attachment.get("url")
+    url = _unwrap(attachment.get("url"))
     title = attachment.get("title")
     normalized = {
         "url": url if isinstance(url, str) else None,
