@@ -49,8 +49,8 @@ def run(args, ctx):
                 state['ssr_cursor'] = initial.cursor
                 check_access(initial, transport, state)
         else:
-            html = transport.page('/')
-            if args.command == 'home' and ctx['feed'] == 'foryou':
+            html = transport.page('/following' if args.command == 'home' and ctx['feed'] == 'following' else '/')
+            if args.command == 'home':
                 initial = read_page(transport.rendered(SSR(html), 'feed'), OPERATIONS['feed'])
         check_actor(state, transport)
         operation, variables = query_for(ctx, state)

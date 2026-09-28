@@ -1,7 +1,7 @@
 """Anchored connection paths; a missing pagination contract is never exhaustion."""
 from ..errors import changed
 from ..model import Page
-from .operations import CAPPED, OFFSET, RELAY, SINGLE_BATCH
+from .operations import CAPPED, OFFSET, RELAY, SINGLE_BATCH, SSR_ONLY
 from .normalize import build_post, build_user
 
 
@@ -27,7 +27,7 @@ def read_page(response, operation):
     connection = at(data, root)
     if not isinstance(connection, dict) or not isinstance(connection.get('edges'), list):
         raise drift('Expected explicit edges at ' + root)
-    page = Page(stop={CAPPED: 'server_capped', SINGLE_BATCH: 'not_paginable'}.get(policy, 'exhausted'))
+    page = Page(stop={CAPPED: 'server_capped', SINGLE_BATCH: 'not_paginable', SSR_ONLY: 'not_paginable'}.get(policy, 'exhausted'))
     if policy in (RELAY, OFFSET):
         info = connection.get('page_info')
         if not isinstance(info, dict) or type(info.get('has_next_page')) is not bool:

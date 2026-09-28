@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from .fixtures.builders import envelope, feed, listed_post
+from .fixtures.builders import envelope, listed_post, tab
 from .helpers import POST, calls, data, more_args, run_cli, run_more
 
 LEGACY = Path(__file__).with_name('fixtures') / 'legacy'
-FOLLOWING = 'BarcelonaFeedDirectQuery'
+REPLIES = 'BarcelonaProfileRepliesTabDirectQuery'
 
 
 @pytest.mark.parametrize('arguments', [
@@ -51,15 +51,15 @@ def test_a_tab_url_reads_that_tab(routes):
 
 
 def test_the_request_cap_is_ten_unless_the_caller_names_another(routes):
-    routes.set(FOLLOWING, envelope(feed([listed_post(1)], 'c1')))
+    routes.set(REPLIES, envelope(tab([listed_post(1)], 'c1')))
     for n in range(1, 60):
-        routes.set(f'{FOLLOWING}:after=c{n}', envelope(feed([listed_post(n + 1)], f'c{n + 1}')))
+        routes.set(f'{REPLIES}:after=c{n}', envelope(tab([listed_post(n + 1)], f'c{n + 1}')))
     routes.write()
     for extra in ([], ['--limit', '30'], ['--since', '2020-01-01'], ['--until', '2030-01-01'], ['--out', 'f.ndjson']):
         extra = [part.replace('f.ndjson', str(routes.path.parent / f'f{len(extra)}.ndjson')) for part in extra]
-        body = data(run_cli('home', '--feed', 'following', '--json', *extra))
+        body = data(run_cli('user', '@fixture_user', '--tab', 'replies', '--json', *extra))
         assert body['budget']['limit'] == 10, extra
-    assert data(run_cli('home', '--feed', 'following', '--limit', '30', '--max-requests', '25', '--json'))['budget']['limit'] == 25
+    assert data(run_cli('user', '@fixture_user', '--tab', 'replies', '--limit', '30', '--max-requests', '25', '--json'))['budget']['limit'] == 25
 
 
 def test_more_keeps_the_display_and_cost_choices(fake_aside):
@@ -128,9 +128,9 @@ def test_a_tab_not_ordered_by_writing_time_never_claims_its_window_start(routes)
 
 
 def test_a_window_cut_short_says_it_is_partial_and_how_to_continue(routes):
-    routes.set(FOLLOWING, envelope(feed([listed_post(1, taken_at=NEW)], 'c1')))
-    routes.set(FOLLOWING + ':after=c1', envelope(feed([listed_post(2, taken_at=NEW)], 'c2'))).write()
-    body = data(run_cli('home', '--feed', 'following', '--since', '2026-09-01', '--limit', '1', '--json'))
+    routes.set(REPLIES, envelope(tab([listed_post(1, taken_at=NEW)], 'c1')))
+    routes.set(REPLIES + ':after=c1', envelope(tab([listed_post(2, taken_at=NEW)], 'c2'))).write()
+    body = data(run_cli('user', '@fixture_user', '--tab', 'replies', '--since', '2026-09-01', '--limit', '1', '--json'))
     assert body['window']['complete'] is False and body['next']
-    last = run_cli('home', '--feed', 'following', '--since', '2026-09-01', '--limit', '1').stdout.splitlines()[-1]
+    last = run_cli('user', '@fixture_user', '--tab', 'replies', '--since', '2026-09-01', '--limit', '1').stdout.splitlines()[-1]
     assert last.startswith('window: since 2026-09-01 · partial') and 'more:' in last

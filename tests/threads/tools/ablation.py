@@ -71,7 +71,8 @@ def fixtures(task, directory):
                    envelope(tab([listed_post(i) for i in range(5, 9)])))
         routes.set('BarcelonaProfileThreadsTabDirectQuery', ERRORS['rotated'], tab_page, tab_page)
     elif task == 'F2':
-        routes.set('BarcelonaFeedDirectQuery', ERRORS['checkpoint'])
+        routes.set('/following', envelope('synthetic checkpoint page <form action="/challenge/"></form>',
+                                          url='https://www.threads.com/following'))
     elif task == 'F3':
         topics = ['coffee roasting', 'marathon training', 'home espresso', 'trail running', 'sourdough baking']
         pages = [[listed_post(n, caption={'text': f'Synthetic note {n} about {topics[n % len(topics)]}'})
@@ -96,8 +97,14 @@ def run(args):
     runs.mkdir(parents=True, exist_ok=True)
     if args.snapshot:
         args.snapshot = str(Path(args.snapshot).resolve())
-    number = 1 + sum(1 for p in runs.glob(f'{args.task}-{args.arm}-*'))
-    base = runs / f'{args.task}-{args.arm}-{number}'
+    number = 1
+    while True:  # claim a run folder; concurrent runs of one arm take the next number
+        base = runs / f'{args.task}-{args.arm}-{number}'
+        try:
+            base.mkdir()
+            break
+        except FileExistsError:
+            number += 1
     skill = base / 'skill' / 'threads'
     shutil.copytree(SKILL, skill, ignore=shutil.ignore_patterns('__pycache__'))
     (base / 'work').mkdir()

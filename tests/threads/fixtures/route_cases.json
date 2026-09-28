@@ -1,5 +1,34 @@
-{"allowed": ["/", "/search?q=a&serp_type=default", "/liked", "/liked/", "/saved/", "/@a_b.c", "/@name/replies",
-             "/@name/threads", "/@name/reposts", "/@name/media", "/@name/post/ABC_1-x", "/@name/post/ABC?sort_order=recent",
-             "/t/ABC", "/t/ABC/"],
- "refused": ["//evil.test/", "https://evil.test/", "/activity", "/@name/../activity", "/settings", "/@name/followers",
-             "/graphql/query", "/@name\\x", "/search#x", "search", "/@name/post/", "/t/"]}
+{
+ "allowed": [
+  "/",
+  "/search?q=a&serp_type=default",
+  "/liked",
+  "/liked/",
+  "/saved/",
+  "/@a_b.c",
+  "/@name/replies",
+  "/@name/threads",
+  "/@name/reposts",
+  "/@name/media",
+  "/@name/post/ABC_1-x",
+  "/@name/post/ABC?sort_order=recent",
+  "/t/ABC",
+  "/t/ABC/",
+  "/following",
+  "/following/"
+ ],
+ "refused": [
+  "//evil.test/",
+  "https://evil.test/",
+  "/activity",
+  "/@name/../activity",
+  "/settings",
+  "/@name/followers",
+  "/graphql/query",
+  "/@name\\x",
+  "/search#x",
+  "search",
+  "/@name/post/",
+  "/t/"
+ ]
+}

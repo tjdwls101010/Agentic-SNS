@@ -65,9 +65,9 @@ def test_a_cache_override_written_before_post_pages_left_the_registry_still_load
     home.mkdir(parents=True)
     legacy = Path(__file__).with_name('fixtures') / 'legacy' / 'registry.json'
     (home / 'registry.json').write_text(legacy.read_text())
-    feed = run_cli('home', '--feed', 'following', '--limit', '3', '--json')
-    assert feed.returncode == 0, feed.stdout + feed.stderr
-    assert calls(fake_aside)[-1]['doc_id'] == '2001'
+    tab = run_cli('user', '@fixture_user', '--limit', '6', '--json')
+    assert tab.returncode == 0, tab.stdout + tab.stderr
+    assert calls(fake_aside)[-1]['doc_id'] == '2003'
     post = run_cli('post', POST, '--json')
     assert post.returncode == 0, post.stdout + post.stderr
 

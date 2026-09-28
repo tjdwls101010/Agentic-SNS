@@ -69,9 +69,9 @@ def test_every_read_result_fits_the_read_result_schema(routes, schema, arguments
 
 
 @pytest.mark.parametrize('setup,arguments,kind', [
-    (lambda r: r.set('BarcelonaFeedDirectQuery', ERRORS['rotated']), ('home', '--feed', 'following'), 'ReadResult'),
+    (lambda r: r.set('BarcelonaProfileRepliesTabDirectQuery', ERRORS['rotated']), ('user', '@fixture_user', '--tab', 'replies'), 'ReadResult'),
     (lambda r: r.set('/@fixture_user/post/FIX_2', ERRORS['rotated']), ('post', POST), 'Error'),
-    (lambda r: r.set('BarcelonaFeedDirectQuery', ERRORS['checkpoint']), ('home', '--feed', 'following'), 'ReadResult'),
+    (lambda r: r.set('BarcelonaProfileRepliesTabDirectQuery', ERRORS['checkpoint']), ('user', '@fixture_user', '--tab', 'replies'), 'ReadResult'),
     (lambda r: None, ('user', '/activity'), 'Error'),
     (lambda r: r.set('BarcelonaSavedPageViewerQuery', envelope({'data': {'xdt_text_app_viewer': {}}})), ('me', 'saved'),
      'ReadResult'),

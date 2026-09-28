@@ -1,5 +1,5 @@
 """The default text output through the CLI: dense, one line per fact, the author's text kept as sent."""
-from .fixtures.builders import envelope, feed, listed_post
+from .fixtures.builders import envelope, listed_post, tab
 from .helpers import POST, run_cli
 
 
@@ -7,7 +7,7 @@ def test_a_listing_is_a_header_three_lines_per_post_and_the_next_hops(fake_aside
     result = run_cli('home', '--limit', '3')
     assert result.returncode == 0, result.stdout + result.stderr
     lines = result.stdout.splitlines()
-    assert lines[0].startswith('home · 3 shown · stopped=limit_reached · feed=foryou · ')
+    assert lines[0].startswith('home · 3 shown · stopped=not_paginable · feed=foryou · ')
     assert 'requests 1 of 10 · window 1/120 per 10 min' in lines[0]
     assert lines[1].startswith('[p1] @fixture_user (Synthetic Person) · ')
     assert lines[2] == '     "Synthetic post 1"'
@@ -19,9 +19,9 @@ def test_a_listing_is_a_header_three_lines_per_post_and_the_next_hops(fake_aside
 
 def test_whitespace_is_folded_line_and_paragraph_breaks_are_marked_and_zero_width_characters_dropped(routes):
     text = 'first  line\r\nsecond​line   \n\n  third'
-    routes.set('BarcelonaFeedDirectQuery', envelope(feed([listed_post(1, caption={'text': text})])))
+    routes.set('BarcelonaProfileRepliesTabDirectQuery', envelope(tab([listed_post(1, caption={'text': text})])))
     routes.write()
-    result = run_cli('home', '--feed', 'following')
+    result = run_cli('user', '@fixture_user', '--tab', 'replies')
     assert '     "first line⏎secondline⏎⏎third"' in result.stdout.splitlines()
 
 
@@ -35,9 +35,9 @@ def test_text_output_keeps_urls_handles_and_body_exactly_as_threads_sent_them(fa
 
 
 def test_a_long_preview_is_cut_at_chars_and_marked(routes):
-    routes.set('BarcelonaFeedDirectQuery', envelope(feed([listed_post(1, caption={'text': 'x' * 50})])))
+    routes.set('BarcelonaProfileRepliesTabDirectQuery', envelope(tab([listed_post(1, caption={'text': 'x' * 50})])))
     routes.write()
-    lines = run_cli('home', '--feed', 'following', '--chars', '10').stdout.splitlines()
+    lines = run_cli('user', '@fixture_user', '--tab', 'replies', '--chars', '10').stdout.splitlines()
     assert '     "' + 'x' * 10 + '…"' in lines
 
 
@@ -65,7 +65,7 @@ def test_an_unreported_reply_count_is_unknown_not_none(routes):
 def test_a_link_preview_shows_where_the_link_goes(routes):
     wrapped = 'https://l.threads.com/?u=https%3A%2F%2Fexample.com%2Fa%3Fb%3D1&e=SYNTHETIC&s=1'
     info = {'direct_reply_count': 12, 'link_preview_attachment': {'title': 'Synthetic link', 'url': wrapped}}
-    routes.set('BarcelonaFeedDirectQuery', envelope(feed([listed_post(1, text_post_app_info=info)]))).write()
-    body = run_cli('home', '--feed', 'following', '--json').stdout
+    routes.set('BarcelonaProfileRepliesTabDirectQuery', envelope(tab([listed_post(1, text_post_app_info=info)]))).write()
+    body = run_cli('user', '@fixture_user', '--tab', 'replies', '--json').stdout
     assert '"url": "https://example.com/a?b=1"' in body and 'l.threads.com' not in body
-    assert 'link: "Synthetic link" (https://example.com/a?b=1)' in run_cli('home', '--feed', 'following').stdout
+    assert 'link: "Synthetic link" (https://example.com/a?b=1)' in run_cli('user', '@fixture_user', '--tab', 'replies').stdout

@@ -27,9 +27,11 @@ def override_entries(data, bundled):
     if not isinstance(data, dict) or not isinstance(data.get('operations'), dict):
         raise ValueError
     if data.get('version') == 2:
-        if any(key not in OPERATIONS or OPERATIONS[key].pagination == SSR_ONLY for key in data['operations']):
+        if any(key not in OPERATIONS for key in data['operations']):
             raise Unknown
-        return {key: {field: entry[field] for field in FIELDS} for key, entry in data['operations'].items()}
+        # An operation since retired to rendered-only reading keeps no entry.
+        return {key: {field: entry[field] for field in FIELDS} for key, entry in data['operations'].items()
+                if OPERATIONS[key].pagination != SSR_ONLY}
     if 'version' in data:
         raise ValueError
     entries = {}

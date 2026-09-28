@@ -148,7 +148,8 @@ def read_profile(args, ctx):
 TARGET = ('target', {'help': 'Threads @handle or profile URL'})
 TAB_TARGET = ('target', {'help': 'Threads @handle or profile URL; a tab URL such as /@name/replies reads that tab'})
 COMMANDS = {
-    'home': Command('Read the for-you or following home feed.', read_listing,
+    'home': Command('Read the first page of the for-you or following feed as Threads renders it (one request); '
+                    'Threads does not let this reader page a feed further.', read_listing,
                     ('feed', 'since', 'until', *READ), identity=('feed', 'since', 'until'),
                     defaults={'feed': 'foryou'}, epilog='--since/--until need --feed following.', overrides=LISTING),
     'user': Command('Read a profile tab: threads, replies, reposts or media.', read_listing,

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from .fixtures.builders import feed, envelope, listed_post, preloader, route
+from .fixtures.builders import envelope, listed_post, preloader, route, tab
 from .helpers import calls, data, run_cli
 
 
@@ -25,8 +25,8 @@ def test_file_continuation_keeps_path_and_rejects_a_handle_advanced_without_the_
 
 
 def test_a_handle_only_continues_the_query_that_made_it(routes):
-    routes.set('BarcelonaFeedDirectQuery', envelope(feed([listed_post(1), listed_post(2)], 'A'))).write()
-    handle = data(run_cli('home', '--feed', 'following', '--limit', '1', '--json'))['next_handle']
+    routes.set('BarcelonaProfileRepliesTabDirectQuery', envelope(tab([listed_post(1), listed_post(2)], 'A'))).write()
+    handle = data(run_cli('user', '@fixture_user', '--tab', 'replies', '--limit', '1', '--json'))['next_handle']
     before = len(calls(routes.path.parent / 'requests.ndjson'))
     other = run_cli('home', '--feed', 'foryou', '--after', str(handle), '--json')
     assert other.returncode == 2

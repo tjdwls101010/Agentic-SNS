@@ -1,6 +1,6 @@
 // threads-snippet: page
 await (async () => {
-  if (typeof ARGS.path !== 'string' || !/^\/(?:|search|liked\/?|saved\/?|@[A-Za-z0-9_.]+(?:\/(?:threads|replies|reposts|media|post\/[A-Za-z0-9_-]+))?\/?|t\/[A-Za-z0-9_-]+\/?)(?:\?[^#\\]*)?$/.test(ARGS.path)) throw new Error('Unsupported reading route');
+  if (typeof ARGS.path !== 'string' || !/^\/(?:|search|following\/?|liked\/?|saved\/?|@[A-Za-z0-9_.]+(?:\/(?:threads|replies|reposts|media|post\/[A-Za-z0-9_-]+))?\/?|t\/[A-Za-z0-9_-]+\/?)(?:\?[^#\\]*)?$/.test(ARGS.path)) throw new Error('Unsupported reading route');
   const response = await fetch('https://www.threads.com' + ARGS.path, {
     method: 'GET', credentials: 'include', redirect: 'manual',
     headers: {

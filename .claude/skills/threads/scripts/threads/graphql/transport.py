@@ -97,7 +97,7 @@ def safe_path(path):
     parsed = urlsplit(path)
     if parsed.scheme or parsed.netloc or not path.startswith('/') or path.startswith('//') or '\\' in path or '#' in path:
         raise ThreadsError(2, 'Route must be a local Threads path.')
-    if not re.fullmatch(r'/(?:|search|liked/?|saved/?|@[A-Za-z0-9_.]+(?:/(?:threads|replies|reposts|media|post/[A-Za-z0-9_-]+))?/?|t/[A-Za-z0-9_-]+/?)', parsed.path):
+    if not re.fullmatch(r'/(?:|search|following/?|liked/?|saved/?|@[A-Za-z0-9_.]+(?:/(?:threads|replies|reposts|media|post/[A-Za-z0-9_-]+))?/?|t/[A-Za-z0-9_-]+/?)', parsed.path):
         raise ThreadsError(2, 'This Threads route is outside the read-only surface.')
     return path
 
@@ -187,5 +187,7 @@ class Transport:
         return data
 
     def rendered(self, ssr, operation, identity=None):
-        """The route's own rendered result for a declared operation."""
-        return ssr.select(self.registry.name(operation), OPERATIONS[operation].ssr_shape, identity)
+        """The route's own rendered result for a declared operation; one read only as rendered has no registered name
+        and is matched by its shape alone."""
+        name = self.registry.name(operation) if operation in self.registry.operations else None
+        return ssr.select(name, OPERATIONS[operation].ssr_shape, identity)

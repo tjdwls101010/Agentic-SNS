@@ -6,16 +6,16 @@ import sys
 import time
 from pathlib import Path
 
-from .fixtures.builders import ERRORS, envelope, feed, listed_post
+from .fixtures.builders import ERRORS, envelope, listed_post, tab
 from .helpers import CLI, PROCESS_DOUBLES, calls, data, run_cli, run_more
 
-FOLLOWING = 'BarcelonaFeedDirectQuery'
+REPLIES = 'BarcelonaProfileRepliesTabDirectQuery'
 
 
 def home_blocked(log):
     """The next read is refused before it makes any request."""
     before = len(calls(log))
-    result = run_cli('home', '--feed', 'following', '--json')
+    result = run_cli('user', '@fixture_user', '--tab', 'replies', '--json')
     return result.returncode == 5 and len(calls(log)) == before, data(result)
 
 
@@ -40,10 +40,11 @@ def test_a_checkpoint_blocks_every_later_request_until_unblock_succeeds(routes):
     log = routes.path.parent / 'requests.ndjson'
     root = routes.body('/')
     ok = envelope(root, url='https://www.threads.com/')
-    routes.set('/', ok, envelope({}, status=429, url='https://www.threads.com/'), ok)
-    routes.set(FOLLOWING, ERRORS['checkpoint'], envelope(feed([listed_post(1)])))
+    # doctor is the only command here that opens /: the first unblock probe is limited, the second succeeds.
+    routes.set('/', envelope({}, status=429, url='https://www.threads.com/'), ok)
+    routes.set(REPLIES, ERRORS['checkpoint'], envelope(tab([listed_post(1)])))
     routes.write()
-    first = run_cli('home', '--feed', 'following', '--json')
+    first = run_cli('user', '@fixture_user', '--tab', 'replies', '--json')
     assert (first.returncode, data(first)['error']) == (5, 'checkpoint')
     assert home_blocked(log)[0]
     assert run_cli('doctor').returncode == 5
@@ -53,41 +54,41 @@ def test_a_checkpoint_blocks_every_later_request_until_unblock_succeeds(routes):
     blocked, body = home_blocked(log)
     assert blocked and body['error'] == 'checkpoint'
     assert run_cli('doctor', '--unblock').returncode == 0
-    assert run_cli('home', '--feed', 'following', '--json').returncode == 0
+    assert run_cli('user', '@fixture_user', '--tab', 'replies', '--json').returncode == 0
 
 
 def test_a_rate_limit_expires_by_itself_after_thirty_minutes(routes):
     log = routes.path.parent / 'requests.ndjson'
-    routes.set(FOLLOWING, ERRORS['rate_limit'], envelope(feed([listed_post(1)])))
+    routes.set(REPLIES, ERRORS['rate_limit'], envelope(tab([listed_post(1)])))
     routes.write()
-    assert data(run_cli('home', '--feed', 'following', '--json'))['error'] == 'rate_limit'
+    assert data(run_cli('user', '@fixture_user', '--tab', 'replies', '--json'))['error'] == 'rate_limit'
     before = len(calls(log))
-    assert run_cli('home', '--feed', 'following', env={'FAKE_CLOCK_OFFSET': '1700'}).returncode == 5
+    assert run_cli('user', '@fixture_user', '--tab', 'replies', env={'FAKE_CLOCK_OFFSET': '1700'}).returncode == 5
     assert len(calls(log)) == before
-    later = run_cli('home', '--feed', 'following', '--json', env={'FAKE_CLOCK_OFFSET': '1801'})
+    later = run_cli('user', '@fixture_user', '--tab', 'replies', '--json', env={'FAKE_CLOCK_OFFSET': '1801'})
     assert later.returncode == 0, later.stdout + later.stderr
 
 
 def test_login_required_is_reported_without_blocking(routes):
-    routes.set(FOLLOWING, ERRORS['login'], envelope(feed([listed_post(1)])))
+    routes.set(REPLIES, ERRORS['login'], envelope(tab([listed_post(1)])))
     routes.write()
-    assert run_cli('home', '--feed', 'following', '--json').returncode == 4
-    assert run_cli('home', '--feed', 'following', '--json').returncode == 0
+    assert run_cli('user', '@fixture_user', '--tab', 'replies', '--json').returncode == 4
+    assert run_cli('user', '@fixture_user', '--tab', 'replies', '--json').returncode == 0
 
 
 def test_a_request_the_bridge_lost_is_still_counted(routes):
-    routes.set(FOLLOWING, {'mode': 'fail'})
+    routes.set(REPLIES, {'mode': 'fail'})
     routes.write()
-    assert run_cli('home', '--feed', 'following', '--json').returncode == 3
+    assert run_cli('user', '@fixture_user', '--tab', 'replies', '--json').returncode == 3
     assert data(run_cli('doctor'))['budget']['window_used'] == 3
 
 
 def test_the_command_request_cap_stops_with_a_continuation(routes):
-    routes.set(FOLLOWING, envelope(feed([listed_post(1)], 'c1')))
+    routes.set(REPLIES, envelope(tab([listed_post(1)], 'c1')))
     for n in range(1, 20):
-        routes.set(f'{FOLLOWING}:after=c{n}', envelope(feed([listed_post(n + 1)], f'c{n + 1}')))
+        routes.set(f'{REPLIES}:after=c{n}', envelope(tab([listed_post(n + 1)], f'c{n + 1}')))
     routes.write()
-    result = run_cli('home', '--feed', 'following', '--json')
+    result = run_cli('user', '@fixture_user', '--tab', 'replies', '--json')
     assert result.returncode == 8, result.stdout + result.stderr
     body = data(result)
     # Ten requests: the route and nine pages of one post each.

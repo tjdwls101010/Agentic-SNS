@@ -4,10 +4,10 @@ import re
 
 import pytest
 
-from .fixtures.builders import ERRORS, envelope, feed, listed_post, null_profile, tab
+from .fixtures.builders import ERRORS, envelope, listed_post, null_profile, tab
 from .helpers import POST, calls, data, more_args, run_cli
 
-FOLLOWING = 'BarcelonaFeedDirectQuery'
+REPLIES = 'BarcelonaProfileRepliesTabDirectQuery'
 
 
 def commands(fix):
@@ -16,8 +16,8 @@ def commands(fix):
 
 
 def test_a_rotated_route_query_is_refreshed_then_retried(routes):
-    routes.set(FOLLOWING, ERRORS['rotated']).write()
-    body = data(run_cli('home', '--feed', 'following', '--json'))
+    routes.set(REPLIES, ERRORS['rotated']).write()
+    body = data(run_cli('user', '@fixture_user', '--tab', 'replies', '--json'))
     assert body['error'] == 'operation_rotated'
     assert commands(body['fix']) == ['refresh'] and 'retry' in body['fix']
 
@@ -31,10 +31,10 @@ def test_a_rotated_app_only_query_needs_capture_and_the_user_first(routes):
 
 
 def test_a_changed_shape_is_not_sent_to_refresh(routes):
-    routes.set(FOLLOWING, envelope({'data': {'feedData': {'edges': []}}})).write()
-    body = data(run_cli('home', '--feed', 'following', '--json'))
+    routes.set(REPLIES, envelope({'data': {'feedData': {'edges': []}}})).write()
+    body = data(run_cli('user', '@fixture_user', '--tab', 'replies', '--json'))
     assert body['error'] == 'shape_changed'
-    assert 'refresh cannot repair' in body['fix'] and 'home reader' in body['fix']
+    assert 'refresh cannot repair' in body['fix'] and 'user reader' in body['fix']
     assert commands(body['fix']) == []
 
 
@@ -64,11 +64,11 @@ def test_an_unavailable_profile_says_so_instead_of_pointing_at_help(routes):
 
 
 @pytest.mark.parametrize('setup,arguments', [
-    (lambda r: r.set(FOLLOWING, ERRORS['rotated']), ('home', '--feed', 'following')),
+    (lambda r: r.set(REPLIES, ERRORS['rotated']), ('user', '@fixture_user', '--tab', 'replies')),
     (lambda r: r.set('BarcelonaFriendshipsFollowersTabQuery', ERRORS['rotated']), ('graph', '@fixture_user', 'followers')),
-    (lambda r: r.set(FOLLOWING, ERRORS['checkpoint']), ('home', '--feed', 'following')),
-    (lambda r: r.set(FOLLOWING, ERRORS['login']), ('home', '--feed', 'following')),
-    (lambda r: r.set(FOLLOWING, envelope(feed([listed_post(1)], 'A'))), ('home', '--feed', 'following', '--limit', '1')),
+    (lambda r: r.set(REPLIES, ERRORS['checkpoint']), ('user', '@fixture_user', '--tab', 'replies')),
+    (lambda r: r.set(REPLIES, ERRORS['login']), ('user', '@fixture_user', '--tab', 'replies')),
+    (lambda r: r.set(REPLIES, envelope(tab([listed_post(1)], 'A'))), ('user', '@fixture_user', '--tab', 'replies', '--limit', '1')),
 ])
 def test_every_command_a_fix_or_continuation_names_runs_as_written(routes, setup, arguments):
     setup(routes)
@@ -83,6 +83,6 @@ def test_every_command_a_fix_or_continuation_names_runs_as_written(routes, setup
 
 def test_a_query_answered_with_a_web_page_is_not_called_transient(routes):
     """Threads answered the feed query with its app shell (seen 2026-09-28): retrying later does not help."""
-    routes.set(FOLLOWING, envelope('<!DOCTYPE html><html><head><title>Threads</title></head></html>')).write()
-    body = data(run_cli('home', '--feed', 'following', '--json'))
-    assert body['error'] == 'shape_changed' and 'home reader' in body['fix']
+    routes.set(REPLIES, envelope('<!DOCTYPE html><html><head><title>Threads</title></head></html>')).write()
+    body = data(run_cli('user', '@fixture_user', '--tab', 'replies', '--json'))
+    assert body['error'] == 'shape_changed' and 'user reader' in body['fix']

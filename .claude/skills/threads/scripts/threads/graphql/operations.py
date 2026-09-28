@@ -72,10 +72,10 @@ def _tab(name, legacy, route, chronological, role='authored', first=25, **variab
 
 
 OPERATIONS = {op.id: op for op in [
-    Operation('feed', ('BarcelonaFeedDirectQuery',), 'route', '/',
-              {'data': {'pagination_source': REQUIRED, 'reason': REQUIRED}, 'variant': REQUIRED, 'after': None},
-              'feedData', 'text_post_app_thread.thread_items', RELAY, 'feedData',
-              signature=Signature(frozenset({'data', 'variant'}), frozenset({'after'}))),
+    # A feed is read only as its route renders it (/ for you, /following): Threads refuses the feed queries, first
+    # page and pagination alike, from outside its own app tab (2026-09-28).
+    Operation('feed', ('BarcelonaFeedDirectQuery',), 'ssr', connection='feedData',
+              items='text_post_app_thread.thread_items', pagination=SSR_ONLY, ssr_shape='feedData'),
     Operation('profile.page', ('BarcelonaProfilePageDirectQuery',), 'route', '/@{viewer}',
               {'userID': REQUIRED, 'canSeeFeedsTab': True, 'showLinkedIGStats': False},
               ssr_shape='user', identity='user', pagination=SINGLE_BATCH,

@@ -67,9 +67,9 @@ def test_a_refresh_that_verified_some_says_what_remains(routes):
 
 
 def test_commands_in_fixes_are_this_cli_invoked_the_way_more_is(routes):
-    routes.set('BarcelonaFeedDirectQuery', {'status': 200, 'url': 'https://www.threads.com/graphql/query',
-                                            'body': '{"data": null, "errors": [{"message": "execution error"}]}'})
+    routes.set('BarcelonaProfileRepliesTabDirectQuery', {'status': 200, 'url': 'https://www.threads.com/graphql/query',
+                                                         'body': '{"data": null, "errors": [{"message": "execution error"}]}'})
     routes.write()
-    fix = data(run_cli('home', '--feed', 'following', '--json'))['fix']
+    fix = data(run_cli('user', '@fixture_user', '--tab', 'replies', '--json'))['fix']
     named = re.findall(r'`([^`]+)`', fix)
     assert named and all(command.startswith(f'uv run "{CLI}" ') for command in named)
