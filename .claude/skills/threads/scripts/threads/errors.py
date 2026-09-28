@@ -12,7 +12,7 @@ _FIXES = {
        'than retrying.',
 }
 ROTATED = 'Run `{cli} refresh`, then retry this command.'
-CAPTURE = ('Ask the user first, because it opens a Threads tab in their browser; then run '
+CAPTURE = ('Ask the user first: it opens a Threads tab in their browser, where the app itself may record views; then run '
            '`{cli} refresh --capture --post <public post URL>` with a real post URL, and retry this command.')
 # The CLI fills in {cli} (its own invocation, as more: writes it) and {command} (the command that failed).
 CHANGED = "Threads changed this response's shape; refresh cannot repair it. Tell the user the {command} reader needs an update."

@@ -38,8 +38,14 @@ class Window:
         """The page's records written inside the window, and whether the window's start is now proven passed."""
         if not self.active:
             return page.records, False
-        records = [p for p in page.records if (t := stamp(p.get('created_at'))) is not None
+        stamps = [stamp(p.get('created_at')) for p in page.records]
+        records = [p for p, t in zip(page.records, stamps) if t is not None
                    and (self.lower is None or t >= self.lower) and (self.upper is None or t < self.upper)]
+        # A post without a date cannot be placed in the window: it is left out and counted once, never silently dropped.
+        # A tombstone is no post to place (and may have no id); every available post has one.
+        undated = set(state.get('undated_ids', []))
+        undated.update(p['id'] for p, t in zip(page.records, stamps) if t is None and not p.get('unavailable'))
+        state['undated_ids'] = sorted(undated)
         activity, unknown = [], False
         for group in page.groups:
             if any(p.get('is_pinned') for p in group):
@@ -60,5 +66,6 @@ class Window:
                        and not state['unordered'])
         return records, reached
 
-    def report(self, stop):
-        return {'since': self.since, 'until': self.until, 'complete': stop in ('exhausted', 'window_reached')}
+    def report(self, stop, state):
+        return {'since': self.since, 'until': self.until, 'complete': stop in ('exhausted', 'window_reached'),
+                'undated': len(state.get('undated_ids', []))}

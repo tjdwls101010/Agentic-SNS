@@ -108,8 +108,10 @@ OPTIONS = {
     'unblock': (('--unblock',), {'action': 'store_true', 'help': 'After checking Threads in Aside yourself, make one '
                                                                 'login probe; a checkpoint is cleared only if it succeeds'}),
     'capture': (('--capture',), {'action': 'store_true', 'help': 'Instead of reading routes, open one Threads app tab '
-                                                                'at --post to observe the queries only the app loads '
-                                                                '(ask the user first)'}),
+                                                                'at --post to observe the queries only the app loads. '
+                                                                'The app in that tab may record views or seen state, '
+                                                                'which this reader\'s read-only guarantee does not cover: '
+                                                                'ask the user first'}),
     'post': (('--post',), {'help': 'A public post URL: without --capture, the post page whose decoding refresh checks; '
                                    'with --capture, the tab it opens'}),
 }
@@ -165,6 +167,8 @@ COMMANDS = {
                     (('target', {'help': 'Post URL or shortcode (a shortcode costs a redirect request)'}),),
                     identity=('target', 'sort'), defaults={'sort': 'top'},
                     overrides={'sort': {'help': 'Reply order (default top); recent may repeat top replies'},
+                               'chars': {'help': 'Text output only: preview length of each parent and reply (default '
+                                                 '180, 0 = full); the post itself is always shown in full'},
                                'limit': {'help': 'Direct replies shown (default 10), each with its received '
                                                  'sub-replies; parents and the post are always shown'}}),
     'graph': Command('Read followers or following.', read_listing, READ[:1] + READ[2:],

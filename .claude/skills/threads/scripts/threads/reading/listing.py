@@ -26,7 +26,7 @@ def run(args, ctx):
             done = {'ok': True, 'results': [], 'stop_reason': stop, 'out': str(output.path), 'count': output.count,
                     'already_complete': True}
             if window.active:
-                done['window'] = window.report(stop)
+                done['window'] = window.report(stop, output.cursor)
             return finish(done, transport)
         state = handle_state if handle_state is not None else (output.cursor if output else None)
         state = state or {}
@@ -84,7 +84,7 @@ def run(args, ctx):
         state = result.pop('state')
         result['context'] = ctx
         if window.active:
-            result['window'] = window.report(result['stop_reason'])
+            result['window'] = window.report(result['stop_reason'], state)
         if args.command == 'graph' and ctx['relation'] == 'followers':
             result['reported_total'] = state.get('reported_total')
         if state['pending'] or not state['done']:

@@ -107,4 +107,6 @@ def window_line(window, stop, more):
         coverage = 'complete: read to the end of this surface'
     else:
         coverage = f'partial: stopped at {stop} before the window was read' + ('; more: reads on' if more else '')
-    return f'window: {bounds} · {coverage}'
+    undated = window.get('undated') or 0
+    left_out = f' · {undated} undated post{"" if undated == 1 else "s"} left out' if undated else ''
+    return f'window: {bounds} · {coverage}{left_out}'

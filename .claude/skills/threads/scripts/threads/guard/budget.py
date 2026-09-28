@@ -37,7 +37,8 @@ class Budget:
                 check_blocked()
             if self.used >= self.maximum:
                 raise ThreadsError(8, 'This command reached its local request cap.',
-                                   'Run more: to continue, or raise --max-requests (at most 40) if one command should read further.',
+                                   'Continue with the more: line when the result has one; otherwise run the command again '
+                                   'with a larger --max-requests (at most 40) if it takes one.',
                                    error='budget')
             times = history()
             if len(times) >= WINDOW_LIMIT:

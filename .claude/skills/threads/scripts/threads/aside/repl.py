@@ -25,7 +25,8 @@ def run(source, args):
     try:
         result = subprocess.run([binary, '--account', 'u0', 'repl', code], capture_output=True, text=True, timeout=125)
     except subprocess.TimeoutExpired:
-        raise ThreadsError(3, 'Aside request exceeded its 120-second time limit.', 'Reduce the request size.') from None
+        raise ThreadsError(3, 'Aside request exceeded its 120-second time limit.',
+                           'Check Aside with `{cli} doctor`, then retry once; if the same read times out again, tell the user.') from None
     except (OSError, UnicodeError):
         raise ThreadsError(3, 'Aside could not run.', 'Start Aside, then run `{cli} doctor`.') from None
     if result.returncode:

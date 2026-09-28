@@ -110,7 +110,7 @@ OLD, NEW = 1780000000, 1790000000   # 2026-05-28 and 2026-09-21
 def test_a_newest_first_tab_ends_at_the_window_start_and_says_the_window_is_complete(fake_aside):
     body = data(run_cli('user', '@fixture_user', '--since', '2027-01-01', '--json'))
     assert body['stop_reason'] == 'window_reached'
-    assert body['window'] == {'since': '2027-01-01', 'until': None, 'complete': True}
+    assert body['window'] == {'since': '2027-01-01', 'until': None, 'complete': True, 'undated': 0}
     last = run_cli('user', '@fixture_user', '--since', '2027-01-01').stdout.splitlines()[-1]
     assert last.startswith('window: since 2027-01-01 · complete')
 
@@ -134,3 +134,31 @@ def test_a_window_cut_short_says_it_is_partial_and_how_to_continue(routes):
     assert body['window']['complete'] is False and body['next']
     last = run_cli('user', '@fixture_user', '--tab', 'replies', '--since', '2026-09-01', '--limit', '1').stdout.splitlines()[-1]
     assert last.startswith('window: since 2026-09-01 · partial') and 'more:' in last
+
+
+def test_posts_without_a_date_are_counted_not_silently_dropped_from_a_window(routes):
+    undated = listed_post(2)
+    undated.pop('taken_at')
+    routes.set(REPLIES, envelope(tab([listed_post(1, taken_at=NEW), undated]))).write()
+    body = data(run_cli('user', '@fixture_user', '--tab', 'replies', '--since', '2026-09-01', '--json'))
+    assert [p['id'] for p in body['results']] == ['1']
+    assert body['window']['undated'] == 1
+    last = run_cli('user', '@fixture_user', '--tab', 'replies', '--since', '2026-09-01').stdout.splitlines()[-1]
+    assert '1 undated post left out' in last
+
+
+def test_an_undated_post_seen_twice_is_one_post_left_out(routes):
+    undated = listed_post(2)
+    undated.pop('taken_at')
+    routes.set(REPLIES, envelope(tab([listed_post(1, taken_at=NEW), undated], 'R')))
+    routes.set(REPLIES + ':after=R', envelope(tab([listed_post(3, taken_at=NEW), undated]))).write()
+    body = data(run_cli('user', '@fixture_user', '--tab', 'replies', '--since', '2026-09-01', '--json'))
+    assert [p['id'] for p in body['results']] == ['1', '3']
+    assert body['window']['undated'] == 1
+
+
+def test_tombstones_are_not_counted_as_undated_posts(routes):
+    routes.set(REPLIES, envelope(tab([listed_post(1, taken_at=NEW), {'is_post_unavailable': True},
+                                      {'is_post_unavailable': True}]))).write()
+    body = data(run_cli('user', '@fixture_user', '--tab', 'replies', '--since', '2026-09-01', '--json'))
+    assert body['window']['undated'] == 0

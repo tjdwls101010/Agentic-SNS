@@ -11,7 +11,8 @@ MEANING = {
     ('Post', 'code'): 'The shortcode in the post URL.',
     ('Post', 'created_at'): 'When the post was written (UTC ISO). A repost carries the original post\'s time, not '
                             'when it was reposted.',
-    ('Post', 'text'): 'The full text as Threads sent it; text output clips it at --chars.',
+    ('Post', 'text'): 'The full text as Threads sent it; text output clips it at --chars, except the post a post read '
+                      'opens.',
     ('Post', 'like_count'): 'Null when the author hides counts.',
     ('Post', 'reply_count'): 'Direct replies Threads reports; a post read shows only its first batch.',
     ('Post', 'is_reply'): 'The post answers another post.',
@@ -66,7 +67,8 @@ ERRORS = {
     'operation_rotated': 'Threads no longer answers this query as registered; fix names the refresh to run',
     'shape_changed': 'a response lacked what the reader reads; only a new version of the skill fixes it',
     'registry': 'the local query registry or its override cannot be read',
-    'budget': '--max-requests was reached; more: continues',
+    'budget': 'the request cap was reached; a listing\'s more: continues, other commands run again with a larger '
+              '--max-requests',
     'empty': 'Threads returned nothing for this target or window',
     'partial': 'records were read, then something failed; for refresh, some queries were verified and others not',
     'unavailable': 'deleted, private and not followed, or redirected away from the post',
@@ -150,8 +152,10 @@ def schema(exit_codes=None):
                                                                     'batch can hold fewer.'),
         'window': obj({'since': NULLABLE_STRING, 'until': NULLABLE_STRING,
                        'complete': described(BOOLEAN, 'The whole window was read: the surface ended, or a '
-                                                      'newest-first tab passed its start.')},
-                      ['since', 'until', 'complete']),
+                                                      'newest-first tab passed its start.'),
+                       'undated': described(INTEGER, 'Posts without a date, left out because they cannot be '
+                                                     'placed in the window.')},
+                      ['since', 'until', 'complete', 'undated']),
         'out': described(STRING, 'The --out file.'), 'count': described(INTEGER, 'Records in the --out file.'),
         'already_complete': described(BOOLEAN, 'The --out file was already complete; nothing was requested.'),
         **FAILURE}, ['ok', 'results', 'stop_reason', 'next', 'budget', 'fetched_bytes'],
