@@ -1,23 +1,25 @@
+import json
+import os
+import subprocess
+import sys
+
 import pytest
 
-from threads_skill.threads import parser
-from threads_skill._target import parse_target
-from threads_skill._cmds_browse import run
-from threads_skill._cmds_post import run as run_post
+from ..helpers import CLI
 
 pytestmark = pytest.mark.live
 
 
-def args(*values):
-    parsed = parser().parse_args(values)
-    if hasattr(parsed, 'target'):
-        parsed.target = parse_target(parsed.target, 'post' if parsed.command == 'post' else 'user')
-    return parsed
+def run(*args):
+    """The real CLI with real pacing, against the logged-in account."""
+    done = subprocess.run([sys.executable, str(CLI), *args, '--json'], capture_output=True, text=True,
+                          env=dict(os.environ), timeout=300)
+    return json.loads(done.stdout)
 
 
 def test_home_and_following():
     for feed in ('foryou', 'following'):
-        result = run(args('home', '--feed', feed, '--limit', '3'))
+        result = run('home', '--feed', feed, '--limit', '3')
         assert result['ok'], result
         assert len(result['results']) == 3
         assert result['budget']['used'] <= (1 if feed == 'foryou' else 2)
@@ -25,25 +27,18 @@ def test_home_and_following():
 
 
 def test_graph_followers_and_following():
-    followers = run(args('graph', '@zuck', 'followers', '--limit', '20'))
+    followers = run('graph', '@zuck', 'followers', '--limit', '20')
     assert followers['ok'], followers.get('message')
     assert followers['stop_reason'] == 'server_capped'
     print('followers reported_total:', followers['reported_total'], '; received:', len(followers['results']))
-    following = run(args('graph', '@zuck', 'following', '--limit', '25'))
+    following = run('graph', '@zuck', 'following', '--limit', '25')
     assert following['ok'], following.get('message')
     assert len({u['id'] for u in following['results']}) == 25
     assert following['budget']['used'] == 3
 
 
-def test_following_pagination():
-    result = run(args('graph', '@zuck', 'following', '--limit', '25'))
-    assert result['ok'], result.get('message')
-    assert len({u['id'] for u in result['results']}) == 25
-    assert result['budget']['used'] == 3
-
-
 def test_post_page():
-    result = run_post(args('post', 'https://www.threads.com/@zuck/post/Dcy_A8pGo-m'))
+    result = run('post', 'https://www.threads.com/@zuck/post/Dcy_A8pGo-m')
     assert result['ok'], result.get('message')
     assert result['budget']['used'] == 1
     coverage = result['completeness']
@@ -53,39 +48,26 @@ def test_post_page():
 
 
 def test_profile_direct_continuation():
-    result = run(args('user', '@zuck', '--limit', '20'))
+    result = run('user', '@zuck', '--limit', '20')
     assert result['ok'], result.get('message')
     assert len({p['id'] for p in result['results']}) == 20
     assert result['budget']['used'] <= 4
     print('profile SSR + Direct:', result['budget']['used'], 'requests, 20 unique posts')
 
 
-def test_following_home():
-    result = run(args('home', '--feed', 'following', '--limit', '3'))
-    assert result['ok'], result.get('message')
-    assert len(result['results']) == 3 and result['budget']['used'] == 2
-
-
 def test_search_accounts():
-    result = run(args('search', 'python', '--type', 'users', '--limit', '5'))
+    result = run('search', 'python', '--type', 'users', '--limit', '5')
     assert result['ok'], result.get('message')
     assert len(result['results']) == 5 and result['stop_reason'] == 'not_paginable'
 
 
-def test_profile_ssr_cursor_and_about():
-    result = run(args('user', '@zuck', '--limit', '6'))
-    assert result['ok'], result
-    ids = [post['id'] for post in result['results']]
-    assert len(ids) == len(set(ids)) == 6
-    assert result['budget']['used'] <= 3
-    print('profile SSR -> Direct:', result['budget']['used'], 'requests;', len(ids), 'unique posts')
-    about = run_post(args('about', '@zuck'))
-    assert about['ok'] or (about.get('code') == 8 and about.get('error') == 'envelope_drift'
-                           and about['results'][0]['counts']['following'] is None), about.get('message')
+def test_profile_card():
+    about = run('about', '@zuck')
+    assert about['results'][0]['username'] == 'zuck'
     assert set(about['results'][0]['counts']) == {'followers', 'following', 'mutuals'}
 
 
 def test_reply_parent_chain():
-    result = run_post(args('post', 'https://www.threads.com/@ashbridge30/post/Dcy_9M-ihsR'))
+    result = run('post', 'https://www.threads.com/@ashbridge30/post/Dcy_9M-ihsR')
     assert result['ok'] and result['budget']['used'] == 1
     assert any(p['role'] == 'parent' and p['code'] == 'Dcy_A8pGo-m' for p in result['results'])

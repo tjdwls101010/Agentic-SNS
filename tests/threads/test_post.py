@@ -3,23 +3,9 @@ import json
 import os
 from pathlib import Path
 
-from .test_cli import run_cli
+from .helpers import POST, calls, run_cli
 
-POST = 'https://www.threads.com/@fixture_user/post/FIX_2'
-
-
-def calls(log):
-    return [json.loads(line) for line in log.read_text().splitlines()]
-
-
-def rows():
-    return [json.loads(line) for line in Path(os.environ['THREADS_FIXTURES']).read_text().splitlines()]
-
-
-def use_rows(rows, tmp_path, monkeypatch):
-    path = tmp_path / 'variant.ndjson'
-    path.write_text(''.join(json.dumps(row) + '\n' for row in rows))
-    monkeypatch.setenv('THREADS_FIXTURES', str(path))
+PAGE = '/@fixture_user/post/FIX_2'
 
 
 def test_post_reads_body_parents_and_first_reply_batch_in_one_request(fake_aside):
@@ -54,28 +40,21 @@ def test_recent_sort_reads_the_recent_route(fake_aside):
     assert [p['id'] for p in json.loads(result.stdout)['results']][2:] == ['6', '5', '7', '3', '4']
 
 
-def test_a_second_payload_claiming_the_same_role_is_refused_not_guessed(fake_aside, tmp_path, monkeypatch):
-    variant = rows()
-    for row in variant:
-        if row['key'] == '/@fixture_user/post/FIX_2':
-            html = row['envelope']['body']
-            start = html.index('{"__bbox": {"complete": true, "result": {"data": {"media": {"pk": "2"')
-            end = html.index('"viewer"', start)
-            duplicate = html[start:end].replace('Synthetic post body', 'Synthetic other body')
-            row['envelope']['body'] = html[:start] + duplicate + '"viewer": {}}}}}, ' + html[start:]
-    use_rows(variant, tmp_path, monkeypatch)
+def test_a_second_payload_claiming_the_same_role_is_refused_not_guessed(routes):
+    def duplicate(html):
+        start = html.index('{"__bbox": {"complete": true, "result": {"data": {"media": {"pk": "2"')
+        end = html.index('"viewer"', start)
+        copy = html[start:end].replace('Synthetic post body', 'Synthetic other body')
+        return html[:start] + copy + '"viewer": {}}}}}, ' + html[start:]
+    routes.edit(PAGE, duplicate).write()
     result = run_cli('post', POST, '--json')
     assert result.returncode == 6, result.stdout + result.stderr
     assert 'Synthetic' not in result.stdout
 
 
-def test_post_route_without_a_single_post_identity_is_refused(fake_aside, tmp_path, monkeypatch):
-    variant = rows()
-    for row in variant:
-        if row['key'] == '/@fixture_user/post/FIX_2':
-            row['envelope']['body'] = row['envelope']['body'].replace(
-                '"variables": {"postID": "2"}}]', '"variables": {"postID": "9"}}]')
-    use_rows(variant, tmp_path, monkeypatch)
+def test_post_route_without_a_single_post_identity_is_refused(routes):
+    routes.edit(PAGE, lambda html: html.replace('"variables": {"postID": "2"}}]', '"variables": {"postID": "9"}}]'))
+    routes.write()
     result = run_cli('post', POST, '--json')
     assert result.returncode == 6, result.stdout + result.stderr
 
@@ -91,3 +70,19 @@ def test_a_cache_override_written_before_post_pages_left_the_registry_still_load
     assert calls(fake_aside)[-1]['doc_id'] == '2001'
     post = run_cli('post', POST, '--json')
     assert post.returncode == 0, post.stdout + post.stderr
+
+
+def test_a_page_for_another_shortcode_is_never_rendered(routes):
+    routes.copy(PAGE, '/@fixture_user/post/WRONG').write()
+    result = run_cli('post', 'https://www.threads.com/@fixture_user/post/WRONG', '--json')
+    assert result.returncode == 6, result.stdout + result.stderr
+    assert 'Synthetic' not in result.stdout
+
+
+def test_a_deleted_reply_keeps_the_replies_received_under_it(routes):
+    tombstone = '{"node": {"pk": "3", "id": "3_43", "is_post_unavailable": true}}'
+    routes.edit(PAGE, lambda html: html.replace(html[html.index('{"node": {"pk": "3"'):
+                                                     html.index('{"node": {"pk": "4"') - 2], tombstone)).write()
+    body = json.loads(run_cli('post', POST, '--json').stdout)
+    assert '4' in [p['id'] for p in body['results']]
+    assert (body['completeness']['unavailable'], body['completeness']['shown_descendants']) == (2, 1)

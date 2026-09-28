@@ -1,21 +1,49 @@
 #!/usr/bin/env python3
-"""Deterministic process-boundary replies; never contacts a browser."""
+"""Deterministic process-boundary replies; never contacts a browser.
+
+A call is looked up by key: the route path for page, `capture` for capture, and for graphql the query name, then
+`<name>:after=<cursor>` or `<name>:after` when it continues. Rows sharing a key answer successive calls in order, the
+last one repeating. An envelope may instead carry `raw_stdout` (printed as is, Aside's own framing) or `mode`
+(`fail`, `timeout`) for a bridge failure. An unknown key fails the call.
+"""
 import json
 import os
 from pathlib import Path
 import re
 import sys
 
+if len(sys.argv) != 5 or sys.argv[1:4] != ['--account', 'u0', 'repl']:
+    sys.exit(2)
 source = sys.argv[-1]
 args = json.JSONDecoder().raw_decode(source.removeprefix('const ARGS = '))[0]
 snippet = re.search(r'// threads-snippet: (\w+)', source)[1]
 log = Path(os.environ['THREADS_FAKE_LOG'])
-with log.open('a') as stream:
-    stream.write(json.dumps({'snippet': snippet, 'path': args.get('path'), 'name': args.get('name'),
-                             'doc_id': args.get('doc_id'), 'variables': args.get('variables')}) + '\n')
+previous = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+after = (args.get('variables') or {}).get('after')
+if snippet == 'page':
+    keys = [args.get('path')]
+elif snippet == 'capture':
+    keys = ['capture']
+else:
+    keys = [args.get('name') + ':after=' + str(after), args.get('name') + ':after'] if after else [args.get('name')]
 fixtures = [json.loads(line) for line in Path(os.environ['THREADS_FIXTURES']).read_text().splitlines()]
-key = args.get('path') if snippet == 'page' else args.get('name') + (':after' if (args.get('variables') or {}).get('after') else '')
-matches = [record for record in fixtures if record['key'] == key]
+key = next((k for k in keys if any(record['key'] == k for record in fixtures)), keys[-1])
+with log.open('a') as stream:
+    stream.write(json.dumps({'snippet': snippet, 'key': key, 'path': args.get('path'), 'name': args.get('name'),
+                             'doc_id': args.get('doc_id'), 'variables': args.get('variables'),
+                             **({'targets': args.get('targets'), 'request_budget': args.get('request_budget')}
+                                if snippet == 'capture' else {})}) + '\n')
+matches = [record['envelope'] for record in fixtures if record['key'] == key]
 if not matches:
     raise SystemExit('No fixture for requested surface')
-print(json.dumps(matches[0]['envelope']))
+envelope = matches[min(sum(call.get('key') == key for call in previous), len(matches) - 1)]
+if envelope.get('mode') == 'fail':
+    print('fake aside: failed', file=sys.stderr)
+    sys.exit(1)
+if envelope.get('mode') == 'timeout':
+    print('daemon is not reachable', file=sys.stderr)
+    sys.exit(1)
+if 'raw_stdout' in envelope:
+    sys.stdout.write(envelope['raw_stdout'])
+    sys.exit(0)
+print(json.dumps(envelope))
