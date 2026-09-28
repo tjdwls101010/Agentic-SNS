@@ -36,7 +36,7 @@ TASKS = {
 # Paragraph ids for minus-X arms: the opening words of each removable paragraph of the body.
 PARAGRAPHS = {
     'account': 'Threads sends no rate-limit headers',
-    'replies': 'The replies a post shows',
+    'replies': 'What Threads shows first',
     'attribution': 'A quote or repost carries',
     'dates': 'Dates are when a post was written',
     'about': 'When who someone is',
