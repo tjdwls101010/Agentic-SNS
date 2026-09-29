@@ -33,4 +33,4 @@ class CursorStore:
                 raise ValueError
             return data
         except (OSError, ValueError, AttributeError):
-            raise TwitterError(2, 'Continuation is missing or belongs to a different query/account.', 'Copy the complete more: command, or start a new query.') from None
+            raise TwitterError(2, 'Continuation is missing or belongs to a different query/account.', 'Copy --after from the latest more: line, or rerun without --after.') from None

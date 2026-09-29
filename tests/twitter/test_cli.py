@@ -180,3 +180,40 @@ def test_more_command_starts_with_the_allowed_tools_invocation(fake_env):
     allowed = re.search(r'(?m)^allowed-tools: Bash\((.+) \*\)$', (skill / 'SKILL.md').read_text())[1]
     code, doc = invoke(["user", "@example", "--limit", "2"], fake_env)
     assert doc["next"].startswith(allowed.replace("${CLAUDE_SKILL_DIR}", str(skill)) + " ")
+
+
+GENERIC_FIXES = {'Run doctor, then follow its recovery advice.', 'Read the command --help for valid options.'}
+
+
+@pytest.mark.parametrize("args,names", [
+    (["home", "--since", "2026-01-01"], ["--feed following", "--since"]),
+    (["user", "@example", "--tab", "highlights", "--since", "2026-01-01"], ["--tab", "--since"]),
+    (["list", "1", "--tab", "members", "--until", "2026-01-01"], ["--tab posts", "--until"]),
+    (["list", "1", "--tab", "about", "--after", "1"], ["--after"]),
+    (["community", "1", "--tab", "media", "--sort", "recent"], ["--sort", "--tab posts"]),
+    (["post", "1", "2", "--sort", "top"], ["--sort"]),
+    (["post", "1", "2", "--after", "1"], ["--after"]),
+    (["post", "1", "2", "--limit", "1"], ["--limit"]),
+    (["search", "x", "--type", "users", "--sort", "latest"], ["--sort"]),
+    (["search", "x", "--in", "communities", "--type", "users"], ["--type", "--in"]),
+    (["search", "x", "--in", "communities", "--sort", "top"], ["--sort", "--in"]),
+    (["search", "x", "--limit", "0"], ["--limit"]),
+    (["home", "--chars", "0"], ["--chars"]),
+    (["user", "@example", "--until", "nonsense"], ["--until"]),
+    (["user", "@example", "--since", "2026-02-01", "--until", "2026-01-01"], ["--since", "--until"]),
+    (["home", "--after", "0"], ["--after"]),
+    (["user", "@example", "--out", "{tmp}/x.ndjson", "--after", "1"], ["--out", "--after"]),
+    (["home", "--tab", "posts"], ["--tab"]),
+    (["user", "@example", "--tab", "bogus"], ["--tab"]),
+    (["home", "--limit", "many"], ["--limit"]),
+    (["graph", "@example"], ["relation"]),
+    (["search"], ["target"]),
+    (["user", "123"], ["@handle"]),
+    (["post", "https://x.com/example"], ["post URL"]),
+    (["list", "abc"], ["list"]),
+])
+def test_every_argument_error_names_what_to_change(args, names, fake_env, tmp_path):
+    code, doc = invoke([a.replace("{tmp}", str(tmp_path)) for a in args], fake_env)
+    assert (code, doc["error"]) == (2, "arguments"), doc
+    assert doc["fix"] not in GENERIC_FIXES and all(name in doc["fix"] for name in names), doc["fix"]
+    assert not Path(fake_env["TWITTER_FAKE_LOG"]).exists()

@@ -5,6 +5,11 @@ from urllib.parse import urlsplit
 from ...errors import TwitterError
 
 
+FIXES = {'user': 'Pass an @handle or an x.com profile URL.', 'post': 'Pass an x.com post URL or the numeric post ID.',
+         'list': 'Pass an x.com/i/lists/<id> list URL or the numeric list ID.',
+         'community': 'Pass an x.com/i/communities/<id> community URL or the numeric community ID.'}
+
+
 @dataclass
 class Target:
     kind: str
@@ -39,4 +44,6 @@ def parse(value, kind):
         return Target(kind, handle=value)
     if kind != 'user' and value.isdigit():
         return parse(value, kind)
-    raise TwitterError(2, f'Invalid {kind} target.', 'Use a handle for profiles; use an X URL or numeric ID for posts, lists and communities.')
+    if kind == 'user' and value.isdigit():
+        raise TwitterError(2, 'Numeric user IDs are not accepted.', 'Pass the @handle or the x.com profile URL.')
+    raise TwitterError(2, f'Invalid {kind} target.', FIXES[kind])

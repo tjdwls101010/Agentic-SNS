@@ -22,8 +22,6 @@ def run(args, context, op, variables, *, rows, personal=False, prepare=None, fet
     output = OutFile(args.out, context) if args.out else None
     try:
         if output:
-            if args.after:
-                raise TwitterError(2, '--out resumes from its own page commits.', 'Repeat the same --out command without --after.')
             state = output.state
             if state.get('metadata', {}).get('user_id'):
                 state['user_id'] = state['metadata']['user_id']

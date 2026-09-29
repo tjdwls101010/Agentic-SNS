@@ -26,7 +26,7 @@ class OutFile:
             self.close()
             if isinstance(error, TwitterError):
                 raise
-            raise TwitterError(2, 'Cannot open or lock the output file.', 'Choose a writable file not used by another process.') from None
+            raise TwitterError(2, 'Cannot open or lock the output file.', 'Pass --out a writable path that no other run is using.') from None
 
     def recover(self):
         first = self.stream.readline()
@@ -36,7 +36,7 @@ class OutFile:
             os.fsync(self.stream.fileno())
             return
         if json.loads(first) != dict(kind='header', **self.context):
-            raise TwitterError(2, 'Output belongs to a different query or viewer.', 'Use a new output file.')
+            raise TwitterError(2, 'Output belongs to a different query or viewer.', 'Pass a new --out path; this file holds a different query or account.')
         boundary, page = self.stream.tell(), []
         while raw := self.stream.readline():
             if not raw.endswith(b'\n'):
@@ -47,7 +47,7 @@ class OutFile:
                 break
             if record.get('kind') == 'page' and 'id' not in record:
                 if record.get('ids') != [r.get('id') for r in page] or record.get('n') != len(page):
-                    raise TwitterError(2, 'Output page integrity check failed.', 'Preserve this file and use a new path.')
+                    raise TwitterError(2, 'Output page integrity check failed.', 'Keep this file and pass a new --out path.')
                 self.ids.update(record['ids'])
                 self.count += len(page)
                 self.state = record['state']

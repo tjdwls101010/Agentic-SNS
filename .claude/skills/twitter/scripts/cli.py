@@ -89,22 +89,25 @@ def sort(*choices, default):
     return Arg(('--sort',), dict(choices=list(choices), help='Post ranking; default latest for search, top otherwise. Account search uses People ranking and has no sort option.'), default)
 
 
-def dated(allowed):
-    return Rule(lambda a, g: (a.since or a.until) and not allowed(a), 'Date windows require a chronological timeline tab.')
+def dated(allowed, fix):
+    return Rule(lambda a, g: (a.since or a.until) and not allowed(a), 'Date windows require a chronological timeline tab.', fix)
 
 
 def batch(args):
     return len(args.target) > 1
 
 
-NO_AFTER = Rule(lambda a, g: a.after and a.tab == 'about', 'This lookup does not support --after.')
+NO_AFTER = Rule(lambda a, g: a.after and a.tab == 'about', 'This lookup does not support --after.',
+                'Remove --after; --tab about returns the whole card in one request.')
 SURFACES = {
     'home': Surface('Read your personalized For you or chronological Following feed.',
                     (*BROWSE, *DATES, Arg(('--feed',), dict(choices=['foryou', 'following'], help='Feed to read, default foryou.'), 'foryou')),
-                    (dated(lambda a: a.feed == 'following'),), operation=operations.home, personal=True),
+                    (dated(lambda a: a.feed == 'following', 'Add --feed following (the chronological feed), or remove --since/--until.'),),
+                    operation=operations.home, personal=True),
     'user': Surface('Read a profile tab. replies-only is an ungated, mixed posts/replies alternative.',
                     (*BROWSE, *DATES, tab('posts', 'replies', 'replies-only', 'media', 'highlights', 'articles'), TARGET),
-                    (dated(lambda a: a.tab in ('posts', 'replies', 'replies-only', 'media')),), 'user',
+                    (dated(lambda a: a.tab in ('posts', 'replies', 'replies-only', 'media'),
+                           'Use --tab posts, replies, replies-only or media, or remove --since/--until.'),), 'user',
                     operations.user, operations.profile_id),
     'about': Surface('Read one or several profile cards in one request.', (CHARS, OUT, TARGETS), (), 'user',
                      operations.about, finish=operations.unresolved_handles, rows='user', continuable=False,
@@ -113,7 +116,8 @@ SURFACES = {
                     (*BROWSE, sort('top', 'recent', default='top'), TARGETS),
                     (Rule(lambda a, g: batch(a) and g['limit'] is not None, 'Batch post lookup returns every requested post and has no --limit.',
                           'Remove --limit, or open one post for replies.', early=True),
-                     Rule(lambda a, g: batch(a) and (g['sort'] is not None or g['after'] is not None), 'Batch post lookup has no replies or continuation.')),
+                     Rule(lambda a, g: batch(a) and (g['sort'] is not None or g['after'] is not None), 'Batch post lookup has no replies or continuation.',
+                          'Remove --sort and --after, or open one post for its replies.')),
                     'post', operations.post, finish=operations.thread_completeness, continuable=lambda a: not batch(a),
                     limit=lambda a: len(a.target) if batch(a) else 20),
     'quotes': Surface('Find posts quoting a post; uses the shared search bucket.', (*BROWSE, TARGET), (), 'post', operations.quotes),
@@ -126,7 +130,8 @@ SURFACES = {
                        Arg(('--in',), dict(dest='scope', choices=['communities'], help='Search posts across ALL communities; only posts/latest supported.'))),
                       (Rule(lambda a, g: a.type == 'users' and g['sort'] is not None, 'Account search uses X People ranking, not top/latest post sorting.',
                             'Omit --sort for --type users.'),
-                       Rule(lambda a, g: a.scope and (a.type != 'posts' or a.sort != 'latest'), 'Community search only supports posts/latest.')),
+                       Rule(lambda a, g: a.scope and (a.type != 'posts' or a.sort != 'latest'), 'Community search only supports posts/latest.',
+                            'Community search reads posts newest first: remove --type and --sort, or drop --in communities.')),
                       operation=operations.search, rows=lambda a: 'user' if a.type == 'users' else 'tweet',
                       sparse=lambda a: a.type == 'users'),
     'graph': Surface('Read following, followers, verified followers or followers you know.',
@@ -137,14 +142,15 @@ SURFACES = {
                   (*BROWSE, Arg(('collection',), dict(choices=['bookmarks', 'likes'], help='Your private collection to read.'))),
                   operation=operations.collection, prepare=operations.viewer_likes, personal=True),
     'list': Surface('Read list posts, members or its information card.', (*BROWSE, *DATES, tab('posts', 'members', 'about'), TARGET),
-                    (NO_AFTER, dated(lambda a: a.tab == 'posts')), 'list', operations.listing,
+                    (NO_AFTER, dated(lambda a: a.tab == 'posts', 'Use --tab posts, or remove --since/--until.')), 'list', operations.listing,
                     rows=lambda a: {'posts': 'tweet', 'members': 'user', 'about': 'place'}[a.tab]),
     'trends': Surface('Read trends and events from an Explore tab; other item types are counted.',
                       (LIMIT, CHARS, OUT, tab('trending', 'foryou', 'news', 'sports', 'entertainment')),
                       operation=operations.trends, fetch=operations.explore, rows='trend', continuable=False),
     'community': Surface('Read community posts, media or information and member roles.',
                          (*BROWSE, tab('posts', 'media', 'about'), sort('top', 'recent', default='top'), TARGET),
-                         (Rule(lambda a, g: a.tab != 'posts' and g['sort'] is not None, 'Sorting only applies to community posts.'), NO_AFTER),
+                         (Rule(lambda a, g: a.tab != 'posts' and g['sort'] is not None, 'Sorting only applies to community posts.',
+                               'Remove --sort, or use --tab posts.'), NO_AFTER),
                          'community', operations.community, operations.community_card,
                          rows=lambda a: 'user' if a.tab == 'about' else 'tweet', continuable=lambda a: a.tab != 'about'),
     'communities': Surface('Browse community posts with links to their communities.', BROWSE, operation=operations.communities),
@@ -160,7 +166,22 @@ UNSET = ('limit', 'after', 'since', 'until', 'tab', 'sort', 'feed', 'type', 'sco
 
 class Parser(argparse.ArgumentParser):
     def error(self, message):
-        raise TwitterError(2, message, 'Read the command --help for valid options.')
+        raise TwitterError(2, message, parse_fix(message))
+
+
+def parse_fix(message):
+    """A fix naming the argument argparse refused."""
+    if match := re.match(r"argument (\S+): invalid choice: \S+ \(choose from (.+)\)", message):
+        return f'Pass {match[1]} one of: ' + match[2].replace("'", '') + '.'
+    if match := re.match(r'argument (\S+): invalid int value', message):
+        return f'Pass {match[1]} a whole number.'
+    if match := re.match(r'argument (\S+): expected one argument', message):
+        return f'Give {match[1]} a value.'
+    if match := re.match(r'unrecognized arguments: (.+)', message):
+        return f'Remove {match[1]}; the command\'s --help lists the options it takes.'
+    if match := re.match(r'the following arguments are required: (.+)', message):
+        return f'Add {match[1]}; the command\'s --help shows the order.'
+    return 'Read the command --help for valid options.'
 
 
 def parser():
@@ -185,10 +206,13 @@ def validate(args):
     given = dict(vars(args))
     args.explicit_limit = args.limit is not None
     if args.after is not None and args.after < 1:
-        raise TwitterError(2, 'Continuation handles must be positive.', 'Copy the complete more: command.')
+        raise TwitterError(2, 'Continuation handles must be positive.', 'Copy --after from the latest more: line, or rerun without --after.')
+    if args.out and args.after is not None:
+        raise TwitterError(2, '--out resumes from its own page commits.', 'Repeat the same --out command without --after.')
     refuse([rule for rule in surface.rules if rule.early], args, given)
-    if args.limit is not None and args.limit < 1 or args.chars is not None and args.chars < 1:
-        raise TwitterError(2, 'limit and chars must be positive.', 'Choose a positive display target.')
+    for key in ('limit', 'chars'):
+        if getattr(args, key) is not None and getattr(args, key) < 1:
+            raise TwitterError(2, f'{key} must be positive.', f'Pass --{key} 1 or more.')
     for arg in sorted(surface.args, key=lambda arg: callable(arg.default)):
         if arg.default is not None and getattr(args, arg.dest) is None:
             setattr(args, arg.dest, value(arg.default, args))
@@ -197,10 +221,10 @@ def validate(args):
         if getattr(args, key):
             normalized = timestamp(getattr(args, key) + 'T00:00:00+00:00' if len(getattr(args, key)) == 10 else getattr(args, key))
             if not normalized:
-                raise TwitterError(2, f'Invalid {key} date.', 'Use YYYY-MM-DD or an ISO timestamp.')
+                raise TwitterError(2, f'Invalid {key} date.', f'Pass --{key} as YYYY-MM-DD or an ISO timestamp.')
             setattr(args, key, normalized)
     if args.since and args.until and args.since >= args.until:
-        raise TwitterError(2, 'since must precede until.')
+        raise TwitterError(2, 'since must precede until.', 'Pass a --since earlier than --until; --until is exclusive.')
     if surface.target:
         args.targets = operations.resolve(args.target if isinstance(args.target, list) else [args.target], surface.target)
     args.limit = args.limit or value(surface.limit, args)
