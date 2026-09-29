@@ -247,3 +247,44 @@ def test_bundled_registry_holds_only_what_requests_are_built_from():
     assert set(registry) == {'bearer', 'features', 'operations'}
     for spec in registry['operations'].values():
         assert {'query_id', 'method', 'gated', 'root', 'vars'} <= set(spec) <= {'query_id', 'method', 'gated', 'root', 'vars', 'fieldToggles'}
+
+
+def rejected_twice(env, op):
+    real_material(env)
+    script(env, {'op': op, 'status': 404, 'body': ''}, *material_pages(), {'op': op, 'status': 404, 'body': ''})
+
+
+@pytest.mark.parametrize('args,op,expected,absent', [
+    (['user', '@example', '--tab', 'replies'], 'UserTweetsAndReplies', ['--tab replies-only', 'non-reply'], []),
+    (['graph', '@example', 'followers'], 'Followers', ['following', 'different question'], ['replies-only']),
+    (['search', 'x'], 'SearchTimeline', ['refresh'], ['replies-only', 'following']),
+    (['quotes', '200'], 'SearchTimeline', ['refresh'], ['replies-only', 'following']),
+])
+def test_signature_failure_fix_fits_the_surface(args, op, expected, absent, fake_env):
+    rejected_twice(fake_env, op)
+    code, doc = invoke(args, fake_env)
+    assert (code, doc['error']) == (6, 'transaction_rejected')
+    assert all(e in doc['fix'] for e in expected) and not any(a in doc['fix'] for a in absent), doc['fix']
+
+
+@pytest.mark.parametrize('op,args,body,status', [
+    ('UserByScreenName', PROFILE, {'errors': [{'message': 'Variable x must be defined'}]}, 422),
+    ('UserByScreenName', PROFILE, {'data': {'different': []}}, 200),
+    ('UserTweets', ['user', '@example'], None, 200),
+])
+def test_drift_says_the_code_must_change_without_vouching_for_other_commands(op, args, body, status, fake_env):
+    script(fake_env, {'op': op, 'status': status, 'body': body if body is not None else wrap('UserTweets', {})})
+    code, doc = invoke(args, fake_env)
+    assert code == 6 and doc['error'] in ('contract_drift', 'envelope_drift')
+    assert 'code change' in doc['fix'] and 'retry' in doc['fix'] and 'does not show' in doc['fix'], doc['fix']
+
+
+def test_aside_time_limit_points_at_aside_not_at_the_display_limit(fake_env):
+    script(fake_env, {'op': 'UserByScreenName', 'raw': 'Error: other side closed', 'exit': 1})
+    code, doc = invoke(PROFILE, fake_env)
+    assert code == 3 and 'Aside' in doc['fix'] and 'retry' in doc['fix'] and 'reduce' not in doc['fix'].lower()
+
+
+def test_no_fix_suggests_shrinking_a_display_target():
+    sources = ' '.join(p.read_text() for p in (ROOT / '.claude/skills/twitter/scripts').rglob('*.py'))
+    assert 'reduce the request size' not in sources.lower()

@@ -15,6 +15,15 @@ def scrub(value):
     return value
 
 
+REFRESH = 'Run refresh, then retry the same command.'
+
+
+def drift(operation):
+    """The fix for a response or variable contract the code no longer matches."""
+    return (f'This needs a code change for {operation}; a retry will not help. '
+            'Other commands may still work, but this failure does not show that they do.')
+
+
 class TwitterError(Exception):
     def __init__(self, code, message, fix='Run doctor, then follow its recovery advice.', error=None):
         super().__init__(scrub(message))

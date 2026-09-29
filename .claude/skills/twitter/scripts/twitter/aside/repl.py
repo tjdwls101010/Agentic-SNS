@@ -8,6 +8,9 @@ import subprocess
 from ..errors import TwitterError
 
 
+ASIDE = 'Check that Aside is running and responsive, then retry the same command.'
+
+
 def run(source, args):
     """Run one browser snippet's source with ARGS in the u0 account's REPL and return its validated envelope."""
     try:
@@ -20,14 +23,14 @@ def run(source, args):
     try:
         result = subprocess.run([binary, '--account', 'u0', 'repl', code], capture_output=True, text=True, timeout=125)
     except subprocess.TimeoutExpired:
-        raise TwitterError(3, 'Aside request exceeded its 120-second time limit.', 'Reduce the request size.') from None
+        raise TwitterError(3, 'Aside request exceeded its 120-second time limit.', ASIDE) from None
     except (OSError, UnicodeError):
         raise TwitterError(3, 'Aside could not run.', 'Start Aside, then run doctor.') from None
     if result.returncode:
         timed_out = any(s in (result.stderr + result.stdout).lower()
                         for s in ('other side closed', 'daemon is not reachable'))
         message = 'Aside request ended at the REPL time limit or lost its connection.' if timed_out else 'Aside request failed.'
-        raise TwitterError(3, message, 'Check Aside, then run doctor.')
+        raise TwitterError(3, message, ASIDE if timed_out else 'Check that Aside is running, then run doctor.')
     try:
         lines = [re.sub(r'\x1b\[[0-9;]*m', '', line).strip() for line in result.stdout.splitlines()]
         records = [json.loads(line) for line in lines if line.startswith('{')]

@@ -2,7 +2,7 @@
 
 cli.py's declarations name these functions; nothing here branches on the command.
 """
-from ..errors import TwitterError
+from ..errors import TwitterError, drift
 from ..graphql.protocol.transport import root_at
 from ..graphql.responses.records import build_place, build_user
 from ..graphql.responses.targets import parse
@@ -114,7 +114,7 @@ def explore(transport, args):
     tab = next((t for t in body.get('timelines', []) if t.get('id') == args.tab), None)
     timeline_id = tab.get('timeline', {}).get('id') if tab else None
     if not timeline_id:
-        raise TwitterError(6, 'Explore tab ID is missing.', 'Update the Explore parser.', 'envelope_drift')
+        raise TwitterError(6, 'Explore tab ID is missing.', drift('ExplorePage'), 'envelope_drift')
     return transport.query('GenericTimelineById', {'timelineId': timeline_id})
 
 

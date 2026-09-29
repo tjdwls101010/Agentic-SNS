@@ -2,7 +2,7 @@
 import json
 import re
 from pathlib import Path
-from ...errors import TwitterError, scrub
+from ...errors import REFRESH, TwitterError, drift, scrub
 from ...account.state import account_lock, set_blocked
 from ...aside.repl import run
 from ...account.budget import Budget
@@ -64,9 +64,9 @@ def classify(envelope, operation, expect):
     if '353' in codes:
         raise TwitterError(4, 'X rejected the CSRF token.', 'Open x.com in Aside, then run doctor.', 'csrf')
     if status == 404 and not raw.strip():
-        raise TwitterError(6, 'X rejected the transaction signature.', 'Run refresh; replies-only and following are ungated alternatives.', 'transaction_rejected')
+        raise TwitterError(6, 'X rejected the transaction signature.', REFRESH, 'transaction_rejected')
     if status == 422 or re.search(r'must be defined|coerced Null value|GRAPHQL_VALIDATION_FAILED', messages):
-        raise TwitterError(6, 'X changed the variable contract.', f'Update registry.json vars for {operation} (code change).', 'contract_drift')
+        raise TwitterError(6, 'X changed the variable contract.', drift(operation), 'contract_drift')
     if status == 400 and 'features cannot be null:' in messages:
         exc = TwitterError(6, messages, 'Run refresh.', 'operation_rotated')
         exc.missing_features = re.findall(r'[A-Za-z_][A-Za-z_0-9]*', messages.split('features cannot be null:', 1)[1])
@@ -84,7 +84,7 @@ def classify(envelope, operation, expect):
         malformed = malformed or any(node is not None and (not isinstance(node, dict) or
             node.get('__typename') != 'UserUnavailable' and not str(node.get('rest_id', '')).isdigit()) for node in nodes)
     if root is None or malformed:
-        raise TwitterError(6, f'Expected response root is missing for {operation}.', 'The response shape changed; update the envelope parser.', 'envelope_drift')
+        raise TwitterError(6, f'Expected response root is missing for {operation}.', drift(operation), 'envelope_drift')
     return root, scrub(errors)
 
 

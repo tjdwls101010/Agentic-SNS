@@ -47,7 +47,7 @@ class Rule:
 class Surface:
     """Everything one command is: its arguments and refusals, what it asks X for, and how its result is shaped.
 
-    `target` is the kind its positional targets parse as; `operation(args)` gives the operation and variables; `prepare`, `fetch` and `finish` are browse/operations hooks (see browse.run); `rows` is the record kind listed; `continuable` issues more: handles; `sparse` stops an account list after three empty pages; `personal` rechecks the viewer cookie; `limit` is the display target when --limit is absent; `runner(args)` replaces all of this for doctor, refresh and schema. A field may be a function of the parsed args.
+    `target` is the kind its positional targets parse as; `fixes` maps an error class to this command's own fix (a function of the args, None to keep the general one); `operation(args)` gives the operation and variables; `prepare`, `fetch` and `finish` are browse/operations hooks (see browse.run); `rows` is the record kind listed; `continuable` issues more: handles; `sparse` stops an account list after three empty pages; `personal` rechecks the viewer cookie; `limit` is the display target when --limit is absent; `runner(args)` replaces all of this for doctor, refresh and schema. A field may be a function of the parsed args.
     """
     help: str
     args: tuple = ()
@@ -63,6 +63,7 @@ class Surface:
     personal: bool = False
     limit: int | Callable = 10
     runner: Callable | None = None
+    fixes: dict = field(default_factory=dict)
 
 
 def value(field, args):
@@ -115,6 +116,11 @@ def dated(allowed, fix):
     return Rule(lambda a, g: (a.since or a.until) and not allowed(a), 'Date windows require a chronological timeline tab.', fix)
 
 
+def signed(alternative):
+    """A signature failure's fix for one surface: refresh first, then what else answers and how that answer differs."""
+    return {error: alternative for error in ('transaction_rejected', 'transaction_unavailable')}
+
+
 def batch(args):
     return len(args.target) > 1
 
@@ -136,7 +142,9 @@ SURFACES = {
                      PROFILE),
                     (dated(lambda a: a.tab in ('posts', 'replies', 'replies-only', 'media'),
                            'Use --tab posts, replies, replies-only or media, or remove --since/--until.'),), 'user',
-                    operations.user, operations.profile_id),
+                    operations.user, operations.profile_id,
+                    fixes=signed(lambda a: 'Run refresh, then retry; or use --tab replies-only, which is unsigned but mixes in some non-reply posts.'
+                                 if a.tab == 'replies' else None)),
     'about': Surface('Read one or several profile cards in one request.',
                      (chars('bio'), OUT, Arg(('target',), dict(nargs='+', help='One or more @handles or x.com profile URLs, read together in one request; numeric user IDs are not accepted.'))),
                      (), 'user', operations.about, finish=operations.unresolved_handles, rows='user', continuable=False,
@@ -175,7 +183,9 @@ SURFACES = {
                      (*ACCOUNTS, PROFILE,
                       Arg(('relation',), dict(choices=['following', 'followers', 'verified', 'known'],
                                               help='Which list: following, followers (signed request), verified (their verified followers) or known (their followers whom you follow).'))),
-                     (), 'user', operations.graph, operations.profile_id, rows='user', sparse=True),
+                     (), 'user', operations.graph, operations.profile_id, rows='user', sparse=True,
+                     fixes=signed(lambda a: 'Run refresh, then retry. graph <handle> following is no substitute: whom they follow is a different question from who follows them.'
+                                  if a.relation == 'followers' else None)),
     'me': Surface('Read your own bookmarks or liked posts.',
                   (*POSTS, Arg(('collection',), dict(choices=['bookmarks', 'likes'], help='Which of your collections: bookmarks or likes.'))),
                   operation=operations.collection, prepare=operations.viewer_likes, personal=True),
@@ -340,12 +350,22 @@ def dispatch(args):
     if surface.runner:
         return surface.runner(args)
     op, variables = surface.operation(args)
-    result = browse(args, context_for(args, op), op, variables, rows=value(surface.rows, args), personal=surface.personal,
-                    prepare=surface.prepare, fetch=surface.fetch, finish=surface.finish,
-                    continuable=value(surface.continuable, args), sparse=value(surface.sparse, args))
+    try:
+        result = browse(args, context_for(args, op), op, variables, rows=value(surface.rows, args), personal=surface.personal,
+                        prepare=surface.prepare, fetch=surface.fetch, finish=surface.finish,
+                        continuable=value(surface.continuable, args), sparse=value(surface.sparse, args))
+    except TwitterError as error:
+        error.fix = own_fix(surface, args, error.error) or error.fix
+        raise
+    if result.get('error'):
+        result['fix'] = own_fix(surface, args, result['error']) or result['fix']
     if result.get('next_handle'):
         result['next'] = more_command(args, result['next_handle'])
     return result
+
+
+def own_fix(surface, args, error):
+    return value(surface.fixes.get(error), args)
 
 
 def main(argv=None):
