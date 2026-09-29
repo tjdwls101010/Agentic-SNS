@@ -4,6 +4,8 @@ import os
 from .account.state import cache_dir
 from .errors import TwitterError
 
+FORMAT = 2
+
 
 class CursorStore:
     def __init__(self):
@@ -19,7 +21,7 @@ class CursorStore:
             except FileExistsError:
                 number += 1
         with os.fdopen(fd, 'wb') as stream:
-            stream.write((json.dumps(dict(state, context=context), ensure_ascii=False) + '\n').encode())
+            stream.write((json.dumps(dict(state, format=FORMAT, context=context), ensure_ascii=False) + '\n').encode())
             stream.flush()
             os.fsync(stream.fileno())
         return number
@@ -29,6 +31,8 @@ class CursorStore:
             if not str(number).isdigit() or int(number) < 1:
                 raise ValueError
             data = json.loads((self.directory / f'{int(number)}.json').read_text())
+            if data.get('format') != FORMAT:
+                raise TwitterError(2, 'This continuation was written by an older version of the skill.', 'Rerun the command without --after.')
             if data.get('context') != context or not isinstance(data.get('pending'), list):
                 raise ValueError
             return data

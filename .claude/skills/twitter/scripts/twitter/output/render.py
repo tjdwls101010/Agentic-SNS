@@ -16,12 +16,6 @@ def number(value):
 
 def _text(row, chars=280):
     value = row.get('text', row.get('description', '')) or ''
-    for link in row.get('entities', {}).get('urls', []):
-        if link.get('url'):
-            value = value.replace(link['url'], link.get('expanded_url') or link['url'])
-    for media in row.get('entities', {}).get('media', []):
-        if media.get('url'):
-            value = value.replace(media['url'], '')
     value = ' ⏎ '.join(' '.join(part.split()) for part in value.splitlines())
     return clip(value, chars)
 

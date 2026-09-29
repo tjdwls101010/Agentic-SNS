@@ -140,3 +140,30 @@ def test_rest_of_a_received_trends_page_is_a_free_continuation(fake_env):
     assert code == 0 and [r['name'] for r in first['results']] == ['T0'] and first['next']
     code, rest = invoke(more_args(first['next']), fake_env)
     assert code == 0 and [r['name'] for r in rest['results']] == ['T1'] and len(calls(fake_env)) == before
+
+
+def test_export_header_carries_the_format_and_an_older_file_is_refused_untouched(fake_env, tmp_path):
+    out = tmp_path / 'new.ndjson'
+    invoke(['user', '@example', '--limit', '2', '--out', str(out)], fake_env)
+    assert records(out)[0]['format'] == 2
+    old = tmp_path / 'old.ndjson'
+    header = {'kind': 'header', 'command': 'user', 'target': ['example'], 'operation': 'UserTweets', 'viewer_id': '100',
+              'tab': 'posts', 'sort': None, 'feed': None, 'type': None, 'scope': None, 'relation': None, 'collection': None,
+              'since': None, 'until': None}
+    old.write_text(json.dumps(header) + '\n')
+    old.chmod(0o600)
+    before = old.read_bytes()
+    code, doc = invoke(['user', '@example', '--limit', '2', '--out', str(old)], fake_env)
+    assert (code, doc['error']) == (2, 'arguments') and 'older' in doc['message'] and '--out' in doc['fix']
+    assert old.read_bytes() == before
+
+
+def test_continuation_state_carries_the_format_and_an_older_one_is_refused(fake_env):
+    code, doc = invoke(['user', '@example', '--limit', '2'], fake_env)
+    state = home(fake_env) / 'cursors' / f"{doc['next_handle']}.json"
+    saved = json.loads(state.read_text())
+    assert saved['format'] == 2
+    saved.pop('format')
+    state.write_text(json.dumps(saved))
+    code, doc = invoke(more_args(doc['next']), fake_env)
+    assert (code, doc['error']) == (2, 'arguments') and 'older' in doc['message'] and 'without --after' in doc['fix']

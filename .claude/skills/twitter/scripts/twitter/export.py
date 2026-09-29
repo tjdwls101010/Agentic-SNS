@@ -6,6 +6,7 @@ from pathlib import Path
 from .errors import TwitterError
 
 COMPLETE = {'exhausted', 'window_reached', 'not_paginable', 'terminated'}
+FORMAT = 2
 
 
 def line(value):
@@ -31,11 +32,15 @@ class OutFile:
     def recover(self):
         first = self.stream.readline()
         if not first:
-            self.stream.write(line(dict(kind='header', **self.context)))
+            self.stream.write(line(dict(kind='header', format=FORMAT, **self.context)))
             self.stream.flush()
             os.fsync(self.stream.fileno())
             return
-        if json.loads(first) != dict(kind='header', **self.context):
+        header = json.loads(first)
+        if not isinstance(header, dict) or header.get('format') != FORMAT:
+            raise TwitterError(2, 'This --out file was written by an older version of the skill and cannot be resumed.',
+                               'Pass a new --out path; the old file stays as it was.')
+        if header != dict(kind='header', format=FORMAT, **self.context):
             raise TwitterError(2, 'Output belongs to a different query or viewer.', 'Pass a new --out path; this file holds a different query or account.')
         boundary, page = self.stream.tell(), []
         while raw := self.stream.readline():
