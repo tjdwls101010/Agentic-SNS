@@ -109,10 +109,10 @@ The schema describes normalized fields and stopping conditions. Use ordinary tex
 
 | Platform | Interpretation and implementation notes |
 |---|---|
-| X | [Skill guidance](../.claude/skills/twitter/SKILL.md) covers account risk, what follows and reposts do not establish, and exports as personal data; command help and `schema` explain repost authors, signed queries, reply counts, and budgets. [Implementation record](../.claude/plans/twitter%20스킬%20구현%20계획.md). |
+| X | [Skill guidance](../.claude/skills/twitter/SKILL.md) covers account risk, what follows and reposts do not establish, and exports as personal data; command help and `schema` explain repost authors, signed queries, reply counts, and budgets. [Implementation record](../.claude/plans/twitter%20스킬%20총체%20점검%20재설계%20계획.md). |
 | Reddit | [Skill guidance](../.claude/skills/reddit/SKILL.md) explains comment trees, cached observations, ranked results, and shared budgets. [Implementation record](../.claude/plans/reddit%20스킬%20구현%20계획.md). |
-| Facebook | [Skill guidance](../.claude/skills/facebook/SKILL.md) explains request budgets on the real account, what a date window covers, truncated text and coverage lines, and personal data in collections. [Implementation record](../.claude/plans/facebook%20스킬%20구현%20계획.md). |
-| Threads | [Skill guidance](../.claude/skills/threads/SKILL.md) explains choosing reads on the real account, what ranked replies and search results can support, attribution and dates, and personal data in collections; `--help` and `schema` cover reply coverage, relationship samples and request counts. [Implementation record](../.claude/plans/threads%20스킬%20구현%20계획.md). |
+| Facebook | [Skill guidance](../.claude/skills/facebook/SKILL.md) explains request budgets on the real account, what a date window covers, truncated text and coverage lines, and personal data in collections. [Implementation record](../.claude/plans/facebook%20스킬%20총체%20점검%20재설계%20계획.md). |
+| Threads | [Skill guidance](../.claude/skills/threads/SKILL.md) explains choosing reads on the real account, what ranked replies and search results can support, attribution and dates, and personal data in collections; `--help` and `schema` cover reply coverage, relationship samples and request counts. [Implementation record](../.claude/plans/threads%20스킬%20총체%20점검%20재설계%20계획.md). |
 | Naver Blog | [Skill guidance](../.claude/skills/naver-blog/SKILL.md) explains unreliable totals, extraction coverage, reviews, and neighbor visibility. [Implementation record](../.claude/plans/naver-blog%20스킬%20구현%20계획.md). |
 
 ## Troubleshooting
