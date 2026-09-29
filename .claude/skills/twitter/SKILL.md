@@ -2,39 +2,33 @@
 name: twitter
 allowed-tools: Bash(uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" *)
 description: >-
-  Read X (Twitter, x.com) through the user's logged-in Aside browser: the home feed, a post with parents and replies, profile posts/replies/media/highlights/articles, followers and following, reposts and quotes, search, trends, lists, communities, and the user's own bookmarks and likes. Use whenever the request is to read or explore X or Twitter — 트위터에서, 엑스에서, 이 트윗 답글, 트위터 검색, 트렌드 — including a bare x.com or twitter.com URL. Not for Threads, Facebook, Reddit, general web pages, news about X the company, posting, replying, liking, reposting, following, or bookmarking.
+  Read X (Twitter, x.com) through the user's logged-in Aside browser: the home feed, a post with parents and replies, profile posts/replies/media/highlights/articles, followers and following, reposts and quotes, search, trends, lists, communities, and the user's own bookmarks and likes. Use whenever the request is to read or explore X or Twitter — 트위터에서, 엑스에서, 이 트윗 답글, 트위터 검색, 트렌드 — including a bare x.com or twitter.com URL. Not for Threads, Facebook, Reddit, general web pages, news about X the company, notifications or direct messages, posting, replying, liking, reposting, following, or bookmarking.
 ---
 
-# X through the user's own browser
+# X through the person's own browser
 
-Aside supplies the logged-in person's session; the bundled CLI supplies read-only queries and dense text. Let `$TW` mean `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py"`, written out on one shell line. Start with its `--help`; command help, `schema`, and an error's `fix` carry the interface details. The script is self-contained and can run from any directory.
+Aside supplies the logged-in person's session; the bundled CLI reads X with it, read-only, and prints dense text. Let `$TW` mean `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py"`, written out on one shell line. `$TW --help` and `$TW <command> --help` give each command's arguments, `$TW schema` what the output means, and every error its own `fix`.
 
-## Every request is the person's account, and X counts by operation
+## Every request spends the person's account
 
-The budget line reports the operation's server bucket, not an account-wide allowance. Every search product shares one bucket; searching for posts and then accounts spends the same reserve. Profile posts and followers also have smaller buckets than home and following. X can lock accounts for automation, so decide how many people or posts answer the question before collecting. A server page contains many more items than the default display target: asking for fewer displayed items does not make that first request cheaper, while a cached continuation can require no request at all.
+X can lock an account for automated use, and it counts requests per operation rather than per account: every search product, quotes included, draws on one bucket, so a people search after a post search spends the same reserve. Decide how many people or posts answer the question before collecting. A server page holds far more items than the default display target, so asking to show fewer does not make the first request cheaper, while following a `more:` line serves the rest of an already fetched page with no request.
 
-## Three surfaces run on a reverse-engineered signature
+## Some surfaces break while others keep working
 
-Search, followers, and the profile replies tab depend on a signature reproduced from X's web client. Every request needs a fresh signature, and a client deployment can break these surfaces while other reads continue working. Query IDs also rotate. Error recovery distinguishes a signature problem, a rotated operation, and a changed variable contract; their fixes are different. The explicit replies-only alternative is a different operation and still contains some non-reply posts.
+Some reads need a request signature reproduced from X's web client, and an X deployment can break them while every other read keeps working. A nearby surface may still answer, but it answers a different question — replies-only mixes in posts that are not replies, and following is not followers — so when you substitute one, say so in the answer.
 
-## A repost's author is the reposter, and other things the numbers hide
+## What a row shows is not what it seems
 
-The person at the front of a repost row is the reposter; the person after “repost of” wrote the original. The row ID and timestamp describe the repost action, while its body, URL, and engagement counts describe the original. Search may supply only an ID for an embedded quote; the next-hop URL opens the missing original. X no longer returns a useful list of people who liked a post, so that surface is absent.
+A repost row records the reposter's act: its author, ID and time are the repost's, while its text, link and counts belong to the original post and its writer. Top search and the For you feed are X's ranking and personalization, not a sample of what was posted; ask for latest or following when recency or coverage matters. A thread's reported reply count is X's claim, not what you read: count only the replies shown, and treat hidden branches as unread. X does not list who liked a post, so that question cannot be answered here.
 
-Top is X's ranking, not a chronological sample, and the home feed is personalized rather than a sample of all X. A blue check denotes a paid subscription; government and business badges carry different meanings. Reply limitations are labeled. Reply totals distinguish direct replies reported by X, direct replies shown, nested replies shown, and hidden branches; related-post recommendations are not replies. These are observations, not a completeness guarantee.
+## Joining records and following links
 
-## @handles and URLs are the next command's arguments
+Handles change and IDs do not, so join records from different collections by ID. A follow is not a friendship and a repost is not an endorsement; a follower list holds accounts that may have no other tie to the subject.
 
-Printed handles and URLs are directly usable as targets. Handles can change but IDs remain stable, so join records by ID. X's usable profile lookup needs a handle rather than a numeric user ID. Following is not friendship, and reposting is not necessarily agreement; a relationship list contains people who may have no other connection to the subject.
+## Date windows: server filter vs client filter
 
-## What has actually bitten
+Search operators such as since: and until: filter on X's side. A timeline's --since and --until only filter what was fetched, so a run that stopped for any reason other than window_reached has not shown that the window was covered; only profile posts are ordered reliably enough to reach that stop.
 
-An unavailable post can arrive as an empty focal node in an otherwise successful response. The second page of replies usually has no focal post. Advertisements are removed, so the displayed feed differs from the complete server response. “More replies” branches are counted but not followed. Article tabs expose their listing; article rich-text bodies are not expanded.
+## Large collections are personal data
 
-Search date operators are server filters. Timeline date windows are client filters, and a stop other than `window_reached` does not establish that the requested time window was fully covered. Only the profile posts surface has enough evidence of chronological ordering to make that early-stop claim. Notifications and DMs are outside this skill.
-
-## Large collections and what the cache holds
-
-Use local exports when the collection is too large to read in the conversation. Exports commit whole eligible pages within the requested date window, so stored and shown counts can differ. Interrupted exports resume from the last complete page; continuation handles consume their cached unseen tail first. Both are bound to query context and the cached viewer, and a detected account change invalidates continuations.
-
-The cache holds the CSRF token, viewer identity, and potentially other people's posts and profiles; the browser retains the actual login credential. Exports and continuation files are personal data: keep them outside the repository and remove them after the task. A long-lived cached session is not continuous proof that the person has stayed logged in as the same account; personal surfaces periodically recheck the viewer cookie.
+Collect anything too large to read in the conversation with --out. Exports and the cache hold other people's posts and profiles: keep export files outside the repository and delete them when the task is done. A cached session is not proof that the same person is still logged in.
