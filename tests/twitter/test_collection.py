@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from .fake_data import entry, tweet, wrap
 from .helpers import calls, home, invoke, more_args, records, script
 
@@ -167,3 +169,61 @@ def test_continuation_state_carries_the_format_and_an_older_one_is_refused(fake_
     state.write_text(json.dumps(saved))
     code, doc = invoke(more_args(doc['next']), fake_env)
     assert (code, doc['error']) == (2, 'arguments') and 'older' in doc['message'] and 'without --after' in doc['fix']
+
+
+def cursor_files(env):
+    return sorted(p.stem for p in (home(env) / 'cursors').glob('*.json'))
+
+
+def test_handles_are_random_six_character_names_that_redraw_on_collision(fake_env):
+    env = dict(fake_env, FAKE_HANDLE_CHARS='aaaaaabbbbbb')
+    code, first = invoke(['user', '@example', '--limit', '2'], env)
+    code, second = invoke(['home', '--limit', '2'], env)
+    assert (first['next_handle'], second['next_handle']) == ('aaaaaa', 'bbbbbb')
+    assert cursor_files(fake_env) == ['aaaaaa', 'bbbbbb']
+
+
+@pytest.mark.parametrize('handle', ['../x', '1', 'ABCDEF', 'abcdefg', 'abc/ef'])
+def test_malformed_handles_are_refused_before_any_file_or_request(handle, fake_env):
+    (home(fake_env) / 'cursors').mkdir(mode=0o000)
+    try:
+        code, doc = invoke(['home', '--after', handle], fake_env)
+    finally:
+        (home(fake_env) / 'cursors').chmod(0o700)
+    assert (code, doc['error']) == (2, 'arguments') and 'six lowercase letters or digits' in doc['message']
+    assert '--after' in doc['fix'] and calls(fake_env) == []
+
+
+def test_a_handle_expires_a_day_after_it_was_issued_and_is_swept_by_the_next_save(fake_env):
+    code, doc = invoke(['user', '@example', '--limit', '2'], fake_env)
+    later = dict(fake_env, FAKE_CLOCK_OFFSET='86401')
+    code, expired = invoke(more_args(doc['next']), later)
+    assert (code, expired['error']) == (2, 'arguments') and 'expired' in expired['message']
+    assert 'without --after' in expired['fix']
+    code, fresh = invoke(['home', '--limit', '2'], later)
+    assert cursor_files(fake_env) == [fresh['next_handle']]
+
+
+def test_more_repeats_only_what_was_typed_plus_limit_chars_and_json(fake_env):
+    code, doc = invoke(['user', '@example', '--limit', '2', '--chars', '50'], fake_env)
+    words = more_args(doc['next'])
+    assert words == ['user', '@example', '--limit', '2', '--chars', '50', '--after', doc['next_handle'], '--json']
+    code, doc = invoke(['search', 'python', '--type', 'users', '--limit', '2'], fake_env)
+    assert more_args(doc['next'])[:6] == ['search', 'python', '--type', 'users', '--limit', '2']
+    code, doc = invoke(['graph', '@example', 'followers', '--limit', '1'], fake_env)
+    assert more_args(doc['next'])[:3] == ['graph', '@example', 'followers'] and '--tab' not in doc['next']
+
+
+def empty_pages(count):
+    return [{'op': 'HomeTimeline', 'body': wrap('HomeTimeline', page(cursor=f'c{i}'))} for i in range(count)]
+
+
+def test_a_continuation_keeps_the_request_cap_of_the_call_that_issued_it(fake_env):
+    script(fake_env, *empty_pages(25))
+    code, first = invoke(['home'], fake_env)
+    assert (code, first['stop_reason'], first['budget']['requests']) == (8, 'budget', 10)
+    code, second = invoke(more_args(first['next']), fake_env)
+    assert second['budget']['requests'] == 10
+    script(fake_env, *empty_pages(25))
+    code, explicit = invoke(['home', '--limit', '10'], fake_env)
+    assert explicit['budget']['requests'] > 10

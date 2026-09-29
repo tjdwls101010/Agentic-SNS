@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 from twitter.browse import maintenance, operations
-from twitter.browse.run import run as browse
+from twitter.browse.run import run as browse, valid_handle
 from twitter.dates import timestamp
 from twitter.errors import TwitterError
 from twitter.output.doctor import summary
@@ -96,7 +96,7 @@ def chars(what, extra=''):
 
 
 def after(extra=''):
-    return Arg(('--after',), dict(type=int, metavar='N', help='Continue from the handle in a more: line; its cached items come first, with no request.' + extra))
+    return Arg(('--after',), dict(metavar='HANDLE', help='Continue from the handle in a more: line; its cached items come first, with no request. Handles expire 24 hours after they are issued.' + extra))
 
 
 def dates(scope):
@@ -268,12 +268,13 @@ def validate(args):
     for key in UNSET:
         if not hasattr(args, key):
             setattr(args, key, None)
-    given = dict(vars(args))
+    given = args.given = dict(vars(args))
     args.explicit_limit = args.limit is not None
-    if args.after is not None and args.after < 1:
-        raise TwitterError(2, 'Continuation handles must be positive.', 'Copy --after from the latest more: line, or rerun without --after.')
     if args.out and args.after is not None:
         raise TwitterError(2, '--out resumes from its own page commits.', 'Repeat the same --out command without --after.')
+    if args.after is not None and not valid_handle(args.after):
+        raise TwitterError(2, 'Continuation handles are six lowercase letters or digits.',
+                           'Copy --after from the latest more: line; a numbered handle from an older version no longer works, so rerun without --after.')
     refuse([rule for rule in surface.rules if rule.early], args, given)
     for key in ('limit', 'chars'):
         if getattr(args, key) is not None and getattr(args, key) < 1:
@@ -314,19 +315,19 @@ def context_for(args, op):
                 **{key: getattr(args, key) for key in ('tab', 'sort', 'feed', 'type', 'scope', 'relation', 'collection', 'since', 'until')})
 
 
-def more_command(args, number):
+def more_command(args, handle):
+    """The next call: positionals, the options that were typed, --limit always (the next display target), then --after."""
     parts = [args.command]
-    if args.target:
-        parts.extend(args.target if isinstance(args.target, list) else [args.target])
-    if args.relation:
-        parts.append(args.relation)
-    if args.collection:
-        parts.append(args.collection)
-    for key in ('tab', 'sort', 'feed', 'type', 'scope', 'since', 'until'):
-        value = getattr(args, key)
-        if value is not None:
-            parts.extend(['--in' if key == 'scope' else '--' + key, value])
-    parts.extend(['--limit', str(args.limit), '--after', str(number)])
+    for arg in SURFACES[args.command].args:
+        typed = args.given.get(arg.dest)
+        if not arg.flags[0].startswith('-'):
+            parts.extend(typed if isinstance(typed, list) else [typed])
+        elif typed is not None and arg.dest not in ('limit', 'chars', 'after', 'out'):
+            parts.extend([arg.flags[0], str(typed)])
+    parts += ['--limit', str(args.limit)]
+    if args.given.get('chars') is not None:
+        parts += ['--chars', str(args.chars)]
+    parts += ['--after', handle] + (['--json'] if args.json else [])
     return invocation() + ' ' + shlex.join(parts)
 
 
