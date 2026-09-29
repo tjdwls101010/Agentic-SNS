@@ -15,14 +15,14 @@ PROCESS_DOUBLES = Path(__file__).with_name('process_doubles')
 FIXTURES = Path(__file__).with_name('fixtures')
 
 
-def run(args, env, *, json_mode=True, cli=CLI):
+def run(args, env, *, json_mode=True, cli=CLI, cwd=None):
     return subprocess.run([sys.executable, str(cli), *args, *(['--json'] if json_mode else [])], capture_output=True,
-                          text=True, env=env, timeout=120)
+                          text=True, env=env, timeout=120, cwd=cwd)
 
 
-def invoke(args, env):
+def invoke(args, env, cwd=None):
     """Exit code and the one JSON document of a --json run."""
-    done = run(args, env)
+    done = run(args, env, cwd=cwd)
     assert done.stdout, done.stderr
     return done.returncode, json.loads(done.stdout)
 

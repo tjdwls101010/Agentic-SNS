@@ -1,7 +1,30 @@
 """Normalized records for X users, places, trends and posts; a repost keeps the reposter identity and the original content."""
+import re
 from dataclasses import asdict, dataclass, field
 
 from ...dates import timestamp
+
+
+def expand(text, links, media=()):
+    """Text with t.co links replaced by their targets and media links removed; the model never needs a t.co URL."""
+    media = {item['url'] for item in media if item.get('url')}
+    for url in media:
+        text = re.sub(r'\s*' + re.escape(url), '', text)
+    for link in links:
+        if link.get('url') and link['url'] not in media:
+            text = text.replace(link['url'], link.get('expanded_url') or link['url'])
+    return text
+
+
+def mentions(entities):
+    """Mentioned handles without @, in the order they appear, each once whatever its case."""
+    seen, handles = set(), []
+    for mention in sorted(entities.get('user_mentions', []), key=lambda m: (m.get('indices') or [0])[0]):
+        handle = mention.get('screen_name')
+        if handle and handle.lower() not in seen:
+            seen.add(handle.lower())
+            handles.append(handle)
+    return handles
 
 
 class Record:
@@ -54,13 +77,20 @@ def build_user(node):
                 favorites_count=node.get('action_counts', {}).get('favorites_count'),
                 is_blue_verified=node.get('is_blue_verified', False), is_verified=node.get('verification', {}).get('verified', False),
                 verified_type=node.get('verification', {}).get('verified_type'), is_protected=node.get('privacy', {}).get('protected', False),
-                description=node.get('profile_bio', {}).get('description', legacy.get('description')),
+                description=bio(node, legacy),
                 location=node.get('location', {}).get('location'), url=node.get('website', {}).get('url'),
                 profile_url=f'https://x.com/{handle}', avatar_url=node.get('avatar', {}).get('image_url'),
                 banner_url=node.get('banner', {}).get('image_url'),
                 **{k: perspectives.get(k) for k in ('following', 'followed_by', 'blocking', 'muting')},
                 follow_request_sent=node.get('follow_request_sent', False), affiliate=node.get('affiliates_highlighted_label', {}),
                 professional=node.get('professional', {}), pinned_ids=node.get('pinned_items', {}).get('tweet_ids_str', []))
+
+
+def bio(node, legacy):
+    text = node.get('profile_bio', {}).get('description', legacy.get('description'))
+    links = (node.get('profile_bio', {}).get('entities', {}).get('description', {}).get('urls')
+             or legacy.get('entities', {}).get('description', {}).get('urls', []))
+    return expand(text, links) if text else text
 
 
 @dataclass
@@ -147,7 +177,7 @@ class Tweet(Record):
     view_count: int | None = None
     media: list[Media] = field(default_factory=list)
     urls: list = field(default_factory=list)
-    entities: dict = field(default_factory=dict)
+    mentions: list = field(default_factory=list)
     hashtags: list = field(default_factory=list)
     is_note_tweet: bool = False
     is_pinned: bool = False
@@ -175,7 +205,9 @@ def build_tweet(node, pinned=False, _depth=0):
     original = build_tweet(legacy.get('retweeted_status_result', {}).get('result'), _depth=_depth + 1)
     quote = build_tweet(node.get('quoted_status_result', {}).get('result'), _depth=_depth + 1)
     note = node.get('note_tweet', {}).get('note_tweet_results', {}).get('result', {})
-    entities = note.get('entity_set') or legacy.get('entities', {})
+    entities = note['entity_set'] if 'text' in note and isinstance(note.get('entity_set'), dict) else legacy.get('entities', {})
+    media_links = legacy.get('extended_entities', {}).get('media', []) + legacy.get('entities', {}).get('media', [])
+    text = expand(note.get('text', legacy.get('full_text', '')), entities.get('urls', []), media_links)
     media = []
     for item in legacy.get('extended_entities', {}).get('media', []):
         variants = [v for v in item.get('video_info', {}).get('variants', []) if v.get('content_type') == 'video/mp4']
@@ -183,18 +215,18 @@ def build_tweet(node, pinned=False, _depth=0):
         size = item.get('original_info', {})
         media.append(Media(item.get('type', 'photo'), url, size.get('width'), size.get('height'), item.get('ext_alt_text')))
     result = Tweet(id=node['rest_id'], url=f'https://x.com/{author.screen_name if author else "i/web"}/status/{node["rest_id"]}',
-                   created_at=timestamp(legacy.get('created_at')), text=note.get('text', legacy.get('full_text', '')),
+                   created_at=timestamp(legacy.get('created_at')), text=text,
                    lang=legacy.get('lang'), author=author, is_reply=bool(legacy.get('in_reply_to_status_id_str')),
                    in_reply_to_id=legacy.get('in_reply_to_status_id_str'), in_reply_to_screen_name=legacy.get('in_reply_to_screen_name'),
                    conversation_id=legacy.get('conversation_id_str'),
                    **{key: legacy.get(source) for key, source in [('reply_count', 'reply_count'), ('retweet_count', 'retweet_count'), ('quote_count', 'quote_count'), ('like_count', 'favorite_count'), ('bookmark_count', 'bookmark_count')]},
                    view_count=int(node['views']['count']) if str(node.get('views', {}).get('count', '')).isdigit() else None,
-                   media=media, entities=entities, urls=[u.get('expanded_url', u.get('url')) for u in entities.get('urls', [])],
+                   media=media, urls=[u.get('expanded_url', u.get('url')) for u in entities.get('urls', [])], mentions=mentions(entities),
                    hashtags=[h.get('text') for h in entities.get('hashtags', [])], is_note_tweet=bool(note.get('text')),
                    is_pinned=pinned, retweeted_tweet=original, quoted_tweet=quote, quoted_tweet_id=legacy.get('quoted_status_id_str'),
                    limited_actions=[a.get('action') for a in limited], is_restricted=restricted,
                    community=node.get('community_results', {}).get('result'))
     if original:
-        for key in ('url', 'text', 'media', 'urls', 'entities', 'hashtags', 'lang', 'reply_count', 'retweet_count', 'quote_count', 'like_count', 'bookmark_count', 'view_count', 'is_note_tweet'):
+        for key in ('url', 'text', 'media', 'urls', 'mentions', 'hashtags', 'lang', 'reply_count', 'retweet_count', 'quote_count', 'like_count', 'bookmark_count', 'view_count', 'is_note_tweet'):
             setattr(result, key, getattr(original, key))
     return result

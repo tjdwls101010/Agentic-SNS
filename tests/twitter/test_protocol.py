@@ -2,12 +2,14 @@
 refresh, and the Aside envelope contract."""
 import base64
 import json
+import os
+import re
 import time
 
 import pytest
 
 from .fake_data import user, wrap
-from .helpers import FIXTURES, ROOT, calls, home, invoke, script, trace
+from .helpers import FIXTURES, ROOT, calls, home, invoke, script, text, trace
 
 FIXTURE = json.loads((FIXTURES / 'transaction.json').read_text())
 PROFILE = ['about', '@example']
@@ -247,3 +249,148 @@ def test_bundled_registry_holds_only_what_requests_are_built_from():
     assert set(registry) == {'bearer', 'features', 'operations'}
     for spec in registry['operations'].values():
         assert {'query_id', 'method', 'gated', 'root', 'vars'} <= set(spec) <= {'query_id', 'method', 'gated', 'root', 'vars', 'fieldToggles'}
+
+
+def rejected_twice(env, op):
+    real_material(env)
+    script(env, {'op': op, 'status': 404, 'body': ''}, *material_pages(), {'op': op, 'status': 404, 'body': ''})
+
+
+@pytest.mark.parametrize('args,op,expected,absent', [
+    (['user', '@example', '--tab', 'replies'], 'UserTweetsAndReplies', ['--tab replies-only', 'non-reply'], []),
+    (['graph', '@example', 'followers'], 'Followers', ['following', 'different question'], ['replies-only']),
+    (['search', 'x'], 'SearchTimeline', ['refresh'], ['replies-only', 'following']),
+    (['quotes', '200'], 'SearchTimeline', ['refresh'], ['replies-only', 'following']),
+])
+def test_signature_failure_fix_fits_the_surface(args, op, expected, absent, fake_env):
+    rejected_twice(fake_env, op)
+    code, doc = invoke(args, fake_env)
+    assert (code, doc['error']) == (6, 'transaction_rejected')
+    assert all(e in doc['fix'] for e in expected) and not any(a in doc['fix'] for a in absent), doc['fix']
+
+
+@pytest.mark.parametrize('op,args,body,status', [
+    ('UserByScreenName', PROFILE, {'errors': [{'message': 'Variable x must be defined'}]}, 422),
+    ('UserByScreenName', PROFILE, {'data': {'different': []}}, 200),
+    ('UserTweets', ['user', '@example'], None, 200),
+])
+def test_drift_says_the_code_must_change_without_vouching_for_other_commands(op, args, body, status, fake_env):
+    script(fake_env, {'op': op, 'status': status, 'body': body if body is not None else wrap('UserTweets', {})})
+    code, doc = invoke(args, fake_env)
+    assert code == 6 and doc['error'] in ('contract_drift', 'envelope_drift')
+    assert 'code change' in doc['fix'] and 'retry' in doc['fix'] and 'does not show' in doc['fix'], doc['fix']
+
+
+def test_aside_time_limit_points_at_aside_not_at_the_display_limit(fake_env):
+    script(fake_env, {'op': 'UserByScreenName', 'raw': 'Error: other side closed', 'exit': 1})
+    code, doc = invoke(PROFILE, fake_env)
+    assert code == 3 and 'Aside' in doc['fix'] and 'retry' in doc['fix'] and 'reduce' not in doc['fix'].lower()
+
+
+def test_no_fix_suggests_shrinking_a_display_target():
+    sources = ' '.join(p.read_text() for p in (ROOT / '.claude/skills/twitter/scripts').rglob('*.py'))
+    assert 'reduce the request size' not in sources.lower()
+
+
+def handle_file(env, name='abc123', age=0):
+    cursors = home(env) / 'cursors'
+    cursors.mkdir(exist_ok=True)
+    path = cursors / f'{name}.json'
+    path.write_text('{}')
+    os.utime(path, (time.time() - age, time.time() - age))
+    return path
+
+
+def test_doctor_rereads_the_cookie_and_reports_a_matching_viewer(fake_env):
+    code, output = text(['doctor'], fake_env)
+    assert code == 0 and 'cookie' in snippets(fake_env)
+    line = output.splitlines()[0]
+    assert line.startswith('@example · viewer 100 (matches cache) · unblocked · ')
+    assert re.search(r'registry (bundled|refreshed \d+d ago) · signature material \d+d · Viewer \d+/\d+ · window \d+/200 · cache \S+ \(\d+ continuations\)$', line), line
+
+
+def test_doctor_finds_a_changed_viewer_and_drops_its_continuations(fake_env):
+    handle_file(fake_env)
+    script(fake_env, {'snippet': 'cookie', 'body': {'ct0': 'other', 'twid': 'u%3D200'}},
+           {'op': 'Viewer', 'body': wrap('Viewer', user('200', 'other'))})
+    code, doc = invoke(['doctor'], fake_env)
+    assert code == 0 and doc['viewer_changed'] is True and doc['continuations'] == 0
+    assert 'viewer changed' in doc['summary'] and not list((home(fake_env) / 'cursors').glob('*.json'))
+
+
+def test_doctor_reports_a_block_before_any_request(fake_env):
+    (home(fake_env) / 'budget.json').write_text(json.dumps({'block': {'reason': 'challenge', 'expires_at': None}}))
+    code, output = text(['doctor'], fake_env)
+    assert code == 5 and trace(fake_env) == []
+    assert 'unverified (blocked)' in output and 'doctor --unblock' in output
+
+
+def test_unblock_clears_only_the_block_then_diagnoses(fake_env):
+    bucket = {'limit': 50, 'remaining': 3, 'reset_at': time.time() + 600, 'observed_at': time.time()}
+    earlier = [time.time() - 30, time.time() - 20]
+    (home(fake_env) / 'budget.json').write_text(json.dumps({'block': {'reason': 'account_locked', 'expires_at': None},
+                                                            'buckets': {'other-query': bucket}, 'requests': earlier}))
+    code, doc = invoke(['doctor', '--unblock'], fake_env)
+    budget = json.loads((home(fake_env) / 'budget.json').read_text())
+    assert code == 0 and 'block' not in budget and budget['buckets']['other-query'] == bucket
+    assert budget['requests'][:2] == earlier
+
+
+def test_doctor_sweeps_expired_continuations(fake_env):
+    old, fresh = handle_file(fake_env, 'old000', age=90000), handle_file(fake_env, 'new000')
+    code, doc = invoke(['doctor'], fake_env)
+    assert not old.exists() and fresh.exists() and doc['continuations'] == 1
+
+
+def test_doctor_refuses_to_certify_a_viewer_x_does_not_confirm(fake_env):
+    script(fake_env, {'op': 'Viewer', 'body': wrap('Viewer', user('200', 'someone'))})
+    before = (home(fake_env) / 'session.json').read_text()
+    code, doc = invoke(['doctor'], fake_env)
+    assert (code, doc['error']) == (2, 'viewer_changed') and 'doctor' in doc['fix']
+    assert json.loads((home(fake_env) / 'session.json').read_text()).get('viewer_handle') != 'someone'
+    assert json.loads(before)['viewer_id'] == '100'
+
+
+def test_doctor_sweeps_even_when_diagnosis_fails(fake_env):
+    old = handle_file(fake_env, 'old000', age=0)
+    old.write_text(json.dumps({'format': 2, 'created_at': time.time() - 90000}))
+    code, doc = invoke(['doctor'], dict(fake_env, TWITTER_ASIDE_BIN='/nonexistent/aside'))
+    assert code == 3 and not old.exists()
+
+
+def test_doctor_reports_a_block_even_with_unreadable_registry_cache(fake_env):
+    (home(fake_env) / 'budget.json').write_text(json.dumps({'block': {'reason': 'challenge', 'expires_at': None}}))
+    (home(fake_env) / 'registry.json').write_text('{broken')
+    code, doc = invoke(['doctor'], fake_env)
+    assert (code, doc['error']) == (5, 'challenge') and 'unverified (blocked)' in doc['summary']
+
+
+def test_doctor_reports_signature_material_it_made_during_the_check(fake_env):
+    (home(fake_env) / 'txid.json').unlink()
+    script(fake_env, *material_pages())
+    code, doc = invoke(['doctor'], fake_env)
+    assert code == 0 and doc['txid_age_days'] == 0 and 'signature material 0d' in doc['summary']
+
+
+@pytest.mark.parametrize('registry', ['[]', '{"refreshed_at": "yesterday"}', '{"refreshed_at": 1e999}'])
+def test_doctor_reports_a_block_whatever_the_registry_cache_holds(registry, fake_env):
+    (home(fake_env) / 'budget.json').write_text(json.dumps({'block': {'reason': 'challenge', 'expires_at': None}}))
+    (home(fake_env) / 'registry.json').write_text(registry)
+    (home(fake_env) / 'txid.json').write_text('{"fetched_at": "soon"}')
+    code, doc = invoke(['doctor'], fake_env)
+    assert (code, doc['error']) == (5, 'challenge')
+
+
+def test_an_unreadable_cache_is_its_own_error_class_the_envelope_names(fake_env):
+    (home(fake_env) / 'budget.json').write_text('{broken')
+    code, doc = invoke(['doctor'], fake_env)
+    code, envelope = invoke(['schema', 'envelope'], fake_env)
+    assert doc['error'] == 'cache_unreadable' and doc['error'] in envelope['properties']['error']['enum']
+
+
+def test_an_empty_note_text_keeps_its_own_empty_entities(fake_env):
+    from .test_reading import linked_post, only_post
+    node = linked_post()
+    node['note_tweet'] = {'note_tweet_results': {'result': {'text': '', 'entity_set': {}}}}
+    row = only_post(fake_env, node)
+    assert row['text'] == '' and row['mentions'] == []

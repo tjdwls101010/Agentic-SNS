@@ -1,10 +1,11 @@
+import json
 import re
 import subprocess
 import sys
 from pathlib import Path
 import pytest
 
-from .helpers import CLI, invoke
+from .helpers import CLI, invoke, run as run_plain
 
 
 @pytest.mark.parametrize(
@@ -161,7 +162,7 @@ def test_account_search_does_not_claim_a_chronological_sort(fake_env):
     assert p.returncode == 0
     assert 'sort=latest' not in p.stdout
     assert 'rank=people' in p.stdout
-    assert 'requests 1' in p.stdout
+    assert '1 request' in p.stdout
     p = subprocess.run([sys.executable, str(CLI), 'search', 'python', '--type', 'users', '--sort', 'latest', '--json'],
                        capture_output=True, text=True, env=fake_env)
     assert p.returncode == 2
@@ -180,3 +181,135 @@ def test_more_command_starts_with_the_allowed_tools_invocation(fake_env):
     allowed = re.search(r'(?m)^allowed-tools: Bash\((.+) \*\)$', (skill / 'SKILL.md').read_text())[1]
     code, doc = invoke(["user", "@example", "--limit", "2"], fake_env)
     assert doc["next"].startswith(allowed.replace("${CLAUDE_SKILL_DIR}", str(skill)) + " ")
+
+
+GENERIC_FIXES = {'Run doctor, then follow its recovery advice.', 'Read the command --help for valid options.'}
+
+
+@pytest.mark.parametrize("args,names", [
+    (["home", "--since", "2026-01-01"], ["--feed following", "--since"]),
+    (["user", "@example", "--tab", "highlights", "--since", "2026-01-01"], ["--tab", "--since"]),
+    (["list", "1", "--tab", "members", "--until", "2026-01-01"], ["--tab posts", "--until"]),
+    (["list", "1", "--tab", "about", "--after", "1"], ["--after"]),
+    (["community", "1", "--tab", "media", "--sort", "recent"], ["--sort", "--tab posts"]),
+    (["post", "1", "2", "--sort", "top"], ["--sort"]),
+    (["post", "1", "2", "--after", "1"], ["--after"]),
+    (["post", "1", "2", "--limit", "1"], ["--limit"]),
+    (["search", "x", "--type", "users", "--sort", "latest"], ["--sort"]),
+    (["search", "x", "--in", "communities", "--type", "users"], ["--type", "--in"]),
+    (["search", "x", "--in", "communities", "--sort", "top"], ["--sort", "--in"]),
+    (["search", "x", "--limit", "0"], ["--limit"]),
+    (["home", "--chars", "0"], ["--chars"]),
+    (["user", "@example", "--until", "nonsense"], ["--until"]),
+    (["user", "@example", "--since", "2026-02-01", "--until", "2026-01-01"], ["--since", "--until"]),
+    (["home", "--after", "0"], ["--after"]),
+    (["user", "@example", "--out", "{tmp}/x.ndjson", "--after", "1"], ["--out", "--after"]),
+    (["home", "--tab", "posts"], ["--tab"]),
+    (["user", "@example", "--tab", "bogus"], ["--tab"]),
+    (["home", "--limit", "many"], ["--limit"]),
+    (["graph", "@example"], ["relation"]),
+    (["search"], ["target"]),
+    (["user", "123"], ["@handle"]),
+    (["post", "https://x.com/example"], ["post URL"]),
+    (["list", "abc"], ["list"]),
+])
+def test_every_argument_error_names_what_to_change(args, names, fake_env, tmp_path):
+    code, doc = invoke([a.replace("{tmp}", str(tmp_path)) for a in args], fake_env)
+    assert (code, doc["error"]) == (2, "arguments"), doc
+    assert doc["fix"] not in GENERIC_FIXES and all(name in doc["fix"] for name in names), doc["fix"]
+    assert not Path(fake_env["TWITTER_FAKE_LOG"]).exists()
+
+
+def test_media_search_refuses_a_sort_it_would_ignore(fake_env):
+    code, doc = invoke(["search", "x", "--type", "media", "--sort", "top"], fake_env)
+    assert (code, doc["error"]) == (2, "arguments") and "Remove --sort" in doc["fix"]
+    assert not Path(fake_env["TWITTER_FAKE_LOG"]).exists()
+
+
+def help_text(*command):
+    done = subprocess.run([sys.executable, str(CLI), *command, "--help"], capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+    return done.stdout
+
+
+def option(output, flag):
+    """The help of one option or positional: its line, and the next when a long invocation pushed the help there."""
+    lines = output.splitlines()
+    index = next(i for i, line in enumerate(lines) if re.match(r"\s+" + re.escape(flag) + r"\b", line))
+    following = lines[index + 1] if index + 1 < len(lines) else ""
+    return lines[index] + (" " + following.strip() if re.match(r"\s{20,}\S", following) else "")
+
+
+COMMANDS = ["home", "user", "about", "post", "quotes", "reposts", "search", "graph", "me", "list", "trends",
+            "community", "communities", "doctor", "refresh", "schema"]
+
+
+@pytest.mark.parametrize("command", ["", *COMMANDS])
+def test_help_never_folds_a_sentence(command):
+    output = help_text(*([command] if command else []))
+    folded = [line for line in output.splitlines() if re.match(r"\s{20,}[a-z]", line)]
+    assert folded == [] and all(len(line) < 400 or " " in line for line in output.splitlines())
+
+
+@pytest.mark.parametrize("command", ["home", "user", "about", "quotes", "reposts", "search", "graph", "me", "list",
+                                     "trends", "community", "communities"])
+def test_only_post_help_talks_about_batches_and_the_focal_post(command):
+    output = help_text(command).lower()
+    assert "batch" not in output and "focal" not in output
+
+
+def test_help_states_each_command_s_own_units_and_limits():
+    assert "--feed following" in option(help_text("home"), "--since")
+    user = help_text("user")
+    assert "numeric" in option(user, "target") and "not accepted" in option(user, "target")
+    assert all(tab in option(user, "--since") for tab in ("posts", "replies", "replies-only", "media"))
+    assert "not expanded" in option(user, "--tab")
+    assert "bio" in option(help_text("about"), "--chars")
+    post = help_text("post")
+    assert all(flag in option(post, "target") for flag in ("--limit", "--sort", "--after"))
+    assert "latest" not in option(post, "--sort") and "account" not in option(post, "--sort").lower()
+    for command in ("reposts", "graph"):
+        assert "accounts" in option(help_text(command), "--limit").lower() and "bio" in option(help_text(command), "--chars")
+    search = help_text("search")
+    assert "--type users" in option(search, "--sort") and "media" in option(search, "--sort")
+    listing = help_text("list")
+    assert "--tab about" in option(listing, "--after") and "--tab posts" in option(listing, "--since")
+    trends = help_text("trends")
+    assert "--after" in trends and "description" in option(trends, "--chars")
+    community = help_text("community")
+    assert "--tab posts" in option(community, "--sort") and "--tab about" in option(community, "--after")
+    root = help_text()
+    assert all(f"{code} " in root for code in (0, 2, 3, 4, 5, 6, 7, 8, 9))
+
+
+def test_help_owns_the_liker_limit_and_local_date_filtering():
+    assert "who liked a post" in help_text()
+    for command, flag in (("home", "--since"), ("user", "--until"), ("list", "--since")):
+        text = option(help_text(command), flag)
+        assert "fetched" in text and "since:" in text, text
+
+
+def test_a_search_text_that_looks_like_an_option_survives_more(fake_env):
+    from .helpers import more_args
+    done = run_plain(["search", "--json", "--limit", "2", "--", "-filter:retweets"], fake_env, json_mode=False)
+    words = more_args(json.loads(done.stdout)["next"])
+    assert words[-2:] == ["--", "-filter:retweets"]
+    more = json.loads(run_plain(words, fake_env, json_mode=False).stdout)
+    assert more["ok"] and more["results"]
+
+
+@pytest.mark.parametrize("args,flag", [(["search", "q", "--type", "bad value"], "--type"), (["home", "--json=yes"], "--json"),
+                                       (["home", "--feed", "following", "--since", "0001-01-01T00:00:00+23:00"], "--since")])
+def test_odd_argument_values_still_get_a_named_fix(args, flag, fake_env):
+    done = run_plain([*args, "--json"] if "--json=yes" not in args else args, fake_env)
+    doc = json.loads(done.stdout) if done.stdout.startswith("{") else {}
+    assert done.returncode == 2 and flag in (doc.get("fix") or done.stdout), done.stdout
+
+
+def test_community_search_help_matches_what_it_refuses():
+    assert "--sort top" in option(help_text("search"), "--in")
+
+
+def test_a_quoted_choice_with_an_apostrophe_still_names_its_flag(fake_env):
+    code, doc = invoke(["search", "q", "--type", "bad'value"], fake_env)
+    assert code == 2 and "--type" in doc["fix"]

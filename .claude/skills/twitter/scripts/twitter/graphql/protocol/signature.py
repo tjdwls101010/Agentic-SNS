@@ -31,12 +31,12 @@ import re
 import time
 from functools import reduce
 from html.parser import HTMLParser
-from ...errors import TwitterError
+from ...errors import REFRESH, TwitterError
 from ...account.state import read_state, write_state, account_lock
 
 
 def transaction_error(message):
-    return TwitterError(6, message, "Run refresh; --tab replies-only is an ungated alternative.", "transaction_unavailable")
+    return TwitterError(6, message, REFRESH, "transaction_unavailable")
 
 _ADDITIONAL_RANDOM_NUMBER = 3
 _DEFAULT_KEYWORD = "obfiowerehiring"

@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
 """Fake Aside CLI answering the twitter skill's browser snippets.
 
-TWITTER_FAKE_SCRIPT names a JSON list of scripted answers: each call consumes the first entry whose `snippet` (and
-`op`, when the entry names one) matches, and the file is rewritten without it. An entry answers with `status` and
-`body` (a string is sent as is, anything else JSON-encoded), split into `chunks` body_chunk records when given, or
-prints `raw` verbatim instead of an envelope. Unscripted calls answer from fake_data (graphql, under
-TWITTER_FAKE_SCENARIO) or with a fixed cookie. TWITTER_FAKE_LOG receives op, method and variables of every call;
-TWITTER_FAKE_TRACE receives the snippet, argv shape, ct0, txid and url of every call.
+TWITTER_FAKE_SCRIPT names a JSON list of scripted answers: each call takes the first entry whose `snippet` (and `op` and `cursor`, when the entry names them) matches, and the file is rewritten without it unless the entry has `keep`. An entry answers with `status` and `body` (a string is sent as is, anything else JSON-encoded), split into `chunks` body_chunk records when given, or prints `raw` verbatim instead of an envelope. Unscripted calls answer from fake_data (graphql, under TWITTER_FAKE_SCENARIO) or with a fixed cookie. TWITTER_FAKE_LOG receives op, method and variables of every call; TWITTER_FAKE_TRACE receives the snippet, argv shape, ct0, txid and url of every call.
 """
 import fcntl
 import json
@@ -35,8 +30,9 @@ if path := os.environ.get("TWITTER_FAKE_SCRIPT"):
         fcntl.flock(stream, fcntl.LOCK_EX)
         entries = json.loads(stream.read() or "[]")
         for index, entry in enumerate(entries):
-            if entry.get("snippet", "graphql") == snippet and entry.get("op") in (None, args.get("op")):
-                scripted = entries.pop(index)
+            if (entry.get("snippet", "graphql") == snippet and entry.get("op") in (None, args.get("op"))
+                    and ("cursor" not in entry or entry["cursor"] == (args.get("variables") or {}).get("cursor"))):
+                scripted = entry if entry.get("keep") else entries.pop(index)
                 break
         stream.seek(0)
         stream.truncate()

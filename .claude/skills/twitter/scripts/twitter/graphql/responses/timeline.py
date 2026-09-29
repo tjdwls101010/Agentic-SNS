@@ -1,6 +1,6 @@
 """Pure instruction walker retaining module boundaries and continuation evidence."""
 from dataclasses import dataclass, field
-from ...errors import TwitterError
+from ...errors import TwitterError, drift
 
 
 @dataclass
@@ -27,7 +27,7 @@ class Page:
 
 def walk(instructions):
     if not isinstance(instructions, list):
-        raise TwitterError(6, 'Timeline instructions are not a list.', 'Update the envelope parser.', 'envelope_drift')
+        raise TwitterError(6, 'Timeline instructions are not a list.', drift('this timeline'), 'envelope_drift')
     page = Page()
 
     def item(content, identity, module=None, index=0, pinned=False):

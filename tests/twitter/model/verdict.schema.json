@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "criterion": {"type": "string"},
+          "kind": {"type": "string", "enum": ["must", "must_not"]},
+          "respected": {"type": "boolean"},
+          "evidence": {"type": "string"}
+        },
+        "required": ["criterion", "kind", "respected", "evidence"],
+        "additionalProperties": false
+      }
+    },
+    "passed": {"type": "boolean"}
+  },
+  "required": ["criteria", "passed"],
+  "additionalProperties": false
+}

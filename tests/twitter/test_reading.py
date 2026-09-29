@@ -181,3 +181,86 @@ def test_place_target_forms(command, value, op, key, fake_env):
 def test_invalid_profile_targets_are_argument_errors_before_any_request(value, fake_env):
     code, doc = invoke(['about', value], fake_env)
     assert (code, doc['error']) == (2, 'arguments') and calls(fake_env) == []
+
+
+LINK = {'url': 'https://t.co/link', 'expanded_url': 'https://example.com/article'}
+PHOTO = {'url': 'https://t.co/photo', 'type': 'photo', 'media_url_https': 'https://pbs.twimg.com/media/x.jpg'}
+
+
+def mentioned(*names):
+    """user_mentions for names appearing in this order in 'Hi @Alice and @bob, again @ALICE'."""
+    text = 'Hi @Alice and @bob, again @ALICE'
+    at, found = 0, []
+    for name in names:
+        start = text.index('@' + name, at)
+        found.append({'screen_name': name, 'indices': [start, start + len(name) + 1]})
+        at = start + 1
+    return found
+
+
+def linked_post(identity='200'):
+    node = post(identity, text='Hi @Alice and @bob, again @ALICE https://t.co/link https://t.co/photo')
+    node['legacy']['entities'] = {'urls': [LINK], 'media': [PHOTO],
+                                  'user_mentions': list(reversed(mentioned('Alice', 'bob', 'ALICE')))}
+    node['legacy']['extended_entities'] = {'media': [PHOTO]}
+    return node
+
+
+def only_post(env, node, op='HomeTimeline'):
+    raw = {'entryId': 'tweet-x', 'content': {'itemContent': {'tweet_results': {'result': node}}}}
+    script(env, {'op': op, 'body': wrap(op, timeline(raw))})
+    code, doc = invoke(['home', '--limit', '1'], env)
+    assert code == 0, doc
+    return doc['results'][0]
+
+
+def test_post_text_carries_expanded_links_and_no_media_links_or_raw_entities(fake_env):
+    row = only_post(fake_env, linked_post())
+    assert row['text'] == 'Hi @Alice and @bob, again @ALICE https://example.com/article'
+    assert row['urls'] == ['https://example.com/article'] and 'entities' not in row
+    assert row['mentions'] == ['Alice', 'bob']
+
+
+def test_long_post_takes_links_and_mentions_from_its_note(fake_env):
+    node = linked_post()
+    node['note_tweet'] = {'note_tweet_results': {'result': {
+        'text': 'Longer: @carol wrote https://t.co/note',
+        'entity_set': {'urls': [{'url': 'https://t.co/note', 'expanded_url': 'https://example.com/note'}],
+                       'user_mentions': [{'screen_name': 'carol', 'indices': [8, 14]}]}}}}
+    row = only_post(fake_env, node)
+    assert row['text'] == 'Longer: @carol wrote https://example.com/note' and row['mentions'] == ['carol']
+
+
+def test_repost_row_carries_the_original_mentions_and_a_quote_keeps_its_own(fake_env):
+    quoted = post('300', text='Quoted @dave')
+    quoted['legacy']['entities'] = {'user_mentions': [{'screen_name': 'dave', 'indices': [7, 12]}]}
+    original = linked_post('201')
+    original['quoted_status_result'] = {'result': quoted}
+    outer = post('202', text='RT @Alice: …', retweeted_status_result={'result': original})
+    outer['legacy']['entities'] = {'user_mentions': [{'screen_name': 'Alice', 'indices': [3, 9]}]}
+    outer['core']['user_results']['result'] = user('101', 'reposter')
+    row = only_post(fake_env, outer)
+    assert row['mentions'] == ['Alice', 'bob'] and row['retweeted_tweet']['mentions'] == ['Alice', 'bob']
+    assert row['retweeted_tweet']['quoted_tweet']['mentions'] == ['dave']
+
+
+def test_bio_links_are_expanded(fake_env):
+    node = user()
+    node['profile_bio'] = {'description': 'Reads at https://t.co/bio'}
+    node['legacy'] = {'entities': {'description': {'urls': [{'url': 'https://t.co/bio', 'expanded_url': 'https://example.com/bio'}]}}}
+    script(fake_env, {'op': 'UserByScreenName', 'body': wrap('UserByScreenName', node)})
+    code, doc = invoke(['about', '@example'], fake_env)
+    assert doc['results'][0]['description'] == 'Reads at https://example.com/bio'
+
+
+def test_an_empty_note_entity_set_brings_no_mentions_from_the_short_text(fake_env):
+    node = linked_post()
+    node['note_tweet'] = {'note_tweet_results': {'result': {'text': 'No mentions here', 'entity_set': {}}}}
+    assert only_post(fake_env, node)['mentions'] == []
+
+
+def test_a_media_link_listed_among_urls_is_still_removed(fake_env):
+    node = post('200', text='Look https://t.co/photo')
+    node['legacy']['entities'] = {'urls': [{'url': 'https://t.co/photo', 'expanded_url': 'https://x.com/example/status/200/photo/1'}],
+                                  'media': [PHOTO]}
+    assert only_post(fake_env, node)['text'] == 'Look'

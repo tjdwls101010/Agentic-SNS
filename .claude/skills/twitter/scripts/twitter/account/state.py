@@ -28,7 +28,7 @@ def read_state(name, default=None):
     except FileNotFoundError:
         return {} if default is None else default
     except (OSError, ValueError):
-        raise TwitterError(5, 'Cache state is unreadable.', 'Inspect TWITTER_HOME; preserve collected output before starting fresh.') from None
+        raise TwitterError(5, 'Cache state is unreadable.', 'Inspect TWITTER_HOME; preserve collected output before starting fresh.', 'cache_unreadable') from None
 
 
 def write_state(name, value):

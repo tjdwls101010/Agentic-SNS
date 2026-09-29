@@ -2,14 +2,32 @@
 import fcntl
 import json
 import os
+import shlex
 from pathlib import Path
+from .account.state import cache_dir
 from .errors import TwitterError
 
 COMPLETE = {'exhausted', 'window_reached', 'not_paginable', 'terminated'}
+FORMAT = 2
 
 
 def line(value):
     return (json.dumps(value, ensure_ascii=False) + '\n').encode()
+
+
+def check(path):
+    """Before any request: refuse an export inside the skill's cache, or an existing one other users can read (left as it is)."""
+    existing = Path(path).expanduser()
+    caches = {cache_dir().expanduser().absolute(), cache_dir().expanduser().resolve()}
+    if any(place == cache or cache in place.parents for place in (existing.absolute(), existing.resolve()) for cache in caches):
+        raise TwitterError(2, 'The --out file would sit inside the skill\'s cache and be overwritten by it.', 'Pass --out a path outside ' + str(cache_dir()) + '.')
+    if existing.exists() and existing.stat().st_mode & 0o077:
+        raise readable(path)
+
+
+def readable(path):
+    return TwitterError(2, 'The --out file can be read by other users.',
+                        f'Run chmod 600 {shlex.quote(str(Path(path).expanduser().absolute()))}, or pass a new --out path.')
 
 
 class OutFile:
@@ -20,38 +38,53 @@ class OutFile:
         try:
             fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600)
             self.stream = os.fdopen(fd, 'r+b')
+            if os.fstat(fd).st_mode & 0o077:
+                raise readable(path)
             fcntl.flock(self.stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self.recover()
         except (OSError, ValueError, TwitterError) as error:
             self.close()
             if isinstance(error, TwitterError):
                 raise
-            raise TwitterError(2, 'Cannot open or lock the output file.', 'Choose a writable file not used by another process.') from None
+            raise TwitterError(2, 'Cannot open or lock the output file.', 'Pass --out a writable path that no other run is using.') from None
 
     def recover(self):
         first = self.stream.readline()
         if not first:
-            self.stream.write(line(dict(kind='header', **self.context)))
+            self.stream.write(line(dict(kind='header', format=FORMAT, **self.context)))
             self.stream.flush()
             os.fsync(self.stream.fileno())
             return
-        if json.loads(first) != dict(kind='header', **self.context):
-            raise TwitterError(2, 'Output belongs to a different query or viewer.', 'Use a new output file.')
+        header = json.loads(first)
+        if not isinstance(header, dict) or header.get('format') != FORMAT:
+            raise TwitterError(2, 'This --out file was written by an older version of the skill and cannot be resumed.',
+                               'Pass a new --out path; the old file stays as it was.')
+        if header != dict(kind='header', format=FORMAT, **self.context):
+            raise TwitterError(2, 'Output belongs to a different query or viewer.', 'Pass a new --out path; this file holds a different query or account.')
         boundary, page = self.stream.tell(), []
+        damaged = TwitterError(2, 'Output page integrity check failed.', 'Keep this file and pass a new --out path.')
         while raw := self.stream.readline():
             if not raw.endswith(b'\n'):
                 break
             try:
                 record = json.loads(raw)
+                if not isinstance(record, dict):
+                    raise ValueError
             except ValueError:
+                if self.stream.read(1):
+                    raise damaged from None
                 break
             if record.get('kind') == 'page' and 'id' not in record:
-                if record.get('ids') != [r.get('id') for r in page] or record.get('n') != len(page):
-                    raise TwitterError(2, 'Output page integrity check failed.', 'Preserve this file and use a new path.')
+                try:
+                    if (record['ids'] != [r.get('id') for r in page] or record['n'] != len(page) or not isinstance(record['state'], dict)
+                            or not all(isinstance(identity, str) for identity in record['ids'])):
+                        raise ValueError
+                    self.complete = record['stop_reason'] in COMPLETE
+                except (KeyError, TypeError, ValueError):
+                    raise damaged from None
                 self.ids.update(record['ids'])
                 self.count += len(page)
                 self.state = record['state']
-                self.complete = record['stop_reason'] in COMPLETE
                 boundary, page = self.stream.tell(), []
             else:
                 page.append(record)
