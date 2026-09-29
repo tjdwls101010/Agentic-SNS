@@ -8,16 +8,9 @@ __pycache__/
 .ruff_cache/
 *.ndjson
 !tests/facebook/fixtures/*.ndjson
-!.claude/plans/
-.claude/plans/*
-!.claude/plans/facebook 스킬 구현 계획.md
-!.claude/plans/reddit 스킬 구현 계획.md
 !tests/reddit/fixtures/*.ndjson
-!.claude/plans/threads 스킬 구현 계획.md
 !tests/threads/fixtures/*.ndjson
-!.claude/plans/twitter 스킬 구현 계획.md
 !tests/twitter/fixtures/*.ndjson
-!.claude/plans/naver-blog 스킬 구현 계획.md
 # The naver-blog suite keeps whole fixture sets in subdirectories, so this has to
 # reach into them: a top-level-only exception left them untracked and CI failed
 # on eight tests that pass locally.
@@ -26,6 +19,5 @@ __pycache__/
 # SEC requester identity stays local.
 .claude/skills/sec/Scripts/.env
 
-# Finviz keeps its locked runtime local and its development plan tracked.
+# Finviz keeps its locked runtime local.
 .claude/skills/finviz/.venv/
-!.claude/plans/finviz 스킬 구현 계획.md
