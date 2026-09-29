@@ -7,7 +7,7 @@ import time
 import pytest
 
 from .fake_data import user, wrap
-from .helpers import FIXTURES, calls, home, invoke, script, trace
+from .helpers import FIXTURES, ROOT, calls, home, invoke, script, trace
 
 FIXTURE = json.loads((FIXTURES / 'transaction.json').read_text())
 PROFILE = ['about', '@example']
@@ -240,3 +240,10 @@ def test_untrusted_envelope_is_rejected_without_echoing_it(raw, fake_env):
     script(fake_env, {'op': 'UserByScreenName', 'raw': '\n'.join(json.dumps(r) for r in raw)})
     done = invoke(PROFILE, fake_env)
     assert done[0] == 3 and '/etc/passwd' not in json.dumps(done[1])
+
+
+def test_bundled_registry_holds_only_what_requests_are_built_from():
+    registry = json.loads((ROOT / '.claude/skills/twitter/scripts/twitter/graphql/protocol/registry.json').read_text())
+    assert set(registry) == {'bearer', 'features', 'operations'}
+    for spec in registry['operations'].values():
+        assert {'query_id', 'method', 'gated', 'root', 'vars'} <= set(spec) <= {'query_id', 'method', 'gated', 'root', 'vars', 'fieldToggles'}
