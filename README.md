@@ -8,7 +8,7 @@ Try asking: **“Explore NASA's recent X posts. Open a post that interests you, 
 
 ```text
 $ uv run .claude/skills/twitter/scripts/cli.py about @NASA
-@NASA (NASA ✓gov) · followers 92.4M · following 117 · posts 74.3K · joined 2007-12 · bio: "Making the seemingly impossible, possible. ✨" · url: "https://x.com/NASA"
+@NASA (NASA ✓gov) · followers 92.4M · following 115 · posts 74.3K · joined 2007-12 · bio: "Making the seemingly impossible, possible. ✨" · https://x.com/NASA
 ```
 
 Captured September 8, 2026; request-budget header omitted. Live content and counts change. [See the profile → posts → replies commands](docs/usage.md#follow-a-result).
