@@ -45,20 +45,50 @@ def test_focal_is_full_quote_is_a_next_hop_and_partial_failure_is_reported(fake_
     assert output.rstrip('\n').splitlines()[-1].startswith('stopped: rate_limit: X operation rate limit reached. · fix: Wait until')
 
 
-def test_schema_describes_exactly_the_emitted_post_fields(fake_env):
-    code, schema = invoke(['schema'], fake_env)
-    code, doc = invoke(['home', '--limit', '1'], fake_env)
-    post = schema['results'][0]['Tweet']
-    assert set(post['properties']) == set(doc['results'][0])
-    assert 'reposter' in post['properties']['author']['description']
+TOPICS = ['tweet', 'user', 'media', 'list', 'community', 'trend', 'envelope', 'export']
+DYNAMIC = ['role', 'depth', 'module', 'index_in_module', 'community_url']
 
 
-def test_schema_types_are_machine_readable_with_nullable_and_nested_records(fake_env):
+def test_schema_without_a_topic_is_a_short_table_of_contents(fake_env):
+    code, output = text(['schema'], fake_env)
+    assert code == 0 and len(output.encode()) <= 1024 and 'schema <topic>' in output
+    assert all(re.search(rf'(?m)^{topic}\b', output) for topic in TOPICS)
     code, doc = invoke(['schema'], fake_env)
-    post = doc['schema']['$defs']['Tweet']['properties']
-    assert post['text']['type'] == 'string'
-    assert post['author']['anyOf'] == [{'$ref': '#/$defs/User'}, {'type': 'null'}]
+    assert sorted(doc['topics']) == sorted(TOPICS) and 'results' not in doc
+
+
+def test_tweet_topic_lists_emitted_and_dynamic_fields_once(fake_env):
+    code, doc = invoke(['schema', 'tweet'], fake_env)
+    code, listing = invoke(['home', '--limit', '1'], fake_env)
+    post = doc['$defs']['Tweet']['properties']
+    assert set(post) == set(listing['results'][0]) | set(DYNAMIC)
+    assert sorted(doc['$defs']) == ['Media', 'Tweet', 'User'] and doc['$ref'] == '#/$defs/Tweet'
+    assert 'reposter' in post['author']['description'] and 'not zero' in post['like_count']['description']
+    assert post['text']['type'] == 'string' and post['author']['anyOf'] == [{'$ref': '#/$defs/User'}, {'type': 'null'}]
     assert post['media']['items'] == {'$ref': '#/$defs/Media'}
+    code, output = text(['schema', 'tweet'], fake_env)
+    assert all(re.search(rf'(?m)^{field} ', output) for field in DYNAMIC)
+
+
+def test_only_the_envelope_topic_explains_every_stop_reason_and_exit_code(fake_env):
+    reasons = ['limit_reached', 'exhausted', 'window_reached', 'not_paginable', 'terminated', 'empty_pages', 'budget',
+               'blocked', 'query_failure']
+    code, envelope = text(['schema', 'envelope'], fake_env)
+    assert all(reason in envelope for reason in reasons) and all(f'exit {code}' in envelope for code in (0, 2, 3, 4, 5, 6, 7, 8, 9))
+    assert 'transaction_rejected' in envelope and 'next_handle' in envelope
+    for topic in ['', *[t for t in TOPICS if t != 'envelope']]:
+        code, output = text(['schema', *([topic] if topic else [])], fake_env)
+        assert 'empty_pages' not in output and 'query_failure' not in output
+
+
+def test_export_topic_describes_lines_format_and_resume(fake_env):
+    code, output = text(['schema', 'export'], fake_env)
+    assert all(word in output for word in ('header', 'page', 'format 2', 'resume'))
+
+
+def test_trend_id_is_described_as_an_entry_identifier(fake_env):
+    code, doc = invoke(['schema', 'trend'], fake_env)
+    assert 'entry' in doc['$defs']['Trend']['properties']['id']['description']
 
 
 def trend_page(*descriptions):

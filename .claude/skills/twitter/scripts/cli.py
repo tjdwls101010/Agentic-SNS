@@ -19,7 +19,7 @@ from twitter.dates import timestamp
 from twitter.errors import TwitterError
 from twitter.output.doctor import summary
 from twitter.output.render import plain, render
-from twitter.output.schema import schema
+from twitter.output.schema import ABOUT as TOPICS, schema
 
 
 @dataclass(frozen=True)
@@ -83,7 +83,7 @@ EXITS = {
     9: 'unavailable: a deleted, protected or suspended target',
 }
 JSON = Arg(('--json',), dict(action='store_true', help='Print one JSON document instead of text, including partial results and the error fix.'))
-OUT = Arg(('--out',), dict(metavar='FILE', help='Also save whole date-eligible pages to this private NDJSON file; run the same command again to resume.'))
+OUT = Arg(('--out',), dict(metavar='FILE', help='Also save whole date-eligible pages to this private NDJSON file; run the same command again to resume. schema export describes the file.'))
 PROFILE = Arg(('target',), dict(help='@handle or x.com profile URL; numeric user IDs are not accepted.'))
 POST = Arg(('target',), dict(help='x.com post URL or numeric post ID.'))
 
@@ -219,7 +219,9 @@ SURFACES = {
                       runner=lambda args: summary(maintenance.doctor(args))),
     'refresh': Surface('Mine current read-query IDs and signatures, then verify two operations before saving.',
                        runner=lambda args: summary(maintenance.refresh(args))),
-    'schema': Surface('Describe the normalized output fields without making requests.', runner=lambda args: schema()),
+    'schema': Surface('Describe the output without any request: the topic list, or one topic.',
+                      (Arg(('topic',), dict(nargs='?', choices=list(TOPICS), help='Record fields for tweet, user, media, list, community or trend; envelope: result fields, stop reasons, exit codes and error classes; export: the --out file. Without a topic: the topic list.')),),
+                      runner=lambda args: schema(args.topic, EXITS, text=not args.json)),
 }
 UNSET = ('limit', 'after', 'since', 'until', 'tab', 'sort', 'feed', 'type', 'scope', 'relation', 'collection', 'target')
 
@@ -338,11 +340,12 @@ def more_command(args, handle):
 def emit(result, args):
     code = result.pop('code', 0)
     result.pop('state', None)
-    result.setdefault('next', None)
-    result.setdefault('warnings', [])
-    result.setdefault('fetched_bytes', 0)
-    result.setdefault('budget', {})
     surface = SURFACES[args.command]
+    if not surface.runner:
+        result.setdefault('next', None)
+        result.setdefault('warnings', [])
+        result.setdefault('fetched_bytes', 0)
+        result.setdefault('budget', {})
     if args.json:
         print(json.dumps(result, ensure_ascii=False))
     else:
