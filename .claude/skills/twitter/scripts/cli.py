@@ -244,7 +244,9 @@ class Parser(argparse.ArgumentParser):
 
 def parse_fix(message):
     """A fix naming the argument argparse refused."""
-    if match := re.match(r"argument (\S+): invalid choice: '.*?' \(choose from (.+)\)", message):
+    if match := re.match(r"argument (\S+): invalid choice: (['\"]).*?\2 \(choose from (.+)\)", message):
+        return f'Pass {match[1]} one of: ' + match[3].replace("'", '') + '.'
+    if match := re.match(r"argument (\S+): invalid choice: .* \(choose from (.+)\)", message):
         return f'Pass {match[1]} one of: ' + match[2].replace("'", '') + '.'
     if match := re.match(r'argument (\S+): invalid int value', message):
         return f'Pass {match[1]} a whole number.'

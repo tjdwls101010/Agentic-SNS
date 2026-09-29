@@ -110,6 +110,7 @@ ERRORS = {
     'empty': (7, 'A valid response with no matching items.'),
     'budget': (8, 'This run\'s request cap stopped it; more: continues.'),
     'partial': (8, 'Local output or cache input/output failed.'),
+    'cache_unreadable': (5, 'A file in the skill\'s cache could not be read; nothing was requested.'),
     'unavailable': (9, 'The target is deleted, suspended or unavailable.'),
     'protected': (9, 'A protected profile you do not follow.'),
 }

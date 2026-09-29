@@ -3,6 +3,7 @@ import time
 from ..account.budget import Budget
 from ..account.state import account_lock, cache_dir, read_state, write_state, unblock
 from ..continuation import CursorStore
+from ..dates import moment
 from ..errors import TwitterError
 from ..graphql.protocol.refresh import refresh as publish
 from ..graphql.protocol.transport import Transport
@@ -29,6 +30,8 @@ def doctor(args):
                            'Run doctor again once the browser shows the account you mean.', 'viewer_changed')
     with account_lock():
         session = read_state('session.json')
+        if session.get('viewer_id') != user['id']:
+            raise TwitterError(2, 'Another run changed the cached account while doctor was checking.', 'Run doctor again once the other run has finished.', 'viewer_changed')
         session['viewer_handle'] = user['screen_name']
         write_state('session.json', session)
     result = dict(ok=True, results=[user], stop_reason='not_paginable', viewer_id=session['viewer_id'],
@@ -45,13 +48,15 @@ def ages(refreshed):
 def readable(name):
     """A cache file's state, or nothing when it is unreadable; diagnosis reports around a damaged file rather than stopping."""
     try:
-        return read_state(name)
+        state = read_state(name)
     except TwitterError:
         return {}
+    return state if isinstance(state, dict) else {}
 
 
-def days(moment):
-    return round((time.time() - moment) / 86400) if moment else None
+def days(value):
+    value = moment(value)
+    return round((time.time() - value) / 86400) if value else None
 
 
 def refresh(args):

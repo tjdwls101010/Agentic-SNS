@@ -308,3 +308,8 @@ def test_odd_argument_values_still_get_a_named_fix(args, flag, fake_env):
 
 def test_community_search_help_matches_what_it_refuses():
     assert "--sort top" in option(help_text("search"), "--in")
+
+
+def test_a_quoted_choice_with_an_apostrophe_still_names_its_flag(fake_env):
+    code, doc = invoke(["search", "q", "--type", "bad'value"], fake_env)
+    assert code == 2 and "--type" in doc["fix"]

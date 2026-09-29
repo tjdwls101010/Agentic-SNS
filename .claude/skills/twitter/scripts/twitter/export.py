@@ -18,15 +18,16 @@ def line(value):
 def check(path):
     """Before any request: refuse an export inside the skill's cache, or an existing one other users can read (left as it is)."""
     existing = Path(path).expanduser()
-    cache = cache_dir().expanduser().resolve()
-    if existing.resolve() == cache or cache in existing.resolve().parents:
-        raise TwitterError(2, 'The --out file would sit inside the skill\'s cache and be overwritten by it.', 'Pass --out a path outside ' + str(cache) + '.')
+    caches = {cache_dir().expanduser().absolute(), cache_dir().expanduser().resolve()}
+    if any(place == cache or cache in place.parents for place in (existing.absolute(), existing.resolve()) for cache in caches):
+        raise TwitterError(2, 'The --out file would sit inside the skill\'s cache and be overwritten by it.', 'Pass --out a path outside ' + str(cache_dir()) + '.')
     if existing.exists() and existing.stat().st_mode & 0o077:
         raise readable(path)
 
 
 def readable(path):
-    return TwitterError(2, 'The --out file can be read by other users.', f'Run chmod 600 {shlex.quote(str(path))}, or pass a new --out path.')
+    return TwitterError(2, 'The --out file can be read by other users.',
+                        f'Run chmod 600 {shlex.quote(str(Path(path).expanduser().absolute()))}, or pass a new --out path.')
 
 
 class OutFile:
@@ -75,7 +76,8 @@ class OutFile:
                 break
             if record.get('kind') == 'page' and 'id' not in record:
                 try:
-                    if record['ids'] != [r.get('id') for r in page] or record['n'] != len(page) or not isinstance(record['state'], dict):
+                    if (record['ids'] != [r.get('id') for r in page] or record['n'] != len(page) or not isinstance(record['state'], dict)
+                            or not all(isinstance(identity, str) for identity in record['ids'])):
                         raise ValueError
                     self.complete = record['stop_reason'] in COMPLETE
                 except (KeyError, TypeError, ValueError):

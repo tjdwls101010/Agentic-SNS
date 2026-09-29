@@ -1,12 +1,12 @@
 """Private continuation handles: random names, bound to their query and viewer, valid for a day after issue."""
 import json
-import math
 import os
 import re
 import secrets
 import string
 import time
 from .account.state import cache_dir
+from .dates import moment
 from .errors import TwitterError
 
 FORMAT = 2
@@ -52,12 +52,13 @@ class CursorStore:
             raise TwitterError(2, 'Continuation is missing or belongs to a different query/account.', 'Copy --after from the latest more: line, or rerun without --after.') from None
         if data.get('format') != FORMAT:
             raise TwitterError(2, 'This continuation was written by an older version of the skill.', 'Rerun the command without --after.')
-        created = data.get('created_at')
-        if not isinstance(created, (int, float)) or isinstance(created, bool) or not math.isfinite(created):
+        created = moment(data.get('created_at'))
+        if created is None:
             raise TwitterError(2, 'Continuation is missing or belongs to a different query/account.', 'Copy --after from the latest more: line, or rerun without --after.')
         if time.time() - created > LIFETIME:
             raise TwitterError(2, 'This continuation expired 24 hours after it was issued.', 'Rerun the command without --after.')
-        if data.get('context') != context or not isinstance(data.get('pending'), list):
+        if (data.get('context') != context or not isinstance(data.get('pending'), list)
+                or not all(isinstance(record, dict) for record in data['pending'])):
             raise TwitterError(2, 'Continuation is missing or belongs to a different query/account.', 'Copy --after from the latest more: line, or rerun without --after.')
         return data
 
@@ -67,10 +68,10 @@ class CursorStore:
         for path in self.directory.glob('*.json') if self.directory.is_dir() else ():
             try:
                 try:
-                    created = json.loads(path.read_text()).get('created_at')
+                    created = moment(json.loads(path.read_text()).get('created_at'))
                 except (ValueError, AttributeError):
                     created = None
-                if not isinstance(created, (int, float)) or isinstance(created, bool) or not math.isfinite(created):
+                if created is None:
                     created = path.stat().st_mtime
                 if time.time() - created > LIFETIME:
                     path.unlink()

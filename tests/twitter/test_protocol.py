@@ -370,3 +370,27 @@ def test_doctor_reports_signature_material_it_made_during_the_check(fake_env):
     script(fake_env, *material_pages())
     code, doc = invoke(['doctor'], fake_env)
     assert code == 0 and doc['txid_age_days'] == 0 and 'signature material 0d' in doc['summary']
+
+
+@pytest.mark.parametrize('registry', ['[]', '{"refreshed_at": "yesterday"}', '{"refreshed_at": 1e999}'])
+def test_doctor_reports_a_block_whatever_the_registry_cache_holds(registry, fake_env):
+    (home(fake_env) / 'budget.json').write_text(json.dumps({'block': {'reason': 'challenge', 'expires_at': None}}))
+    (home(fake_env) / 'registry.json').write_text(registry)
+    (home(fake_env) / 'txid.json').write_text('{"fetched_at": "soon"}')
+    code, doc = invoke(['doctor'], fake_env)
+    assert (code, doc['error']) == (5, 'challenge')
+
+
+def test_an_unreadable_cache_is_its_own_error_class_the_envelope_names(fake_env):
+    (home(fake_env) / 'budget.json').write_text('{broken')
+    code, doc = invoke(['doctor'], fake_env)
+    code, envelope = invoke(['schema', 'envelope'], fake_env)
+    assert doc['error'] == 'cache_unreadable' and doc['error'] in envelope['properties']['error']['enum']
+
+
+def test_an_empty_note_text_keeps_its_own_empty_entities(fake_env):
+    from .test_reading import linked_post, only_post
+    node = linked_post()
+    node['note_tweet'] = {'note_tweet_results': {'result': {'text': '', 'entity_set': {}}}}
+    row = only_post(fake_env, node)
+    assert row['text'] == '' and row['mentions'] == []

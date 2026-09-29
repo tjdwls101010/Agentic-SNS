@@ -295,3 +295,43 @@ def test_a_readable_export_fix_quotes_its_path(fake_env, tmp_path):
     shared.chmod(0o644)
     code, doc = invoke(['user', '@example', '--out', str(shared)], fake_env)
     assert f"chmod 600 '{shared}'" in doc['fix']
+
+
+def test_a_cache_path_symlinked_elsewhere_is_still_refused(fake_env, tmp_path):
+    target = tmp_path / 'elsewhere.ndjson'
+    target.write_text('')
+    target.chmod(0o600)
+    (home(fake_env) / 'budget.json').symlink_to(target)
+    code, doc = invoke(['user', '@example', '--out', str(home(fake_env) / 'budget.json')], fake_env)
+    assert (code, doc['error']) == (2, 'arguments') and calls(fake_env) == []
+
+
+@pytest.mark.parametrize('field,value', [('created_at', 10 ** 400), ('pending', [None])])
+def test_odd_continuation_values_are_refused(field, value, fake_env):
+    code, doc = invoke(['user', '@example', '--limit', '2'], fake_env)
+    state = home(fake_env) / 'cursors' / f"{doc['next_handle']}.json"
+    state.write_text(json.dumps(dict(json.loads(state.read_text()), **{field: value})))
+    code, refused = invoke(more_args(doc['next']), fake_env)
+    assert (code, refused['error']) == (2, 'arguments')
+    code, other = invoke(['home', '--limit', '2'], fake_env)
+    assert code == 0
+
+
+def test_an_export_with_non_string_ids_is_refused(fake_env, tmp_path):
+    out = tmp_path / 'ids.ndjson'
+    invoke(['user', '@example', '--limit', '2', '--out', str(out)], fake_env)
+    header = out.read_text().splitlines()[0]
+    out.write_text(header + '\n' + json.dumps({'id': [], 'kind': 'tweet'}) + '\n'
+                   + json.dumps({'kind': 'page', 'ids': [[]], 'n': 1, 'state': {}, 'stop_reason': 'limit_reached'}) + '\n')
+    code, doc = invoke(['user', '@example', '--limit', '2', '--out', str(out)], fake_env)
+    assert (code, doc['error']) == (2, 'arguments')
+
+
+@pytest.mark.parametrize('name', ['~/private posts.ndjson', '-report.ndjson'])
+def test_a_permission_fix_can_be_pasted_as_is(name, fake_env, tmp_path):
+    env = dict(fake_env, HOME=str(tmp_path))
+    real = tmp_path / name.removeprefix('~/')
+    real.write_text('')
+    real.chmod(0o644)
+    code, doc = invoke(['user', '@example', f'--out={name}'], env, cwd=tmp_path)
+    assert f"chmod 600 '{real}'" in doc['fix'] or f'chmod 600 {real}' in doc['fix'], doc['fix']

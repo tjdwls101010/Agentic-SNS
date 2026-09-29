@@ -205,7 +205,7 @@ def build_tweet(node, pinned=False, _depth=0):
     original = build_tweet(legacy.get('retweeted_status_result', {}).get('result'), _depth=_depth + 1)
     quote = build_tweet(node.get('quoted_status_result', {}).get('result'), _depth=_depth + 1)
     note = node.get('note_tweet', {}).get('note_tweet_results', {}).get('result', {})
-    entities = note['entity_set'] if note.get('text') and isinstance(note.get('entity_set'), dict) else legacy.get('entities', {})
+    entities = note['entity_set'] if 'text' in note and isinstance(note.get('entity_set'), dict) else legacy.get('entities', {})
     media_links = legacy.get('extended_entities', {}).get('media', []) + legacy.get('entities', {}).get('media', [])
     text = expand(note.get('text', legacy.get('full_text', '')), entities.get('urls', []), media_links)
     media = []
