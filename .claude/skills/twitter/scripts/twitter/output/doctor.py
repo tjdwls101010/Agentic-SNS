@@ -1,4 +1,5 @@
 """One-line summaries of doctor and refresh results."""
+import os
 
 
 def summary(result):
@@ -13,10 +14,18 @@ def summary(result):
         if changed:
             line += ' · ' + ', '.join(f'{c["operation"]}({c["old"]}→{c["new"]})' for c in changed)
     else:
-        user, registry_age, txid_age = result['results'][0], result['registry_age_days'], result['txid_age_days']
-        line = (f'Aside u0 · @{user["screen_name"]} · viewer {user["id"]} · unblocked · '
-                f'registry age {registry_age if registry_age is not None else "bundled"} days · txid age {txid_age} days')
-        bucket = result['budget']['operations'].get('Viewer', {})
-        line += f' · budget Viewer {bucket.get("remaining", "?")} of {bucket.get("limit", "?")} · window {result["budget"]["window"]}/200'
+        registry = 'registry bundled' if result['registry_age_days'] is None else f'registry refreshed {result["registry_age_days"]}d ago'
+        signature = 'signature material missing' if result['txid_age_days'] is None else f'signature material {result["txid_age_days"]}d'
+        home = os.path.expanduser('~')
+        cache = '~' + result['cache'][len(home):] if result['cache'].startswith(home + os.sep) else result['cache']
+        where = f'cache {cache} ({result["continuations"]} continuations)'
+        if result.get('error'):
+            line = (f'blocked: {result["error"]} · viewer {result["viewer"]} · {registry} · {signature} · {where}\n'
+                    f'fix: {result["fix"]}')
+        else:
+            user = result['results'][0]
+            bucket = result['budget']['operations'].get('Viewer', {})
+            line = (f'@{user["screen_name"]} · viewer {user["id"]} ({result["viewer"]}) · unblocked · {registry} · {signature} · '
+                    f'Viewer {bucket.get("remaining", "?")}/{bucket.get("limit", "?")} · window {result["budget"]["window"]}/200 · {where}')
     result['summary'] = line
     return result

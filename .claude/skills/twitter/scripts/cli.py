@@ -214,7 +214,7 @@ SURFACES = {
                          rows=lambda a: 'user' if a.tab == 'about' else 'tweet', continuable=lambda a: a.tab != 'about',
                          label=lambda a: f'community {a.tab}' + (f' {a.sort}' if a.tab == 'posts' else '')),
     'communities': Surface('Browse posts from communities, each with a link to its community.', POSTS, operation=operations.communities),
-    'doctor': Surface('Check Aside, your viewer, protection state and cache ages.',
+    'doctor': Surface('Report a block without any request; otherwise re-read the login cookie against the cached viewer, then show cache ages, the Viewer bucket, the account window and the cache location.',
                       (Arg(('--unblock',), dict(action='store_true', help='After resolving a challenge or lock in Aside, clear it, then diagnose; rate limits still apply.')),),
                       runner=lambda args: summary(maintenance.doctor(args))),
     'refresh': Surface('Mine current read-query IDs and signatures, then verify two operations before saving.',

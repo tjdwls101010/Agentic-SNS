@@ -2,12 +2,14 @@
 refresh, and the Aside envelope contract."""
 import base64
 import json
+import os
+import re
 import time
 
 import pytest
 
 from .fake_data import user, wrap
-from .helpers import FIXTURES, ROOT, calls, home, invoke, script, trace
+from .helpers import FIXTURES, ROOT, calls, home, invoke, script, text, trace
 
 FIXTURE = json.loads((FIXTURES / 'transaction.json').read_text())
 PROFILE = ['about', '@example']
@@ -288,3 +290,52 @@ def test_aside_time_limit_points_at_aside_not_at_the_display_limit(fake_env):
 def test_no_fix_suggests_shrinking_a_display_target():
     sources = ' '.join(p.read_text() for p in (ROOT / '.claude/skills/twitter/scripts').rglob('*.py'))
     assert 'reduce the request size' not in sources.lower()
+
+
+def handle_file(env, name='abc123', age=0):
+    cursors = home(env) / 'cursors'
+    cursors.mkdir(exist_ok=True)
+    path = cursors / f'{name}.json'
+    path.write_text('{}')
+    os.utime(path, (time.time() - age, time.time() - age))
+    return path
+
+
+def test_doctor_rereads_the_cookie_and_reports_a_matching_viewer(fake_env):
+    code, output = text(['doctor'], fake_env)
+    assert code == 0 and 'cookie' in snippets(fake_env)
+    line = output.splitlines()[0]
+    assert line.startswith('@example · viewer 100 (matches cache) · unblocked · ')
+    assert re.search(r'registry (bundled|refreshed \d+d ago) · signature material \d+d · Viewer \d+/\d+ · window \d+/200 · cache \S+ \(\d+ continuations\)$', line), line
+
+
+def test_doctor_finds_a_changed_viewer_and_drops_its_continuations(fake_env):
+    handle_file(fake_env)
+    script(fake_env, {'snippet': 'cookie', 'body': {'ct0': 'other', 'twid': 'u%3D200'}})
+    code, doc = invoke(['doctor'], fake_env)
+    assert code == 0 and doc['viewer_changed'] is True and doc['continuations'] == 0
+    assert 'viewer changed' in doc['summary'] and not list((home(fake_env) / 'cursors').glob('*.json'))
+
+
+def test_doctor_reports_a_block_before_any_request(fake_env):
+    (home(fake_env) / 'budget.json').write_text(json.dumps({'block': {'reason': 'challenge', 'expires_at': None}}))
+    code, output = text(['doctor'], fake_env)
+    assert code == 5 and trace(fake_env) == []
+    assert 'unverified (blocked)' in output and 'doctor --unblock' in output
+
+
+def test_unblock_clears_only_the_block_then_diagnoses(fake_env):
+    bucket = {'limit': 50, 'remaining': 3, 'reset_at': time.time() + 600, 'observed_at': time.time()}
+    earlier = [time.time() - 30, time.time() - 20]
+    (home(fake_env) / 'budget.json').write_text(json.dumps({'block': {'reason': 'account_locked', 'expires_at': None},
+                                                            'buckets': {'other-query': bucket}, 'requests': earlier}))
+    code, doc = invoke(['doctor', '--unblock'], fake_env)
+    budget = json.loads((home(fake_env) / 'budget.json').read_text())
+    assert code == 0 and 'block' not in budget and budget['buckets']['other-query'] == bucket
+    assert budget['requests'][:2] == earlier
+
+
+def test_doctor_sweeps_expired_continuations(fake_env):
+    old, fresh = handle_file(fake_env, 'old000', age=90000), handle_file(fake_env, 'new000')
+    code, doc = invoke(['doctor'], fake_env)
+    assert not old.exists() and fresh.exists() and doc['continuations'] == 1
