@@ -90,22 +90,26 @@ def tweet_lines(row, index, chars, labels):
     return [indent + line for line in lines]
 
 
-def render(result, args):
-    if args.command in ('doctor', 'refresh', 'schema'):
-        return result.get('summary') or json.dumps(result, ensure_ascii=False, indent=2)
+def plain(result):
+    """A result without records to list: its summary line, or the whole document."""
+    return result.get('summary') or json.dumps(result, ensure_ascii=False, indent=2)
+
+
+def render(result, args, rows):
+    """A listing as dense text; `rows` is the record kind the listing holds."""
     header = [args.command, f'operation={result.get("operation", "?")}', f'{len(result.get("results", []))} shown']
     if result.get('stored') is not None:
         header.append(f'{result["stored"]} stored')
     if args.sort:
         header.append('sort=' + args.sort)
-    if args.command == 'search' and getattr(args, 'type', None) == 'users':
+    if getattr(args, 'type', None) == 'users':
         header.append('rank=people')
-    if args.command == 'home':
+    if args.feed:
         header.append('feed=' + args.feed + (' (personalized)' if args.feed == 'foryou' else ''))
     header.extend([f'stopped={result.get("stop_reason")}', f'fetched {result.get("fetched_bytes", 0) / 1048576:.2f}MB'])
     if 'direct_shown' in result:
         header.append(f'replies: {result["direct_shown"]} direct shown of {result.get("reported")} reported · +{result["nested_shown"]} nested · hidden branches {result["hidden_branches"]}')
-    if args.command == 'trends':
+    if rows == 'trend':
         header.append(f'other items {result.get("other_items", 0)} · promoted excluded {result.get("promoted", 0)}')
     budget = result.get('budget', {})
     for name, bucket in budget.get('operations', {}).items():
