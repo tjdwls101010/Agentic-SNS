@@ -1,7 +1,7 @@
 """Connect normalized pages, continuation state and page-committed output; the caller turns a handle into more:."""
 from .pagination import collect
 from ..continuation import CursorStore, valid as valid_handle
-from ..export import OutFile
+from ..export import OutFile, check
 from ..errors import TwitterError
 from ..graphql.protocol.transport import Transport
 from ..graphql.responses.pages import normalize_page
@@ -15,6 +15,8 @@ def run(args, context, op, variables, *, rows, personal=False, prepare=None, fet
 
     `context` is the query's identity, to which the viewer is attached here. `rows` is the kind of record the pages hold; `personal` rechecks the viewer cookie; `prepare(transport, args, session, state, variables, card)` makes the requests needed before the first page and returns the card; `fetch(transport, args)` replaces the single request for a first page that takes more; `finish(result, args)` adds to the collected result; a query that is not `continuable` gets no handle and is not paged further; `sparse` account lists stop after three empty pages.
     """
+    if args.out:
+        check(args.out)
     transport = Transport(10)
     session = transport.session(personal=personal)
     context['viewer_id'] = session['viewer_id']

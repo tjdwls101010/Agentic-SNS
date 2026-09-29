@@ -227,3 +227,15 @@ def test_a_continuation_keeps_the_request_cap_of_the_call_that_issued_it(fake_en
     script(fake_env, *empty_pages(25))
     code, explicit = invoke(['home', '--limit', '10'], fake_env)
     assert explicit['budget']['requests'] > 10
+
+
+def test_an_existing_export_readable_by_others_is_refused_untouched_and_new_ones_are_private(fake_env, tmp_path):
+    shared = tmp_path / 'shared.ndjson'
+    shared.write_text('')
+    shared.chmod(0o644)
+    code, doc = invoke(['user', '@example', '--out', str(shared)], fake_env)
+    assert (code, doc['error']) == (2, 'arguments') and 'chmod 600' in doc['fix'] and '--out' in doc['fix']
+    assert shared.read_bytes() == b'' and shared.stat().st_mode & 0o777 == 0o644 and calls(fake_env) == []
+    fresh = tmp_path / 'fresh.ndjson'
+    invoke(['user', '@example', '--out', str(fresh)], fake_env)
+    assert fresh.stat().st_mode & 0o777 == 0o600

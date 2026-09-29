@@ -13,6 +13,13 @@ def line(value):
     return (json.dumps(value, ensure_ascii=False) + '\n').encode()
 
 
+def check(path):
+    """Refuse an existing export other users can read, before any request; its bytes and mode stay as they are."""
+    existing = Path(path).expanduser()
+    if existing.exists() and existing.stat().st_mode & 0o077:
+        raise TwitterError(2, 'The --out file can be read by other users.', f'Run chmod 600 {path}, or pass a new --out path.')
+
+
 class OutFile:
     def __init__(self, path, context):
         self.path, self.context = Path(path).expanduser(), context
