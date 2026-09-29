@@ -7,7 +7,7 @@ Give your agent a question. It can search, open posts and replies, inspect profi
 Try asking: **“Explore NASA's recent X posts. Open a post that interests you, read its replies, and summarize what you found with links.”** The agent chooses its next command from the results. For example, a profile lookup returns this real output row:
 
 ```text
-$ python3 .claude/skills/twitter/scripts/twitter.py about @NASA
+$ uv run .claude/skills/twitter/scripts/cli.py about @NASA
 @NASA (NASA ✓gov) · followers 92.4M · following 117 · posts 74.3K · joined 2007-12 · bio: "Making the seemingly impossible, possible. ✨" · url: "https://x.com/NASA"
 ```
 
@@ -66,7 +66,7 @@ Expected: the agent invokes the Twitter CLI and answers with NASA's bio and `htt
 You can check the browser connection independently of the agent:
 
 ```bash
-python3 .claude/skills/twitter/scripts/twitter.py about @NASA
+uv run .claude/skills/twitter/scripts/cli.py about @NASA
 ```
 
 A successful read prints the profile row shown above, preceded by request and budget information. Then try the longer exploration request at the top of this README. If a command fails, follow its `fix`; [connection and login troubleshooting](docs/usage.md#troubleshooting) covers the common cases.

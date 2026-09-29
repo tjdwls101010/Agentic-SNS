@@ -1,9 +1,9 @@
 import multiprocessing
 import os
 import pytest
-from twitter_skill._blocked import account_lock, read_state, set_blocked, write_state
-from twitter_skill._budget import Budget
-from twitter_skill._errors import TwitterError
+from twitter.account.state import account_lock, read_state, set_blocked, write_state
+from twitter.account.budget import Budget
+from twitter.errors import TwitterError
 
 
 def reserve_in_process(home):

@@ -1,0 +1,130 @@
+"""Collecting across pages: cached tails, stops, date windows, continuation handles and page-committed --out files."""
+import json
+from pathlib import Path
+
+from .fake_data import entry, tweet, wrap
+from .helpers import calls, home, invoke, more_args, records, script
+
+
+def page(*nodes, cursor='next', pinned=None):
+    entries = [entry(n) for n in nodes]
+    if cursor:
+        entries.append({'entryId': 'cursor-bottom', 'content': {'cursorType': 'Bottom', 'value': cursor}})
+    body = [{'type': 'TimelinePinEntry', 'entry': entry(pinned)}] if pinned else []
+    return body + [{'type': 'TimelineAddEntries', 'entries': entries}]
+
+
+def dated(identity, when, parent=None):
+    """A post created at an X-format timestamp such as 'Fri Jan 01 00:00:00 +0000 2021'."""
+    node = tweet(identity, parent)
+    node['legacy']['created_at'] = when
+    return node
+
+
+def ids(doc):
+    return [r['id'] for r in doc['results']]
+
+
+def test_cached_tail_is_served_in_order_before_another_request(fake_env):
+    code, first = invoke(['user', '@example', '--limit', '2'], fake_env)
+    before = len(calls(fake_env))
+    code, second = invoke(more_args(first['next']), fake_env)
+    assert code == 0 and ids(first) == ['200', '201'] and ids(second) == ['202', '203']
+    assert len(calls(fake_env)) == before and second['budget']['requests'] == 0
+
+
+def test_partial_failure_keeps_results_and_resumes_from_the_failed_cursor(fake_env):
+    code, doc = invoke(['home', '--limit', '10'], dict(fake_env, TWITTER_FAKE_SCENARIO='429'))
+    assert code == 8 and ids(doc) == ['200', '201', '202', '203', '204'] and doc['stop_reason'] == 'blocked'
+    assert calls(fake_env)[-1]['variables']['cursor'] == 'next'
+    (home(fake_env) / 'budget.json').unlink()
+    code, resumed = invoke(more_args(doc['next']), fake_env)
+    assert code == 0 and ids(resumed) == ['205', '206']
+    assert calls(fake_env)[-1]['variables']['cursor'] == 'next'
+
+
+def test_account_lists_stop_after_three_empty_pages(fake_env):
+    code, doc = invoke(['graph', '@example', 'followers'], dict(fake_env, TWITTER_FAKE_SCENARIO='empty_users'))
+    assert (code, doc['stop_reason']) == (8, 'empty_pages')
+    assert [c['op'] for c in calls(fake_env)].count('Followers') == 3
+
+
+def test_duplicates_are_dropped_and_a_repeated_cursor_ends_the_listing(fake_env):
+    script(fake_env, {'op': 'UserTweets', 'body': wrap('UserTweets', page(tweet('200'), tweet('201'), cursor='same'))},
+           {'op': 'UserTweets', 'body': wrap('UserTweets', page(tweet('201'), tweet('202'), cursor='same'))})
+    code, doc = invoke(['user', '@example', '--limit', '3'], fake_env)
+    assert code == 0 and ids(doc) == ['200', '201', '202'] and doc['stop_reason'] == 'exhausted'
+    assert [c['op'] for c in calls(fake_env)].count('UserTweets') == 2
+
+
+def test_date_window_ignores_the_pin_and_stops_early_only_on_profile_posts(fake_env):
+    first = page(dated('new', 'Fri Jan 01 00:00:00 +0000 2026'), pinned=dated('pin', 'Fri Jan 01 00:00:00 +0000 2010'))
+    script(fake_env, {'op': 'UserTweets', 'body': wrap('UserTweets', first)},
+           {'op': 'UserTweets', 'body': wrap('UserTweets', page(dated('old', 'Wed Jan 01 00:00:00 +0000 2020'), cursor='end'))},
+           {'op': 'ListLatestTweetsTimeline',
+            'body': wrap('ListLatestTweetsTimeline', page(dated('old', 'Wed Jan 01 00:00:00 +0000 2020'), cursor=None))})
+    code, doc = invoke(['user', '@example', '--since', '2025-01-01'], fake_env)
+    assert doc['stop_reason'] == 'window_reached' and ids(doc) == ['new']
+    assert [c['op'] for c in calls(fake_env)].count('UserTweets') == 2
+    code, doc = invoke(['list', '1', '--since', '2025-01-01'], fake_env)
+    assert doc['stop_reason'] == 'exhausted' and ids(doc) == []
+
+
+def test_parent_and_focal_do_not_spend_the_reply_display_limit(fake_env):
+    code, doc = invoke(['post', '200', '--limit', '1'], fake_env)
+    assert code == 0 and ids(doc) == ['99', '200', '301']
+    assert [r['role'] for r in doc['results']] == ['parent', 'focal', 'reply']
+    code, tail = invoke(more_args(doc['next']), fake_env)
+    assert ids(tail)[0] == '302'
+
+
+def test_export_stores_only_the_date_window_but_remembers_every_seen_post(fake_env, tmp_path):
+    body = page(dated('old', 'Wed Jan 01 00:00:00 +0000 2020'), dated('inside', 'Wed Jan 01 00:00:00 +0000 2025'),
+                dated('future', 'Fri Jan 01 00:00:00 +0000 2027'), cursor=None)
+    script(fake_env, {'op': 'UserTweets', 'body': wrap('UserTweets', body)})
+    out = tmp_path / 'window.ndjson'
+    invoke(['user', '@example', '--since', '2024-01-01', '--until', '2026-01-01', '--out', str(out)], fake_env)
+    lines = records(out)
+    assert [r['id'] for r in lines if 'id' in r] == ['inside']
+    assert set(lines[-1]['state']['seen']) == {'old', 'inside', 'future'}
+
+
+def test_thread_export_accumulates_hidden_branches_and_reply_counts(fake_env, tmp_path):
+    focal, reply, nested = tweet('1'), tweet('2', '1'), tweet('3', '2')
+    focal['legacy']['reply_count'] = 9
+    more = [{'type': 'TimelineAddToModule', 'moduleEntryId': 'conversationthread-' + m, 'moduleItems': [
+        {'entryId': 'more-' + m, 'item': {'itemContent': {'cursorType': 'ShowMoreThreads', 'value': m}}}]} for m in 'ab']
+    script(fake_env, {'op': 'TweetDetail', 'body': wrap('TweetDetail', page(focal, reply) + more)},
+           {'op': 'TweetDetail', 'body': wrap('TweetDetail', page(nested, cursor=None))})
+    out = tmp_path / 'thread.ndjson'
+    code, doc = invoke(['post', '1', '--limit', '10', '--out', str(out)], fake_env)
+    assert code == 0 and doc['hidden_branches'] == 2
+    metadata = [r for r in records(out) if r.get('kind') == 'page'][-1]['state']['metadata']
+    assert {k: metadata[k] for k in ('reported', 'direct_shown', 'nested_shown', 'hidden_branches')} == dict(
+        reported=9, direct_shown=1, nested_shown=1, hidden_branches=2)
+
+
+def test_export_recovers_an_uncommitted_tail_and_refuses_another_viewer(fake_env, tmp_path):
+    out = tmp_path / 'posts.ndjson'
+    code, first = invoke(['user', '@example', '--limit', '2', '--out', str(out)], fake_env)
+    assert code == 0 and first['stored'] == 5
+    with out.open('ab') as stream:
+        stream.write(b'{"id":"uncommitted"}\n')
+    code, resumed = invoke(['user', '@example', '--limit', '2', '--out', str(out)], fake_env)
+    stored = [r['id'] for r in records(out) if 'id' in r]
+    assert code == 0 and resumed['stored'] == 7 and 'uncommitted' not in stored and len(stored) == len(set(stored))
+    assert calls(fake_env)[-1]['variables']['cursor'] == 'next'
+    session = json.loads((home(fake_env) / 'session.json').read_text())
+    (home(fake_env) / 'session.json').write_text(json.dumps(dict(session, viewer_id='200')))
+    code, doc = invoke(['user', '@example', '--limit', '2', '--out', str(out)], fake_env)
+    assert (code, doc['error']) == (2, 'arguments') and 'different query or viewer' in doc['message']
+
+
+def test_continuation_is_private_and_bound_to_the_viewer(fake_env):
+    code, doc = invoke(['user', '@example', '--limit', '2'], fake_env)
+    handle = Path(home(fake_env) / 'cursors' / f"{doc['next_handle']}.json")
+    assert handle.stat().st_mode & 0o777 == 0o600
+    session = json.loads((home(fake_env) / 'session.json').read_text())
+    (home(fake_env) / 'session.json').write_text(json.dumps(dict(session, viewer_id='200')))
+    code, doc = invoke(more_args(doc['next']), fake_env)
+    assert (code, doc['error']) == (2, 'arguments')

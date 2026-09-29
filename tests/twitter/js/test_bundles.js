@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
-const source=()=>fs.readFileSync(path.resolve(__dirname,'../../../.claude/skills/twitter/scripts/browser/bundles.js'),'utf8');
+const source=()=>fs.readFileSync(path.resolve(__dirname,'../../../.claude/skills/twitter/scripts/twitter/graphql/protocol/snippets/bundles.js'),'utf8');
 test('mines only queries from both maps, including unnamed chunks and switches',async()=>{
   const html='<script src="https://abs.twimg.com/responsive-web/client-web/main.abc.js"></script> .u=e=>""+({12:"ondemand.s",13:"bundle.List"})[e]+"."+({12:"aa",13:"bb",14:"cc"})[e]+"a.js"; "flag":{"value":true}';
   const urls=[],logs=[];

@@ -7,9 +7,9 @@
 An agent can choose where to go next from the handles, URLs, and continuation commands in each response. These commands were used to follow NASA's public X profile to its posts and one post's replies on September 8, 2026:
 
 ```bash
-python3 .claude/skills/twitter/scripts/twitter.py about @NASA
-python3 .claude/skills/twitter/scripts/twitter.py user @NASA --limit 2 --chars 220
-python3 .claude/skills/twitter/scripts/twitter.py post https://x.com/NASA/status/2095890073031966734 --limit 2
+uv run .claude/skills/twitter/scripts/cli.py about @NASA
+uv run .claude/skills/twitter/scripts/cli.py user @NASA --limit 2 --chars 220
+uv run .claude/skills/twitter/scripts/cli.py post https://x.com/NASA/status/2095890073031966734 --limit 2
 ```
 
 The first command returns a profile card. The second returns post text, authors, timestamps, counts, and URLs; a `more:` command continues the listing. The third opens the chosen post with its full received text and a reply batch. In this run, it reported `2 direct shown of 139 reported`, so the result was a sample of the replies. The post was found in the second command's output; your next result may be different. Copy the URL relevant to your question rather than relying on a fixed post remaining available.
@@ -90,7 +90,7 @@ Run these from the clone's root. Every CLI provides `--help`, command-specific h
 
 | Platform | Entry point |
 |---|---|
-| X | `python3 .claude/skills/twitter/scripts/twitter.py --help` |
+| X | `uv run .claude/skills/twitter/scripts/cli.py --help` |
 | Reddit | `python3 .claude/skills/reddit/scripts/reddit.py --help` |
 | Facebook | `uv run .claude/skills/facebook/scripts/cli.py --help` |
 | Threads | `uv run .claude/skills/threads/scripts/cli.py --help` |
@@ -99,8 +99,8 @@ Run these from the clone's root. Every CLI provides `--help`, command-specific h
 For example:
 
 ```bash
-python3 .claude/skills/twitter/scripts/twitter.py post --help
-python3 .claude/skills/twitter/scripts/twitter.py schema
+uv run .claude/skills/twitter/scripts/cli.py post --help
+uv run .claude/skills/twitter/scripts/cli.py schema
 ```
 
 The schema describes normalized fields and stopping conditions. Use ordinary text for exploration, `--json` when a downstream program needs structured objects, and a supported command's `--out` option for resumable file collection. Keep output files outside the repository. The printed continuation command carries the original query context; copy it instead of guessing cursor arguments.
@@ -130,7 +130,7 @@ The schema describes normalized fields and stopping conditions. Use ordinary tex
 For an X connection check:
 
 ```bash
-python3 .claude/skills/twitter/scripts/twitter.py doctor
+uv run .claude/skills/twitter/scripts/cli.py doctor
 ```
 
 `doctor` reads the real account and can display account information. Review its output before sharing it in an issue. [Report security-sensitive failures privately](../SECURITY.md).

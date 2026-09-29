@@ -1,13 +1,13 @@
 ---
 name: twitter
-allowed-tools: Bash(python3 "${CLAUDE_SKILL_DIR}/scripts/twitter.py" *)
+allowed-tools: Bash(uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" *)
 description: >-
   Read X (Twitter, x.com) through the user's logged-in Aside browser: the home feed, a post with parents and replies, profile posts/replies/media/highlights/articles, followers and following, reposts and quotes, search, trends, lists, communities, and the user's own bookmarks and likes. Use whenever the request is to read or explore X or Twitter — 트위터에서, 엑스에서, 이 트윗 답글, 트위터 검색, 트렌드 — including a bare x.com or twitter.com URL. Not for Threads, Facebook, Reddit, general web pages, news about X the company, posting, replying, liking, reposting, following, or bookmarking.
 ---
 
 # X through the user's own browser
 
-Aside supplies the logged-in person's session; the bundled CLI supplies read-only queries and dense text. Let `$TW` mean the absolute path `${CLAUDE_SKILL_DIR}/scripts/twitter.py`, invoked as `python3 "$TW"`. Start with its `--help`; command help, `schema`, and an error's `fix` carry the interface details. The script is self-contained and can run from any directory.
+Aside supplies the logged-in person's session; the bundled CLI supplies read-only queries and dense text. Let `$TW` mean `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py"`, written out on one shell line. Start with its `--help`; command help, `schema`, and an error's `fix` carry the interface details. The script is self-contained and can run from any directory.
 
 ## Every request is the person's account, and X counts by operation
 

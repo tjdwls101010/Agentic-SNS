@@ -9,8 +9,15 @@ from pathlib import Path
 import pytest
 
 pytestmark = pytest.mark.live
-CLI = Path(__file__).resolve().parents[3] / ".claude/skills/twitter/scripts/twitter.py"
+CLI = Path(__file__).resolve().parents[3] / ".claude/skills/twitter/scripts/cli.py"
 GUARD = Path(__file__).with_name("guard_aside.py")
+
+
+def more_args(command):
+    """A more: command is the allowed-tools invocation of this CLI; run its arguments with this interpreter."""
+    words = shlex.split(command)
+    assert words[:3] == ["uv", "run", str(CLI)], command
+    return words[3:]
 
 
 def run(args):
@@ -41,12 +48,12 @@ def test_live_feeds_profiles_and_continuations():
     home = run(["home", "--limit", "3"])
     assert home["results"] and all(r["kind"] == "tweet" for r in home["results"])
     following = run(["home", "--feed", "following", "--limit", "3"])
-    continuation = shlex.split(following["next"])[2:]
+    continuation = more_args(following["next"])
     tail = run(continuation)
     assert tail["budget"]["requests"] == 0
     assert {r["id"] for r in following["results"]}.isdisjoint(r["id"] for r in tail["results"])
     # Consume a full cached tail plus some of the next server page in one invocation.
-    larger = shlex.split(tail["next"])[2:]
+    larger = more_args(tail["next"])
     larger[larger.index("--limit") + 1] = "65"
     page2 = run(larger)
     assert page2["budget"]["requests"] >= 1

@@ -182,8 +182,12 @@ def response(op, v, scenario="normal"):
             root = []
         if scenario == "empty_users":
             root = instructions([], cursor=(cursor or "") + "x")
-    path = ROOTS.get(op, "data.user.result.timeline.timeline.instructions")
+    return 200, wrap(op, root)
+
+
+def wrap(op, root):
+    """A response body holding `root` where the operation's registry root path points."""
     body = root
-    for key in reversed(path.split(".")):
+    for key in reversed(ROOTS.get(op, "data.user.result.timeline.timeline.instructions").split(".")):
         body = {key: body}
-    return 200, body
+    return body
