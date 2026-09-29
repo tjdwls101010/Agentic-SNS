@@ -69,24 +69,46 @@ def value(field, args):
     return field(args) if callable(field) else field
 
 
-JSON = Arg(('--json',), dict(action='store_true', help='Emit exactly one JSON document, including partial results and recovery.'))
-LIMIT = Arg(('--limit',), dict(type=int, help='Display target: 10 items; single post 20 replies. Batch posts return all results without this option. Explicit limits allow 40 requests.'))
-CHARS = Arg(('--chars',), dict(type=int, help='Text characters per item, default 280; the focal post is always full.'), 280)
-OUT = Arg(('--out',), dict(metavar='FILE', help='Commit whole date-eligible pages as private NDJSON; repeat the same command to resume.'))
-AFTER = Arg(('--after',), dict(type=int, metavar='N', help='Resume a numbered more: handle, consuming cached items before requesting another page.'))
-DATES = tuple(Arg(('--' + flag,), dict(help=f'Client date filter ({flag} ISO date/time); chronological tabs only. until is exclusive.'))
-              for flag in ('since', 'until'))
-BROWSE = (LIMIT, CHARS, OUT, AFTER)
-TARGET = Arg(('target',), dict(help='@handle/profile URL for profiles; X URL or numeric ID for other targets.'))
-TARGETS = Arg(('target',), dict(nargs='+', help='@handle/profile URL for profiles; X URL or numeric ID for other targets.'))
+EXITS = {
+    0: 'success',
+    2: 'arguments or local state: change what the fix names',
+    3: 'Aside is unavailable or its reply was invalid',
+    4: 'no usable X session in Aside',
+    5: 'blocked, rate-limited, or the account window is full: wait or unblock as the fix says',
+    6: 'X changed something or failed transiently: the error says which',
+    7: 'empty: a valid response with no matching items',
+    8: 'partial results, or this run spent its request budget: more: continues',
+    9: 'unavailable: a deleted, protected or suspended target',
+}
+JSON = Arg(('--json',), dict(action='store_true', help='Print one JSON document instead of text, including partial results and the error fix.'))
+OUT = Arg(('--out',), dict(metavar='FILE', help='Also save whole date-eligible pages to this private NDJSON file; run the same command again to resume.'))
+PROFILE = Arg(('target',), dict(help='@handle or x.com profile URL; numeric user IDs are not accepted.'))
+POST = Arg(('target',), dict(help='x.com post URL or numeric post ID.'))
 
 
-def tab(*choices):
-    return Arg(('--tab',), dict(choices=list(choices), help=f'Tab to read; default {choices[0]}.'), choices[0])
+def limit(noun, default, extra=''):
+    return Arg(('--limit',), dict(type=int, help=f'{noun} to show, default {default}{extra}. Giving --limit lets this run make up to 40 requests instead of 10.'))
 
 
-def sort(*choices, default):
-    return Arg(('--sort',), dict(choices=list(choices), help='Post ranking; default latest for search, top otherwise. Account search uses People ranking and has no sort option.'), default)
+def chars(what, extra=''):
+    return Arg(('--chars',), dict(type=int, help=f'Characters of {what} to show per item, default 280{extra}.'), 280)
+
+
+def after(extra=''):
+    return Arg(('--after',), dict(type=int, metavar='N', help='Continue from the handle in a more: line; its cached items come first, with no request.' + extra))
+
+
+def dates(scope):
+    return (Arg(('--since',), dict(help=f'Keep posts at or after this date (YYYY-MM-DD or ISO time); {scope} only.')),
+            Arg(('--until',), dict(help=f'Keep posts before this date, exclusive (YYYY-MM-DD or ISO time); {scope} only.')))
+
+
+def tab(*choices, help):
+    return Arg(('--tab',), dict(choices=list(choices), help=help), choices[0])
+
+
+def sort(*choices, default, help):
+    return Arg(('--sort',), dict(choices=list(choices), help=help), default)
 
 
 def dated(allowed, fix):
@@ -99,35 +121,48 @@ def batch(args):
 
 NO_AFTER = Rule(lambda a, g: a.after and a.tab == 'about', 'This lookup does not support --after.',
                 'Remove --after; --tab about returns the whole card in one request.')
+POSTS = (limit('Posts', 10), chars('post text'), OUT, after())
+ACCOUNTS = (limit('Accounts', 10), chars('bio'), OUT, after())
 SURFACES = {
-    'home': Surface('Read your personalized For you or chronological Following feed.',
-                    (*BROWSE, *DATES, Arg(('--feed',), dict(choices=['foryou', 'following'], help='Feed to read, default foryou.'), 'foryou')),
+    'home': Surface('Read your home feed: For you (personalized ranking) or Following (chronological).',
+                    (*POSTS, *dates('with --feed following'),
+                     Arg(('--feed',), dict(choices=['foryou', 'following'], help='Feed: foryou (personalized ranking, default) or following (chronological).'), 'foryou')),
                     (dated(lambda a: a.feed == 'following', 'Add --feed following (the chronological feed), or remove --since/--until.'),),
                     operation=operations.home, personal=True),
-    'user': Surface('Read a profile tab. replies-only is an ungated, mixed posts/replies alternative.',
-                    (*BROWSE, *DATES, tab('posts', 'replies', 'replies-only', 'media', 'highlights', 'articles'), TARGET),
+    'user': Surface('Read one profile tab of an account.',
+                    (*POSTS, *dates('tabs posts, replies, replies-only and media'),
+                     tab('posts', 'replies', 'replies-only', 'media', 'highlights', 'articles',
+                         help='Tab, default posts. replies needs a signed request; replies-only is unsigned but mixes in some non-reply posts; articles lists articles, their bodies not expanded.'),
+                     PROFILE),
                     (dated(lambda a: a.tab in ('posts', 'replies', 'replies-only', 'media'),
                            'Use --tab posts, replies, replies-only or media, or remove --since/--until.'),), 'user',
                     operations.user, operations.profile_id),
-    'about': Surface('Read one or several profile cards in one request.', (CHARS, OUT, TARGETS), (), 'user',
-                     operations.about, finish=operations.unresolved_handles, rows='user', continuable=False,
+    'about': Surface('Read one or several profile cards in one request.',
+                     (chars('bio'), OUT, Arg(('target',), dict(nargs='+', help='One or more @handles or x.com profile URLs, read together in one request; numeric user IDs are not accepted.'))),
+                     (), 'user', operations.about, finish=operations.unresolved_handles, rows='user', continuable=False,
                      limit=lambda a: len(a.target)),
-    'post': Surface('Open a post with parents and replies; several IDs fetch posts without threads.',
-                    (*BROWSE, sort('top', 'recent', default='top'), TARGETS),
+    'post': Surface('Open a post with its parents and replies, or fetch several posts by ID without threads.',
+                    (limit('Replies', 20, '; the post and its parents are always shown'),
+                     chars('parent and reply text', '; the opened post is always shown in full'), OUT, after(),
+                     sort('top', 'recent', default='top', help='Reply order, default top (X ranking); recent is newest first.'),
+                     Arg(('target',), dict(nargs='+', help='x.com post URL or numeric post ID. Several IDs fetch just those posts, without replies, and refuse --limit, --sort and --after.'))),
                     (Rule(lambda a, g: batch(a) and g['limit'] is not None, 'Batch post lookup returns every requested post and has no --limit.',
                           'Remove --limit, or open one post for replies.', early=True),
                      Rule(lambda a, g: batch(a) and (g['sort'] is not None or g['after'] is not None), 'Batch post lookup has no replies or continuation.',
                           'Remove --sort and --after, or open one post for its replies.')),
                     'post', operations.post, finish=operations.thread_completeness, continuable=lambda a: not batch(a),
                     limit=lambda a: len(a.target) if batch(a) else 20),
-    'quotes': Surface('Find posts quoting a post; uses the shared search bucket.', (*BROWSE, TARGET), (), 'post', operations.quotes),
-    'reposts': Surface('Read the accounts that reposted a post.', (*BROWSE, TARGET), (), 'post', operations.reposts,
+    'quotes': Surface('Find posts quoting a post; spends the search bucket.',
+                      (limit('Quoting posts', 10), chars('post text'), OUT, after(), POST), (), 'post', operations.quotes),
+    'reposts': Surface('Read the accounts that reposted a post.', (*ACCOUNTS, POST), (), 'post', operations.reposts,
                        rows='user', sparse=True),
-    'search': Surface('Search posts, accounts or media. X search operators pass through unchanged.',
-                      (*BROWSE, sort('top', 'latest', default=lambda a: 'latest' if a.type != 'users' else None),
-                       Arg(('target',), dict(help='Search text, including X from:, since:, until: or engagement operators.')),
-                       Arg(('--type',), dict(choices=['posts', 'users', 'media'], help='Search product, default posts; all share one operation bucket.'), 'posts'),
-                       Arg(('--in',), dict(dest='scope', choices=['communities'], help='Search posts across ALL communities; only posts/latest supported.'))),
+    'search': Surface('Search posts, accounts or media; X search operators pass through unchanged.',
+                      (limit('Posts or accounts', 10), chars('post text or bio'), OUT, after(),
+                       sort('top', 'latest', default=lambda a: 'latest' if a.type != 'users' else None,
+                            help='Post order, default latest (newest first); top is X ranking. Not with --type users or media, which have one ranking each.'),
+                       Arg(('target',), dict(help='Search text; X operators such as from:, since:, until: and min_faves: pass through unchanged.')),
+                       Arg(('--type',), dict(choices=['posts', 'users', 'media'], help='Product: posts (default), users (accounts, People ranking) or media. All three spend the one search bucket.'), 'posts'),
+                       Arg(('--in',), dict(dest='scope', choices=['communities'], help='Search posts across all communities, newest first; not with --type or --sort.'))),
                       (Rule(lambda a, g: a.type == 'media' and g['sort'] is not None, 'Media search has one ranking; --sort would not change it.',
                             'Remove --sort for --type media.'),
                        Rule(lambda a, g: a.type == 'users' and g['sort'] is not None, 'Account search uses X People ranking, not top/latest post sorting.',
@@ -136,34 +171,53 @@ SURFACES = {
                             'Community search reads posts newest first: remove --type and --sort, or drop --in communities.')),
                       operation=operations.search, rows=lambda a: 'user' if a.type == 'users' else 'tweet',
                       sparse=lambda a: a.type == 'users'),
-    'graph': Surface('Read following, followers, verified followers or followers you know.',
-                     (*BROWSE, Arg(('target',), dict(help='@handle or profile URL; numeric user IDs are unavailable.')),
-                      Arg(('relation',), dict(choices=['following', 'followers', 'verified', 'known'], help='Relationship list to read.'))),
+    'graph': Surface("Read an account's following, followers, verified followers, or followers you know.",
+                     (*ACCOUNTS, PROFILE,
+                      Arg(('relation',), dict(choices=['following', 'followers', 'verified', 'known'],
+                                              help='Which list: following, followers (signed request), verified (their verified followers) or known (their followers whom you follow).'))),
                      (), 'user', operations.graph, operations.profile_id, rows='user', sparse=True),
-    'me': Surface('Read your bookmarks or liked posts.',
-                  (*BROWSE, Arg(('collection',), dict(choices=['bookmarks', 'likes'], help='Your private collection to read.'))),
+    'me': Surface('Read your own bookmarks or liked posts.',
+                  (*POSTS, Arg(('collection',), dict(choices=['bookmarks', 'likes'], help='Which of your collections: bookmarks or likes.'))),
                   operation=operations.collection, prepare=operations.viewer_likes, personal=True),
-    'list': Surface('Read list posts, members or its information card.', (*BROWSE, *DATES, tab('posts', 'members', 'about'), TARGET),
+    'list': Surface("Read a list's posts, members or information card.",
+                    (limit('Posts or members', 10), chars('post text, bio or list description'), OUT, after(' Not with --tab about.'),
+                     *dates('--tab posts'),
+                     tab('posts', 'members', 'about', help='Tab, default posts: members lists accounts; about is the list card, read in one request.'),
+                     Arg(('target',), dict(help='x.com/i/lists URL or numeric list ID.'))),
                     (NO_AFTER, dated(lambda a: a.tab == 'posts', 'Use --tab posts, or remove --since/--until.')), 'list', operations.listing,
                     rows=lambda a: {'posts': 'tweet', 'members': 'user', 'about': 'place'}[a.tab]),
     'trends': Surface('Read trends and events from an Explore tab; other item types are counted.',
-                      (*BROWSE, tab('trending', 'foryou', 'news', 'sports', 'entertainment')),
+                      (limit('Trends', 10), chars('trend description'), OUT, after(),
+                       tab('trending', 'foryou', 'news', 'sports', 'entertainment', help='Explore tab, default trending.')),
                       operation=operations.trends, fetch=operations.explore, rows='trend'),
-    'community': Surface('Read community posts, media or information and member roles.',
-                         (*BROWSE, tab('posts', 'media', 'about'), sort('top', 'recent', default='top'), TARGET),
+    'community': Surface("Read a community's posts, media, or information card with member roles.",
+                         (limit('Posts or members', 10), chars('post text, bio or community description'), OUT, after(' Not with --tab about.'),
+                          tab('posts', 'media', 'about', help='Tab, default posts: media, or about for the card and member roles.'),
+                          sort('top', 'recent', default='top', help='Post order for --tab posts, default top (X ranking); recent is newest first.'),
+                          Arg(('target',), dict(help='x.com/i/communities URL or numeric community ID.'))),
                          (Rule(lambda a, g: a.tab != 'posts' and g['sort'] is not None, 'Sorting only applies to community posts.',
                                'Remove --sort, or use --tab posts.'), NO_AFTER),
                          'community', operations.community, operations.community_card,
                          rows=lambda a: 'user' if a.tab == 'about' else 'tweet', continuable=lambda a: a.tab != 'about'),
-    'communities': Surface('Browse community posts with links to their communities.', BROWSE, operation=operations.communities),
+    'communities': Surface('Browse posts from communities, each with a link to its community.', POSTS, operation=operations.communities),
     'doctor': Surface('Check Aside, your viewer, protection state and cache ages.',
-                      (Arg(('--unblock',), dict(action='store_true', help='Clear a challenge/lock after checking X in Aside; rate limits still apply.')),),
+                      (Arg(('--unblock',), dict(action='store_true', help='After resolving a challenge or lock in Aside, clear it, then diagnose; rate limits still apply.')),),
                       runner=lambda args: summary(maintenance.doctor(args))),
     'refresh': Surface('Mine current read-query IDs and signatures, then verify two operations before saving.',
                        runner=lambda args: summary(maintenance.refresh(args))),
     'schema': Surface('Describe the normalized output fields without making requests.', runner=lambda args: schema()),
 }
 UNSET = ('limit', 'after', 'since', 'until', 'tab', 'sort', 'feed', 'type', 'scope', 'relation', 'collection', 'target')
+
+
+class Wide(argparse.HelpFormatter):
+    """Help that never folds a sentence and keeps the line breaks it was written with."""
+
+    def __init__(self, prog):
+        super().__init__(prog, max_help_position=30, width=10_000)
+
+    def _fill_text(self, text, width, indent):
+        return ''.join(indent + line for line in text.splitlines(keepends=True))
 
 
 class Parser(argparse.ArgumentParser):
@@ -187,12 +241,11 @@ def parse_fix(message):
 
 
 def parser():
-    p = Parser(description='Read-only X (Twitter) via the logged-in Aside u0 browser.',
-               epilog='Exit: 0 success; 2 arguments; 3 Aside; 4 session; 5 blocked/rate/window; '
-                      '6 API drift; 7 empty; 8 partial/budget; 9 unavailable. Errors include a recovery fix.')
+    p = Parser(description='Read-only X (Twitter) via the logged-in Aside u0 browser.', formatter_class=Wide,
+               epilog='Exit codes; every error also carries a recovery fix:\n' + ''.join(f'  {code}  {meaning}\n' for code, meaning in EXITS.items()))
     subs = p.add_subparsers(dest='command', required=True)
     for name, surface in SURFACES.items():
-        sub = subs.add_parser(name, help=surface.help, description=surface.help)
+        sub = subs.add_parser(name, help=surface.help, description=surface.help, formatter_class=Wide)
         for arg in (JSON, *surface.args):
             sub.add_argument(*arg.flags, **arg.options)
     return p

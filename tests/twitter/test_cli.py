@@ -223,3 +223,59 @@ def test_media_search_refuses_a_sort_it_would_ignore(fake_env):
     code, doc = invoke(["search", "x", "--type", "media", "--sort", "top"], fake_env)
     assert (code, doc["error"]) == (2, "arguments") and "Remove --sort" in doc["fix"]
     assert not Path(fake_env["TWITTER_FAKE_LOG"]).exists()
+
+
+def help_text(*command):
+    done = subprocess.run([sys.executable, str(CLI), *command, "--help"], capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+    return done.stdout
+
+
+def option(output, flag):
+    """The help of one option or positional: its line, and the next when a long invocation pushed the help there."""
+    lines = output.splitlines()
+    index = next(i for i, line in enumerate(lines) if re.match(r"\s+" + re.escape(flag) + r"\b", line))
+    following = lines[index + 1] if index + 1 < len(lines) else ""
+    return lines[index] + (" " + following.strip() if re.match(r"\s{20,}\S", following) else "")
+
+
+COMMANDS = ["home", "user", "about", "post", "quotes", "reposts", "search", "graph", "me", "list", "trends",
+            "community", "communities", "doctor", "refresh", "schema"]
+
+
+@pytest.mark.parametrize("command", ["", *COMMANDS])
+def test_help_never_folds_a_sentence(command):
+    output = help_text(*([command] if command else []))
+    folded = [line for line in output.splitlines() if re.match(r"\s{20,}[a-z]", line)]
+    assert folded == [] and all(len(line) < 400 or " " in line for line in output.splitlines())
+
+
+@pytest.mark.parametrize("command", ["home", "user", "about", "quotes", "reposts", "search", "graph", "me", "list",
+                                     "trends", "community", "communities"])
+def test_only_post_help_talks_about_batches_and_the_focal_post(command):
+    output = help_text(command).lower()
+    assert "batch" not in output and "focal" not in output
+
+
+def test_help_states_each_command_s_own_units_and_limits():
+    assert "--feed following" in option(help_text("home"), "--since")
+    user = help_text("user")
+    assert "numeric" in option(user, "target") and "not accepted" in option(user, "target")
+    assert all(tab in option(user, "--since") for tab in ("posts", "replies", "replies-only", "media"))
+    assert "not expanded" in option(user, "--tab")
+    assert "bio" in option(help_text("about"), "--chars")
+    post = help_text("post")
+    assert all(flag in option(post, "target") for flag in ("--limit", "--sort", "--after"))
+    assert "latest" not in option(post, "--sort") and "account" not in option(post, "--sort").lower()
+    for command in ("reposts", "graph"):
+        assert "accounts" in option(help_text(command), "--limit").lower() and "bio" in option(help_text(command), "--chars")
+    search = help_text("search")
+    assert "--type users" in option(search, "--sort") and "media" in option(search, "--sort")
+    listing = help_text("list")
+    assert "--tab about" in option(listing, "--after") and "--tab posts" in option(listing, "--since")
+    trends = help_text("trends")
+    assert "--after" in trends and "description" in option(trends, "--chars")
+    community = help_text("community")
+    assert "--tab posts" in option(community, "--sort") and "--tab about" in option(community, "--after")
+    root = help_text()
+    assert all(f"{code} " in root for code in (0, 2, 3, 4, 5, 6, 7, 8, 9))
