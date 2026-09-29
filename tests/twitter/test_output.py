@@ -172,3 +172,10 @@ def test_a_secondary_bucket_shows_only_when_it_runs_low(fake_env):
     assert 'UserByScreenName 20/150' in output.splitlines()[0] and 'UserByScreenName 20/150 resets' not in output
     code, output = text(['user', '@example', '--limit', '1'], fake_env)
     assert 'UserByScreenName' not in output.splitlines()[0]
+
+
+def test_envelope_and_export_topics_are_json_schemas(fake_env):
+    code, envelope = invoke(['schema', 'envelope'], fake_env)
+    assert envelope['$schema'].startswith('https://json-schema.org') and 'empty_pages' in envelope['properties']['stop_reason']['enum']
+    code, export = invoke(['schema', 'export'], fake_env)
+    assert export['$schema'].startswith('https://json-schema.org') and export['oneOf']

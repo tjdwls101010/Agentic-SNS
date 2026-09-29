@@ -7,12 +7,12 @@ from ...dates import timestamp
 
 def expand(text, links, media=()):
     """Text with t.co links replaced by their targets and media links removed; the model never needs a t.co URL."""
+    media = {item['url'] for item in media if item.get('url')}
+    for url in media:
+        text = re.sub(r'\s*' + re.escape(url), '', text)
     for link in links:
-        if link.get('url'):
+        if link.get('url') and link['url'] not in media:
             text = text.replace(link['url'], link.get('expanded_url') or link['url'])
-    for item in media:
-        if item.get('url'):
-            text = re.sub(r'\s*' + re.escape(item['url']), '', text)
     return text
 
 
@@ -205,7 +205,7 @@ def build_tweet(node, pinned=False, _depth=0):
     original = build_tweet(legacy.get('retweeted_status_result', {}).get('result'), _depth=_depth + 1)
     quote = build_tweet(node.get('quoted_status_result', {}).get('result'), _depth=_depth + 1)
     note = node.get('note_tweet', {}).get('note_tweet_results', {}).get('result', {})
-    entities = note.get('entity_set') or legacy.get('entities', {})
+    entities = note['entity_set'] if note.get('text') and isinstance(note.get('entity_set'), dict) else legacy.get('entities', {})
     media_links = legacy.get('extended_entities', {}).get('media', []) + legacy.get('entities', {}).get('media', [])
     text = expand(note.get('text', legacy.get('full_text', '')), entities.get('urls', []), media_links)
     media = []

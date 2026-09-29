@@ -163,7 +163,7 @@ class Transport:
                     session = self.session(force=True)
                     if session['viewer_id'] != previous_viewer:
                         raise TwitterError(2, 'The X account changed while recovering the session.',
-                                           'Start a new query and use a new output file for this account.', 'viewer_changed')
+                                           'Rerun the command without --after, and pass a new --out path for this account.', 'viewer_changed')
                     continue
                 if error.error == 'transaction_rejected' and not signature_retry:
                     signature_retry = True

@@ -71,8 +71,8 @@ def ranked_feed():
 def date_window():
     days = [(d, 'Sep') for d in range(30, 0, -1)] + [(31, 'Aug'), (30, 'Aug')]
     posts = [post(1000 + i, f'Daily note for {month} {day}.', when(day, 12, month), 10) for i, (day, month) in enumerate(days)]
-    return [page('UserTweets', posts[:10], 'c1'), page('UserTweets', posts[10:20], 'c2', 'c1'),
-            page('UserTweets', posts[20:], None, 'c2')]
+    return [page(op, chunk, cursor, after) for op in ('UserTweets', 'UserTweetsAndReplies', 'SearchTimeline')
+            for chunk, cursor, after in ((posts[:10], 'c1', None), (posts[10:20], 'c2', 'c1'), (posts[20:], None, 'c2'))]
 
 
 def thread_sample():
@@ -223,9 +223,10 @@ def main():
     copy = Path(tempfile.mkdtemp(prefix='twitter-skill-copy-')) / 'twitter'
     shutil.copytree(SKILL / 'scripts', copy / 'scripts', ignore=shutil.ignore_patterns('__pycache__'))
     body = skill_body(options.skill, options.drop)
-    jobs = [(s, t) for s in scenarios for t in (options.treatment or ['A', 'C']) for _ in range(options.repeat)]
+    jobs = [(s, t, options.label + (f'.{i}' if options.repeat > 1 else '')) for s in scenarios
+            for t in (options.treatment or ['A', 'C']) for i in range(1, options.repeat + 1)]
     with ThreadPoolExecutor(options.parallel) as pool:
-        results = list(pool.map(lambda job: run(options.out, copy, job[0], job[1], body, options.label), jobs))
+        results = list(pool.map(lambda job: run(options.out, copy, job[0], job[1], body, job[2]), jobs))
     with open(options.out / 'results.jsonl', 'a') as stream:
         for result in results:
             stream.write(json.dumps(result, ensure_ascii=False) + '\n')

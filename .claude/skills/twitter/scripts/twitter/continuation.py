@@ -1,5 +1,6 @@
 """Private continuation handles: random names, bound to their query and viewer, valid for a day after issue."""
 import json
+import math
 import os
 import re
 import secrets
@@ -51,18 +52,27 @@ class CursorStore:
             raise TwitterError(2, 'Continuation is missing or belongs to a different query/account.', 'Copy --after from the latest more: line, or rerun without --after.') from None
         if data.get('format') != FORMAT:
             raise TwitterError(2, 'This continuation was written by an older version of the skill.', 'Rerun the command without --after.')
-        if time.time() - data.get('created_at', 0) > LIFETIME:
+        created = data.get('created_at')
+        if not isinstance(created, (int, float)) or isinstance(created, bool) or not math.isfinite(created):
+            raise TwitterError(2, 'Continuation is missing or belongs to a different query/account.', 'Copy --after from the latest more: line, or rerun without --after.')
+        if time.time() - created > LIFETIME:
             raise TwitterError(2, 'This continuation expired 24 hours after it was issued.', 'Rerun the command without --after.')
         if data.get('context') != context or not isinstance(data.get('pending'), list):
             raise TwitterError(2, 'Continuation is missing or belongs to a different query/account.', 'Copy --after from the latest more: line, or rerun without --after.')
         return data
 
     def sweep(self):
-        """Delete handles older than their lifetime; return how many remain."""
+        """Delete handles past their lifetime, counted from the issue time they record (the file time when they record none); return how many remain."""
         remaining = 0
         for path in self.directory.glob('*.json') if self.directory.is_dir() else ():
             try:
-                if time.time() - path.stat().st_mtime > LIFETIME:
+                try:
+                    created = json.loads(path.read_text()).get('created_at')
+                except (ValueError, AttributeError):
+                    created = None
+                if not isinstance(created, (int, float)) or isinstance(created, bool) or not math.isfinite(created):
+                    created = path.stat().st_mtime
+                if time.time() - created > LIFETIME:
                     path.unlink()
                 else:
                     remaining += 1

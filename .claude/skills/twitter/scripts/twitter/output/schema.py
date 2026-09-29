@@ -28,7 +28,7 @@ MEANINGS = {
         'in_reply_to_id': 'Parent post ID; the parent may not be on this page.',
         'mentions': 'Mentioned handles without @, in order of appearance, each once.',
         'urls': 'Expanded link targets.',
-        'is_pinned': 'Pinned to the profile; date windows ignore it.',
+        'is_pinned': 'Pinned to the profile; an old pin never ends a date window early, though --since/--until still drop it when it falls outside.',
         'limited_actions': 'Actions X restricts on this post, such as Reply.',
         'is_note_tweet': 'A long post whose full text came from X\'s note.',
         **{key: NULL_COUNT for key in ('reply_count', 'retweet_count', 'quote_count', 'like_count', 'bookmark_count', 'view_count')},
@@ -78,10 +78,10 @@ ENVELOPE = {
     'reported / direct_shown / nested_shown / hidden_branches': 'Thread completeness: replies X counted, direct and nested replies shown, and reply branches X collapsed (not followed).',
     'other_items / promoted': 'Trends: Explore items that are neither trends nor events, and ads, both left out.',
     'unresolved': 'about: handles X returned no card for.',
-    'already_complete': 'With --out: the file already holds the whole listing; nothing was requested.',
+    'already_complete': 'With --out: the file already holds the whole listing; no page was requested.',
 }
 STOPS = {
-    'limit_reached': 'The display target was met; more: continues, its cached items first.',
+    'limit_reached': 'The display target was met; when the result carries a more: line, it continues with the cached items first.',
     'exhausted': 'X has no further page.',
     'window_reached': 'Profile posts went past --since; only profile posts are ordered enough to prove this.',
     'not_paginable': 'A single lookup or a one-page surface.',
@@ -189,10 +189,8 @@ def schema(topic=None, exits=None, text=True):
             lines.append(f'{key} {kind if key not in DYNAMIC.get(topic, {}) else "(dynamic)"} {meaning}'.rstrip())
         return {'ok': True, 'summary': '\n'.join(lines)}
     if topic == 'envelope':
-        data = {'fields': ENVELOPE, 'stop_reasons': STOPS, 'exit_codes': {str(k): v for k, v in (exits or {}).items()},
-                'errors': {name: dict(exit=code, meaning=meaning) for name, (code, meaning) in ERRORS.items()}}
         if not text:
-            return data
+            return envelope_schema(exits or {})
         lines = ['envelope: every JSON result; text output shows the same facts in its header and closing lines', 'fields:']
         lines += [f'  {name}: {meaning}' for name, meaning in ENVELOPE.items()]
         lines += ['stop reasons:'] + [f'  {name}: {meaning}' for name, meaning in STOPS.items()]
@@ -200,5 +198,32 @@ def schema(topic=None, exits=None, text=True):
         lines += ['error classes:'] + [f'  {name} (exit {code}): {meaning}' for name, (code, meaning) in ERRORS.items()]
         return {'ok': True, 'summary': '\n'.join(lines)}
     if not text:
-        return {'format': 2, 'lines': dict(EXPORT)}
+        return export_schema()
     return {'ok': True, 'summary': '\n'.join(['export: --out writes private NDJSON, format 2'] + [f'{name}: {rule}' for name, rule in EXPORT])}
+
+
+def envelope_schema(exits):
+    properties = {}
+    for names, meaning in ENVELOPE.items():
+        for name in names.split(' / '):
+            properties[name] = {'description': meaning}
+    properties['stop_reason'] = {'type': 'string', 'enum': list(STOPS),
+                                 'description': ' '.join(f'{name}: {meaning}' for name, meaning in STOPS.items())}
+    properties['error'] = {'type': 'string', 'enum': list(ERRORS),
+                           'description': ' '.join(f'{name} (exit {code}): {meaning}' for name, (code, meaning) in ERRORS.items())}
+    return {'$schema': 'https://json-schema.org/draft/2020-12/schema', 'title': 'result envelope', 'type': 'object',
+            'description': 'Exit codes: ' + '; '.join(f'{code} {meaning}' for code, meaning in exits.items()),
+            'properties': properties, 'required': ['ok']}
+
+
+def export_schema():
+    rules = dict(EXPORT)
+    return {'$schema': 'https://json-schema.org/draft/2020-12/schema', 'title': '--out NDJSON line', 'description': rules['resume'] + ' ' + rules['window'],
+            'oneOf': [
+                {'description': rules['header'], 'type': 'object', 'required': ['kind', 'format'],
+                 'properties': {'kind': {'const': 'header'}, 'format': {'const': 2}}},
+                {'description': rules['page'], 'type': 'object', 'required': ['kind', 'ids', 'n', 'state', 'stop_reason'],
+                 'properties': {'kind': {'const': 'page'}, 'ids': {'type': 'array', 'items': {'type': 'string'}}, 'n': {'type': 'integer'},
+                                'state': {'type': 'object'}, 'stop_reason': {'enum': list(STOPS)}}},
+                {'description': rules['record'] + ' See schema tweet, user, list, community or trend.', 'type': 'object',
+                 'required': ['kind'], 'properties': {'kind': {'enum': ['tweet', 'user', 'list', 'community', 'trend', 'event']}}}]}

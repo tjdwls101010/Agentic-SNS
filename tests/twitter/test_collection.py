@@ -239,3 +239,59 @@ def test_an_existing_export_readable_by_others_is_refused_untouched_and_new_ones
     fresh = tmp_path / 'fresh.ndjson'
     invoke(['user', '@example', '--out', str(fresh)], fake_env)
     assert fresh.stat().st_mode & 0o777 == 0o600
+
+
+def test_an_export_inside_the_cache_directory_is_refused(fake_env):
+    code, doc = invoke(['user', '@example', '--out', str(home(fake_env) / 'budget.json')], fake_env)
+    assert (code, doc['error']) == (2, 'arguments') and '--out' in doc['fix'] and calls(fake_env) == []
+
+
+def test_a_damaged_line_before_committed_pages_is_not_truncated_away(fake_env, tmp_path):
+    out = tmp_path / 'posts.ndjson'
+    invoke(['user', '@example', '--limit', '2', '--out', str(out)], fake_env)
+    lines = out.read_text().splitlines(keepends=True)
+    lines[1] = '{damaged\n'
+    out.write_text(''.join(lines))
+    before = out.read_bytes()
+    code, doc = invoke(['user', '@example', '--limit', '2', '--out', str(out)], fake_env)
+    assert (code, doc['error']) == (2, 'arguments') and out.read_bytes() == before
+
+
+def test_malformed_local_state_is_a_structured_refusal(fake_env, tmp_path):
+    code, doc = invoke(['user', '@example', '--limit', '2'], fake_env)
+    state = home(fake_env) / 'cursors' / f"{doc['next_handle']}.json"
+    saved = json.loads(state.read_text())
+    for created in (float('nan'), float('inf'), None, 'yesterday'):
+        state.write_text(json.dumps(dict(saved, created_at=created)))
+        code, refused = invoke(more_args(doc['next']), fake_env)
+        assert (code, refused['error']) == (2, 'arguments'), created
+    out = tmp_path / 'odd.ndjson'
+    invoke(['user', '@example', '--limit', '2', '--out', str(out)], fake_env)
+    lines = out.read_text().splitlines(keepends=True)
+    out.write_text(lines[0] + '[1, 2]\n' + ''.join(lines[1:]))
+    code, doc = invoke(['user', '@example', '--limit', '2', '--out', str(out)], fake_env)
+    assert (code, doc['error']) == (2, 'arguments')
+
+
+def test_sweep_follows_the_issue_time_not_the_file_time(fake_env):
+    code, doc = invoke(['user', '@example', '--limit', '2'], fake_env)
+    state = home(fake_env) / 'cursors' / f"{doc['next_handle']}.json"
+    data = json.loads(state.read_text())
+    state.write_text(json.dumps(dict(data, created_at=data['created_at'] - 90000)))
+    invoke(['home', '--limit', '2'], fake_env)
+    assert not state.exists()
+
+
+@pytest.mark.parametrize('args,flag', [(['home', '--feed', 'following', '--since', ''], '--since'),
+                                       (['home', '--out', ''], '--out')])
+def test_empty_option_values_are_refused(args, flag, fake_env):
+    code, doc = invoke(args, fake_env)
+    assert (code, doc['error']) == (2, 'arguments') and flag in doc['fix'] and calls(fake_env) == []
+
+
+def test_a_readable_export_fix_quotes_its_path(fake_env, tmp_path):
+    shared = tmp_path / 'private posts.ndjson'
+    shared.write_text('')
+    shared.chmod(0o644)
+    code, doc = invoke(['user', '@example', '--out', str(shared)], fake_env)
+    assert f"chmod 600 '{shared}'" in doc['fix']

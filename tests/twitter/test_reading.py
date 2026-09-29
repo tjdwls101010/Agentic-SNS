@@ -251,3 +251,16 @@ def test_bio_links_are_expanded(fake_env):
     script(fake_env, {'op': 'UserByScreenName', 'body': wrap('UserByScreenName', node)})
     code, doc = invoke(['about', '@example'], fake_env)
     assert doc['results'][0]['description'] == 'Reads at https://example.com/bio'
+
+
+def test_an_empty_note_entity_set_brings_no_mentions_from_the_short_text(fake_env):
+    node = linked_post()
+    node['note_tweet'] = {'note_tweet_results': {'result': {'text': 'No mentions here', 'entity_set': {}}}}
+    assert only_post(fake_env, node)['mentions'] == []
+
+
+def test_a_media_link_listed_among_urls_is_still_removed(fake_env):
+    node = post('200', text='Look https://t.co/photo')
+    node['legacy']['entities'] = {'urls': [{'url': 'https://t.co/photo', 'expanded_url': 'https://x.com/example/status/200/photo/1'}],
+                                  'media': [PHOTO]}
+    assert only_post(fake_env, node)['text'] == 'Look'

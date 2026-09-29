@@ -2,7 +2,9 @@
 import fcntl
 import json
 import os
+import shlex
 from pathlib import Path
+from .account.state import cache_dir
 from .errors import TwitterError
 
 COMPLETE = {'exhausted', 'window_reached', 'not_paginable', 'terminated'}
@@ -14,10 +16,17 @@ def line(value):
 
 
 def check(path):
-    """Refuse an existing export other users can read, before any request; its bytes and mode stay as they are."""
+    """Before any request: refuse an export inside the skill's cache, or an existing one other users can read (left as it is)."""
     existing = Path(path).expanduser()
+    cache = cache_dir().expanduser().resolve()
+    if existing.resolve() == cache or cache in existing.resolve().parents:
+        raise TwitterError(2, 'The --out file would sit inside the skill\'s cache and be overwritten by it.', 'Pass --out a path outside ' + str(cache) + '.')
     if existing.exists() and existing.stat().st_mode & 0o077:
-        raise TwitterError(2, 'The --out file can be read by other users.', f'Run chmod 600 {path}, or pass a new --out path.')
+        raise readable(path)
+
+
+def readable(path):
+    return TwitterError(2, 'The --out file can be read by other users.', f'Run chmod 600 {shlex.quote(str(path))}, or pass a new --out path.')
 
 
 class OutFile:
@@ -28,6 +37,8 @@ class OutFile:
         try:
             fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600)
             self.stream = os.fdopen(fd, 'r+b')
+            if os.fstat(fd).st_mode & 0o077:
+                raise readable(path)
             fcntl.flock(self.stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
             self.recover()
         except (OSError, ValueError, TwitterError) as error:
@@ -50,20 +61,28 @@ class OutFile:
         if header != dict(kind='header', format=FORMAT, **self.context):
             raise TwitterError(2, 'Output belongs to a different query or viewer.', 'Pass a new --out path; this file holds a different query or account.')
         boundary, page = self.stream.tell(), []
+        damaged = TwitterError(2, 'Output page integrity check failed.', 'Keep this file and pass a new --out path.')
         while raw := self.stream.readline():
             if not raw.endswith(b'\n'):
                 break
             try:
                 record = json.loads(raw)
+                if not isinstance(record, dict):
+                    raise ValueError
             except ValueError:
+                if self.stream.read(1):
+                    raise damaged from None
                 break
             if record.get('kind') == 'page' and 'id' not in record:
-                if record.get('ids') != [r.get('id') for r in page] or record.get('n') != len(page):
-                    raise TwitterError(2, 'Output page integrity check failed.', 'Keep this file and pass a new --out path.')
+                try:
+                    if record['ids'] != [r.get('id') for r in page] or record['n'] != len(page) or not isinstance(record['state'], dict):
+                        raise ValueError
+                    self.complete = record['stop_reason'] in COMPLETE
+                except (KeyError, TypeError, ValueError):
+                    raise damaged from None
                 self.ids.update(record['ids'])
                 self.count += len(page)
                 self.state = record['state']
-                self.complete = record['stop_reason'] in COMPLETE
                 boundary, page = self.stream.tell(), []
             else:
                 page.append(record)

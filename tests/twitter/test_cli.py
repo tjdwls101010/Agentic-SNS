@@ -1,10 +1,11 @@
+import json
 import re
 import subprocess
 import sys
 from pathlib import Path
 import pytest
 
-from .helpers import CLI, invoke
+from .helpers import CLI, invoke, run as run_plain
 
 
 @pytest.mark.parametrize(
@@ -279,3 +280,31 @@ def test_help_states_each_command_s_own_units_and_limits():
     assert "--tab posts" in option(community, "--sort") and "--tab about" in option(community, "--after")
     root = help_text()
     assert all(f"{code} " in root for code in (0, 2, 3, 4, 5, 6, 7, 8, 9))
+
+
+def test_help_owns_the_liker_limit_and_local_date_filtering():
+    assert "who liked a post" in help_text()
+    for command, flag in (("home", "--since"), ("user", "--until"), ("list", "--since")):
+        text = option(help_text(command), flag)
+        assert "fetched" in text and "since:" in text, text
+
+
+def test_a_search_text_that_looks_like_an_option_survives_more(fake_env):
+    from .helpers import more_args
+    done = run_plain(["search", "--json", "--limit", "2", "--", "-filter:retweets"], fake_env, json_mode=False)
+    words = more_args(json.loads(done.stdout)["next"])
+    assert words[-2:] == ["--", "-filter:retweets"]
+    more = json.loads(run_plain(words, fake_env, json_mode=False).stdout)
+    assert more["ok"] and more["results"]
+
+
+@pytest.mark.parametrize("args,flag", [(["search", "q", "--type", "bad value"], "--type"), (["home", "--json=yes"], "--json"),
+                                       (["home", "--feed", "following", "--since", "0001-01-01T00:00:00+23:00"], "--since")])
+def test_odd_argument_values_still_get_a_named_fix(args, flag, fake_env):
+    done = run_plain([*args, "--json"] if "--json=yes" not in args else args, fake_env)
+    doc = json.loads(done.stdout) if done.stdout.startswith("{") else {}
+    assert done.returncode == 2 and flag in (doc.get("fix") or done.stdout), done.stdout
+
+
+def test_community_search_help_matches_what_it_refuses():
+    assert "--sort top" in option(help_text("search"), "--in")

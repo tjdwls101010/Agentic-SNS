@@ -311,7 +311,8 @@ def test_doctor_rereads_the_cookie_and_reports_a_matching_viewer(fake_env):
 
 def test_doctor_finds_a_changed_viewer_and_drops_its_continuations(fake_env):
     handle_file(fake_env)
-    script(fake_env, {'snippet': 'cookie', 'body': {'ct0': 'other', 'twid': 'u%3D200'}})
+    script(fake_env, {'snippet': 'cookie', 'body': {'ct0': 'other', 'twid': 'u%3D200'}},
+           {'op': 'Viewer', 'body': wrap('Viewer', user('200', 'other'))})
     code, doc = invoke(['doctor'], fake_env)
     assert code == 0 and doc['viewer_changed'] is True and doc['continuations'] == 0
     assert 'viewer changed' in doc['summary'] and not list((home(fake_env) / 'cursors').glob('*.json'))
@@ -339,3 +340,33 @@ def test_doctor_sweeps_expired_continuations(fake_env):
     old, fresh = handle_file(fake_env, 'old000', age=90000), handle_file(fake_env, 'new000')
     code, doc = invoke(['doctor'], fake_env)
     assert not old.exists() and fresh.exists() and doc['continuations'] == 1
+
+
+def test_doctor_refuses_to_certify_a_viewer_x_does_not_confirm(fake_env):
+    script(fake_env, {'op': 'Viewer', 'body': wrap('Viewer', user('200', 'someone'))})
+    before = (home(fake_env) / 'session.json').read_text()
+    code, doc = invoke(['doctor'], fake_env)
+    assert (code, doc['error']) == (2, 'viewer_changed') and 'doctor' in doc['fix']
+    assert json.loads((home(fake_env) / 'session.json').read_text()).get('viewer_handle') != 'someone'
+    assert json.loads(before)['viewer_id'] == '100'
+
+
+def test_doctor_sweeps_even_when_diagnosis_fails(fake_env):
+    old = handle_file(fake_env, 'old000', age=0)
+    old.write_text(json.dumps({'format': 2, 'created_at': time.time() - 90000}))
+    code, doc = invoke(['doctor'], dict(fake_env, TWITTER_ASIDE_BIN='/nonexistent/aside'))
+    assert code == 3 and not old.exists()
+
+
+def test_doctor_reports_a_block_even_with_unreadable_registry_cache(fake_env):
+    (home(fake_env) / 'budget.json').write_text(json.dumps({'block': {'reason': 'challenge', 'expires_at': None}}))
+    (home(fake_env) / 'registry.json').write_text('{broken')
+    code, doc = invoke(['doctor'], fake_env)
+    assert (code, doc['error']) == (5, 'challenge') and 'unverified (blocked)' in doc['summary']
+
+
+def test_doctor_reports_signature_material_it_made_during_the_check(fake_env):
+    (home(fake_env) / 'txid.json').unlink()
+    script(fake_env, *material_pages())
+    code, doc = invoke(['doctor'], fake_env)
+    assert code == 0 and doc['txid_age_days'] == 0 and 'signature material 0d' in doc['summary']

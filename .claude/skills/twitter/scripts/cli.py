@@ -101,8 +101,9 @@ def after(extra=''):
 
 
 def dates(scope):
-    return (Arg(('--since',), dict(help=f'Keep posts at or after this date (YYYY-MM-DD or ISO time); {scope} only.')),
-            Arg(('--until',), dict(help=f'Keep posts before this date, exclusive (YYYY-MM-DD or ISO time); {scope} only.')))
+    local = 'filters the posts fetched here, not on X; search since: and until: filter on X instead'
+    return (Arg(('--since',), dict(help=f'Keep posts at or after this date (YYYY-MM-DD or ISO time); {scope} only. It {local}.')),
+            Arg(('--until',), dict(help=f'Keep posts before this date, exclusive (YYYY-MM-DD or ISO time); {scope} only. It {local}.')))
 
 
 def tab(*choices, help):
@@ -172,7 +173,7 @@ SURFACES = {
                             help='Post order, default latest (newest first); top is X ranking. Not with --type users or media, which have one ranking each.'),
                        Arg(('target',), dict(help='Search text; X operators such as from:, since:, until: and min_faves: pass through unchanged.')),
                        Arg(('--type',), dict(choices=['posts', 'users', 'media'], help='Product: posts (default), users (accounts, People ranking) or media. All three spend the one search bucket.'), 'posts'),
-                       Arg(('--in',), dict(dest='scope', choices=['communities'], help='Search posts across all communities, newest first; not with --type or --sort.'))),
+                       Arg(('--in',), dict(dest='scope', choices=['communities'], help='Search posts across all communities, newest first; --type users or media and --sort top are refused.'))),
                       (Rule(lambda a, g: a.type == 'media' and g['sort'] is not None, 'Media search has one ranking; --sort would not change it.',
                             'Remove --sort for --type media.'),
                        Rule(lambda a, g: a.type == 'users' and g['sort'] is not None, 'Account search uses X People ranking, not top/latest post sorting.',
@@ -243,10 +244,12 @@ class Parser(argparse.ArgumentParser):
 
 def parse_fix(message):
     """A fix naming the argument argparse refused."""
-    if match := re.match(r"argument (\S+): invalid choice: \S+ \(choose from (.+)\)", message):
+    if match := re.match(r"argument (\S+): invalid choice: '.*?' \(choose from (.+)\)", message):
         return f'Pass {match[1]} one of: ' + match[2].replace("'", '') + '.'
     if match := re.match(r'argument (\S+): invalid int value', message):
         return f'Pass {match[1]} a whole number.'
+    if match := re.match(r'argument (\S+): ignored explicit argument', message):
+        return f'Pass {match[1]} on its own, without a value.'
     if match := re.match(r'argument (\S+): expected one argument', message):
         return f'Give {match[1]} a value.'
     if match := re.match(r'unrecognized arguments: (.+)', message):
@@ -257,7 +260,7 @@ def parse_fix(message):
 
 
 def parser():
-    p = Parser(description='Read-only X (Twitter) via the logged-in Aside u0 browser.', formatter_class=Wide,
+    p = Parser(description='Read-only X (Twitter) via the logged-in Aside u0 browser. X offers no list of who liked a post, so no command reads one.', formatter_class=Wide,
                epilog='Exit codes; every error also carries a recovery fix:\n' + ''.join(f'  {code}  {meaning}\n' for code, meaning in EXITS.items()))
     subs = p.add_subparsers(dest='command', required=True)
     for name, surface in SURFACES.items():
@@ -275,6 +278,9 @@ def validate(args):
         if not hasattr(args, key):
             setattr(args, key, None)
     given = args.given = dict(vars(args))
+    for arg in surface.args:
+        if arg.flags[0].startswith('--') and given.get(arg.dest) == '':
+            raise TwitterError(2, f'{arg.flags[0]} was given an empty value.', f'Give {arg.flags[0]} a value, or leave it out.')
     args.explicit_limit = args.limit is not None
     if args.out and args.after is not None:
         raise TwitterError(2, '--out resumes from its own page commits.', 'Repeat the same --out command without --after.')
@@ -323,17 +329,17 @@ def context_for(args, op):
 
 def more_command(args, handle):
     """The next call: positionals, the options that were typed, --limit always (the next display target), then --after."""
-    parts = [args.command]
+    positionals, options = [], []
     for arg in SURFACES[args.command].args:
         typed = args.given.get(arg.dest)
         if not arg.flags[0].startswith('-'):
-            parts.extend(typed if isinstance(typed, list) else [typed])
+            positionals.extend(typed if isinstance(typed, list) else [typed])
         elif typed is not None and arg.dest not in ('limit', 'chars', 'after', 'out'):
-            parts.extend([arg.flags[0], str(typed)])
-    parts += ['--limit', str(args.limit)]
-    if args.given.get('chars') is not None:
-        parts += ['--chars', str(args.chars)]
-    parts += ['--after', handle] + (['--json'] if args.json else [])
+            options.extend([arg.flags[0], str(typed)])
+    options += ['--limit', str(args.limit)] + (['--chars', str(args.chars)] if args.given.get('chars') is not None else [])
+    options += ['--after', handle] + (['--json'] if args.json else [])
+    dashed = any(str(value).startswith('-') for value in positionals)
+    parts = [args.command, *options, '--', *positionals] if dashed else [args.command, *positionals, *options]
     return invocation() + ' ' + shlex.join(parts)
 
 
