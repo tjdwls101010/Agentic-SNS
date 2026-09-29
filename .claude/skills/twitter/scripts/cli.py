@@ -47,7 +47,7 @@ class Rule:
 class Surface:
     """Everything one command is: its arguments and refusals, what it asks X for, and how its result is shaped.
 
-    `target` is the kind its positional targets parse as; `fixes` maps an error class to this command's own fix (a function of the args, None to keep the general one); `operation(args)` gives the operation and variables; `prepare`, `fetch` and `finish` are browse/operations hooks (see browse.run); `rows` is the record kind listed; `continuable` issues more: handles; `sparse` stops an account list after three empty pages; `personal` rechecks the viewer cookie; `limit` is the display target when --limit is absent; `runner(args)` replaces all of this for doctor, refresh and schema. A field may be a function of the parsed args.
+    `target` is the kind its positional targets parse as; `fixes` maps an error class to this command's own fix (a function of the args, None to keep the general one); `operation(args)` gives the operation and variables; `prepare`, `fetch` and `finish` are browse/operations hooks (see browse.run); `rows` is the record kind listed; `continuable` issues more: handles; `sparse` stops an account list after three empty pages; `personal` rechecks the viewer cookie; `limit` is the display target when --limit is absent; `label` names in the text header what the request asked for (default: the command); `runner(args)` replaces all of this for doctor, refresh and schema. A field may be a function of the parsed args.
     """
     help: str
     args: tuple = ()
@@ -64,6 +64,7 @@ class Surface:
     limit: int | Callable = 10
     runner: Callable | None = None
     fixes: dict = field(default_factory=dict)
+    label: Callable | None = None
 
 
 def value(field, args):
@@ -134,7 +135,7 @@ SURFACES = {
                     (*POSTS, *dates('with --feed following'),
                      Arg(('--feed',), dict(choices=['foryou', 'following'], help='Feed: foryou (personalized ranking, default) or following (chronological).'), 'foryou')),
                     (dated(lambda a: a.feed == 'following', 'Add --feed following (the chronological feed), or remove --since/--until.'),),
-                    operation=operations.home, personal=True),
+                    operation=operations.home, personal=True, label=lambda a: f'home {a.feed}'),
     'user': Surface('Read one profile tab of an account.',
                     (*POSTS, *dates('tabs posts, replies, replies-only and media'),
                      tab('posts', 'replies', 'replies-only', 'media', 'highlights', 'articles',
@@ -142,7 +143,7 @@ SURFACES = {
                      PROFILE),
                     (dated(lambda a: a.tab in ('posts', 'replies', 'replies-only', 'media'),
                            'Use --tab posts, replies, replies-only or media, or remove --since/--until.'),), 'user',
-                    operations.user, operations.profile_id,
+                    operations.user, operations.profile_id, label=lambda a: f'user {a.tab}',
                     fixes=signed(lambda a: 'Run refresh, then retry; or use --tab replies-only, which is unsigned but mixes in some non-reply posts.'
                                  if a.tab == 'replies' else None)),
     'about': Surface('Read one or several profile cards in one request.',
@@ -159,6 +160,7 @@ SURFACES = {
                      Rule(lambda a, g: batch(a) and (g['sort'] is not None or g['after'] is not None), 'Batch post lookup has no replies or continuation.',
                           'Remove --sort and --after, or open one post for its replies.')),
                     'post', operations.post, finish=operations.thread_completeness, continuable=lambda a: not batch(a),
+                    label=lambda a: 'post' if batch(a) else f'post {a.sort}',
                     limit=lambda a: len(a.target) if batch(a) else 20),
     'quotes': Surface('Find posts quoting a post; spends the search bucket.',
                       (limit('Quoting posts', 10), chars('post text'), OUT, after(), POST), (), 'post', operations.quotes),
@@ -178,28 +180,29 @@ SURFACES = {
                        Rule(lambda a, g: a.scope and (a.type != 'posts' or a.sort != 'latest'), 'Community search only supports posts/latest.',
                             'Community search reads posts newest first: remove --type and --sort, or drop --in communities.')),
                       operation=operations.search, rows=lambda a: 'user' if a.type == 'users' else 'tweet',
-                      sparse=lambda a: a.type == 'users'),
+                      sparse=lambda a: a.type == 'users',
+                      label=lambda a: 'search ' + ('in=communities' if a.scope else {'users': 'rank=people', 'media': 'product=media'}.get(a.type, a.sort))),
     'graph': Surface("Read an account's following, followers, verified followers, or followers you know.",
                      (*ACCOUNTS, PROFILE,
                       Arg(('relation',), dict(choices=['following', 'followers', 'verified', 'known'],
                                               help='Which list: following, followers (signed request), verified (their verified followers) or known (their followers whom you follow).'))),
-                     (), 'user', operations.graph, operations.profile_id, rows='user', sparse=True,
+                     (), 'user', operations.graph, operations.profile_id, rows='user', sparse=True, label=lambda a: f'graph {a.relation}',
                      fixes=signed(lambda a: 'Run refresh, then retry. graph <handle> following is no substitute: whom they follow is a different question from who follows them.'
                                   if a.relation == 'followers' else None)),
     'me': Surface('Read your own bookmarks or liked posts.',
                   (*POSTS, Arg(('collection',), dict(choices=['bookmarks', 'likes'], help='Which of your collections: bookmarks or likes.'))),
-                  operation=operations.collection, prepare=operations.viewer_likes, personal=True),
+                  operation=operations.collection, prepare=operations.viewer_likes, personal=True, label=lambda a: f'me {a.collection}'),
     'list': Surface("Read a list's posts, members or information card.",
                     (limit('Posts or members', 10), chars('post text, bio or list description'), OUT, after(' Not with --tab about.'),
                      *dates('--tab posts'),
                      tab('posts', 'members', 'about', help='Tab, default posts: members lists accounts; about is the list card, read in one request.'),
                      Arg(('target',), dict(help='x.com/i/lists URL or numeric list ID.'))),
                     (NO_AFTER, dated(lambda a: a.tab == 'posts', 'Use --tab posts, or remove --since/--until.')), 'list', operations.listing,
-                    rows=lambda a: {'posts': 'tweet', 'members': 'user', 'about': 'place'}[a.tab]),
+                    rows=lambda a: {'posts': 'tweet', 'members': 'user', 'about': 'place'}[a.tab], label=lambda a: f'list {a.tab}'),
     'trends': Surface('Read trends and events from an Explore tab; other item types are counted.',
                       (limit('Trends', 10), chars('trend description'), OUT, after(),
                        tab('trending', 'foryou', 'news', 'sports', 'entertainment', help='Explore tab, default trending.')),
-                      operation=operations.trends, fetch=operations.explore, rows='trend'),
+                      operation=operations.trends, fetch=operations.explore, rows='trend', label=lambda a: f'trends {a.tab}'),
     'community': Surface("Read a community's posts, media, or information card with member roles.",
                          (limit('Posts or members', 10), chars('post text, bio or community description'), OUT, after(' Not with --tab about.'),
                           tab('posts', 'media', 'about', help='Tab, default posts: media, or about for the card and member roles.'),
@@ -208,7 +211,8 @@ SURFACES = {
                          (Rule(lambda a, g: a.tab != 'posts' and g['sort'] is not None, 'Sorting only applies to community posts.',
                                'Remove --sort, or use --tab posts.'), NO_AFTER),
                          'community', operations.community, operations.community_card,
-                         rows=lambda a: 'user' if a.tab == 'about' else 'tweet', continuable=lambda a: a.tab != 'about'),
+                         rows=lambda a: 'user' if a.tab == 'about' else 'tweet', continuable=lambda a: a.tab != 'about',
+                         label=lambda a: f'community {a.tab}' + (f' {a.sort}' if a.tab == 'posts' else '')),
     'communities': Surface('Browse posts from communities, each with a link to its community.', POSTS, operation=operations.communities),
     'doctor': Surface('Check Aside, your viewer, protection state and cache ages.',
                       (Arg(('--unblock',), dict(action='store_true', help='After resolving a challenge or lock in Aside, clear it, then diagnose; rate limits still apply.')),),
@@ -342,7 +346,7 @@ def emit(result, args):
     if args.json:
         print(json.dumps(result, ensure_ascii=False))
     else:
-        print(plain(result) if surface.runner else render(result, args, value(surface.rows, args)))
+        print(plain(result) if surface.runner else render(result, args, value(surface.rows, args), value(surface.label, args) or args.command))
     return code
 
 

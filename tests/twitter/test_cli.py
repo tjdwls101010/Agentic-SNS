@@ -161,7 +161,7 @@ def test_account_search_does_not_claim_a_chronological_sort(fake_env):
     assert p.returncode == 0
     assert 'sort=latest' not in p.stdout
     assert 'rank=people' in p.stdout
-    assert 'requests 1' in p.stdout
+    assert '1 request' in p.stdout
     p = subprocess.run([sys.executable, str(CLI), 'search', 'python', '--type', 'users', '--sort', 'latest', '--json'],
                        capture_output=True, text=True, env=fake_env)
     assert p.returncode == 2

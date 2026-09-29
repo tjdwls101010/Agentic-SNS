@@ -1,6 +1,9 @@
 """What the model reads: dense text rendering and the schema of emitted records."""
+import json
+import re
+
 from .fake_data import tweet, user, wrap
-from .helpers import invoke, script, text
+from .helpers import home, invoke, script, text
 
 
 def test_text_expands_links_drops_media_links_and_marks_line_breaks(fake_env):
@@ -39,7 +42,7 @@ def test_focal_is_full_quote_is_a_next_hop_and_partial_failure_is_reported(fake_
     assert 'text[full]: "A long focal body"' in output
     assert 'https://x.com/i/web/status/2 (open with post)' in output and '[limited: replies]' in output
     assert '0 direct shown of 9 reported' in output and 'hidden branches 2' in output
-    assert output.rstrip('\n').splitlines()[-1].startswith('stopped: rate_limit · Wait until')
+    assert output.rstrip('\n').splitlines()[-1].startswith('stopped: rate_limit: X operation rate limit reached. · fix: Wait until')
 
 
 def test_schema_describes_exactly_the_emitted_post_fields(fake_env):
@@ -76,3 +79,66 @@ def test_place_card_descriptions_follow_chars(fake_env):
         'id_str': '1', 'name': 'Example list', 'description': 'Synthetic list description'})})
     code, output = text(['list', '1', '--tab', 'about', '--chars', '4'], fake_env)
     assert code == 0 and 'Synt…' in output and 'Synthetic list' not in output
+
+
+def business(identity='100', handle='example'):
+    node = user(identity, handle)
+    node.update(verification={'verified_type': 'Business'}, relationship_counts={'followers': 1800000, 'following': 40},
+                profile_bio={'description': 'Reads at https://t.co/bio'},
+                legacy={'entities': {'description': {'urls': [{'url': 'https://t.co/bio', 'expanded_url': 'https://example.com/bio'}]}}})
+    return node
+
+
+def test_listing_renders_as_the_agreed_dense_text(fake_env):
+    node = tweet('2102897863097545197')
+    node['core']['user_results']['result'] = business()
+    node['legacy'].update(full_text='…outbreak\n\nRead the full piece…', created_at='Wed Sep 23 23:08:00 +0000 2026',
+                          favorite_count=855, retweet_count=63, reply_count=137, quote_count=14, entities={})
+    node['views'] = {'count': '126200'}
+    entries = [{'entryId': 'tweet-1', 'content': {'itemContent': {'tweet_results': {'result': node}}}},
+               {'entryId': 'cursor-bottom', 'content': {'cursorType': 'Bottom', 'value': 'next'}}]
+    script(fake_env, {'op': 'UserByScreenName', 'body': wrap('UserByScreenName', business())},
+           {'op': 'UserTweets', 'body': wrap('UserTweets', [{'type': 'TimelineAddEntries', 'entries': entries}])})
+    code, output = text(['user', '@example', '--limit', '1'], dict(fake_env, TZ='Asia/Seoul'))
+    lines = output.rstrip('\n').splitlines()
+    assert code == 0
+    assert re.fullmatch(r'user posts · 1 shown · stopped=limit_reached · 2 requests · UserTweets 490/500 resets 1[45]m · '
+                        r'window 2/200', lines[0]), lines[0]
+    assert lines[1] == ('@example (Example ✓business) · followers 1.8M · following 40 · posts 50 · joined 2020-01 · '
+                        'bio: "Reads at https://example.com/bio" · https://x.com/example')
+    assert lines[2] == '[t1] @example ✓business · 2026-09-24 08:08+09:00 · likes=855 reposts=63 replies=137 quotes=14 views=126.2K'
+    assert lines[3] == '     "…outbreak ⏎⏎ Read the full piece…"'
+    assert lines[4] == '     https://x.com/example/status/2102897863097545197'
+    assert re.fullmatch(r'more: uv run ".+/scripts/cli\.py" user @example --limit 1 --after [a-z0-9]{6}', lines[5])
+    assert len(lines) == 6 and len(lines[0]) <= 120
+
+
+def test_thread_completeness_trend_counts_and_viewer_change_keep_their_lines(fake_env):
+    code, output = text(['post', '200'], fake_env)
+    assert 'replies: 2 direct shown of 7 reported · +1 nested · hidden branches 0' in output.splitlines()
+    assert len(output.splitlines()[0]) <= 120
+    code, output = text(['trends'], fake_env)
+    assert 'other items 0 · promoted excluded 0' in output.splitlines()
+    (home(fake_env) / 'session.json').write_text(json.dumps({'ct0': 'x', 'viewer_id': '200', 'read_at': 0}))
+    code, output = text(['home', '--limit', '1'], fake_env)
+    assert 'viewer changed' in output.splitlines()[0]
+
+
+def test_warnings_are_sentences_once_each_and_a_partial_failure_says_why(fake_env):
+    body = {'data': {'list': {'id_str': '1', 'name': 'Example'}},
+            'errors': [{'code': 214, 'message': 'Synthetic warning'}, {'code': 214, 'message': 'Synthetic warning'}]}
+    script(fake_env, {'op': 'ListByRestId', 'body': body})
+    code, output = text(['list', '1', '--tab', 'about'], fake_env)
+    assert [line for line in output.splitlines() if line.startswith('warning:')] == ['warning: Synthetic warning']
+    code, output = text(['home', '--limit', '10'], dict(fake_env, TWITTER_FAKE_SCENARIO='429'))
+    last = output.rstrip('\n').splitlines()[-1]
+    assert last.startswith('stopped: rate_limit: X operation rate limit reached. · fix: Wait until'), last
+
+
+def test_a_secondary_bucket_shows_only_when_it_runs_low(fake_env):
+    low = {'limit': 150, 'remaining': 20, 'reset': 4102444800}
+    script(fake_env, {'op': 'UserByScreenName', 'body': wrap('UserByScreenName', user()), 'ratelimit': low})
+    code, output = text(['user', '@example', '--limit', '1'], fake_env)
+    assert 'UserByScreenName 20/150' in output.splitlines()[0] and 'UserByScreenName 20/150 resets' not in output
+    code, output = text(['user', '@example', '--limit', '1'], fake_env)
+    assert 'UserByScreenName' not in output.splitlines()[0]

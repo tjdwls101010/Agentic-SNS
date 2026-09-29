@@ -1,5 +1,6 @@
 """Dense human-readable output; normalization and truncation live here alone."""
 import json
+import re
 import time
 from datetime import datetime
 
@@ -17,7 +18,7 @@ def number(value):
 def _text(row, chars=280):
     value = row.get('text', row.get('description', '')) or ''
     value = ' ⏎ '.join(' '.join(part.split()) for part in value.splitlines())
-    return clip(value, chars)
+    return clip(re.sub(r'⏎(\s+⏎)+', '⏎⏎', value), chars)
 
 
 def clip(value, chars):
@@ -45,13 +46,13 @@ def user_card(user, chars=280):
         pieces.append('affiliate ' + str(affiliate.get('description', affiliate.get('url', {}).get('url', ''))))
     if user.get('role'):
         pieces.append(user['role'])
-    pieces.append('url: ' + json.dumps(user.get('profile_url')))
+    pieces.append(str(user.get('profile_url')))
     return ' · '.join(pieces)
 
 
 def local_time(value):
     try:
-        return datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone().isoformat(timespec='minutes')
+        return datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone().isoformat(sep=' ', timespec='minutes')
     except (ValueError, AttributeError):
         return '?'
 
@@ -81,7 +82,7 @@ def tweet_lines(row, index, chars, labels):
         lines.append(f'     quoting @{(quote.get("author") or {}).get("screen_name", "?")}: ' + json.dumps(_text(quote, chars), ensure_ascii=False) + ' (' + str(quote.get('url')) + ')')
     elif row.get('quoted_tweet_id'):
         lines.append(f'     quoting https://x.com/i/web/status/{row["quoted_tweet_id"]} (open with post)')
-    lines.append('     url: ' + json.dumps(row.get('url')))
+    lines.append('     ' + str(row.get('url')))
     if row.get('community_url'):
         lines.append('     community: ' + str(row['community_url']))
     indent = '  ' * min(row.get('depth', 0), 12)
@@ -93,33 +94,29 @@ def plain(result):
     return result.get('summary') or json.dumps(result, ensure_ascii=False, indent=2)
 
 
-def render(result, args, rows):
-    """A listing as dense text; `rows` is the record kind the listing holds."""
-    header = [args.command, f'operation={result.get("operation", "?")}', f'{len(result.get("results", []))} shown']
+def render(result, args, rows, label):
+    """A listing as dense text; `rows` is the record kind listed and `label` names what was asked for."""
+    budget = result.get('budget', {})
+    header = [label, f'{len(result.get("results", []))} shown']
     if result.get('stored') is not None:
         header.append(f'{result["stored"]} stored')
-    if args.sort:
-        header.append('sort=' + args.sort)
-    if getattr(args, 'type', None) == 'users':
-        header.append('rank=people')
-    if args.feed:
-        header.append('feed=' + args.feed + (' (personalized)' if args.feed == 'foryou' else ''))
-    header.extend([f'stopped={result.get("stop_reason")}', f'fetched {result.get("fetched_bytes", 0) / 1048576:.2f}MB'])
-    if 'direct_shown' in result:
-        header.append(f'replies: {result["direct_shown"]} direct shown of {result.get("reported")} reported · +{result["nested_shown"]} nested · hidden branches {result["hidden_branches"]}')
-    if rows == 'trend':
-        header.append(f'other items {result.get("other_items", 0)} · promoted excluded {result.get("promoted", 0)}')
-    budget = result.get('budget', {})
-    for name, bucket in budget.get('operations', {}).items():
-        if bucket:
-            header.append(f'budget {name} {bucket.get("remaining")} of {bucket.get("limit")} (resets in {max(0, round((bucket.get("reset_at", 0) - time.time()) / 60))}m)')
-    header.append(f'requests {budget.get("requests", 0)}')
-    header.append(f'account window {budget.get("window", 0)}/200')
-    if result.get('warnings'):
-        header.append(f'warnings={len(result["warnings"])}')
+    header.append(f'stopped={result.get("stop_reason")}')
+    requests = budget.get('requests', 0)
+    header.append(f'{requests} request' + ('' if requests == 1 else 's'))
+    buckets = budget.get('operations', {})
+    for name in sorted(buckets, key=lambda name: name != result.get('operation')):
+        bucket, main = buckets[name], name == result.get('operation')
+        if bucket and (main or bucket.get('remaining', 0) < bucket.get('limit', 0) * .2):
+            header.append(f'{name} {bucket.get("remaining")}/{bucket.get("limit")}'
+                          + (f' resets {max(0, round((bucket.get("reset_at", 0) - time.time()) / 60))}m' if main else ''))
+    header.append(f'window {budget.get("window", 0)}/200')
     if result.get('viewer_changed'):
         header.append('viewer changed')
     lines, labels = [' · '.join(header)], {}
+    if 'direct_shown' in result:
+        lines.append(f'replies: {result["direct_shown"]} direct shown of {result.get("reported")} reported · +{result["nested_shown"]} nested · hidden branches {result["hidden_branches"]}')
+    if rows == 'trend':
+        lines.append(f'other items {result.get("other_items", 0)} · promoted excluded {result.get("promoted", 0)}')
     if card := result.get('card'):
         lines.append(user_card(card, args.chars) if card['kind'] == 'user' else place_card(card, args.chars))
     for index, row in enumerate(result.get('results', []), 1):
@@ -137,10 +134,18 @@ def render(result, args, rows):
         lines.append('unresolved: ' + ', '.join('@' + h for h in result['unresolved']))
     if result.get('next'):
         lines.append('more: ' + result['next'])
+    for warning in dict.fromkeys(warning_text(w) for w in result.get('warnings', [])):
+        lines.append('warning: ' + warning)
     if result.get('error'):
-        lines.append('stopped: ' + result['error'] + ' · ' + result.get('fix', ''))
+        lines.append(f'stopped: {result["error"]}: {result.get("message", "")} · fix: {result.get("fix", "")}')
     return '\n'.join(lines)
 
 
+def warning_text(warning):
+    if isinstance(warning, dict):
+        return str(warning.get('message') or f'X reported error code {warning.get("code")} alongside the data.')
+    return str(warning)
+
+
 def place_card(row, chars):
-    return ' · '.join(clip(str(row[k]), chars) if k == 'description' else str(row[k]) for k in ('name', 'description') if row.get(k)) + ' · ' + ' · '.join(f'{k}={row[k]}' for k in ('member_count', 'subscriber_count', 'mode', 'join_policy', 'is_nsfw') if row.get(k) is not None) + ' · url: ' + json.dumps(row.get('url'))
+    return ' · '.join(clip(str(row[k]), chars) if k == 'description' else str(row[k]) for k in ('name', 'description') if row.get(k)) + ' · ' + ' · '.join(f'{k}={row[k]}' for k in ('member_count', 'subscriber_count', 'mode', 'join_policy', 'is_nsfw') if row.get(k) is not None) + ' · ' + str(row.get('url'))
