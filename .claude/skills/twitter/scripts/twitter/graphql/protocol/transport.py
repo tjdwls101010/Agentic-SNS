@@ -1,11 +1,28 @@
 """Read-only transport and ordered response classification."""
 import json
 import re
-from ._errors import TwitterError, scrub
-from ._blocked import account_lock, set_blocked
-from ._aside import run_snippet
-from ._budget import Budget
-from ._registry import Registry, learn
+from pathlib import Path
+from ...errors import TwitterError, scrub
+from ...account.state import account_lock, set_blocked
+from ...aside.repl import run
+from ...account.budget import Budget
+from .registry import Registry, learn
+
+SNIPPETS = Path(__file__).resolve().parent / 'snippets'
+
+
+def run_snippet(name, args):
+    """Run one of this folder's browser snippets through Aside; names outside the folder are refused."""
+    if not isinstance(name, str) or Path(name).name != name:
+        raise TwitterError(3, 'Invalid browser snippet.', 'Reinstall the Twitter skill.')
+    name = name if name.endswith('.js') else name + '.js'
+    try:
+        source = (SNIPPETS / name).read_text(encoding='utf-8')
+        if not source.strip():
+            raise ValueError
+    except (OSError, ValueError):
+        raise TwitterError(3, 'Browser snippet is missing or invalid.', 'Reinstall the Twitter skill.') from None
+    return run(source, args)
 
 
 def root_at(data, path):
@@ -92,17 +109,17 @@ class Transport:
             return envelope
 
     def session(self, force=False, personal=False):
-        from ._session import ensure
+        from .session import ensure
         return ensure(self, force, personal)
 
     def transaction(self, force=False):
-        from ._txid import load_material
+        from .signature import load_material
         if self.material is None or force:
             self.material = load_material(self, force)
         return self.material
 
     def query(self, operation, variables=None, expect=None):
-        from ._txid import generate
+        from .signature import generate
         spec = self.registry.get(operation)
         variables = self.registry.variables(operation, **(variables or {}))
         session = self.session()

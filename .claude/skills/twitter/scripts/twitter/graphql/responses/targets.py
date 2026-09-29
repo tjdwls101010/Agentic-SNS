@@ -2,7 +2,7 @@
 import re
 from dataclasses import dataclass
 from urllib.parse import urlsplit
-from ._errors import TwitterError
+from ...errors import TwitterError
 
 
 @dataclass

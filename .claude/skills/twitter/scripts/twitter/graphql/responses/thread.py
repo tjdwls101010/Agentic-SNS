@@ -1,6 +1,6 @@
 """Thread roles follow reply IDs, while modules retain missing-branch evidence."""
-from ._models import build_tweet
-from ._errors import TwitterError
+from .records import build_tweet
+from ...errors import TwitterError
 
 
 def thread_records(page, focal_id, continuing=False):

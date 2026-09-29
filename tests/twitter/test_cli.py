@@ -1,3 +1,4 @@
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -172,3 +173,10 @@ def test_profile_card_respects_requested_text_length(fake_env):
     assert p.returncode == 0
     assert 'bio: "Syn…"' in p.stdout
     assert 'Synthetic profile' not in p.stdout
+
+
+def test_more_command_starts_with_the_allowed_tools_invocation(fake_env):
+    skill = CLI.parents[1]
+    allowed = re.search(r'(?m)^allowed-tools: Bash\((.+) \*\)$', (skill / 'SKILL.md').read_text())[1]
+    code, doc = invoke(["user", "@example", "--limit", "2"], fake_env)
+    assert doc["next"].startswith(allowed.replace("${CLAUDE_SKILL_DIR}", str(skill)) + " ")

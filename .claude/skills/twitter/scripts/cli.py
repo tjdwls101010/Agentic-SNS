@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 """Read X through Aside. This entry point only validates and dispatches."""
 import argparse
-import importlib.util
 import json
+import os
+import re
+import shlex
 import sys
-from pathlib import Path
 
-if not __package__:
-    root = Path(__file__).resolve().parent
-    spec = importlib.util.spec_from_file_location('twitter_skill', root / '__init__.py', submodule_search_locations=[str(root)])
-    package = importlib.util.module_from_spec(spec)
-    sys.modules['twitter_skill'] = package
-    spec.loader.exec_module(package)
-    __package__ = 'twitter_skill'
-
-from ._errors import TwitterError
-from ._entities import timestamp
-from ._target import parse
+from twitter.browse.maintenance import run as maintain
+from twitter.browse.operations import operation, resolve
+from twitter.browse.run import run as browse
+from twitter.dates import timestamp
+from twitter.errors import TwitterError
+from twitter.output.doctor import summary
+from twitter.output.render import render
+from twitter.output.schema import schema
 
 DESCRIPTIONS = {
     'home': 'Read your personalized For you or chronological Following feed.',
@@ -131,22 +133,71 @@ def validate(args):
     kinds = {'user': 'user', 'about': 'user', 'graph': 'user', 'post': 'post', 'quotes': 'post', 'reposts': 'post', 'list': 'list', 'community': 'community'}
     if args.command in kinds:
         values = args.target if isinstance(args.target, list) else [args.target]
-        args.targets = [parse(v, kinds[args.command]) for v in values]
+        args.targets = resolve(values, kinds[args.command])
     args.limit = args.limit or (len(args.target) if args.command == 'about' or args.command == 'post' and len(args.target) > 1 else 20 if args.command == 'post' else 10)
     args.chars = args.chars or 280
     return args
+
+
+def invocation():
+    """This CLI as its allowed-tools pattern runs it: the path as called, double-quoted, never resolved."""
+    return 'uv run "' + re.sub(r'([\\"$`])', r'\\\1', os.path.abspath(__file__)) + '"'
+
+
+def context_for(args, op):
+    """A query's identity for continuations and exports; the run attaches the viewer."""
+    targets = [t.handle.lower() if t.handle else t.tweet_id or t.list_id or t.community_id for t in args.targets] if hasattr(args, 'targets') else args.target
+    return dict(command=args.command, target=targets, operation=op, viewer_id=None,
+                **{key: getattr(args, key) for key in ('tab', 'sort', 'feed', 'type', 'scope', 'relation', 'collection', 'since', 'until')})
+
+
+def more_command(args, number):
+    parts = [args.command]
+    if args.target:
+        parts.extend(args.target if isinstance(args.target, list) else [args.target])
+    if args.relation:
+        parts.append(args.relation)
+    if args.collection:
+        parts.append(args.collection)
+    for key in ('tab', 'sort', 'feed', 'type', 'scope', 'since', 'until'):
+        value = getattr(args, key)
+        if value is not None:
+            parts.extend(['--in' if key == 'scope' else '--' + key, value])
+    parts.extend(['--limit', str(args.limit), '--after', str(number)])
+    return invocation() + ' ' + shlex.join(parts)
+
+
+def emit(result, args):
+    code = result.pop('code', 0)
+    result.pop('state', None)
+    result.setdefault('next', None)
+    result.setdefault('warnings', [])
+    result.setdefault('fetched_bytes', 0)
+    result.setdefault('budget', {})
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False))
+    else:
+        print(render(result, args))
+    return code
+
+
+def dispatch(args):
+    if args.command == 'schema':
+        return schema()
+    if args.command in ('doctor', 'refresh'):
+        return summary(maintain(args))
+    op, _ = operation(args)
+    result = browse(args, context_for(args, op))
+    if result.get('next_handle'):
+        result['next'] = more_command(args, result['next_handle'])
+    return result
 
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     try:
         args = validate(parser().parse_args(argv))
-        from ._output import emit
-        if args.command in ('doctor', 'refresh', 'schema'):
-            from ._cmds_meta import run
-        else:
-            from ._browse import run
-        return emit(run(args), args)
+        return emit(dispatch(args), args)
     except TwitterError as error:
         if '--json' in argv:
             print(json.dumps(error.to_dict(), ensure_ascii=False))

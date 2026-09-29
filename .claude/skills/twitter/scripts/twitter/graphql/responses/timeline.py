@@ -1,6 +1,6 @@
 """Pure instruction walker retaining module boundaries and continuation evidence."""
 from dataclasses import dataclass, field
-from ._errors import TwitterError
+from ...errors import TwitterError
 
 
 @dataclass

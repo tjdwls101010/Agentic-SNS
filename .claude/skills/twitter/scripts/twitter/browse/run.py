@@ -1,89 +1,22 @@
-"""Connect normalized pages, continuation state and page-committed output."""
-import shlex
-from pathlib import Path
-from ._cmds_browse import operation
-from ._entities import build_user, build_place, build_trend
-from ._models import build_tweet
-from ._walk import walk
-from ._thread import thread_records, completeness
-from ._listing import collect
-from ._output import CursorStore, OutFile
-from ._transport import Transport, root_at
-from ._errors import TwitterError
+"""Connect normalized pages, continuation state and page-committed output; the caller turns a handle into more:."""
+from .operations import operation
+from .pagination import collect
+from ..continuation import CursorStore
+from ..export import OutFile
+from ..errors import TwitterError
+from ..graphql.protocol.transport import Transport, root_at
+from ..graphql.responses.pages import normalize_page
+from ..graphql.responses.records import build_place, build_user
+from ..graphql.responses.thread import completeness
 
 
-def context_for(args, op, viewer):
-    targets = [t.handle.lower() if t.handle else t.tweet_id or t.list_id or t.community_id for t in args.targets] if hasattr(args, 'targets') else args.target
-    return dict(command=args.command, target=targets, operation=op, viewer_id=viewer,
-                **{key: getattr(args, key) for key in ('tab', 'sort', 'feed', 'type', 'scope', 'relation', 'collection', 'since', 'until')})
-
-
-def more_command(args, number):
-    parts = ['python3', str(Path(__file__).with_name('twitter.py')), args.command]
-    if args.target:
-        parts.extend(args.target if isinstance(args.target, list) else [args.target])
-    if args.relation:
-        parts.append(args.relation)
-    if args.collection:
-        parts.append(args.collection)
-    for key in ('tab', 'sort', 'feed', 'type', 'scope', 'since', 'until'):
-        value = getattr(args, key)
-        if value is not None:
-            parts.extend(['--in' if key == 'scope' else '--' + key, value])
-    parts.extend(['--limit', str(args.limit), '--after', str(number)])
-    return shlex.join(parts)
-
-
-def normalize_page(root, op, args, cursor=None):
-    if op in ('UserByScreenName', 'UsersByScreenNames', 'TweetResultsByRestIds', 'ListByRestId', 'CommunityByRestId'):
-        nodes = root if isinstance(root, list) else [root]
-        records = []
-        for node in nodes:
-            if not node or node.get('__typename') in ('UserUnavailable', 'TweetTombstone'):
-                continue
-            item = (build_user(node) if op.startswith('User') else build_tweet(node) if op.startswith('Tweet') else
-                    build_place(node, 'list' if op == 'ListByRestId' else 'community'))
-            if item:
-                records.append(item.to_dict())
-        return records, None, dict(not_paginable=True)
-    page = walk(root)
-    if op == 'TweetDetail':
-        rows, metadata = thread_records(page, args.targets[0].tweet_id, continuing=bool(cursor))
-    else:
-        rows, metadata = [], {}
-        desired = 'user' if op in ('Following', 'Followers', 'BlueVerifiedFollowers', 'FollowersYouKnow', 'Retweeters', 'ListMembers', 'CommunityAboutTimeline') or args.command == 'search' and args.type == 'users' else 'trend' if args.command == 'trends' else 'tweet'
-        for entry in page.entries:
-            if entry.kind not in (('trend', 'event') if desired == 'trend' else (desired,)):
-                if entry.kind != 'cursor':
-                    page.other_items += 1
-                continue
-            item = build_tweet(entry.node, entry.pinned) if entry.kind == 'tweet' else build_user(entry.node) if entry.kind == 'user' else build_trend(entry.node, entry.entry_id, entry.kind == 'event')
-            if not item:
-                continue
-            row = item.to_dict()
-            if row.get('promoted'):
-                page.promoted += 1
-                continue
-            if entry.module_id:
-                row['module'] = entry.module_id
-                if entry.module_id.startswith(('communityModerators', 'communityMembers')):
-                    row['role'] = 'moderator' if entry.module_id.startswith('communityModerators') else 'member'
-            if entry.social_context.get('landingUrl'):
-                landing = entry.social_context['landingUrl']
-                row['community_url'] = landing.get('url') if isinstance(landing, dict) else landing
-            rows.append(row)
-        if args.command == 'trends':
-            metadata.update(other_items=page.other_items, promoted=page.promoted, not_paginable=True)
-    metadata['terminated'] = page.terminated
-    return rows, page.bottom_cursor, metadata
-
-
-def run(args):
+def run(args, context):
+    """Fetch and collect one query; `context` is its identity, to which the viewer is attached here."""
     maximum = 40 if args.explicit_limit or args.since or args.out else 10
     transport = Transport(maximum)
     session = transport.session(personal=args.command in ('home', 'me'))
     op, variables = operation(args)
-    context = context_for(args, op, session['viewer_id'])
+    context['viewer_id'] = session['viewer_id']
     store = CursorStore()
     state = store.load(args.after, context) if args.after else {}
     output = OutFile(args.out, context) if args.out else None
@@ -148,7 +81,7 @@ def run(args):
         remaining = result['state'].get('pending') or not result['state'].get('terminal')
         if remaining and not output and op != 'TweetResultsByRestIds' and args.command not in ('about', 'trends') and not (args.command == 'community' and args.tab == 'about'):
             number = store.save(context, result['state'])
-            result['next'] = more_command(args, number)
+            result['next'] = None
             result['next_handle'] = number
         if not result['results'] and not result.get('other_items') and not output and result['code'] == 0 and args.command != 'trends':
             result.update(code=7, error='empty', message='The valid response contained no matching items.', fix='Try a different target or date window.')

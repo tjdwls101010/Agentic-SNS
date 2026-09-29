@@ -1,5 +1,5 @@
 """Pagination policy independent of transport; a pending tail costs no request."""
-from ._errors import TwitterError
+from ..errors import TwitterError
 
 
 def collect(fetch, *, limit=10, state=None, users=False, since=None, until=None, monotonic=False, out=None):

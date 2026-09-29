@@ -2,8 +2,8 @@ import base64
 import json
 from pathlib import Path
 import pytest
-from twitter_skill._errors import TwitterError
-from twitter_skill._txid import compute_animation_key, derive, generate
+from twitter.errors import TwitterError
+from twitter.graphql.protocol.signature import compute_animation_key, derive, generate
 
 
 def test_public_ingredients_match_independent_legacy_vector():

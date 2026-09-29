@@ -4,23 +4,15 @@ import os
 import re
 import shutil
 import subprocess
-from pathlib import Path
 
-from ._errors import TwitterError
-
-SNIPPETS = Path(__file__).resolve().parent / 'browser'
+from ..errors import TwitterError
 
 
-def run_snippet(name, args):
-    if not isinstance(name, str) or Path(name).name != name:
-        raise TwitterError(3, 'Invalid browser snippet.', 'Reinstall the Twitter skill.')
-    name = name if name.endswith('.js') else name + '.js'
+def run(source, args):
+    """Run one browser snippet's source with ARGS in the u0 account's REPL and return its validated envelope."""
     try:
-        source = (SNIPPETS / name).read_text(encoding='utf-8')
-        if not source.strip():
-            raise ValueError
         code = 'const ARGS = ' + json.dumps(args, ensure_ascii=True) + ';\n' + source
-    except (OSError, ValueError, TypeError):
+    except (ValueError, TypeError):
         raise TwitterError(3, 'Browser snippet is missing or invalid.', 'Reinstall the Twitter skill.') from None
     binary = os.environ.get('TWITTER_ASIDE_BIN') or shutil.which('aside')
     if not binary:

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-const source = name => fs.readFileSync(path.resolve(__dirname, '../../../.claude/skills/twitter/scripts/browser', name+'.js'),'utf8');
+const source = name => fs.readFileSync(path.resolve(__dirname, '../../../.claude/skills/twitter/scripts/twitter/graphql/protocol/snippets', name+'.js'),'utf8');
 for (const method of ['GET','POST']) test(method+' contract', async()=>{
   let call; const logs=[];
   await new AsyncFunction('ARGS','fetch','console',source('graphql'))({op:'HomeTimeline',query_id:'abc',method,variables:{count:3,rawQuery:'a & b'},features:{flag:true},ct0:'csrf',bearer:'public',txid:'fresh'},async(url,options)=>{call={url,options};return {status:200,url,text:async()=>'{"data":{}}',headers:{get:()=> '50'}}},{log:x=>logs.push(JSON.parse(x))});

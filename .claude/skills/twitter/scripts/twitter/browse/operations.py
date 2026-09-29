@@ -1,4 +1,6 @@
-"""Resolve CLI browsing intent into immutable operation and variable choices."""
+"""Resolve CLI browsing intent into targets and immutable operation and variable choices."""
+from ..graphql.responses.targets import parse
+
 USER_TABS = {'posts': 'UserTweets', 'replies': 'UserTweetsAndReplies', 'replies-only': 'UserRepliesTimeline',
              'media': 'UserMedia', 'highlights': 'UserHighlightsTweets', 'articles': 'UserArticlesTweets'}
 RELATIONS = dict(following='Following', followers='Followers', verified='BlueVerifiedFollowers', known='FollowersYouKnow')
@@ -44,3 +46,8 @@ def operation(args):
     if command == 'communities':
         return 'CommunitiesExploreTimeline', variables
     return 'ExplorePage', variables
+
+
+def resolve(values, kind):
+    """Parse targets before any request; an invalid one is an argument error."""
+    return [parse(value, kind) for value in values]

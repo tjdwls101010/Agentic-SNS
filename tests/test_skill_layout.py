@@ -28,6 +28,12 @@ SKILLS = {
         'guard': 'store', 'store': 'store',
         'reading': 'feature', 'output': 'feature',
     }),
+    'twitter': ('twitter', {
+        'errors': 'common', 'dates': 'common',
+        'aside': 'system', 'graphql': 'system',
+        'account': 'store', 'continuation': 'store', 'export': 'store',
+        'browse': 'feature', 'output': 'feature',
+    }),
     'yfinance': ('yfinance_skill', {
         'envelope': 'common', 'shape': 'common', 'display': 'common', 'selection': 'common', 'budget': 'common',
         'leaf': 'common',

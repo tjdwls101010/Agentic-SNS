@@ -2,8 +2,8 @@
 import copy
 import json
 from pathlib import Path
-from ._blocked import read_state, write_state
-from ._errors import TwitterError
+from ...account.state import read_state, write_state
+from ...errors import TwitterError
 
 
 class Registry:

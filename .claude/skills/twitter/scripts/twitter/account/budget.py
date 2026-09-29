@@ -1,8 +1,8 @@
 """Reserve before requesting; authoritative headers replace the reservation."""
 import random
 import time
-from ._blocked import read_state, write_state
-from ._errors import TwitterError
+from .state import read_state, write_state
+from ..errors import TwitterError
 
 
 class Budget:

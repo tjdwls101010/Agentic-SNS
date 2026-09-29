@@ -212,7 +212,8 @@ def relocation(text):
         nonlocal count
         count += 1
         return '<CLI>'
-    text = re.sub(r"""uv run \\?"[^"\\]*/scripts/cli\.py\\?"|python3 '?[^' ]*/scripts/twitter\.py'?""", prefix, text)
+    text = re.sub(r"""uv run \\?"[^"\\]*/scripts/cli\.py\\?"|python3 '[^']*/scripts/twitter\.py'|python3 \S*/scripts/twitter\.py""",
+                  prefix, text)
 
     def usage(match):
         nonlocal count

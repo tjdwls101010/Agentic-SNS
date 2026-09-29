@@ -3,8 +3,8 @@ import json
 import re
 import time
 from urllib.parse import unquote
-from ._blocked import account_lock, cache_dir, read_state, write_state
-from ._errors import TwitterError
+from ...account.state import account_lock, cache_dir, read_state, write_state
+from ...errors import TwitterError
 
 
 def viewer_from_twid(value):

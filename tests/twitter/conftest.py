@@ -1,20 +1,10 @@
-import importlib.util
 import json
 import os
-import sys
 import time
-from pathlib import Path
 
 import pytest
 
 from .helpers import FAKE_ASIDE, PROCESS_DOUBLES
-
-ROOT = Path(__file__).resolve().parents[2]
-SCRIPTS = ROOT / '.claude/skills/twitter/scripts'
-spec = importlib.util.spec_from_file_location('twitter_skill', SCRIPTS / '__init__.py', submodule_search_locations=[str(SCRIPTS)])
-module = importlib.util.module_from_spec(spec)
-sys.modules['twitter_skill'] = module
-spec.loader.exec_module(module)
 
 
 @pytest.fixture

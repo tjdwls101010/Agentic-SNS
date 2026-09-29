@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-CLI = ROOT / '.claude/skills/twitter/scripts/twitter.py'
+CLI = ROOT / '.claude/skills/twitter/scripts/cli.py'
 FAKE_ASIDE = Path(__file__).with_name('fake_aside') / 'aside'
 PROCESS_DOUBLES = Path(__file__).with_name('process_doubles')
 FIXTURES = Path(__file__).with_name('fixtures')
@@ -59,7 +59,7 @@ def home(env):
 
 
 def more_args(command):
-    """A more: command is this CLI's own invocation; return the arguments after it."""
+    """A more: command is this CLI's allowed-tools invocation; return the arguments after it."""
     words = shlex.split(command)
-    assert words[:2] == ['python3', str(CLI)], command
-    return words[2:]
+    assert words[:3] == ['uv', 'run', str(CLI)], command
+    return words[3:]

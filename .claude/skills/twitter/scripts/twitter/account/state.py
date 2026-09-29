@@ -5,7 +5,7 @@ import os
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from ._errors import TwitterError
+from ..errors import TwitterError
 
 
 def cache_dir():

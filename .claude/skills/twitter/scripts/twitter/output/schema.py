@@ -1,8 +1,7 @@
 """Schema fields come from the same to_dict interface as emitted records."""
 import types
 from typing import get_args, get_origin, get_type_hints
-from ._entities import User, List, Community, Trend
-from ._models import Tweet, Media
+from ..graphql.responses.records import User, List, Community, Trend, Tweet, Media
 
 MEANINGS = {
     'id': 'Stable X rest_id; join and deduplicate by this field, never by handle.',

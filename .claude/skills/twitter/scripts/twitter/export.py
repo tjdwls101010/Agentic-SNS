@@ -1,47 +1,15 @@
-"""Numbered private continuations and atomic page markers for NDJSON exports."""
+"""Private NDJSON exports committed a whole page at a time, with a query header and tail recovery."""
 import fcntl
 import json
 import os
 from pathlib import Path
-from ._blocked import cache_dir
-from ._errors import TwitterError
+from .errors import TwitterError
 
 COMPLETE = {'exhausted', 'window_reached', 'not_paginable', 'terminated'}
 
 
 def line(value):
     return (json.dumps(value, ensure_ascii=False) + '\n').encode()
-
-
-class CursorStore:
-    def __init__(self):
-        self.directory = cache_dir() / 'cursors'
-
-    def save(self, context, state):
-        self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-        number = 1
-        while True:
-            try:
-                fd = os.open(self.directory / f'{number}.json', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-                break
-            except FileExistsError:
-                number += 1
-        with os.fdopen(fd, 'wb') as stream:
-            stream.write(line(dict(state, context=context)))
-            stream.flush()
-            os.fsync(stream.fileno())
-        return number
-
-    def load(self, number, context):
-        try:
-            if not str(number).isdigit() or int(number) < 1:
-                raise ValueError
-            data = json.loads((self.directory / f'{int(number)}.json').read_text())
-            if data.get('context') != context or not isinstance(data.get('pending'), list):
-                raise ValueError
-            return data
-        except (OSError, ValueError, AttributeError):
-            raise TwitterError(2, 'Continuation is missing or belongs to a different query/account.', 'Copy the complete more: command, or start a new query.') from None
 
 
 class OutFile:
@@ -112,18 +80,3 @@ class OutFile:
         if self.stream:
             self.stream.close()
             self.stream = None
-
-
-def emit(result, args):
-    from ._render import render
-    code = result.pop('code', 0)
-    result.pop('state', None)
-    result.setdefault('next', None)
-    result.setdefault('warnings', [])
-    result.setdefault('fetched_bytes', 0)
-    result.setdefault('budget', {})
-    if args.json:
-        print(json.dumps(result, ensure_ascii=False))
-    else:
-        print(render(result, args))
-    return code

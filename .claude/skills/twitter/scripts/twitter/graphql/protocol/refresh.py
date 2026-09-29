@@ -3,10 +3,10 @@ import json
 import os
 import tempfile
 import time
-from ._blocked import account_lock, cache_dir, read_state, write_state
-from ._registry import Registry
-from ._txid import derive
-from ._errors import TwitterError
+from ...account.state import account_lock, cache_dir, read_state, write_state
+from .registry import Registry
+from .signature import derive
+from ...errors import TwitterError
 
 
 def refresh(transport):
@@ -63,11 +63,6 @@ def refresh(transport):
         raise
     feature_changes = [name for name, value in features.items() if current.data['features'].get(name) != value]
     verified = ['UserByScreenName', 'SearchTimeline']
-    summary = (f'verified {verified} · discovered {len(operations) - len(missing)} · changed {len(changed)} · '
-               f'unchanged {len(operations) - len(changed)} · missing {missing} · features {len(features)} '
-               + ' '.join(('+' if features[name] else '-') + name for name in feature_changes) + ' · txid ok')
-    if changed:
-        summary += ' · ' + ', '.join(f'{c["operation"]}({c["old"]}→{c["new"]})' for c in changed)
     return dict(ok=True, results=[], stop_reason='not_paginable', verified=verified, discovered=len(operations) - len(missing),
                 changed=changed, missing=missing, features=features, absent_features=absent_features,
-                txid='ok', summary=summary, failures=harvested.get('failures', []), code=0)
+                txid='ok', summary=None, failures=harvested.get('failures', []), code=0, feature_changes=feature_changes)
