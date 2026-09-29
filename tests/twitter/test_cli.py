@@ -1,12 +1,9 @@
-import json
-import os
-import time
 import subprocess
 import sys
 from pathlib import Path
 import pytest
 
-CLI = Path(__file__).resolve().parents[2] / ".claude/skills/twitter/scripts/twitter.py"
+from .helpers import CLI, invoke
 
 
 @pytest.mark.parametrize(
@@ -52,28 +49,6 @@ def test_help(command):
 def test_invalid_before_network(args):
     p = subprocess.run([sys.executable, str(CLI), *args, "--json"], capture_output=True, text=True)
     assert p.returncode == 2
-
-
-@pytest.fixture
-def fake_env(tmp_path):
-    home = tmp_path / "cache"
-    home.mkdir()
-    (home / "session.json").write_text(json.dumps({"ct0": "synthetic", "viewer_id": "100", "read_at": time.time()}))
-    (home / "txid.json").write_text(
-        json.dumps({"key_bytes": [1] * 48, "animation_key": "synthetic", "fetched_at": time.time()})
-    )
-    return {
-        **os.environ,
-        "TWITTER_HOME": str(home),
-        "TWITTER_ASIDE_BIN": str(Path(__file__).parent / "fake_aside/aside"),
-        "TWITTER_FAKE_LOG": str(tmp_path / "calls.ndjson"),
-    }
-
-
-def invoke(args, env):
-    p = subprocess.run([sys.executable, str(CLI), *args, "--json"], capture_output=True, text=True, env=env)
-    assert p.stdout, p.stderr
-    return p.returncode, json.loads(p.stdout)
 
 
 @pytest.mark.parametrize(

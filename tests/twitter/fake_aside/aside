@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+"""Fake Aside CLI answering the twitter skill's browser snippets.
+
+TWITTER_FAKE_SCRIPT names a JSON list of scripted answers: each call consumes the first entry whose `snippet` (and
+`op`, when the entry names one) matches, and the file is rewritten without it. An entry answers with `status` and
+`body` (a string is sent as is, anything else JSON-encoded), split into `chunks` body_chunk records when given, or
+prints `raw` verbatim instead of an envelope. Unscripted calls answer from fake_data (graphql, under
+TWITTER_FAKE_SCENARIO) or with a fixed cookie. TWITTER_FAKE_LOG receives op, method and variables of every call;
+TWITTER_FAKE_TRACE receives the snippet, argv shape, ct0, txid and url of every call.
+"""
+import fcntl
 import json
 import os
 import sys
@@ -10,22 +20,46 @@ from fake_data import response
 
 code = sys.argv[-1]
 args = json.loads(code.split("const ARGS = ", 1)[1].split(";\n", 1)[0])
+snippet = code.split("// twitter-snippet: ", 1)[1].split("\n", 1)[0].strip() if "// twitter-snippet: " in code else None
 if log := os.environ.get("TWITTER_FAKE_LOG"):
     with open(log, "a") as stream:
         stream.write(json.dumps({k: v for k, v in args.items() if k in ("op", "variables", "method")}) + "\n")
-if "// twitter-snippet: cookie" in code:
+if trace := os.environ.get("TWITTER_FAKE_TRACE"):
+    with open(trace, "a") as stream:
+        stream.write(json.dumps({"snippet": snippet, "argv": sys.argv[1:4], "op": args.get("op"), "ct0": args.get("ct0"),
+                                 "txid": args.get("txid"), "url": args.get("url")}) + "\n")
+
+scripted = None
+if path := os.environ.get("TWITTER_FAKE_SCRIPT"):
+    with open(path, "r+") as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        entries = json.loads(stream.read() or "[]")
+        for index, entry in enumerate(entries):
+            if entry.get("snippet", "graphql") == snippet and entry.get("op") in (None, args.get("op")):
+                scripted = entries.pop(index)
+                break
+        stream.seek(0)
+        stream.truncate()
+        stream.write(json.dumps(entries))
+
+if scripted and "raw" in scripted:
+    print(scripted["raw"])
+    sys.exit(scripted.get("exit", 0))
+if scripted:
+    status, body = scripted.get("status", 200), scripted.get("body", "")
+elif snippet == "cookie":
     status, body = 200, {"ct0": "synthetic", "twid": "u%3D100"}
-elif "// twitter-snippet: graphql" in code:
+elif snippet == "graphql":
     status, body = response(args["op"], args["variables"], os.environ.get("TWITTER_FAKE_SCENARIO", "normal"))
 else:
     status, body = 500, {}
-print(
-    json.dumps(
-        {
-            "status": status,
-            "url": "https://x.com/",
-            "body": json.dumps(body),
-            "ratelimit": {"limit": 500, "remaining": 490, "reset": int(time.time()) + 900},
-        }
-    )
-)
+body = body if isinstance(body, str) else json.dumps(body)
+envelope = {"status": status, "url": "https://x.com/", "body": body,
+            "ratelimit": (scripted or {}).get("ratelimit", {"limit": 500, "remaining": 490, "reset": int(time.time()) + 900})}
+if scripted and scripted.get("chunks"):
+    size = -(-len(body) // scripted["chunks"])
+    for index in range(scripted["chunks"]):
+        print(json.dumps({"kind": "body_chunk", "index": index, "body": body[index * size:(index + 1) * size]}))
+    envelope.pop("body")
+    envelope["body_chunks"] = scripted["chunks"]
+print(json.dumps(envelope))
