@@ -23,6 +23,10 @@ def _text(row, chars=280):
         if media.get('url'):
             value = value.replace(media['url'], '')
     value = ' ⏎ '.join(' '.join(part.split()) for part in value.splitlines())
+    return clip(value, chars)
+
+
+def clip(value, chars):
     return value[:chars] + '…' if chars and len(value) > chars else value
 
 
@@ -123,7 +127,7 @@ def render(result, args, rows):
         header.append('viewer changed')
     lines, labels = [' · '.join(header)], {}
     if card := result.get('card'):
-        lines.append(user_card(card, args.chars) if card['kind'] == 'user' else place_card(card))
+        lines.append(user_card(card, args.chars) if card['kind'] == 'user' else place_card(card, args.chars))
     for index, row in enumerate(result.get('results', []), 1):
         kind = row.get('kind')
         if kind == 'tweet':
@@ -131,9 +135,10 @@ def render(result, args, rows):
         elif kind == 'user':
             lines.append(user_card(row, args.chars))
         elif kind in ('list', 'community'):
-            lines.append(place_card(row))
+            lines.append(place_card(row, args.chars))
         else:
-            lines.append(f'[{"event" if kind == "event" else index}] ' + ' · '.join(str(row[k]) for k in ('name', 'context', 'description', 'url') if row.get(k)))
+            lines.append(f'[{"event" if kind == "event" else index}] ' + ' · '.join(
+                clip(str(row[k]), args.chars) if k == 'description' else str(row[k]) for k in ('name', 'context', 'description', 'url') if row.get(k)))
     if result.get('unresolved'):
         lines.append('unresolved: ' + ', '.join('@' + h for h in result['unresolved']))
     if result.get('next'):
@@ -143,5 +148,5 @@ def render(result, args, rows):
     return '\n'.join(lines)
 
 
-def place_card(row):
-    return ' · '.join(str(row[k]) for k in ('name', 'description') if row.get(k)) + ' · ' + ' · '.join(f'{k}={row[k]}' for k in ('member_count', 'subscriber_count', 'mode', 'join_policy', 'is_nsfw') if row.get(k) is not None) + ' · url: ' + json.dumps(row.get('url'))
+def place_card(row, chars):
+    return ' · '.join(clip(str(row[k]), chars) if k == 'description' else str(row[k]) for k in ('name', 'description') if row.get(k)) + ' · ' + ' · '.join(f'{k}={row[k]}' for k in ('member_count', 'subscriber_count', 'mode', 'join_policy', 'is_nsfw') if row.get(k) is not None) + ' · url: ' + json.dumps(row.get('url'))

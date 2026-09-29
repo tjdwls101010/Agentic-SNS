@@ -217,3 +217,9 @@ def test_every_argument_error_names_what_to_change(args, names, fake_env, tmp_pa
     assert (code, doc["error"]) == (2, "arguments"), doc
     assert doc["fix"] not in GENERIC_FIXES and all(name in doc["fix"] for name in names), doc["fix"]
     assert not Path(fake_env["TWITTER_FAKE_LOG"]).exists()
+
+
+def test_media_search_refuses_a_sort_it_would_ignore(fake_env):
+    code, doc = invoke(["search", "x", "--type", "media", "--sort", "top"], fake_env)
+    assert (code, doc["error"]) == (2, "arguments") and "Remove --sort" in doc["fix"]
+    assert not Path(fake_env["TWITTER_FAKE_LOG"]).exists()

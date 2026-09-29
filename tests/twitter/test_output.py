@@ -56,3 +56,23 @@ def test_schema_types_are_machine_readable_with_nullable_and_nested_records(fake
     assert post['text']['type'] == 'string'
     assert post['author']['anyOf'] == [{'$ref': '#/$defs/User'}, {'type': 'null'}]
     assert post['media']['items'] == {'$ref': '#/$defs/Media'}
+
+
+def trend_page(*descriptions):
+    entries = [{'entryId': f'trend-{i}', 'content': {'itemContent': {
+        'itemType': 'TimelineTrend', 'name': f'Trend {i}', 'trend_metadata': {'meta_description': d}}}}
+        for i, d in enumerate(descriptions)]
+    return wrap('GenericTimelineById', [{'type': 'TimelineAddEntries', 'entries': entries}])
+
+
+def test_trend_descriptions_follow_chars(fake_env):
+    script(fake_env, {'op': 'GenericTimelineById', 'body': trend_page('A long trend description')})
+    code, output = text(['trends', '--chars', '6'], fake_env)
+    assert code == 0 and 'A long…' in output and 'A long trend' not in output
+
+
+def test_place_card_descriptions_follow_chars(fake_env):
+    script(fake_env, {'op': 'ListByRestId', 'body': wrap('ListByRestId', {
+        'id_str': '1', 'name': 'Example list', 'description': 'Synthetic list description'})})
+    code, output = text(['list', '1', '--tab', 'about', '--chars', '4'], fake_env)
+    assert code == 0 and 'Synt…' in output and 'Synthetic list' not in output

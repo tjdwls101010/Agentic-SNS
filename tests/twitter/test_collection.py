@@ -128,3 +128,15 @@ def test_continuation_is_private_and_bound_to_the_viewer(fake_env):
     (home(fake_env) / 'session.json').write_text(json.dumps(dict(session, viewer_id='200')))
     code, doc = invoke(more_args(doc['next']), fake_env)
     assert (code, doc['error']) == (2, 'arguments')
+
+
+def test_rest_of_a_received_trends_page_is_a_free_continuation(fake_env):
+    entries = [{'entryId': f'trend-{i}', 'content': {'itemContent': {'itemType': 'TimelineTrend', 'name': f'T{i}'}}}
+               for i in range(3)]
+    script(fake_env, {'op': 'GenericTimelineById',
+                      'body': wrap('GenericTimelineById', [{'type': 'TimelineAddEntries', 'entries': entries}])})
+    code, first = invoke(['trends', '--limit', '1'], fake_env)
+    before = len(calls(fake_env))
+    assert code == 0 and [r['name'] for r in first['results']] == ['T0'] and first['next']
+    code, rest = invoke(more_args(first['next']), fake_env)
+    assert code == 0 and [r['name'] for r in rest['results']] == ['T1'] and len(calls(fake_env)) == before
