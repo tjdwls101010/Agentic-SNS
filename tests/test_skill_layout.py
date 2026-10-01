@@ -244,7 +244,7 @@ def violations(skill_dir, tests_dir, package, children, extra_scope=(), units=No
 
 SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
 COMPREHENSIONS = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
-# Calls whose first string argument names an import path; like pkgutil.resolve_name, they take each part as a module while one exists.
+# Calls whose first argument (or `target=`/`name=`) names an import path; like pkgutil.resolve_name, they take each part as a module while one exists.
 PATCHERS = {'patch', 'setattr', 'delattr', 'import_module', '__import__', 'resolve_name'}
 
 
@@ -323,7 +323,7 @@ def name_uses(tree, current, is_package):
             parts = dotted(node)
             if parts:
                 found.extend((('.'.join([target, *parts[1:]]), explicit), True) for target, explicit in filter(None, lookup(parts[0], chain)))
-        elif isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+        elif isinstance(node, ast.Call) and isinstance(named := (node.args[0] if node.args else next((k.value for k in node.keywords if k.arg in ('target', 'name')), None)), ast.Constant) and isinstance(named.value, str):
             if isinstance(node.func, ast.Attribute):
                 patcher = node.func.attr in PATCHERS
             elif isinstance(node.func, ast.Name):
@@ -332,7 +332,7 @@ def name_uses(tree, current, is_package):
             else:
                 patcher = False
             if patcher:
-                found.append(((node.args[0].value, len(node.args[0].value.split('.'))), False))
+                found.append(((named.value, len(named.value.split('.'))), False))
         for child in ast.iter_child_nodes(node):
             child.parent = node
         if isinstance(node, SCOPES):
@@ -607,6 +607,7 @@ def test_a_conforming_unit_tree_has_no_violations(tmp_path, files):
     ({SKILL + 'render.py': 'from demo import reading as source\n\n\ndef probe(source=source.helpers):\n    return source\n'}, 'demo.render reaches past demo.reading into helpers'),
     ({SKILL + 'render.py': 'from demo import reading as source\n\nPROBE = [source for source in source.helpers.items]\n'}, 'demo.render reaches past demo.reading into helpers'),
     ({'tests/demo/test_demo.py': 'from unittest.mock import patch as replace\n\nPROBE = replace("demo.web.client.fetch")\n'}, 'test_demo.py reaches past demo.web into client'),
+    ({'tests/demo/test_demo.py': 'from unittest.mock import patch\n\nPROBE = patch(target="demo.web.client.fetch")\n'}, 'test_demo.py reaches past demo.web into client'),
     ({'jobs/demo/run.py': 'from demo.reading.helpers import tidy\n'}, 'run.py reaches past demo.reading into helpers'),
     ({'jobs/demo/run.py': 'import sys\nsys.path.insert(0, "x")\n'}, 'run.py edits the import path'),
     ({'jobs/demo/run.py': 'from cli import main\n'}, 'run.py imports cli'),
