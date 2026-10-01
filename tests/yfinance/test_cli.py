@@ -163,3 +163,12 @@ def test_the_root_help_and_schema_state_every_exit_code(cli):
     assert listed == expected, text[-900:]
     proc, doc = cli("schema")
     assert doc["results"][0]["data"]["output"]["exit_codes"] == expected
+
+
+def test_a_range_a_default_completes_is_checked_again_before_anything_is_asked(cli, tmp_path):
+    """A calendar's --start defaults to today, so an --end in the past makes a reversed range that was never checked once the default filled it in."""
+    store = tmp_path / "never-created"
+    proc, doc = cli("calendar", "economic", "--end", "2020-01-01", routes=[], store=store)
+    assert proc.returncode == 2, proc.stdout[:400]
+    assert doc["results"][0]["error"]["code"] == "invalid"
+    assert not store.exists()

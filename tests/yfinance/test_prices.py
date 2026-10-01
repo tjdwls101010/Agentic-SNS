@@ -115,3 +115,12 @@ def test_field_discovery_oversize_recovery_names_filter_not_selection(cli):
     fix = doc["results"][0]["error"]["fix"]
     assert "--filter" in fix
     assert "--fields" not in fix and "--limit" not in fix
+
+
+@pytest.mark.parametrize("leaf", ["history", "actions"])
+def test_repair_with_five_day_bars_is_refused_before_any_request(cli, leaf):
+    """yfinance raises for repair with the 5d interval whatever the symbol, so the call is refused here rather than reported as the source's failure."""
+    proc, doc = cli("prices", leaf, "AAPL", "--repair", "--interval", "5d", routes=[])
+    assert proc.returncode == 2, proc.stdout[:400]
+    error = doc["results"][0]["error"]
+    assert error["code"] == "invalid" and "--repair" in error["fix"] and "--interval" in error["fix"], error

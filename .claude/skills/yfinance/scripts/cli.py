@@ -211,6 +211,11 @@ RANGE = [*dates("ISO date YYYY-MM-DD; inclusive. Defaults to today for market-wi
 # ---- argument defaults, checks and recovery wording -----------------------------------------------------------------
 
 
+def bars_check(args):
+    if args.repair and args.interval == "5d":
+        raise InputError("yfinance refuses to repair five-day bars", fix="Drop --repair, or choose another --interval such as 1d or 1wk.")
+
+
 def period_unless_dates(args):
     if args.period is None and not (args.start or args.end):
         args.period = "1mo"
@@ -296,10 +301,10 @@ COMMANDS = {command.path: command for command in [
     Command("prices", "quote", "Current price, trading session and market-capitalisation fields for one instrument.", "prices.quote",
             args=[SYMBOLS, FROM], narrow=["--fields"], fields=QUOTE_FIELDS, exportable=False),
     Command("prices", "history", "OHLCV bars, dividends and splits over a date range or relative period.", "prices.history",
-            args=BAR_ARGS, end_exclusive=True, defaults=period_unless_dates,
+            args=BAR_ARGS, end_exclusive=True, check=bars_check, defaults=period_unless_dates,
             narrow=["--fields", "--limit", "--period", "--start/--end", "--interval"]),
     Command("prices", "actions", "Dividends, splits and capital gains within a date range or relative period.", "prices.actions",
-            args=BAR_ARGS, end_exclusive=True, defaults=period_unless_dates, narrow=["--limit", "--period", "--start/--end"]),
+            args=BAR_ARGS, end_exclusive=True, check=bars_check, defaults=period_unless_dates, narrow=["--limit", "--period", "--start/--end"]),
 
     Command("company", "profile", "Business description, sector, governance risk and headquarters for one company.", "company.profile",
             args=[SYMBOLS, FROM], narrow=["--fields"], fields=PROFILE_FIELDS, exportable=False),
@@ -469,9 +474,8 @@ def validate(args, command=None):
                     raise ValueError()
             except ValueError:
                 raise InputError(f"--{name} expects YYYY-MM-DD") from None
+    date_range(args, command)
     start, end = getattr(args, "start", None), getattr(args, "end", None)
-    if isinstance(start, str) and isinstance(end, str) and (start > end or (command and command.end_exclusive and start == end)):
-        raise InputError("Invalid date range; a price --end is exclusive so it must be after --start, and a calendar --end is inclusive so it may equal --start")
     if hasattr(args, "period"):
         if args.period and (start or end):
             raise InputError("--period cannot be combined with --start or --end")
@@ -479,6 +483,12 @@ def validate(args, command=None):
             raise InputError("--period expects a positive range such as 5d, 1mo, 1y, ytd or max")
     if getattr(args, "out", None) and args.list_fields:
         raise InputError("--list-fields names columns and --out writes rows; use one of them.")
+
+
+def date_range(args, command=None):
+    start, end = getattr(args, "start", None), getattr(args, "end", None)
+    if isinstance(start, str) and isinstance(end, str) and (start > end or (command and command.end_exclusive and start == end)):
+        raise InputError("Invalid date range; a price --end is exclusive so it must be after --start, and a calendar --end is inclusive so it may equal --start")
 
 
 def chosen(request, given, parser):
@@ -511,13 +521,14 @@ def main():
         given = dict(vars(args))  # a copy: prepare fills defaults in, and chosen() tells them apart from what was typed
         validate(args, command)
         querying.prepare(command, args)
+        date_range(args, command)  # a default can complete a range the caller gave one end of
         if args.fields and any(not f for f in args.fields):
             raise InputError("--fields requires nonempty comma-separated field names")
         saved = querying.open_store(args)
         request = {k: v for k, v in vars(args).items() if k not in ("symbols", "store", "ttl_days", "max_chars", "list_fields")}
         return exit_code(*querying.answer(args, command, COMMANDS, saved, request, chosen(request, given, parsers[args.group, args.leaf])))
     except InputError as exc:
-        fix = "Use --help for this command's arguments, or schema GROUP LEAF for its defaults, units and limits."
+        fix = exc.fix or "Use --help for this command's arguments, or schema GROUP LEAF for its defaults, units and limits."
         results = [ordered(result("request", error=error_info("invalid", exc, fix)))]
         # 성진: 잘못된 --max-chars 자체가 입력 오류일 때 그 값으로 오류 문서를 재면 too_large가 invalid를 가린다 —
         # 무엇이 틀렸는지 말하는 문서는 틀린 예산의 적용 대상이 아니다.
