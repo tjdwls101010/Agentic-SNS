@@ -514,3 +514,140 @@ claude plugin validate --strict .claude/skills
 - screen run 쿼리 조건 판정, ADR EPS 단위(결정 9).
 - twitter의 `tests/twitter/model/` 이동, 다른 세 스킬의 #5 이행(레거시 조항).
 - in-process 테스트 seam, `csv/` 시스템 폴더, 산업 키·`--sort`·`--field`의 choices화, CI 재활성화, 텍스트 렌더러, 단일 모듈 단위의 폴더화(M9 "두 번째 이유가 생기기 전까지 모듈").
+
+# 구현 기록 (2026-10-02)
+
+## 결과
+
+- PR #34 `refactor: yfinance 단위 입구와 Yahoo 경계를 정리한다` (f9cd7fb) — R1–R7, 구조 테스트 C4 ①②③.
+- PR #35 `fix: yfinance 이어 읽기와 옵션 체인 계약을 바로잡는다` (d6d969e) — F1–F9.
+- PR #36 `feat: yfinance help를 두 단계로 바꾸고 상태를 data로 옮긴다` (d27369d) — S1–S10, C4 ④, C17, C18.
+- 마지막 검증(main d27369d 기준 브랜치 끝): 오프라인 스위트 + 구조 테스트 545 passed(3.13), yfinance 479 passed(3.12), CI offline 잡 1569 passed, ruff 통과, live 68 passed·5 skipped, `claude plugin validate --strict .claude/skills` exit 0, skill-doctor 충돌 보고 없음, graphify 로컬 리빌드(5,412 노드).
+- 성진이 SKILL.md 전문을 승인했다(본문 한 문단만 바뀜, description·allowed-tools 그대로).
+
+## 계획과 달라진 곳과 이유
+
+- **`yahoo/catalog.py`를 더했다.** 계획의 트리에는 없다. 입구 `__init__`이 하위 모듈 객체를 바인딩하지 않고 DATASETS를 노출하지 않으려면 사전과 가져오기를 둘 모듈이 필요했고, `datasets.py`에 두면 순환 import가 된다. 구조 테스트가 catalog 내부 접근을 위반으로 잡는다.
+- **PR ①의 행동 불변에 예외 하나를 두었다.** R4가 시각 변환을 저장 앞으로 옮기자 달력에 없는 epoch(1e30)가 저장 전에 실패해 id를 잃었다(코덱스 리뷰 ①). 변환을 전 함수로 만들어 그 값은 받은 그대로 두었다 — main은 exit 6(id 있음), 이후는 exit 0(id 있음). main의 "저장 후 실패"를 재현하려면 R4가 지운 변환을 envelope에 되살려야 했다. C1이 클로드의 결정이라 PR 본문에 명시하고 진행했다.
+- **구조 검사기는 계획보다 훨씬 커졌다.** 리뷰 ①과 두 번의 재확인에서 스코프(지역 import·인자·대입의 가림, 기본값·데코레이터·컴프리헨션 첫 iterable의 평가 스코프), 재수출(다른 모듈을 거친 하위 모듈 바인딩), 속성 사슬의 기능 간선, patch 계열 문자열(모듈 우선 해석, 별칭 호출, `target=` 키워드), job의 전체 점 경로, 일반 문자열 오탐이 차례로 드러났고 모두 실패 픽스처를 먼저 두고 고쳤다. 동적 import·문자열 조립은 여전히 범위 밖이다.
+- **F1–F4를 커밋 하나로 묶었다.** 네 수정이 `select_sides`·`following`·`shrink`·`continuation`에 걸쳐 항목별 커밋은 덩어리 수술이 필요했다. 커밋 본문에 항목마다 red 근거를 적었다.
+- **market summary의 narrowing에 `--limit`을 더했다(F9의 귀결).** 거래소가 행이 되어 `--limit`이 실제로 줄이므로 회복 문장이 그것을 말해도 된다. 그에 맞춰 옛 단언 둘(narrowing에 --limit 없음, `--limit 1`의 --out이 SNP)을 바꿨다.
+- **`--store` 제거로 도달할 수 없게 된 테스트 하나를 지웠다.** 단일 종목 earnings의 too_large 회복 테스트는 `--store`가 회복 문장을 늘려 만든 거절이었고, 그 없이는 한 행이 최소 예산 안에 들어간다. 모드별 금지 narrowing은 `search --type` 테스트가 계속 맡는다.
+- **argparse 약어를 껐다.** 문서의 인자 태그를 파서와 대조하는 테스트가 `screen presets --field region`이 `--fields`의 약어로 받아들여지는 것을 찾았다.
+- **그룹 문서에 계획에 없던 줄 둘을 두었다.** `narrow with:`(회복이 이름 붙일 인자, 모델이 미리 줄일 축이자 테스트 seam)와 `same as [kind]:`(같은 그룹의 같은 사실을 한 번만 쓰기 — 8천 자 지침에 따른 중복 제거). 단일 레코드 kind는 `--limit does not apply`를 쓴다.
+- **그룹 문서 크기는 8천 자를 넘는 것이 많다**: search 7017 · prices 11982 · company 10952 · financials 9230 · analysts 10127 · holders 9062 · fund 9427 · options 7486 · screen 9970 · market 8815 · calendar 9116 · read 6714 · 루트 3233. 넘는 몫은 모든 문서에 실리는 공통 계약(공유 인자·출력·종료 코드 약 4.9천)과 kind 고유 사실(quote의 기본 필드 41개·units 23개 등)이고, 같은 문장의 두 번째 사본은 C18에서 지웠다.
+- **시나리오 실행기**: restricted 모드의 Read는 작업 디렉터리만 보므로 cwd를 런 디렉터리(스킬 사본을 담은 곳)로 두었다. 모델이 한 Bash 명령에 CLI를 여러 번 체인하거나 셸 변수로 부르므로 발견 호출은 CLI 실행 단위로 센다(`discovery_invocations`), `--summarise`로 저장된 스트림에서 다시 집계한다.
+- **골든**: main을 분리 워크트리로 두고 자정 이후 같은 날 캡처했다(달력 기본값이 오늘이라). basetemp는 공백 없는 `$TMPDIR`(레포 경로의 공백이 shlex 따옴표로 바뀐다), 비교에는 mkstemp 접미사 정규화를 더했고, `--out` 경로 길이를 고정하는 테스트 때문에 라벨 길이를 맞췄다.
+- **live**: PR ②에서 intraday 탐침의 "limits에 구간별 키" 단언을 `intraday_range` 문장 확인으로 바꿨다(F7이 의도적으로 바꾼 계약). 탐침 자체(원천 거절과 fix의 일수)는 live로 통과.
+- **코덱스 리뷰 횟수**: ①은 리뷰 + 재확인 2회, ②는 리뷰 + 재확인 1회, ③은 리뷰 + 재확인 2회. 마지막 확인의 NEW minor(market sector의 top-etfs·top-funds도 `--limit`이 자르지 않는 매핑)는 시나리오가 쓰지 않는 문장이라 후 시나리오 뒤에 고쳤다(7db9296).
+
+## 모델 시나리오 전후 (C12, claude-opus-5-5)
+
+전 = main d6d969e의 스킬, 후 = 브랜치 83dcac4의 스킬(이후 변경은 market 문장 하나). 실행기 `scenarios/yfinance/run.py`, 결과 `.tmp/yf-scenarios/2026-10-02/{before,before-retry,after-final,after-final-retry}`(커밋 안 함).
+
+| 기준 | 전 | 후 |
+|---|---|---|
+| 유효 런의 expect 합격 | 22/22 | 18/18 |
+| "전" 합격 → "후" 불합격 | – | 0 |
+| 발견 실행(첫 데이터 실행 전 --help·schema) 중앙값 | 5 | 2 |
+| 스킬 원인 실패 호출 런당 | 최대 2(schema 범위·크기 오류, 단일 레코드 --out) | ≤ 1 |
+| 핵심 전제 유효 표본: 예산 partial / id 있는 too_large / 다대상 too_large / 부족분 경고 | 1 / 3 / 2 / 1 | 2 / 1 / 0 / 0 |
+| 비용(초회 24건) | $3.95 | $4.86 |
+
+- 전제 미성립(두 번 모두): 전 budget-spy-drops·budget-income-ten. 후 budget-spy-drops·budget-income-ten·budget-balance-five·budget-balance-other-five·budget-profile-officers(모델이 처음부터 --out으로 받거나 한 번에 들어옴), news-all(원천).
+- **후의 다대상 too_large와 부족분 경고는 미검증이다.** 다대상 재무제표 시나리오는 후 런 여섯 번 모두 경로가 생기지 않았고, 부족분 경고는 Yahoo가 AAPL 뉴스를 0건 주는 외부 상태 때문이다(main 스킬·yfinance `get_news` 직접 호출 모두 0건, 2026-10-02 08시 KST). 성진 결정으로 미검증 기록 후 머지했다. 두 경로의 CLI 동작은 오프라인 테스트가 덮는다.
+- 시나리오별 판정 표는 아래 두 절에 그대로 옮긴다.
+
+### 전 판정
+
+| id | 전제 | 판정 | 발견 실행 | 비고 |
+|---|---|---|---|---|
+| five-year-trend | – | 합격 | 5 | 2021-10-01~2026-10-01, 최신까지 |
+| toyota-pe | – | 합격 | 5 | 통화 불일치 명시, USD·JPY 각각 일관 계산 |
+| spy-pe | – | 합격 | 5 | 1/0.04035 = 24.78, 역수 명시 |
+| earnings-surprise | – | 합격 | 4 | 0.0674 → 6.74% |
+| one-day-calendar | – | 합격 | 5 | 그날 기업 나열, 날짜 조건 확인 |
+| blackrock-position | – | 합격 | 4 | 6/30 보유 vs 현재가 평가액 구분 |
+| screen-tech | – | 합격 | 5 | 실패 호출 1(screen run 필드 오류, 모델 인자 선택) |
+| compare-three | – | 합격 | 5 | 세 종목 모두 |
+| unplanned | – | 합격 | 5 | 단위·한계 명시 |
+| mdd | – | 합격 | 5 | 1,254일, 기간 명시 |
+| growth-screen | – | 합격 | 5 | 임계 20(퍼센트 포인트), 100억; 실패 호출 1(필드 오류) |
+| ko-dividend | – | 합격 | 5 | 2.46%·62.5%, 필드 명시 |
+| msft-pe-trend | – | 합격 | 5 | Current를 TTM 스냅샷으로 설명 |
+| qqq-top10 | – | 합격 | 5 | 기간·가격 기준 명시 |
+| correlation | – | 합격 | 5 | --out 전 행, 751 표본 |
+| date-close | – | 합격 | 5 | 20행 |
+| budget-five-year-close | 성립(partial) | 합격 | 5 | read로 나머지 읽음 |
+| budget-spy-drops | 미성립 ×2 | 미검증(전제) | 5 | 두 번 다 바로 --out, 답은 맞음 |
+| budget-balance-five | 성립(too_large+id, 다대상) | 합격 | 4 | 저장 id를 read --out; 실패 호출 1(schema read exit 2 — 스킬 원인) |
+| budget-income-ten | 미성립 ×2 | 미검증(전제) | 5 | 두 번 다 바로 --out, 답은 맞음 |
+| budget-balance-other-five | 성립(다대상 too_large) | 합격 | 6 | 실패 호출 3 중 스킬 원인 2(schema too_large, schema read exit 2), 1은 전제의 too_large |
+| news-all | 성립(부족분 경고) | 합격 | 5 | 200건을 "전부"라 하지 않음 |
+| budget-quote-every-field | 성립(단일 레코드 too_large+id) | 합격 | 4 | 실패 호출 4 중 스킬 원인 2(schema prices quote too_large, read --out 단일 레코드 exit 2) |
+| budget-profile-officers | 성립 | 합격 | 6 | 임원 10명·요약 전문 |
+- 전제가 성립했거나 전제가 없는 22건 모두 합격. 핵심 전제 유효 표본: 예산 partial 1(budget-five-year-close), id 있는 too_large 3, 다대상 too_large 2, 부족분 경고 1.
+- 발견 실행(첫 데이터 실행 전 --help·schema 실행) 중앙값 5. 스킬 원인 실패 호출은 발견 단계(schema 범위 오류·schema 크기 초과)와 단일 레코드 --out.
+- 비용 합계 $3.95(재실행 제외), 런당 20–137초.
+
+### 후 판정
+
+| id | 전제 | 판정 | 발견 실행 | 비고 |
+|---|---|---|---|---|
+| five-year-trend | – | 합격 | 2 | 2021-10-04~2026-10-01; 실패 1은 이전 런이 /tmp에 남긴 같은 --out 경로(환경, CLI가 덮어쓰기 거절) |
+| toyota-pe | – | 합격 | 3 | 통화 불일치 명시, EPS를 달러로 환산 |
+| spy-pe | – | 합격 | 3 | 1/0.04035, 역수 명시 |
+| earnings-surprise | – | 합격 | 3 | 0.0674 → 6.74%, 달력 값과 환산 일치 |
+| one-day-calendar | – | 합격 | 2 | 그날 행 확인 |
+| blackrock-position | – | 합격 | 2 | 6/30 보유 vs 현재가 평가액 구분 |
+| screen-tech | – | 합격 | 3 | 실패 1(필드 선택, 모델) |
+| compare-three | – | 합격 | 2 | 세 종목 |
+| unplanned | – | 합격 | 2 | 단위·한계 |
+| mdd | – | 합격 | 3 | 1,254일 |
+| growth-screen | – | 합격 | 3 | 임계 20·100억; 실패 2(스크린 필드 오류, prices quote --out — 둘 다 문서가 이미 막는 모델 선택) |
+| ko-dividend | – | 합격 | 3 | 2.46%·62.46% |
+| msft-pe-trend | – | 합격 | 2 | Current를 TTM 스냅샷으로 |
+| qqq-top10 | – | 합격 | 3 | 기간·기준 명시 |
+| correlation | – | 합격 | 3 | 752 표본, 파일로 전 행 |
+| date-close | – | 합격 | 2 | 20행 |
+| budget-five-year-close | 성립(partial) | 합격 | 2 | 1,254행을 read 조각으로 모두 읽음 |
+| budget-quote-every-field | 성립(단일 레코드 too_large+id) | 합격 | 2 | 187개 필드 전부; 실패 2 중 1은 전제의 too_large, 1은 --list-fields에 --limit(모델) 뒤 fix대로 --filter |
+| budget-spy-drops | 미성립 ×2 | 미검증(전제) | 3 | 바로 --out, 답은 맞음 |
+| budget-income-ten | 미성립 ×2 | 미검증(전제) | 2 | 바로 --out, 답은 맞음 |
+| budget-balance-five | 미성립 ×2 | 미검증(전제) | 2 | 바로 --out, 다섯 회사 모두 |
+| budget-balance-other-five | 미성립 ×2 | 미검증(전제) | 2 | 바로 --out, 다섯 회사 모두 |
+| budget-profile-officers | 미성립 ×2 | 미검증(전제) | 3 | 한 번에 들어옴, 임원 10명·요약 전문 |
+| news-all | 미성립 ×2(원천) | 미검증(전제) | 2 | Yahoo가 AAPL 뉴스를 0건 반환(main·yfinance 직접 호출로 확인, 외부 상태); search news로 46건, "전부 아님" 명시 |
+- 합격 기준: 유효 런 전부 합격, "전" 합격 → "후" 불합격 0, 발견 실행 중앙값 5 → 2, 스킬 원인 실패 호출 런당 ≤ 1 — 충족. 핵심 전제 유효 표본(후): 예산 partial 2(budget-five-year-close, news-all 재실행), id 있는 too_large 1 — 충족; 다대상 too_large 0, 부족분 경고 0 — 미충족, 성진 결정으로 미검증 기록 후 머지.
+- 비용 $4.86(초회) + 재실행, 런당 18–166초.
+
+## 원리 충돌의 해소가 구현에서 된 모습
+
+- ① 사실의 소유와 배치: 입력 계약(인자·choices·기본값·모드·배타·쿼리 문법)은 cli의 인자 help와 `epilog`, Yahoo 사실(단위·해석·한계·함정)은 yahoo dataset, `describe`가 넘기고 cli가 배치한다. C18에서 같은 사실의 두 사본을 지울 때도 이 기준으로 남길 쪽을 골랐다(`--end` 배타 → 인자, 날짜의 거래소 시간대 → kind 의미).
+- ② 닫힌 집합: 프리셋·섹터·지역·interval은 choices이고 `test_vocabulary`가 라이브러리 값과 대조한다(섹터 키는 `SECTOR_INDUSTY_MAPPING_LC`, C13). 산업 키·스크린 필드는 발견 kind와 fix.
+- ③ 상태: 관측만 `data/observations`, yfinance 라이브러리 캐시는 기본값(결정 8). 구조 테스트 C4 ④는 스킬 코드만 본다.
+- ④ 숫자와 실패: yfinance 1.7.0의 `period=max` 변환은 숫자로, Yahoo 서버의 intraday 한도는 거절과 fix로 쓴다(F7).
+- ⑤ 단일 모듈 단위: `describe.py`·`store.py`·`export.py`.
+- ⑥ 기본 창: cli `Command(rows, fields)`, 개수를 보내는 데이터셋(`counted`)은 querying이 실효 개수를 `rows`로 넘긴다.
+
+## 남은 한계와 불확실성
+
+- 시나리오는 런 한 번씩(전제 미성립만 한 번 더)이라 실사용 여러 세션의 성능을 증명하지 않는다. 성진의 SKILL.md 승인도 그 증거가 아니다.
+- 후의 다대상 too_large·부족분 경고 경로는 모델 시나리오로 확인되지 않았다(위). 원천이 뉴스를 다시 주면 news-all을 다시 돌릴 수 있다.
+- 그룹 문서가 최대 약 1.2만 자다. 길이가 모델의 주의를 흩는지는 함정 시나리오의 합격 유지로만 간접 확인했다(spy-pe·toyota-pe·earnings-surprise·ko-dividend·growth-screen·blackrock-position 모두 합격).
+- Yahoo 서버 한도와 응답(뉴스 0건처럼)은 예고 없이 바뀐다. 문서는 한도를 거절과 fix로 쓴다.
+- 구조 검사는 정적 접근만 본다(동적 import·조립된 문자열은 범위 밖).
+- 시나리오 하네스는 `--tools Bash,Read,Write`로 Bash를 되살리므로 격리되지 않는다. 런은 레포 밖 임시 경로의 사본으로만 돌렸고, 모델이 `/tmp`에 남긴 파일이 다음 런과 부딪힌 경우가 한 번 있었다(five-year-trend의 --out 경로, CLI가 덮어쓰기를 거절해 무해).
+
+## 기본값을 교정하는 문장의 기준 모델
+
+그룹 문서의 kind별 의미(역수 배수, 퍼센트·비율 충돌, 통화 분리, 시각 혼합 등)와 회복 문장은 claude-opus-5-5 시나리오로 확인했고, 리뷰는 gpt-6-astra(high, read-only)가 했다. 모델이 바뀌면 같은 은행으로 다시 본다.
+
+## `성진:` 장부 (yfinance 스킬·테스트)
+
+`grep -rn "성진:" .claude/skills/yfinance scenarios/yfinance tests/yfinance tests/test_skill_layout.py` — 24곳, 모두 코드의 불변조건·한계 설명이다. 이번에 더한 것은 `store.py`의 옛 epoch 정규화와 `selection.py`의 "투영을 먼저 하고 자른다" 둘이다.
+
+## 후속 과제
+
+- twitter의 `tests/twitter/model/`을 레포의 하는 일 폴더로 옮기기, facebook·threads·twitter의 skill-maker #5 이행(UNITS 등록 포함).
+- 원천이 뉴스를 다시 주면 news-all 시나리오 재실행.
