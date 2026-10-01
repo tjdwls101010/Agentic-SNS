@@ -2,7 +2,7 @@
 
 Each run copies the skill (without its saved observations) to a new path containing a space, replaces ${CLAUDE_SKILL_DIR} in the copy's SKILL.md with that path as Claude Code does when it loads a skill, gives the run its own store, works in the run's own directory (which holds the copy, since restricted mode lets Read see only the working directory), and builds the copy's uv environment before the run starts. The child runs `claude -p --safe-mode --restricted` with Bash restored, so it is not sandboxed: run it only from scratch locations, never inside the repository. Judging an answer against its `expect` is left to the reader of the results.
 
-Writes <out>/results.jsonl (one line per run) and <out>/runs/<id>-<n>/{prompt.txt, stream.jsonl, answer.md}.
+Writes <out>/results.jsonl (one line per run: CLI runs counted inside chained Bash commands, discovery runs before the first data run, failed tool calls with their output, premise signals, permission denials, tokens, cost, time) and <out>/runs/<id>-<n>/{prompt.txt, stream.jsonl, answer.md}.
 """
 import argparse
 import concurrent.futures
@@ -30,9 +30,17 @@ def copy_skill(source, run):
     return skill
 
 
-def is_discovery(command):
-    """A call that reads the CLI's own description rather than data: --help, or schema while it exists."""
-    return "--help" in command.split() or bool(re.search(r"cli\.py\"?\s+(?:--\S+\s+\S+\s+)*schema\b", command))
+INVOCATION = re.compile(r"\buv run\b.*(?:cli\.py|\"?\$\{?\w+)")  # the CLI by path, or through a shell variable holding it
+
+
+def invocations(command):
+    """The CLI runs inside one Bash command, which often chains several (`… --help; … schema prices`) or names the CLI through a variable."""
+    return [part for part in re.split(r"\s*(?:;|&&|\|\||\n|\|)\s*", command) if INVOCATION.search(part)]
+
+
+def is_discovery(invocation):
+    """A run that reads the CLI's own description rather than data: --help, or schema while it exists."""
+    return bool(re.search(r"(?:^|\s)(?:--help|schema)(?:\s|$)", invocation))
 
 
 def summarise(stream):
@@ -58,14 +66,16 @@ def summarise(stream):
                 outputs[block.get("tool_use_id")] = {"text": text, "error": bool(block.get("is_error"))}
         if event.get("type") == "result":
             final, answer = event, event.get("result") or ""
-    cli = [(calls[i], outputs.get(i, {})) for i in calls if "cli.py" in calls[i]]
-    data = [n for n, (command, _) in enumerate(cli) if not is_discovery(command)]
+    cli = [(calls[i], outputs.get(i, {})) for i in calls if invocations(calls[i])]
+    runs = [part for command, _ in cli for part in invocations(command)]
+    first_data = next((n for n, part in enumerate(runs) if not is_discovery(part)), len(runs))
     texts = [o.get("text", "") for _, o in cli]
     usage = final.get("usage") or {}
     return {
         "cli_calls": len(cli),
-        "discovery_calls": data[0] if data else len(cli),
-        "failed_calls": [c[:200] + " => " + o.get("text", "")[:200] for c, o in cli if o.get("error")],
+        "cli_invocations": len(runs),
+        "discovery_invocations": first_data,
+        "failed_calls": [c[:240] + " => " + o.get("text", "")[:240] for c, o in cli if o.get("error")],
         "premise": {
             "partial_budget": any('"truncated_by":"budget"' in t for t in texts),
             "too_large_with_id": any('"code":"too_large"' in t and re.search(r'"id":"[0-9a-f]{16}"', t) for t in texts),
@@ -73,7 +83,7 @@ def summarise(stream):
             "shortfall_warning": any("usable entries arrived of the" in t for t in texts),
         },
         "max_chars_raised": any(int(m) > 3000 for c, _ in cli for m in re.findall(r"--max-chars (\d+)", c)),
-        "other_bash": [c[:160] for c in calls.values() if "cli.py" not in c][:10],
+        "other_bash": [c[:160] for c in calls.values() if not invocations(c)][:10],
         "permission_denials": final.get("permission_denials") or [],
         "tokens": {k: usage.get(k) for k in ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")},
         "cost_usd": final.get("total_cost_usd"),
@@ -99,10 +109,14 @@ def run_one(scenario, n, args, work, out):
         proc = subprocess.run(["claude", "-p", "--safe-mode", "--restricted", "--permission-mode", "acceptEdits", "--tools", "Bash,Read,Write",
                                "--allowedTools", "Bash", "--model", args.model, "--output-format", "stream-json", "--verbose", prompt],
                               stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.PIPE, text=True, cwd=run, env=env, timeout=args.timeout)
+    return result(scenario, n, record, proc.returncode, proc.stderr[-300:])
+
+
+def result(scenario, n, record, code, stderr):
     summary, answer = summarise(record / "stream.jsonl")
     (record / "answer.md").write_text(answer, encoding="utf-8")
     return {"id": scenario["id"], "n": n, "budget": bool(scenario.get("budget")), "premise_wanted": scenario.get("premise"),
-            "exit": proc.returncode, "stderr": proc.stderr[-300:], **summary}
+            "exit": code, "stderr": stderr, **summary}
 
 
 def main():
@@ -116,6 +130,7 @@ def main():
     parser.add_argument("--work", type=Path, help="Where the skill copies and stores go (default a new temporary directory whose name has a space).")
     parser.add_argument("--workers", type=int, default=4, help="Runs at once (default 4).")
     parser.add_argument("--timeout", type=int, default=1500, help="Seconds one run may take (default 1500).")
+    parser.add_argument("--summarise", action="store_true", help="Run nothing: rebuild --out's results.jsonl from the streams already in its runs/ folder.")
     args = parser.parse_args()
     bank = {s["id"]: s for s in json.loads(BANK.read_text(encoding="utf-8"))}
     unknown = sorted(set(args.scenario or ()) - set(bank))
@@ -124,14 +139,21 @@ def main():
     chosen = [bank[i] for i in args.scenario] if args.scenario else list(bank.values())
     out = args.out or REPO / ".tmp/yf-scenarios" / dt.date.today().isoformat() / args.label
     out.mkdir(parents=True, exist_ok=True)
+    if args.summarise:
+        rows = []
+        for record in sorted((out / "runs").iterdir()):
+            sid, n = record.name.rsplit("-", 1)
+            rows.append(result(bank[sid], int(n), record, None, ""))
+        (out / "results.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+        return
     work = args.work or Path(tempfile.mkdtemp(prefix="yf scenarios "))
     lock = threading.Lock()
 
     def job(pair):
-        result = run_one(*pair, args, work, out)
+        found = run_one(*pair, args, work, out)
         with lock, open(out / "results.jsonl", "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(result, ensure_ascii=False) + "\n")
-        print(json.dumps({k: result[k] for k in ("id", "n", "exit", "cli_calls", "discovery_calls", "premise", "cost_usd")}, ensure_ascii=False), flush=True)
+            handle.write(json.dumps(found, ensure_ascii=False) + "\n")
+        print(json.dumps({k: found[k] for k in ("id", "n", "exit", "cli_invocations", "discovery_invocations", "premise", "cost_usd")}, ensure_ascii=False), flush=True)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as pool:
         list(pool.map(job, [(s, n) for s in chosen for n in range(1, args.repeat + 1)]))
