@@ -12,8 +12,8 @@ import shlex
 
 from yfinance_skill.display import display, dump
 from yfinance_skill.envelope import error_info, ordered
-from yfinance_skill.shape import is_empty, row_count
-from yfinance_skill.selection import select
+from yfinance_skill.shape import is_empty, is_sided, row_count
+from yfinance_skill.selection import following, page_rows, select, select_sides
 
 MIN_CHARS = 1000
 
@@ -36,14 +36,18 @@ def shrink(envelope, item, args, size, max_chars):
     expansion ratio is the only number that holds for both.
     """
     full = envelope.get("_full")
-    shown = (envelope.get("coverage") or {}).get("shown") or row_count(envelope.get("data")) or 0
+    shown = page_rows(envelope.get("data"), envelope.get("coverage") or {}) or row_count(envelope.get("data")) or 0
     if full is None or not shown or not item.sliceable:
         return False
     keep = max(1, int(shown * max_chars * 0.8 / size))
     if keep >= shown:
         keep = max(1, shown - 1)
-    data, coverage = select(full, args, item, keep=keep)
-    if row_count(data) == shown:
+    if is_sided(full):
+        coverage = {}
+        data = select_sides(full, args, item, coverage, keep)
+    else:
+        data, coverage = select(full, args, item, keep=keep)
+    if page_rows(data, coverage) == shown:
         return False
     if "requested" in (envelope.get("coverage") or {}):  # a narrowing re-selects the rows; what the source was asked for stays
         coverage = {"requested": envelope["coverage"]["requested"], **coverage}
@@ -57,12 +61,26 @@ def shrink(envelope, item, args, size, max_chars):
     envelope["warnings"] = warnings + [notice]
     # 성진: continuation을 축소 전 개수로 계산해 두면 예산이 창을 줄인 만큼의 행을 건너뛴다 — 따라가면 조용히 빠진다.
     # 그리고 잘린 결과는 나머지를 읽는 명령을 스스로 이름 붙여야 한다; id만 주고 명령을 말하지 않으면 회복을 읽는 쪽이 조립하게 된다.
-    following = coverage.get("start", 0) + (coverage.get("shown") or 0)
-    if envelope.get("id") and following < (coverage.get("received") or 0):
-        envelope["continuation"] = {"start": following, "command": read_command(envelope["id"], item, args, coverage.get("shown"), following)}
-    else:
-        envelope.pop("continuation", None)
+    envelope.pop("continuation", None)
+    if envelope.get("id"):
+        envelope["continuation"] = continuation(envelope["id"], item, args, data, coverage)
+        if envelope["continuation"] is None:
+            envelope.pop("continuation")
     return True
+
+
+def continuation(ident, item, args, data, coverage):
+    """The read that goes on from this slice, or None when it reached the end.
+
+    A first cut that kept a series' newest rows showed its tail, so reading on from the number shown would never reach the rows before it: that continuation starts over from the first saved row and says which rows were already shown.
+    """
+    if coverage.get("kept") == "newest":
+        received, shown = coverage["received"], coverage["shown"]
+        return {"start": 0, "restart": True, "shown": [received - shown, received], "command": read_command(ident, item, args, shown, 0)}
+    after = following(data, coverage)
+    if after is None:
+        return None
+    return {"start": after, "command": read_command(ident, item, args, page_rows(data, coverage), after)}
 
 
 def export_command(ident, args):

@@ -29,15 +29,11 @@ def read(args, saved, commands):
     age = store.age_seconds(record.get("observed_at"))
     if record.get("status") == "empty":
         warnings.append("The original observation returned nothing usable; reading it again does not change that.")
-    if is_sided(record["data"]):
-        sides = [v for v in coverage.values() if isinstance(v, dict) and "received" in v]
-        coverage = dict(coverage, received=sum(s["received"] for s in sides), shown=sum(s.get("shown", 0) for s in sides)) if sides else coverage
     coverage = asked_for(coverage, record.get("requested"))
-    shown, received, start = coverage.get("shown"), coverage.get("received"), coverage.get("start", 0)
     extra = {}
-    if shown is not None and received is not None and start + shown < received:
-        following = start + shown
-        extra["continuation"] = {"start": following, "command": budget.read_command(args.id, item, args, shown, following)}
+    following = budget.continuation(args.id, item, args, data, coverage)
+    if following:
+        extra["continuation"] = following
     envelope = result(record["target"], data, record.get("context"), warnings, status=record.get("status") if record.get("status") == "empty" else None,
                       conditions=record.get("conditions"), coverage=coverage, ident=args.id,
                       observed_at=record.get("observed_at"), source_time=record.get("source_time"), extra=extra)

@@ -20,8 +20,7 @@ def exported(encoded, args, item):
             args.fields = ["key", *args.fields]
     if is_sided(encoded):
         data = select_sides(encoded, args, whole, coverage)
-        sides = [v for v in coverage.values() if isinstance(v, dict) and "received" in v]
-        coverage = {"received": sum(s["received"] for s in sides), "shown": sum(s.get("shown", 0) for s in sides)}
+        coverage = {"received": coverage["received"], "shown": coverage["shown"]}
     else:
         data, coverage = select(encoded, args, whole, coverage)
     if is_empty(data):

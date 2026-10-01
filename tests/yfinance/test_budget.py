@@ -12,6 +12,7 @@ import shlex
 import pytest
 
 from conftest import inflate, shape
+from test_selection import closes, series_routes
 
 CHART = {"chart": {"error": None, "result": [{"meta": {"currency": "USD", "symbol": "AAPL", "exchangeName": "NMS", "instrumentType": "EQUITY", "firstTradeDate": 345479400, "regularMarketTime": 1704387600, "gmtoffset": -18000, "timezone": "EST", "exchangeTimezoneName": "America/New_York", "regularMarketPrice": 110, "chartPreviousClose": 100, "priceHint": 2, "dataGranularity": "1d", "validRanges": ["1d", "5d", "1mo", "max"]},
     "timestamp": [1704205800 + 86400 * i for i in range(300)],
@@ -410,3 +411,111 @@ def test_a_refusal_points_at_the_target_that_carries_the_recovery(cli, tmp_path)
     pointers = [r["error"]["fix"] for r in doc["results"] if r.get("error", {}).get("fix", "").startswith("Recover with the fix on")]
     assert carrier["target"] == "AAA" and pointers, proc.stdout[:800]
     assert all("AAA" in fix for fix in pointers), pointers
+
+
+# ---- following a cut never skips a row --------------------------------------------------------------------------------
+
+
+def follow(cli, store, continuation, extra=()):
+    """Run each continuation's command until none is left; returns every page's result."""
+    pages = []
+    while continuation:
+        command = shlex.split(continuation["command"])
+        assert len(pages) < 60, "the continuation never ends"
+        proc, page = cli(*command, *extra, routes=[], store=store)
+        assert proc.returncode in (0, 8), proc.stdout[:400]
+        pages.append(page["results"][0])
+        continuation = pages[-1].get("continuation")
+    return pages
+
+
+def test_the_continuation_after_a_newest_tail_starts_over_and_reaches_every_row(cli, tmp_path):
+    """The first cut of an oldest-first series keeps its newest rows, so a continuation that starts after the number shown never reaches the rows before the tail."""
+    store = tmp_path / "s"
+    proc, doc = cli("prices", "history", "AAPL", "--period", "1y", "--fields", "Close", "--max-chars", "1500", routes=series_routes(100), store=store)
+    assert proc.returncode == 8, proc.stdout[:400]
+    first = doc["results"][0]
+    shown = closes(first)
+    assert first["coverage"]["kept"] == "newest" and shown == list(range(100 - len(shown), 100)), shown
+    assert first["continuation"] == {"start": 0, "restart": True, "shown": [100 - len(shown), 100],
+                                     "command": f"read {first['id']} --fields Close --start 0 --limit {len(shown)}"}
+    read = [value for page in follow(cli, store, first["continuation"], ("--max-chars", "1500")) for value in closes(page)]
+    assert read == list(range(100)), "rows were skipped or read twice"
+
+
+def chain_routes(calls, puts, wide=0):
+    """An option chain whose calls carry strikes 100, 101, … and whose puts carry 200, 201, …; `wide` pads each contract symbol."""
+    def contract(prefix, strike, i):
+        return {"contractSymbol": f"{prefix}{i}" + "x" * wide, "strike": strike + i, "lastPrice": 1.0, "currency": "USD"}
+    chain = {"optionChain": {"result": [{"expirationDates": [1735689600], "quote": {"symbol": "AAPL", "regularMarketPrice": 100},
+             "options": [{"expirationDate": 1735689600, "calls": [contract("C", 100.0, i) for i in range(calls)],
+                          "puts": [contract("P", 200.0, i) for i in range(puts)]}]}], "error": None}}
+    return [{"path": "/v7/finance/options/AAPL", "json": chain}]
+
+
+def strikes(result, side):
+    return [row[0] for row in result["data"][side]["data"]]
+
+
+@pytest.mark.parametrize("calls,puts,budget", [(60, 45, []), (60, 25, []), (5, 0, []), (60, 45, ["--max-chars", "1500"])])
+def test_reading_a_chain_page_by_page_reaches_every_contract_of_both_sides_once(cli, tmp_path, calls, puts, budget):
+    """Each side is cut from the same start, so the next start is the furthest row any side reached; adding the two sides' counts skipped rows of both, and a side that ran out first was refused."""
+    store = tmp_path / "s"
+    proc, doc = cli("options", "chain", "AAPL", "--fields", "strike", routes=chain_routes(calls, puts), store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    ident = doc["results"][0]["id"]
+    proc, page = cli("read", ident, "--fields", "strike", "--start", "0", "--limit", "20", *budget, routes=[], store=store)
+    assert proc.returncode in (0, 8), proc.stdout[:400]
+    pages = [page["results"][0]] + follow(cli, store, page["results"][0].get("continuation"), budget)
+    assert [s for p in pages for s in strikes(p, "calls")] == [100 + i for i in range(calls)]
+    assert [s for p in pages for s in strikes(p, "puts")] == [200 + i for i in range(puts)]
+
+
+CHAIN_COLUMNS = ["contractSymbol", "lastTradeDate", "strike", "lastPrice", "bid", "ask", "change", "percentChange", "volume", "openInterest",
+                 "impliedVolatility", "inTheMoney", "contractSize", "currency"]  # the columns yfinance 1.7.0 reindexes every chain side to
+
+
+def test_a_chain_lists_the_columns_its_sides_have_and_selects_them_on_both_sides(cli, tmp_path):
+    store = tmp_path / "s"
+    proc, doc = cli("options", "chain", "AAPL", "--list-fields", routes=chain_routes(3, 2), store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert doc["results"][0]["data"] == CHAIN_COLUMNS
+    proc, back = cli("read", doc["results"][0]["id"], "--list-fields", routes=[], store=store)
+    assert back["results"][0]["data"] == CHAIN_COLUMNS
+    proc, doc = cli("options", "chain", "AAPL", "--fields", "strike", routes=chain_routes(3, 2), store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert strikes(doc["results"][0], "calls") == [100, 101, 102] and strikes(doc["results"][0], "puts") == [200, 201]
+
+
+def test_a_chain_over_the_budget_is_narrowed_on_both_sides_and_keeps_its_id(cli, tmp_path):
+    """One padded contract per side fits 3,500 characters and two per side do not, so the budget keeps exactly the first contract of each side — on the first call and on a read of the same observation."""
+    store = tmp_path / "s"
+
+    def narrowed(proc, doc, kept):
+        assert proc.returncode == 8, proc.stdout[:400]
+        assert len(proc.stdout.strip()) <= 3500
+        r = doc["results"][0]
+        assert [row[1] for row in r["data"]["calls"]["data"]] == [100] and [row[1] for row in r["data"]["puts"]["data"]] == [200]
+        assert r["data"]["calls"]["data"][0][0] == "C0" + "x" * 900
+        for side in ("calls", "puts"):
+            assert r["coverage"][side] == {"received": 6, "fields": {"received": 14, "shown": 2, "source": "requested"}, "kept": kept, "truncated_by": "budget", "shown": 1}
+        assert r["continuation"] == {"start": 1, "command": f"read {r['id']} --fields contractSymbol,strike --start 1 --limit 1"}
+        return r["id"]
+
+    proc, doc = cli("options", "chain", "AAPL", "--fields", "contractSymbol,strike", "--max-chars", "3500", routes=chain_routes(6, 6, wide=900), store=store)
+    ident = narrowed(proc, doc, "first")
+    proc, doc = cli("read", ident, "--fields", "contractSymbol,strike", "--max-chars", "3500", routes=[], store=store)
+    assert narrowed(proc, doc, "window") == ident
+    assert (store / f"{ident}.json").exists()
+
+
+def test_a_chain_whose_single_contract_exceeds_the_budget_is_refused_with_its_id(cli, tmp_path):
+    store = tmp_path / "s"
+    proc, doc = cli("options", "chain", "AAPL", "--max-chars", "3000", routes=chain_routes(3, 3, wide=5000), store=store)
+    assert proc.returncode == 9, proc.stdout[:400]
+    assert len(proc.stdout.strip()) <= 3000
+    ident = doc["results"][0]["id"]
+    assert ident and doc["results"][0]["error"]["code"] == "too_large"
+    proc, back = cli("read", ident, "--max-chars", "100000", routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert len(back["results"][0]["data"]["calls"]["data"]) == 3 and len(back["results"][0]["data"]["puts"]["data"]) == 3
