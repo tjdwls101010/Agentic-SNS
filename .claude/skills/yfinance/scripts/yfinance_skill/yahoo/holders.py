@@ -14,7 +14,7 @@ DATASETS = {
     "holders.major": holder(
         "get_major_holders",
         units={"insidersPercentHeld": RATE, "institutionsPercentHeld": RATE, "institutionsFloatPercentHeld": RATE, "institutionsCount": COUNT},
-        interpretation={"float": "institutionsPercentHeld is of shares outstanding while institutionsFloatPercentHeld is of the float, so the second is the larger of the two."}),
+        interpretation={"float": "institutionsPercentHeld is of shares outstanding, institutionsFloatPercentHeld of the float."}),
 } | {
     f"holders.{name}": holder(
         method,
@@ -28,7 +28,7 @@ DATASETS = {
         interpretation={"rows": "The first column labels each row; % rows carry ratios while the others carry share counts, in the same column."}),
     "holders.insider-transactions": holder(
         "get_insider_transactions", units={"Shares": SHARES, "Value": CURRENCY},
-        interpretation={"order": "The index is a row number and says nothing about time; Start Date does, and rows arrive newest first, so a limit keeps the most recent transactions.",
+        interpretation={"order": "The index is a row number; Start Date carries the time, and rows arrive newest first.",
                         "value": "Value is absent where the source reports no price, including every row whose Text is empty; that is a missing price, not a zero-value transfer."}),
     "holders.insider-roster": holder(
         "get_insider_roster_holders", units={"Shares Owned Directly": SHARES},

@@ -4,11 +4,11 @@ import datetime as dt
 from yfinance_skill.shape import column, is_empty
 
 STATUSES = {
-    "ok": "usable data within this command's own default window",
-    "empty": "the source answered with nothing usable; not proof the data does not exist",
-    "partial": "usable data with a stated gap: a budget-narrowed window, or a mix of succeeded and failed targets",
-    "error": "no usable result; error.code and error.fix say what to do",
-    "not_attempted": "a later target the CLI did not ask for after the source rate-limited an earlier one",
+    "ok": "usable data in the default window (exit 0)",
+    "empty": "nothing usable came back (exit 7)",
+    "partial": "usable data with a stated gap (exit 8)",
+    "error": "no usable result; error.code names which exit code below, and error.fix says what to do",
+    "not_attempted": "not asked, because the source rate-limited an earlier target",
 }
 
 
@@ -59,17 +59,17 @@ ORDER = ("target", "id", "observed_at", "source_time", "stored_age_seconds", "st
 # What each envelope key means, in ORDER; a command's --help prints it.
 ENVELOPE = {
     "target": "the symbol, query or key this result answers",
-    "id": "saved observation id; every response is saved before anything is selected from it, so a result that did not fit is still reachable with read",
+    "id": "saved observation id; the response is saved before anything is selected, so `read ID` reaches what did not fit",
     "observed_at": "when this CLI received the response",
-    "source_time": "the time the source itself put on this data, where it supplies one; after a close it can be hours before observed_at",
-    "stored_age_seconds": "read only: how long ago the observation was saved, which says nothing about whether its values are current",
-    "status": "one of the statuses below",
-    "context": "what the source said about this response besides its rows: currency, timezone, the expiration chosen, the next source page (next_offset — a new request), and the like",
-    "conditions": "only the arguments this response carries evidence for: {requested, status: confirmed|not_applied|unverified, evidence}. A successful call is not evidence that a condition was applied",
-    "coverage": "requested = rows asked of the source, present only for commands that send it a count (company news, screen run, calendars, search except research); fewer received than requested is not by itself proof the source has no more, and where a command knows what a shortfall means, a warning says so. received = rows the response holds, start = the first row a read began at, shown = rows printed (or written with --out), kept = which end a limit kept (window for read), truncated_by = leaf_default (this command's own window, status ok), explicit_limit, or budget (your range did not fit, status partial), fields = how many of the available fields the projection kept. An option chain reports each side under its own name, and received and shown total the sides",
-    "continuation": "the read command for the next slice of the same saved observation — no new request. restart: true with shown [a, b] means the rows shown were the newest end [a, b) and the command starts over from row 0, so following it reaches every row once",
-    "warnings": "limitations that affect how this data can be used",
-    "data": "the selected value; tables are {index, columns, data, index_names, column_names}. With --out: {out, rows, columns, first, last}, where rows is this target's share of the file and columns may become a count when the summary would not fit",
+    "source_time": "the time the source put on the data, where it gives one; after a close it can be hours before observed_at",
+    "stored_age_seconds": "read only: seconds since the observation was saved, not a sign its values are current",
+    "status": "see statuses",
+    "context": "what the source said besides the rows: currency, timezone, the chosen expiration, next_offset for the next source page (a new request)",
+    "conditions": "the arguments this response carries evidence for: {requested, status: confirmed|not_applied|unverified, evidence}; a successful call is not evidence a condition was applied",
+    "coverage": "requested: rows asked of the source, only where a count is sent; fewer received is not proof there are no more. received: rows the response holds. start: where a read began. shown: rows printed or written. kept: which end a limit kept (window for read). truncated_by: leaf_default (status ok), explicit_limit, or budget (status partial). fields: how many offered fields were kept. A chain reports each side under its name; received and shown total them",
+    "continuation": "the read command for the next slice of this saved observation (no new request); restart: true with shown [a, b] means the newest rows [a, b) were shown and reading starts over at row 0",
+    "warnings": "limits on how this data can be used",
+    "data": "the selected value; a table is {index, columns, data, index_names, column_names}; with --out, {out, rows, columns, first, last}",
     "error": "{code, message, fix}",
 }
 

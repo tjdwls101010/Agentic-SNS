@@ -11,7 +11,7 @@ def summary(target, args, context, warnings):
 
 
 REGION_INTERPRETATION = {
-    "region": "--region takes only the country codes Yahoo serves for this dataset; an unserved code returns the United States result with no warning, which is indistinguishable from a real answer.",
+    "region": "Yahoo answers an unserved country code with the United States result and no warning, so only served codes are offered.",
     "keys": "Sector keys are hyphenated (consumer-cyclical); fund sector-weights uses underscores.",
 }
 # 성진: 같은 값을 overview는 market_weight(밑줄), 구성종목 표는 "market weight"(공백)로 부른다. 한쪽만 선언하면

@@ -101,8 +101,14 @@ def kind_block(group, kind):
 
 
 def fact(group, kind, label):
-    """The text after `label: ` in a kind's block, or None."""
-    return next((line[len(label) + 2:] for line in kind_block(group, kind) if line.startswith(label + ": ")), None)
+    """The text after `label: ` in a kind's block, or None; a fact the block names as `same as [earlier]: …` is read from that kind."""
+    block = kind_block(group, kind)
+    found = next((line[len(label) + 2:] for line in block if line.startswith(label + ": ")), None)
+    for line in block if found is None else []:
+        same = re.match(r"same as \[([^\]]+)\]: (.*)", line)
+        if same and label in same[2].split(", "):
+            return fact(group, "" if same[1] == group else same[1], label)
+    return found
 
 
 def units(group, kind):

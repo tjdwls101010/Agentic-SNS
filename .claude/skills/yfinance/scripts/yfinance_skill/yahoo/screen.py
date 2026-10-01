@@ -139,15 +139,15 @@ def run(target, args, context, warnings, rows):
 DATASETS = {
     "screen.presets": Dataset(
         presets,
-        interpretation={"name_is_not_the_condition": "Each entry carries the query it runs. Describe a preset's results by that query, not by its name: small_cap_gainers, for one, screens for small capitalisation sorted by volume and has no gain condition."}),
+        interpretation={"name_is_not_the_condition": "Each entry carries the query it runs, which its name does not state: small_cap_gainers, for one, screens for small capitalisation sorted by volume and has no gain condition."}),
     "screen.fields": Dataset(fields),
     "screen.values": Dataset(values),
     "screen.run": Dataset(
         run, counted=True, conditions=screen_conditions, prepare=preset_defaults,
         units={"regularMarketChangePercent": PERCENT, "fiftyTwoWeekChangePercent": PERCENT, "marketCap": CURRENCY,
                "trailingPE": MULTIPLE, "regularMarketVolume": COUNT},
-        interpretation={"query_scale": "A growth threshold in the query is in percentage points, while the same measurement in a quote is a ratio: BTWN quarterlyrevenuegrowth.quarterly 20 30 selects companies whose quote revenueGrowth is 0.2-0.3, and 0.20 0.30 selects companies growing a fifth of a percent. Neither call fails, so an output ratio reused as a bound screens for something a hundredfold smaller and still returns a plausible list.",
+        interpretation={"query_scale": "A growth threshold in the query is in percentage points while the same measurement in a quote is a ratio: BTWN quarterlyrevenuegrowth.quarterly 20 30 matches quote revenueGrowth 0.2-0.3, and 0.20 0.30 matches growth of a fifth of a percent. Neither fails, so a ratio reused as a bound returns a plausible list for a hundredfold smaller threshold.",
                         "matches_not_a_census": "These are the rows matching the query, ordered by the sort field. They are not a verified census of a market, and total is the provider's own claim.",
                         "paging": "--offset continues a query rather than reading an immutable snapshot; rows can move between pages.",
-                        "default_fields": "Each row carries far more fields than the default projection; --fields reaches them and --list-fields names them."}),
+                        "default_fields": "Each row carries far more fields than the default projection."}),
 }

@@ -19,14 +19,13 @@ def filings(ticker, args, context, warnings):
 DATASETS = {
     "company.profile": Dataset(
         info, ticker=True, shares_info=True, source_time=info_time, units=INFO_UNITS,
-        interpretation={"sibling": "prices quote selects the price side of this same assembled response; --from reuses the observation rather than requesting it again.",
+        interpretation={"sibling": "prices quote selects the price side of this same assembled response.",
                         "currency": CURRENCY_SPLIT,
                         "governance": "The risk fields are ISS governance deciles, 1-10 relative to the company's index and region, where 1 is the lowest relative risk; they are ranks, not scores out of ten."},
         gotchas=["companyOfficers and executiveTeam are omitted from the default projection because they are large; ask for them by name."]),
     "company.shares": Dataset(
         shares, ticker=True, recent=True, units={"value": SHARES},
-        interpretation={"dates": "Each row is a share count dated to the day Yahoo reports it; dates come dozens a year and can repeat within a day, so they do not follow a quarterly filing calendar.",
-                        "range": "An omitted --end means now and an omitted --start means about 18 months before the end."}),
+        interpretation={"dates": "Each row is a share count dated to the day Yahoo reports it; dates come dozens a year and can repeat within a day, so they do not follow a quarterly filing calendar."}),
     "company.news": Dataset(
         news, ticker=True, counted=True,
         shortfall=("{received} usable entries arrived of the {requested} asked for. yfinance drops sponsored entries from what the feed sent, "

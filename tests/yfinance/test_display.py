@@ -156,7 +156,7 @@ def test_a_group_document_states_its_own_arguments_and_the_shared_ones_once(cli)
     named = [line.split()[0] for line in shared]
     assert set(named) == COMMON and len(named) == len(COMMON)
     for line in shared:
-        assert "Applies to" in line or "COMMAND" in line, line
+        assert line.endswith("]") and "[" in line, f"{line} does not say where it applies"
     assert fact("prices", "history", "default rows") is None, "history shows every row unless the budget or --limit cuts it"
 
 

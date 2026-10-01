@@ -44,16 +44,14 @@ def exit_code(status, codes):
 # ---- shared arguments and declaration tools -----------------------------------------------------------------------
 
 GLOBAL_DEFAULTS = {"max_chars": 20000, "ttl_days": 14}
-MAX_CHARS_HELP = "Maximum JSON characters. Each command's own default window is what keeps a result to one screen; this is the safety boundary behind it."
-TTL_HELP = "Delete saved observations older than this many days. Retention only: an observation inside the window is not therefore current, and source_time is what says whether a value is fresh."
+MAX_CHARS_HELP = "Largest JSON document to print. Each command's default window keeps a result to one screen; this is the boundary behind it, and a result over it comes back narrowed (partial) or refused (too_large) with a recovery."
+TTL_HELP = "Delete saved observations older than this many days. Retention only: source_time, not age, says whether a value is current."
 
-OUT_HELP = ("Write this observation's rows to a new CSV file and print only a summary: every digit and timestamp as saved, one target column, "
-            "table indices as columns, option sides as side, mapping keys as key, lists of values as value, nested records as dotted columns, "
-            "other objects and lists as JSON cells, nulls as blank cells, and a name that would collide prefixed source. — read the returned columns. "
-            "The screen's default window and projection do not apply; an explicit --fields or --limit does. Commands that ask the source for a set number of rows "
-            "(news, screen, calendars, search) ask for their default count, or for an explicit --limit instead, and fetch no further pages. "
-            "Targets with nothing selected add no rows and no file is made when none do, so check each target's status before comparing. "
-            "When the summaries do not fit --max-chars, one receipt reports the path, the total rows and the targets the file lacks. An existing file is never overwritten.")
+OUT_HELP = ("Write every saved row to a new CSV file (an existing one is never overwritten) and print a summary instead: values and timestamps as saved, "
+            "a target column, index levels as columns, option sides as side, mapping keys as key, a list of values as value, nested records as dotted columns, "
+            "other objects as JSON, nulls blank, and a clashing name prefixed source. — read the summary's columns. The default window and projection do not apply; "
+            "an explicit --fields or --limit does. Commands that send the source a count (news, screen, calendars, search) still ask for their default count, "
+            "or an explicit --limit, and read no further pages. A target with no rows adds none, so check each target's status before comparing.")
 
 class Arg:
     """One argparse argument. `minimum` is checked after parsing, with the same message for every command."""
@@ -87,11 +85,11 @@ def field_list(value):
 
 # The arguments every data command takes, each with where it applies; read takes all but --timeout. --filter defaults to None so that a given one, even "", can be told apart and refused where it narrows nothing.
 SHARED = [
-    (Arg("--fields", type=field_list, metavar="A,B", help="Comma-separated output fields, replacing this command's default projection. Nested payloads take dotted paths such as content.title; --list-fields names them."), "every data command and read"),
-    (Arg("--list-fields", action="store_true", help="Name the fields available for this dataset and target instead of returning values."), "every data command and read"),
-    (Arg("--filter", metavar="TEXT", help="Case-insensitive substring that narrows a catalog or a --list-fields listing."), "screen presets, fields and values, and --list-fields; refused anywhere else"),
-    (Arg("--limit", type=int, metavar="N", help="Maximum output rows, replacing this command's default window; the kind's 'a limit keeps' line says which end of a series it keeps."), "every data command and read; screen caps it at 250 and calendar at 100"),
-    (Arg("--timeout", type=int, default=30, metavar="SECONDS", help="Wall-clock seconds per target, library calls included."), "every data command, per target; read makes no request and takes none"),
+    (Arg("--fields", type=field_list, metavar="A,B", help="Comma-separated fields replacing the default projection; nested payloads take dotted paths such as content.title, and --list-fields names them."), "every data command and read"),
+    (Arg("--list-fields", action="store_true", help="List the fields this result offers instead of its values."), "every data command and read"),
+    (Arg("--filter", metavar="TEXT", help="Case-insensitive substring narrowing a catalog or a --list-fields listing."), "screen presets, fields and values, and --list-fields; refused elsewhere"),
+    (Arg("--limit", type=int, metavar="N", help="Maximum rows, replacing the default window; each kind's 'a limit keeps' line says which end."), "every data command and read; screen caps it at 250, calendar at 100"),
+    (Arg("--timeout", type=int, default=30, metavar="SECONDS", help="Seconds per target, library calls included."), "every data command; not read, which makes no request"),
 ]
 OUT = "data commands whose results are rows, and read; the kinds list marks the ones without it"
 
@@ -153,7 +151,7 @@ SCREEN_FIELDS = ("symbol", "shortName", "regularMarketPrice", "regularMarketChan
                  "marketCap", "trailingPE", "fiftyTwoWeekChangePercent", "averageAnalystRating", "fullExchangeName")
 
 SYMBOLS = Arg("symbols", nargs="+", help="One or more Yahoo symbols; each is queried separately.")
-FROM = Arg("--from", dest="from_id", metavar="ID", help="Read this saved observation instead of making a new request. prices quote and company profile select different sides of the same assembled response, so the second one costs nothing.")
+FROM = Arg("--from", dest="from_id", metavar="ID", help="Select from this saved prices quote or company profile observation instead of making a new request.")
 
 INTERVALS = ["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"]
 BAR_ARGS = [SYMBOLS, *dates("ISO date YYYY-MM-DD; inclusive.", "ISO date YYYY-MM-DD; exclusive: bars dated on or after it are not returned."),
@@ -182,8 +180,7 @@ QUERY_HELP = '''JSON query: {"operator":OP,"operands":[...]}; field names come f
 EQ [field, string|finite number] (2 operands); IS-IN [field, value, ...] (2+ operands).
 BTWN [field, number, number] (3 operands, inclusive lower/upper); GT, LT, GTE, LTE [field, finite number] (2 operands).
 AND, OR [query, query, ...] (2+ nested query objects). Booleans, null, NaN and Infinity are not query values.
-Nested example: {"operator":"AND","operands":[{"operator":"EQ","operands":["region","us"]},{"operator":"GT","operands":["intradaymarketcap",2000000000]}]}
-Use --query 'JSON' or --preset NAME. Fields and values can be narrowed with --filter TEXT and --field NAME.'''
+Nested example: {"operator":"AND","operands":[{"operator":"EQ","operands":["region","us"]},{"operator":"GT","operands":["intradaymarketcap",2000000000]}]}'''
 
 MARKET_REGIONS = ["US", "GB", "ASIA", "EUROPE", "RATES", "COMMODITIES", "CURRENCIES", "CRYPTOCURRENCIES"]  # yf.MarketRegion in yfinance 1.7.0
 # 성진: Sector·Industry의 region은 yf.MarketRegion(US/GB/ASIA/EUROPE/…)이 아니라 ISO 3166-1 alpha-2다 — 다른 이름공간이라
@@ -199,12 +196,12 @@ SECTOR_KEYS = ["basic-materials", "communication-services", "consumer-cyclical",
 def domain_args(key, datasets):
     # 성진: 닫힌 선택지가 G1을 인터페이스 층에서 없앤다 — 서비스되지 않는 코드는 경고 없이 미국 데이터를 돌려줬다.
     return [key,
-            Arg("--region", choices=DOMAIN_REGIONS, default="US", help="Country code, restricted to the regions Yahoo serves; others return the United States result with no warning. Outside the US the name column arrives null."),
+            Arg("--region", choices=DOMAIN_REGIONS, default="US", help="Country code; only the codes Yahoo serves this dataset for are accepted."),
             Arg("--dataset", choices=["overview", "top-companies", "research-reports"] + datasets, default="overview", help="Part of the sector or industry to return.")]
 
 
 RANGE = [*dates("ISO date YYYY-MM-DD; inclusive. Defaults to today for market-wide calendars.", "ISO date YYYY-MM-DD; inclusive, so --start D --end D returns that day. Defaults to seven days after --start."),
-         Arg("--offset", type=int, default=0, metavar="N", help="Remote row offset for the next source page; context.next_offset is the offset after the rows this call kept from the source (at most --limit), not after a native batch. Rows the budget then cut are read back with the continuation, not a new offset.")]
+         Arg("--offset", type=int, default=0, metavar="N", help="Row offset for the next source page, a new request; context.next_offset supplies it. Rows the budget cut are read with the continuation instead.")]
 
 
 # ---- argument defaults, checks and recovery wording -----------------------------------------------------------------
@@ -292,7 +289,7 @@ def statement_command(name, what):
 COMMANDS = {command.path: command for command in [
     Command("search", "", "Find instrument candidates by name, symbol or keyword.", "search",
             args=[Arg("query", help="Company name, symbol fragment or keyword."),
-                  Arg("--type", choices=SEARCH_TYPES, default="all", help="Instrument type filter; applies to --dataset quotes only."),
+                  Arg("--type", choices=SEARCH_TYPES, default="all", help="Instrument type filter for --dataset quotes; any other dataset refuses a --type other than all."),
                   Arg("--dataset", choices=["quotes", "news", "lists", "research"], default="quotes", help="quotes: instrument candidates; news: articles; lists: Yahoo curated lists; research: research reports.")],
             narrow=["--limit", "--type", "--dataset"], check=search_check, rows=10,
             forbidden=lambda args: ["--type"] if getattr(args, "dataset", "quotes") != "quotes" else []),
@@ -351,7 +348,7 @@ COMMANDS = {command.path: command for command in [
     symbol_command("options", "expirations", "Expiration dates with listed contracts for this underlying.", ["--limit"]),
     Command("options", "chain", "Option contracts for one expiration, by side.", "options.chain",
             args=[SYMBOLS, Arg("--date", metavar="DATE", help="Expiration YYYY-MM-DD; omitted selects the nearest available expiry."),
-                  Arg("--side", choices=["calls", "puts", "both"], default="both", help="Contract side to return; each side is limited separately.")],
+                  Arg("--side", choices=["calls", "puts", "both"], default="both", help="Contract side to return; --limit applies to each side.")],
             narrow=["--fields", "--limit", "--side", "--date"], rows=20),
 
     Command("screen", "presets", "Named screeners with the query each one actually runs.", "screen.presets",
@@ -361,11 +358,11 @@ COMMANDS = {command.path: command for command in [
     Command("screen", "values", "Enumerated values accepted by query fields of the selected --type.", "screen.values",
             args=[TYPE, FIELD], check=screen_check, narrow=["--filter", "--field", "--type"], exportable=False, catalog=True),
     Command("screen", "run", "Run a preset or a JSON query and return matching instruments.", "screen.run",
-            args=[TYPE, OneOf(Arg("--query", metavar="JSON", help="JSON operator/operands object; see examples below."),
+            args=[TYPE, OneOf(Arg("--query", metavar="JSON", help="JSON operator/operands object; the grammar is under [run] below."),
                               Arg("--preset", choices=PRESETS, help="Named screener; screen presets shows the query each runs. Its name does not state its condition: describe results by context.preset_query, the query it actually ran."), required=True),
                   Arg("--offset", type=int, default=0, metavar="N", help="Remote row offset for the next page; context.next_offset supplies it."),
                   Arg("--sort", metavar="FIELD", help="Sort field from screen fields; custom query default ticker, preset uses its defined sort."),
-                  Arg("--ascending", action=argparse.BooleanOptionalAction, default=None, help="Sort direction: --ascending or --no-ascending; omitted means the preset's own direction, or descending for a custom query.")],
+                  Arg("--ascending", action=argparse.BooleanOptionalAction, default=None, help="Sort direction; omitted means the preset's own direction, or descending for a custom query.")],
             epilog=QUERY_HELP, check=screen_check, defaults=custom_sort,
             narrow=["--fields", "--limit", "--query", "--preset", "--offset"], rows=25, fields=SCREEN_FIELDS),
 
@@ -395,10 +392,10 @@ PROG = "cli.py"
 LEAD = f"usage: {PROG} [--max-chars N] [--ttl-days N]"
 READ_PURPOSE = "Read a saved observation again, in slices, by fields or to a file, without a new request."
 READ_ARGS = [Arg("id", metavar="ID", help="Observation id from an earlier result."),
-             Arg("--start", dest="row_start", type=int, default=0, help="Zero-based first row to return; each slice names the start of the next one.")]
+             Arg("--start", dest="row_start", type=int, default=0, metavar="N", help="Zero-based first row to return; each slice names the start of the next one.")]
 READ_LIMIT = "Maximum rows, counted forward from --start in saved order; unlike the first call, read does not keep the newest end. The same slice goes to --out."
-DOCUMENT = ["stdout is one JSON document {status, request, results}: status is the results' statuses taken together, request is what you chose and what a default filled in, and results holds one envelope per target in the order given.",
-            "When an --out file was written but even its summaries do not fit --max-chars, the document carries one receipt in place of results: {out, rows (the file's total), and either each target's status and rows, or in_file and missing (the targets the file holds no rows for, by status)}."]
+DOCUMENT = ["stdout is one JSON document {status, request, results}: status combines the results', request echoes what you chose and what a default filled in, results holds one envelope per target in the order given.",
+            "If an --out file was written but its summaries do not fit --max-chars, a receipt replaces results: {out, rows (the file's total), and each target's status and rows, or in_file and missing (targets without rows, by status)}."]
 
 
 def members(group):
@@ -474,10 +471,10 @@ def shared_lines(read=False):
         if read and arg.dest == "timeout":
             continue
         typed, text = spec(arg, READ_LIMIT if read and arg.dest == "limit" else None)
-        lines.append(f"  {typed}  {text} Applies to {applies}.")
-    lines.append(f"  --out FILE  {OUT_HELP} Applies to {OUT}.")
-    lines.append(f"  --max-chars N  {MAX_CHARS_HELP} (default {GLOBAL_DEFAULTS['max_chars']}) Before COMMAND or after the whole command.")
-    lines.append(f"  --ttl-days N  {TTL_HELP} (default {GLOBAL_DEFAULTS['ttl_days']}) Before COMMAND only.")
+        lines.append(f"  {typed}  {text} [{applies}]")
+    lines.append(f"  --out FILE  {OUT_HELP} [{OUT}]")
+    lines.append(f"  --max-chars N  {MAX_CHARS_HELP} (default {GLOBAL_DEFAULTS['max_chars']}) [before COMMAND or after the whole command]")
+    lines.append(f"  --ttl-days N  {TTL_HELP} (default {GLOBAL_DEFAULTS['ttl_days']}) [before COMMAND only]")
     return lines
 
 
@@ -487,10 +484,14 @@ def output_lines():
             + [f"    {status}: {text}" for status, text in STATUSES.items()])
 
 
-def kind_lines(command):
-    """What one kind returns: its default window, which end a limit keeps, how a recovery narrows it, its units, and what its values mean."""
+def kind_lines(command, seen):
+    """What one kind returns: its default window, which end a limit keeps, how a recovery narrows it, its units, and what its values mean.
+
+    `seen` maps each fact line already printed in this document to the kind it was printed under; a repeated one is named once as `same as [kind]: label, …`.
+    """
     facts = describe.describe(command)
-    lines = [f"[{command.name or command.group}]"]
+    name = command.name or command.group
+    lines = [f"[{name}]"]
     if command.rows:
         lines.append(f"  default rows: {command.rows}")
     if command.fields:
@@ -498,11 +499,17 @@ def kind_lines(command):
     lines.append(f"  a limit keeps {facts['limit_keeps']}")
     if command.narrow:
         lines.append(f"  narrow with: {', '.join(command.narrow)}")
-    if facts.get("units"):
-        lines.append("  units: " + json.dumps(facts["units"], ensure_ascii=False, separators=(",", ":")))
-    lines += [f"  {key}: {text}" for key, text in facts.get("interpretation", {}).items()]
-    lines += [f"  limit: {text}" for text in facts.get("limits", {}).values()]
-    lines += [f"  gotcha: {text}" for text in facts.get("gotchas", [])]
+    meaning = [("units", json.dumps(facts["units"], ensure_ascii=False, separators=(",", ":")))] if facts.get("units") else []
+    meaning += list(facts.get("interpretation", {}).items())
+    meaning += [("limit", text) for text in facts.get("limits", {}).values()] + [("gotcha", text) for text in facts.get("gotchas", [])]
+    repeated = {}
+    for label, text in meaning:
+        if (label, text) in seen:
+            repeated.setdefault(seen[label, text], []).append(label)
+        else:
+            seen[label, text] = name
+            lines.append(f"  {label}: {text}")
+    lines += [f"  same as [{earlier}]: {', '.join(labels)}" for earlier, labels in repeated.items()]
     if command.epilog:
         lines += ["  query:"] + [f"    {line}" for line in command.epilog.splitlines()]
     return lines
@@ -518,7 +525,8 @@ def group_document(group):
     lines += ["", "shared arguments:"] + shared_lines()
     lines += ["", "output:"] + output_lines()
     lines += ["", "exit codes:"] + exit_lines()
-    lines += ["", "what each kind returns:"] + [line for command in kinds for line in kind_lines(command)]
+    seen = {}
+    lines += ["", "what each kind returns:"] + [line for command in kinds for line in kind_lines(command, seen)]
     return "\n".join(lines)
 
 
@@ -538,8 +546,8 @@ def root_map():
     lines = [f"{LEAD} COMMAND ...", "Yahoo Finance data by purpose. stdout: one JSON document; stderr: diagnostics.",
              "`COMMAND --help` states that command's kinds, arguments, output, what each kind's values mean, and exit codes.", "", "commands:"]
     lines += [f"  {typed:<{width}}{purpose}" if len(typed) < width else f"  {typed}  {purpose}" for typed, purpose in commands]
-    lines += ["", "options:", f"  --max-chars N  {MAX_CHARS_HELP} (default {GLOBAL_DEFAULTS['max_chars']}) Before COMMAND or after the whole command.",
-              f"  --ttl-days N  {TTL_HELP} (default {GLOBAL_DEFAULTS['ttl_days']}) Before COMMAND only.", "", "exit codes:"] + exit_lines()
+    lines += ["", "options:", f"  --max-chars N  {MAX_CHARS_HELP} (default {GLOBAL_DEFAULTS['max_chars']}) [before COMMAND or after the whole command]",
+              f"  --ttl-days N  {TTL_HELP} (default {GLOBAL_DEFAULTS['ttl_days']}) [before COMMAND only]", "", "exit codes:"] + exit_lines()
     return "\n".join(lines)
 
 

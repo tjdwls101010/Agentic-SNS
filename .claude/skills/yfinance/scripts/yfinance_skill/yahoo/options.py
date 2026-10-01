@@ -32,13 +32,12 @@ def chain(ticker, args, context, warnings):
 DATASETS = {
     "options.expirations": Dataset(
         expirations, ticker=True,
-        interpretation={"use": "Pass one of these to options chain --date; an omitted --date selects the nearest."}),
+        interpretation={"use": "Pass one to options chain --date."}),
     "options.chain": Dataset(
         chain, ticker=True, conditions=date_applied,
         units={"strike": CURRENCY, "lastPrice": CURRENCY, "bid": CURRENCY, "ask": CURRENCY, "change": CURRENCY,
                "percentChange": PERCENT, "impliedVolatility": RATE, "volume": COUNT, "openInterest": COUNT},
-        interpretation={"sides": "calls and puts are selected separately and each is limited on its own, so a limit of 20 with --side both returns 20 of each.",
-                        "staleness": "lastTradeDate is when that contract last traded, which for a thin strike can be days before the chain's most recent trades. A contract's lastPrice is only as recent as its lastTradeDate.",
+        interpretation={"staleness": "lastTradeDate is when that contract last traded, which for a thin strike can be days before the chain's most recent trades. A contract's lastPrice is only as recent as its lastTradeDate.",
                         "timezone": "lastTradeDate is UTC."},
         gotchas=["Contracts are ordered by strike, so a limit keeps the lowest strikes rather than the ones nearest the money."]),
 }
