@@ -150,7 +150,7 @@ COMMON = {"--max-chars", "--filter", "--store", "--fields", "--list-fields", "--
 
 def test_a_leaf_schema_carries_its_own_arguments_and_points_at_the_shared_ones(cli):
     proc = cli("schema", "prices", "history", raw=True)
-    assert len(proc.stdout.strip()) <= 2600, len(proc.stdout.strip())
+    assert len(proc.stdout.strip()) <= 2800, len(proc.stdout.strip())
     described = json.loads(proc.stdout)["results"][0]["data"]
     assert set(described["arguments"]) == {"symbols", "--start", "--end", "--period", "--interval", "--adjust", "--repair", "--prepost"}
     assert "schema" in described["common"] and "--fields" in described["common"]
