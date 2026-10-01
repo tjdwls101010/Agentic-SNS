@@ -33,7 +33,7 @@ DATASETS = {
                    "so a short page does not show that the feed ended, and these are not every article about the company."),
         interpretation={"payload": "Each entry nests its article under content, so a field path is dotted: content.title, content.provider.displayName.",
                         "not_the_article": "Entries locate sources; the text here is a summary, not the article. Read the article itself with a web reader."},
-        gotchas=["The default projection leaves out thumbnail and storyline, which are large; name them to get them.",
+        gotchas=["The default projection leaves out content.thumbnail and content.storyline, which are large; name those paths to get them.",
                  "Entries are not strictly ordered by pubDate, so the first entry is not reliably the most recent."]),
     "company.filings": Dataset(
         filings, ticker=True,

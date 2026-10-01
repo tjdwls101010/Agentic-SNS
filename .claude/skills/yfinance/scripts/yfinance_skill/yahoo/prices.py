@@ -82,9 +82,8 @@ DATASETS = {
                         "adjustment": "--adjust decides what Close means; adding dividends to an already adjusted return counts them twice.",
                         "repair": "--repair is a transformation with its own limits, not proof that a value equals the original trade.",
                         "precision": PRECISION},
-        limits={"1m": "8 days per request", "2m/5m/15m/30m/90m": "the range must fall within the last 60 days",
-                "60m/1h": "no range limit known; a year of 1h bars is far above the default budget",
-                "note": "A request past these fails upstream rather than returning less."},
+        limits={"period_max": "With an intraday interval --period max is not the whole history: yfinance 1.7.0 asks for the last 8 days of 1m, 60 days of 2m/5m/15m/30m/90m and 730 days of 60m/1h bars.",
+                "intraday_range": "Yahoo limits the days one intraday request spans and how far back intraday bars go. When its refusal states the limit, the fix gives --period or --start with that number; otherwise the general fix."},
         gotchas=["A 30m request is resampled from 15m, so Yahoo's refusal for it names 15m, not the interval asked for."]),
     "prices.actions": Dataset(
         actions, ticker=True, conditions=dates_applied, recent=True,

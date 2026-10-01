@@ -3,7 +3,7 @@
 It runs on the encoded value, so the first call and every later `read` of the same observation select through this one
 function and cannot disagree about what a row or a field was.
 """
-from yfinance_skill.shape import is_table, row_count
+from yfinance_skill.shape import is_keyed, is_sided, is_table, row_count
 from yfinance_skill.envelope import InputError
 
 
@@ -100,26 +100,30 @@ def project(data, fields):
     raise InputError("This result has no named fields to select; narrow it with --limit instead.")
 
 
-def select(data, args, item, coverage=None, keep=None):
+def select(data, args, item, coverage=None, keep=None, past_end=False):
     """Apply --list-fields, the field projection and the row window, recording what was left out.
 
     `keep` overrides the row count so the budget can narrow an already-selected result without re-deciding the
-    projection or the direction.
+    projection or the direction. `past_end` lets a --start beyond the last row return no rows instead of refusing, for one side of a chain whose other side goes on.
     """
     coverage = {} if coverage is None else coverage
+    if is_keyed(data):
+        return select_keyed(data, args, item, coverage, keep, past_end)
     if getattr(args, "list_fields", False):
         term = (getattr(args, "filter", "") or "").lower()
+        if is_sided(data):  # a chain's fields are its sides' columns, which --fields selects on every side
+            return [f for f in dict.fromkeys(n for t in data.values() for n in index_names(t) + available_fields(t)) if term in f.lower()], coverage
         return [f for f in index_names(data) + available_fields(data) if term in f.lower()], coverage
     received = row_count(data)
     if received is not None:
         coverage.setdefault("received", received)
     start = getattr(args, "row_start", 0) or 0
     if start and received is not None:
-        if start >= received:
+        if start >= received and not past_end:
             raise InputError(f"--start {start} is past the {received} rows this observation holds; its last row is at {received - 1}.")
-        data = dict(data, data=data["data"][start:], index=data["index"][start:]) if is_table(data) else data[start:]
         coverage["start"] = start
 
+    # 성진: 필드가 있는지는 페이지가 아니라 관측 전체의 사실이다. --start로 자른 뒤에 투영하면 앞 행에만 있던 필드가 뒤 페이지에서 거절된다 — 투영을 먼저 하고 자른다.
     requested = getattr(args, "fields", None)
     fields = requested or (list(item.fields) if item and item.fields else None)
     if fields:
@@ -134,6 +138,8 @@ def select(data, args, item, coverage=None, keep=None):
                 coverage["fields"] = {"received": len(offered), "shown": len(fields), "source": "requested" if requested else "leaf_default"}
         elif requested:
             coverage["unverified_fields"] = requested  # nothing came back at all, so the names could not be checked against a real shape
+    if start and received is not None:
+        data = dict(data, data=data["data"][start:], index=data["index"][start:]) if is_table(data) else data[start:]
 
     explicit = getattr(args, "limit", None)
     limit = keep if keep is not None else explicit if explicit is not None else (item.limit if item else None)
@@ -150,12 +156,46 @@ def select(data, args, item, coverage=None, keep=None):
     return data, coverage
 
 
-def select_sides(encoded, args, item, coverage):
-    """An option chain holds two independently limited tables, so each side reports its own coverage."""
-    data, per_side = {}, {}
+def select_keyed(data, args, item, coverage, keep, past_end):
+    """Records keyed by name are rows in sorted key order, the order the store saves them in, so the first call, a read and --out name the same rows; --fields reaches the records' fields and the result keeps its keys."""
+    keys = sorted(data)
+    rows, coverage = select([data[k] for k in keys], args, item, coverage, keep, past_end)
+    if getattr(args, "list_fields", False):
+        return rows, coverage
+    keys = keys[coverage.get("start", 0):]
+    keys = keys[len(keys) - len(rows):] if coverage.get("kept") == "newest" else keys[:len(rows)]
+    return dict(zip(keys, rows)), coverage
+
+
+def select_sides(encoded, args, item, coverage, keep=None):
+    """An option chain holds two tables limited separately and cut from one --start: each side reports its own coverage, a side that ends before the start comes back with no rows, and the totals only count."""
+    start = getattr(args, "row_start", 0) or 0
+    longest = max((row_count(table) or 0 for table in encoded.values()), default=0)
+    if start and start >= longest:
+        raise InputError(f"--start {start} is past every side of this observation; its longest side holds {longest} rows, the last at {longest - 1}.")
+    data = {}
     for side, table in encoded.items():
         seen = {}
-        data[side], _ = select(table, args, item, seen)
-        per_side[side] = seen
-    coverage.update(per_side)
+        data[side], _ = select(table, args, item, seen, keep, past_end=True)
+        coverage[side] = seen
+    sides = [coverage[side] for side in encoded]
+    coverage.update(received=sum(s.get("received", 0) for s in sides), shown=sum(s.get("shown", 0) for s in sides))
+    if start:
+        coverage["start"] = start
     return data
+
+
+def page_rows(data, coverage):
+    """How many rows the slice shown holds per page: an option chain's sides are cut alike, so its furthest side counts."""
+    if is_sided(data):
+        return max((coverage.get(side, {}).get("shown", 0) for side in data), default=0)
+    return coverage.get("shown")
+
+
+def following(data, coverage):
+    """Where the next slice of the saved rows starts, or None when this one reached the end. A chain goes on after the furthest row any side reached, since every side was cut from the same start."""
+    start, shown = coverage.get("start", 0), page_rows(data, coverage)
+    received = max((coverage.get(side, {}).get("received", 0) for side in data), default=0) if is_sided(data) else coverage.get("received")
+    if shown is None or received is None or start + shown >= received:
+        return None
+    return start + shown

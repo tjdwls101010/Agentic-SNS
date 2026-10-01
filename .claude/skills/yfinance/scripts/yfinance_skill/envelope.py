@@ -12,7 +12,11 @@ STATUSES = {
 
 
 class InputError(ValueError):
-    pass
+    """An argument the caller has to change; `fix`, when given, says how in place of the general advice."""
+
+    def __init__(self, message, fix=None):
+        super().__init__(message)
+        self.fix = fix
 
 
 class LocalFailure(Exception):

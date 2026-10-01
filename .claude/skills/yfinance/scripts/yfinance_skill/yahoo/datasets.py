@@ -21,13 +21,13 @@ class Dataset:
     fussiness — the direction differs inside `analysts` and inside `calendar`, and a single flip would silently break
     the other half.
 
-    How much one screen shows is the command's to declare (cli.py). A `counted` dataset sends the source a count: its fetch takes `rows`, the count in force for this call, and records what it asked for as context["requested"]; `shortfall` is what fewer rows than that means for this dataset, formatted with {received} and {requested}, and a dataset without one makes no claim either way. `prepare` fills in what the source itself fixes for a call (a preset's universe and sort); it only sets values on the namespace, because schema runs it on a synthetic one to report defaults. `coarser` maps an interval to the next coarser one a too-long series can be asked for again at, as (that interval, its bars' name, these bars' name), or None.
+    How much one screen shows is the command's to declare (cli.py). A `counted` dataset sends the source a count: its fetch takes `rows`, the count in force for this call, and records what it asked for as context["requested"]; `shortfall` is what fewer rows than that means for this dataset, formatted with {received} and {requested}, and a dataset without one makes no claim either way. `prepare` fills in what the source itself fixes for a call (a preset's universe and sort); it only sets values on the namespace, because schema runs it on a synthetic one to report defaults. `keyed` says the source returns records keyed by name, which the skill orders by key. `coarser` maps an interval to the next coarser one a too-long series can be asked for again at, as (that interval, its bars' name, these bars' name), or None.
     """
 
     def __init__(self, fetch, *, ticker=False, counted=False, recent=False, units=None, interpretation=None,
                  limits=None, gotchas=(), conditions=None, prepare=None, sliceable=True, shares_info=False,
-                 source_time=None, precise=(), shortfall=None, coarser=None):
-        self.fetch, self.ticker, self.counted, self.recent = fetch, ticker, counted, recent
+                 source_time=None, precise=(), shortfall=None, coarser=None, keyed=False):
+        self.fetch, self.ticker, self.counted, self.recent, self.keyed = fetch, ticker, counted, recent, keyed
         self.units, self.interpretation, self.limits = units or {}, interpretation or {}, limits or {}
         self.gotchas, self.conditions, self.prepare = tuple(gotchas), conditions, prepare
         self.sliceable, self.shares_info, self.source_time, self.precise = sliceable, shares_info, source_time, tuple(precise)

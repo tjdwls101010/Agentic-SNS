@@ -76,7 +76,7 @@ def test_a_leaf_with_a_default_row_window_declares_which_end_a_limit_keeps(cli, 
     """Which end a limit keeps cannot be re-derived from the data, and getting it backwards is silent: the call
     succeeds and returns the wrong end of the series."""
     window = describe(cli, *key)["default_window"]
-    assert window["limit_keeps"] in ("the newest rows of a series the source publishes oldest first", "the first rows in source order")
+    assert window["limit_keeps"] in ("the newest rows of a series the source publishes oldest first", "the first rows in source order", "the first keys in sorted order")
 
 
 @pytest.mark.parametrize("key", EVERY_LEAF, ids=IDS)

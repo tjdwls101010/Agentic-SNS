@@ -22,6 +22,11 @@ def is_sided(value):
     return isinstance(value, dict) and bool(value) and not is_table(value) and all(is_table(v) for v in value.values())
 
 
+def is_keyed(value):
+    """A mapping of records keyed by name (market summary, by exchange): each record is a row and its key names it."""
+    return isinstance(value, dict) and bool(value) and not is_table(value) and not is_sided(value) and all(isinstance(v, dict) for v in value.values())
+
+
 def is_empty(data):
     if is_table(data):
         return not data["data"] or all(cell is None for row in data["data"] for cell in row)

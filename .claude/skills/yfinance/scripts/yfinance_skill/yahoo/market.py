@@ -38,8 +38,8 @@ def domain(kind):
 
 DATASETS = {
     "market.summary": Dataset(
-        summary,
-        interpretation={"shape": "A mapping keyed by exchange, so --fields selects exchanges rather than columns and there are no rows for --limit to cut."}),
+        summary, keyed=True,
+        interpretation={"shape": "A mapping keyed by exchange in which each exchange is a row, in sorted key order on every path: --fields names the records' fields, --limit and read --start count exchanges in that order, and --out writes one row per exchange under a key column."}),
     "market.sectors": Dataset(
         sectors,
         interpretation={"coverage": "These are the known Yahoo sector keys, not a live enumeration of what the source will accept today."}),

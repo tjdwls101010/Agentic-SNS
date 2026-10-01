@@ -16,4 +16,6 @@ class Leaf:
         self.units, self.interpretation, self.limits, self.gotchas = dataset.units, dataset.interpretation, dataset.limits, dataset.gotchas
 
     def limit_keeps(self):
+        if self.dataset.keyed:
+            return "the first keys in sorted order"
         return "the newest rows of a series the source publishes oldest first" if self.recent else "the first rows in source order"
