@@ -13,7 +13,7 @@ from yfinance_skill.shape import is_empty, is_sided, row_count
 
 def open_store(args):
     """Every command opens the store and applies retention before anything else runs."""
-    saved = store.Store(args.store)
+    saved = store.Store()
     saved.prune(args.ttl_days)
     return saved
 
@@ -32,7 +32,7 @@ def prepare(command, args):
         dataset.prepare(args)
 
 
-LOCAL_FIX = "Make the store directory (--store or $YF_STORE) and the --out directory writable, or choose other paths."
+LOCAL_FIX = "Make the store directory the message names (the skill's data/observations, or $YF_STORE) and the --out directory writable, or choose another --out path."
 
 
 def check_out(args, targets):

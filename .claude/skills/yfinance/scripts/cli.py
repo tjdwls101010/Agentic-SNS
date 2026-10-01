@@ -56,7 +56,6 @@ OUT_HELP = ("Write this observation's rows to a new CSV file and print only a su
 SHARED = {
     "max_chars": "every command, before the group or after the whole command",
     "filter": "schema, catalog commands (screen presets/fields/values, market sectors) and --list-fields",
-    "store": "every command; read needs the store an id was saved in",
     "fields": "every data command and read",
     "list_fields": "every data command and read",
     "limit": "every data command and read; screen caps it at 250 and calendar at 100",
@@ -64,13 +63,12 @@ SHARED = {
     "out": "data commands whose results are rows (absent from single-record commands such as prices quote), and read",
     "ttl_days": "before the group only",
 }
-POINTER = "schema (no scope) describes the shared arguments (--fields, --list-fields, --limit, --timeout, --out, --max-chars, --filter, --store) and the envelope, statuses and exit codes every result uses"
+POINTER = "schema (no scope) describes the shared arguments (--fields, --list-fields, --limit, --timeout, --out, --max-chars, --filter) and the envelope, statuses and exit codes every result uses"
 
 
 def add_common(parser, selection=True, root=False):
     parser.add_argument("--max-chars", type=int, default=GLOBAL_DEFAULTS["max_chars"] if root else argparse.SUPPRESS, help="Maximum JSON characters. Each command's own default window is what keeps a result to one screen; this is the safety boundary behind it.")
     parser.add_argument("--filter", default=GLOBAL_DEFAULTS["filter"] if root else argparse.SUPPRESS, help="Case-insensitive substring for schema, catalogs or --list-fields.")
-    parser.add_argument("--store", default=argparse.SUPPRESS if not root else None, help="Directory holding saved observations; the same path is needed to read an earlier id. Defaults to the user cache, or $YF_STORE.")
     if selection:
         parser.add_argument("--fields", type=lambda value: [f.strip() for f in value.split(",")], help="Comma-separated output fields, replacing this command's default projection. Nested payloads take dotted paths such as content.title; --list-fields names them.")
         parser.add_argument("--list-fields", action="store_true", help="Name the fields available for this dataset and target instead of returning values.")
@@ -525,7 +523,7 @@ def main():
         if args.fields and any(not f for f in args.fields):
             raise InputError("--fields requires nonempty comma-separated field names")
         saved = querying.open_store(args)
-        request = {k: v for k, v in vars(args).items() if k not in ("symbols", "store", "ttl_days", "max_chars", "list_fields")}
+        request = {k: v for k, v in vars(args).items() if k not in ("symbols", "ttl_days", "max_chars", "list_fields")}
         return exit_code(*querying.answer(args, command, COMMANDS, saved, request, chosen(request, given, parsers[args.group, args.leaf])))
     except InputError as exc:
         fix = exc.fix or "Use --help for this command's arguments, or schema GROUP LEAF for its defaults, units and limits."

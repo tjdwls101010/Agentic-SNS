@@ -5,7 +5,6 @@ sentence recommended --fields to a payload --fields could not reach, so the chec
 never worked. Here every recovery is parsed out of the error and executed, and the result has to answer the same
 question the failed call asked.
 """
-import json
 import re
 import shlex
 
@@ -243,23 +242,6 @@ def test_a_leaf_that_cannot_be_narrowed_does_not_claim_it_can(cli):
     assert "--limit" in doc["results"][0]["data"]["narrowing"]
 
 
-def earnings_page_routes(count=25):
-    head = "<table><thead><tr><th>Symbol</th><th>Company</th><th>Earnings Date</th><th>EPS Estimate</th><th>Reported EPS</th><th>Surprise (%)</th></tr></thead><tbody>"
-    rows = "".join(f"<tr><td>AAPL</td><td>Apple</td><td>January {25 - i:02d}, 2024 at 4 PM EST</td><td>1</td><td>1</td><td>0</td></tr>" for i in range(count))
-    return [{"path": "/calendar/earnings", "text": head + rows + "</tbody></table>"}]
-
-
-def test_a_single_symbol_earnings_recovery_never_names_a_date_range(cli, tmp_path):
-    """--start/--end is a real narrowing for market-wide calendar earnings and rejected outright for the
-    single-symbol form. With an explicit store the recovery commands grow enough that even one row refuses at the
-    minimum budget, so the refusal lists this leaf's narrowings."""
-    store = tmp_path / "an-explicitly-chosen-store"
-    proc, doc = cli("calendar", "earnings", "AAPL", "--limit", "25", "--max-chars", "1000", "--store", str(store), routes=earnings_page_routes(), store=tmp_path / "s")
-    assert proc.returncode == 9, proc.stdout[:300]
-    fix = doc["results"][0]["error"]["fix"]
-    assert "Narrow with" in fix and "--start" not in fix and "--end" not in fix, fix
-
-
 def test_a_recovery_never_names_an_argument_this_mode_forbids(cli, tmp_path):
     """--type is a real narrowing for instrument search and rejected outright for the other datasets; naming it there
     sends the reader into an invalid-argument error."""
@@ -281,17 +263,6 @@ def test_a_single_row_over_the_budget_is_told_so_rather_than_sent_round_again(cl
     fix = doc["results"][0]["error"]["fix"]
     assert "single entry" in fix and "--max-chars" in fix, fix
     assert "--start 0 --limit 1" not in fix, "the recovery promises a slice that fails identically"
-
-
-def test_a_generated_recovery_points_at_the_store_the_observation_is_in(cli, tmp_path):
-    """An explicitly chosen store has to appear in the command the recovery names, or that command reads the default
-    cache, where the id it just printed does not exist."""
-    store = tmp_path / "custom-cache"
-    proc, doc = cli("prices", "history", "AAPL", "--period", "1y", "--max-chars", "1500", "--store", str(store), routes=chart_routes(), store=tmp_path / "unused")
-    assert proc.returncode in (8, 9), proc.stdout[:300]
-    text = json.dumps(doc, ensure_ascii=False)
-    assert str(store) in text, "a recovery command that omits --store sends the reader to a different cache"
-    assert (store / (doc["results"][0]["id"] + ".json")).exists()
 
 
 # ---- recoveries that leave the budget behind ------------------------------------------------------------------------
@@ -344,15 +315,6 @@ def test_reading_a_long_saved_series_under_a_small_budget_narrows_rather_than_cr
     proc, back = cli("read", doc["results"][0]["id"], "--max-chars", "1500", routes=[], store=store)
     assert proc.returncode == 8, proc.stdout[:400] + proc.stderr[-400:]
     assert back["results"][0]["continuation"]
-
-
-def test_a_multi_target_recovery_keeps_the_store_it_saved_to(cli, tmp_path):
-    store = tmp_path / "custom"
-    symbols = [f"S{i:02d}" for i in range(10)]
-    routes = [r for s in symbols for r in chart_routes(s)]
-    proc, doc = cli("prices", "history", *symbols, "--period", "1y", "--store", str(store), "--max-chars", "4000", routes=routes, store=tmp_path / "unused")
-    assert proc.returncode == 9, proc.stdout[:300]
-    assert f"--store {store}" in doc["results"][0]["error"]["fix"]
 
 
 # ---- B8: a refusal promises only the saves that happened ------------------------------------------------------------

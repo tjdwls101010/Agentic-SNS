@@ -86,7 +86,7 @@ def continuation(ident, item, args, data, coverage):
 def export_command(ident, args):
     """Writing the saved rows to a file costs no request and has no budget, so it is the way out for a computation."""
     fields = ",".join(args.fields) if getattr(args, "fields", None) else None
-    return f"read {ident}" + quoted(args, [("--store", getattr(args, "store", None)), ("--fields", fields)]) + " --out FILE"
+    return f"read {ident}" + quoted(args, [("--fields", fields)]) + " --out FILE"
 
 
 def coarser(item, args):
@@ -105,12 +105,9 @@ def quoted(args, names):
 
 
 def read_command(ident, item, args, keep, start=0):
-    """A recovery that reads a saved observation keeps the original selection and the store it was saved in.
-
-    Dropping --store sends the reader to the default cache, where the observation the sentence names does not exist.
-    """
+    """A recovery that reads a saved observation keeps the original selection."""
     fields = ",".join(args.fields) if getattr(args, "fields", None) else None
-    return f"read {ident}" + quoted(args, [("--store", getattr(args, "store", None)), ("--fields", fields)]) + f" --start {start} --limit {keep}"
+    return f"read {ident}" + quoted(args, [("--fields", fields)]) + f" --start {start} --limit {keep}"
 
 
 def narrowings(item, args):
@@ -144,8 +141,7 @@ def too_large_fix(results, item, size, max_chars, args, needed=None, shown=None)
         # 성진: 다종목에서 첫 id만 주면 비교 요청이 단일 종목 질문으로 바뀐다; 전부 이름 붙이고 목표를 줄이는 길도 함께 준다.
         listed = "; ".join(f"{t} {i}" for t, i in saved)
         # 성진: 목표만 보존하고 투영을 빠뜨리면 회복이 기본 필드집합으로 돌아가 다른 값을 성공적으로 낸다 — 질문이 바뀐 것은 같다.
-        # 성진: 저장소도 함께 — 명시한 --store를 빠뜨리면 이름 붙인 id가 기본 캐시에 없다.
-        kept = quoted(args, [("--store", getattr(args, "store", None)), ("--fields", ",".join(args.fields) if getattr(args, "fields", None) else None)])
+        kept = quoted(args, [("--fields", ",".join(args.fields) if getattr(args, "fields", None) else None)])
         filed = ", rerun with --out FILE to write every target's rows to one file (a new request)" if item.exportable else ""
         which = "Each target was observed and saved separately" if len(saved) == len(results) else f"The {len(saved)} targets that returned data were saved separately"
         each = f" {which}: {listed}. Read one with read ID{kept}" + (f" --limit {keep}" if keep else "") + f", ask for fewer targets in one call{filed}, or rerun with --max-chars {needed}."
