@@ -324,18 +324,36 @@ def name_uses(tree, current, is_package):
             if parts:
                 found.extend((('.'.join([target, *parts[1:]]), explicit), True) for target, explicit in filter(None, lookup(parts[0], chain)))
         elif isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
-            called = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, 'id', None)
-            if called in PATCHERS:
+            if isinstance(node.func, ast.Attribute):
+                patcher = node.func.attr in PATCHERS
+            elif isinstance(node.func, ast.Name):
+                bound = lookup(node.func.id, chain)  # a local def or argument named patch is not the patch API
+                patcher = any(t and t[0].split('.')[-1] in PATCHERS for t in bound) if bound else node.func.id in PATCHERS
+            else:
+                patcher = False
+            if patcher:
                 found.append(((node.args[0].value, len(node.args[0].value.split('.'))), False))
         for child in ast.iter_child_nodes(node):
             child.parent = node
         if isinstance(node, SCOPES):
-            outer = [*getattr(node, 'decorator_list', ()), *getattr(node, 'bases', ()), *getattr(node, 'keywords', ())]
+            # Decorators, bases, defaults, annotations and a comprehension's first iterable are evaluated where the scope is defined; the rest runs inside it.
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
-                outer += [*node.args.defaults, *filter(None, node.args.kw_defaults)]
+                arguments = node.args
+                every = [*arguments.posonlyargs, *arguments.args, *arguments.kwonlyargs, arguments.vararg, arguments.kwarg]
+                outer = [*getattr(node, 'decorator_list', ()), *arguments.defaults, *filter(None, arguments.kw_defaults),
+                         *(a.annotation for a in every if a is not None and a.annotation is not None), *filter(None, [getattr(node, 'returns', None)])]
+                body = node.body if isinstance(node.body, list) else [node.body]
+            elif isinstance(node, ast.ClassDef):
+                outer, body = [*node.decorator_list, *node.bases, *node.keywords], node.body
+            else:
+                outer = [node.generators[0].iter]
+                body = [child for child in ast.iter_child_nodes(node) if child is not node.generators[0]]
+                body += [part for part in ast.iter_child_nodes(node.generators[0]) if part is not node.generators[0].iter]
             inner = chain + [(scope_bindings(node, current, is_package), isinstance(node, ast.ClassDef))]
-            for child in ast.iter_child_nodes(node):
-                walk(child, chain if child in outer else inner)
+            for child in outer:
+                walk(child, chain)
+            for child in body:
+                walk(child, inner)
             return
         for child in ast.iter_child_nodes(node):
             walk(child, chain)
@@ -562,7 +580,8 @@ SKILL = '.claude/skills/demo/scripts/demo/'
     {SKILL + 'web/__init__.py': 'from demo.web.client import Failure, fetch\n\nTIMEOUT = 30\n\n\ndef lazy():\n    from . import client\n    return client\n'},
     {SKILL + 'render.py': 'from demo import reading\n\n\ndef show(reading):\n    return reading.helpers\n'},
     {'tests/demo/test_demo.py': 'MESSAGE = "the client lives in demo.web.client"\n'},
-], ids=['tree', 'local import inside an entry', 'parameter shadowing an import', 'a module path as plain text'])
+    {'tests/demo/test_demo.py': 'def patch(message):\n    return message\n\n\nPROBE = patch("demo.web.client")\n'},
+], ids=['tree', 'local import inside an entry', 'parameter shadowing an import', 'a module path as plain text', 'a local function named patch'])
 def test_a_conforming_unit_tree_has_no_violations(tmp_path, files):
     assert unit_tree(tmp_path, files) == []
 
@@ -585,6 +604,9 @@ def test_a_conforming_unit_tree_has_no_violations(tmp_path, files):
     ({SKILL + 'reading/__init__.py': 'from demo.reading.read import read\nfrom .read import run\nfrom .bridge import public\n', SKILL + 'reading/bridge.py': 'from . import helpers as public\n'}, 'demo.reading binds its module helpers'),
     ({SKILL + 'reading/read.py': 'import demo as pkg\n\n\ndef read():\n    return pkg.render.VALUE\n\n\ndef run():\n    pass\n'}, 'demo.reading.read (feature) imports demo.render (feature)'),
     ({SKILL + 'state.py': 'from jobs.demo.run import fetch\n'}, 'demo.state imports repository code jobs.demo.run'),
+    ({SKILL + 'render.py': 'from demo import reading as source\n\n\ndef probe(source=source.helpers):\n    return source\n'}, 'demo.render reaches past demo.reading into helpers'),
+    ({SKILL + 'render.py': 'from demo import reading as source\n\nPROBE = [source for source in source.helpers.items]\n'}, 'demo.render reaches past demo.reading into helpers'),
+    ({'tests/demo/test_demo.py': 'from unittest.mock import patch as replace\n\nPROBE = replace("demo.web.client.fetch")\n'}, 'test_demo.py reaches past demo.web into client'),
     ({'jobs/demo/run.py': 'from demo.reading.helpers import tidy\n'}, 'run.py reaches past demo.reading into helpers'),
     ({'jobs/demo/run.py': 'import sys\nsys.path.insert(0, "x")\n'}, 'run.py edits the import path'),
     ({'jobs/demo/run.py': 'from cli import main\n'}, 'run.py imports cli'),
