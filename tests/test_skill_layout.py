@@ -41,12 +41,12 @@ SKILLS = {
         'leaf': 'common',
         'yahoo': 'system',
         'store': 'store', 'export': 'store',
-        'querying': 'feature', 'schema': 'feature',
+        'querying': 'feature', 'describe': 'feature',
     }),
 }
 # Skills held to the unit rules: `edges` are the (from, to) feature imports allowed, `jobs` the repository folders whose maintenance code runs the skill. The other registered skills keep the contract above until their own migration.
 UNITS = {
-    'yfinance': {'edges': set(), 'jobs': []},
+    'yfinance': {'edges': set(), 'jobs': ['scenarios/yfinance']},
 }
 # What each kind of top-level child may import; features also import themselves, and another feature only along an edge UNITS names.
 ALLOWED = {
@@ -388,7 +388,7 @@ def resolve(target, modules, exports, seen=frozenset()):
 def unit_violations(package, modules, repository, repo):
     """The unit rules. Returns (violations, {module: the skill modules its attribute chains land in}).
 
-    Outside a subpackage, code reaches it only through the names its `__init__.py` binds as values: an entry that binds one of its own modules, directly or through another module, is a violation, and so is any use that steps from a subpackage into one of its modules from outside. The skill never imports the repository's tests or jobs (`repository`, named by stem and by dotted path from `repo`).
+    Outside a subpackage, code reaches it only through the names its `__init__.py` binds as values: an entry that binds one of its own modules, directly or through another module, is a violation, and so is any use that steps from a subpackage into one of its modules from outside. The skill never imports the repository's tests or jobs (`repository`, named by stem and by dotted path from `repo`). State the skill keeps lives in its own data/ folder, so its code names no home or cache directory (a library's own cache is the library's).
     """
     found = []
     units = sorted(name for name, path in modules.items() if path.name == '__init__.py' and name != package)
@@ -403,6 +403,15 @@ def unit_violations(package, modules, repository, repo):
             path, rest = resolve(target, modules, exports)
             if not rest and path[-1].startswith(unit + '.'):
                 found.append(f'{unit} binds its module {path[-1][len(unit) + 1:]} in its __init__')
+
+    for name, tree in trees.items():
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute) and node.attr in ('home', 'expanduser'):
+                found.append(f'{name} keeps state outside the skill ({"Path.home" if node.attr == "home" else node.attr})')
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+                for marker in ('XDG_CACHE_HOME', '.cache'):
+                    if marker in node.value:
+                        found.append(f'{name} keeps state outside the skill ({marker})')
 
     names = set()
     for path in repository:
@@ -608,6 +617,10 @@ def test_a_conforming_unit_tree_has_no_violations(tmp_path, files):
     ({SKILL + 'render.py': 'from demo import reading as source\n\nPROBE = [source for source in source.helpers.items]\n'}, 'demo.render reaches past demo.reading into helpers'),
     ({'tests/demo/test_demo.py': 'from unittest.mock import patch as replace\n\nPROBE = replace("demo.web.client.fetch")\n'}, 'test_demo.py reaches past demo.web into client'),
     ({'tests/demo/test_demo.py': 'from unittest.mock import patch\n\nPROBE = patch(target="demo.web.client.fetch")\n'}, 'test_demo.py reaches past demo.web into client'),
+    ({SKILL + 'state.py': 'from pathlib import Path\n\nROOT = Path.home() / "demo"\n'}, 'demo.state keeps state outside the skill (Path.home)'),
+    ({SKILL + 'state.py': 'import os\n\nROOT = os.path.expanduser("~/demo")\n'}, 'demo.state keeps state outside the skill (expanduser)'),
+    ({SKILL + 'state.py': 'import os\n\nROOT = os.environ.get("XDG_CACHE_HOME", "/tmp")\n'}, 'demo.state keeps state outside the skill (XDG_CACHE_HOME)'),
+    ({SKILL + 'state.py': 'ROOT = "/Users/me/.cache/demo"\n'}, 'demo.state keeps state outside the skill (.cache)'),
     ({'jobs/demo/run.py': 'from demo.reading.helpers import tidy\n'}, 'run.py reaches past demo.reading into helpers'),
     ({'jobs/demo/run.py': 'import sys\nsys.path.insert(0, "x")\n'}, 'run.py edits the import path'),
     ({'jobs/demo/run.py': 'from cli import main\n'}, 'run.py imports cli'),

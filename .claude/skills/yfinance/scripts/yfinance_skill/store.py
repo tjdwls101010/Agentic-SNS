@@ -27,9 +27,13 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+# The skill's own data folder, found from this file rather than the cwd; a symlinked install resolves to the real folder.
+DEFAULT = Path(__file__).resolve().parents[2] / "data" / "observations"
+
+
 class Store:
-    def __init__(self, directory=None):
-        self.root = Path(directory) if directory else Path(os.environ.get("YF_STORE") or (Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "yfinance-skill"))
+    def __init__(self):
+        self.root = Path(os.environ.get("YF_STORE") or DEFAULT)
         try:
             self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         except OSError as exc:
@@ -57,7 +61,7 @@ class Store:
     def load(self, ident):
         path = self.path(ident)
         if path.is_symlink():
-            raise InputError("Saved observations must not be symbolic links; use a fresh --store directory.")
+            raise InputError(f"Saved observations must not be symbolic links; remove {path} and rerun the original command.")
         try:
             data = path.read_bytes()
         except FileNotFoundError:
@@ -65,7 +69,7 @@ class Store:
         except OSError as exc:
             raise LocalFailure(f"Saved observation {ident} in {self.root} could not be read: {exc}") from None
         if digest(data)[:ID_LENGTH] != ident:
-            raise InputError("Saved bytes do not match their identifier; use a fresh --store directory and rerun the original command.")
+            raise InputError(f"Saved bytes do not match their identifier; remove {path} and rerun the original command.")
         found = json.loads(data)
         when = found.get("source_time")
         if isinstance(when, (int, float)) and when > 0:

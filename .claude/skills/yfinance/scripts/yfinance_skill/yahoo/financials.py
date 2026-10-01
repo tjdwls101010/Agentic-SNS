@@ -7,7 +7,7 @@ STATEMENT_INTERPRETATION = {
     "dates": STATEMENT_DATES,
     "currency": "The reported currency is in context.currency, read from the same company's financialCurrency. It can differ from the currency the share price is quoted in.",
     "orientation": "Rows are periods and columns are native line items, so --fields selects line items.",
-    "scale": "One statement mixes measurements: a rate such as TaxRateForCalcs sits in the same row as a currency amount such as NormalizedEBITDA. The label is the only thing distinguishing them, so read a line item's name before comparing its magnitude to another's.",
+    "scale": "One row mixes measurements, such as TaxRateForCalcs (a rate) beside NormalizedEBITDA (an amount); read a line item's name and units before comparing magnitudes.",
 }
 STATEMENT_UNITS = {"TaxRateForCalcs": RATE, "TaxEffectOfUnusualItems": CURRENCY, "BasicEPS": PER_SHARE, "DilutedEPS": PER_SHARE,
                    "BasicAverageShares": SHARES, "DilutedAverageShares": SHARES, "ShareIssued": SHARES, "OrdinarySharesNumber": SHARES, "TreasurySharesNumber": SHARES}
@@ -49,8 +49,7 @@ def valuation(ticker, args, context, warnings):
 
 DATASETS = {
     f"financials.{name}": Dataset(
-        statement(method), ticker=True, units=STATEMENT_UNITS,
-        interpretation=dict(STATEMENT_INTERPRETATION, frequency=("Balance sheet frequencies are yearly and quarterly only." if name == "balance" else "trailing returns TTM, which is a rolling twelve months and not a completed fiscal period.")))
+        statement(method), ticker=True, units=STATEMENT_UNITS, interpretation=STATEMENT_INTERPRETATION)
     for name, method in STATEMENTS.items()
 } | {
     "financials.valuation": Dataset(
@@ -58,6 +57,5 @@ DATASETS = {
         units={"Market Cap": CURRENCY, "Enterprise Value": CURRENCY, "Trailing P/E": MULTIPLE, "Forward P/E": MULTIPLE,
                "PEG Ratio (5yr expected)": MULTIPLE, "Price/Sales": MULTIPLE, "Price/Book": MULTIPLE,
                "Enterprise Value/Revenue": MULTIPLE, "Enterprise Value/EBITDA": MULTIPLE},
-        interpretation={"dates": "Labels other than Current are native period dates; Current is the latest trailing snapshot, not a completed fiscal period.",
-                        "periods": "--periods is sent upstream here rather than applied locally; 0 returns Current only."}),
+        interpretation={"dates": "Labels other than Current are native period dates; Current is the latest trailing snapshot, not a completed fiscal period."}),
 }

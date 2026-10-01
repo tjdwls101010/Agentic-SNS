@@ -6,4 +6,4 @@ description: Read structured Yahoo Finance market and company data through a sel
 
 # Yahoo Finance data
 
-Run `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" <command> …` on one line. `--help` gives the commands, their arguments and the exit codes, `schema` what results, fields and units mean, and each error's `fix` how to recover.
+Run `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" <command> …` on one line. `--help` maps the commands and their kinds; `<command> --help` states that command's arguments, its output, what each kind's values mean (units, timing, windows, limits) and its exit codes; each error's `fix` says how to recover.

@@ -23,13 +23,9 @@ DATASETS = {
     "analysts.recommendations": analyst(
         "get_recommendations", units=ANALYST_COUNTS,
         interpretation={"periods": "period 0m is the current month and -1m, -2m, -3m are earlier months, so rows are relative, not dated."}),
-    "analysts.summary": analyst(
-        "get_recommendations_summary", units=ANALYST_COUNTS,
-        interpretation={"periods": "period 0m is the current month; earlier months are relative offsets."}),
     "analysts.upgrades": analyst(
         "get_upgrades_downgrades",
-        interpretation={"order": "Actions arrive newest first, so a limit keeps the most recent ones.",
-                        "history": "The full history reaches back more than a decade; the default keeps one screen of the newest actions and coverage reports how many were received."}),
+        interpretation={"order": "Actions arrive newest first."}),
     "analysts.earnings-estimate": analyst(
         "get_earnings_estimate",
         units={"growth": RATE, "avg": PER_SHARE, "low": PER_SHARE, "high": PER_SHARE, "yearAgoEps": PER_SHARE, "numberOfAnalysts": COUNT},
@@ -42,11 +38,11 @@ DATASETS = {
         "get_earnings_history", recent=True,
         units={"epsActual": PER_SHARE, "epsEstimate": PER_SHARE, "epsDifference": PER_SHARE, "surprisePercent": RATE},
         interpretation={"dates": "The index is the fiscal quarter end, not the announcement date.",
-                        "surprise": "surprisePercent is a ratio despite its name: 0.0452 is a 4.52% surprise. calendar earnings reports the same measurement as Surprise(%) on a percent scale, so the two are 100x apart and must not be compared directly."}),
+                        "surprise": "surprisePercent is a ratio despite its name (0.0452 is a 4.52% surprise); calendar earnings reports the same measurement as Surprise(%) in percent, 100x apart."}),
     "analysts.revisions": analyst(
         "get_eps_revisions",
         units={"upLast7days": COUNT, "upLast30days": COUNT, "downLast7Days": COUNT, "downLast30days": COUNT},
-        interpretation={"periods": "0q, +1q, 0y and +1y are relative periods.",
+        interpretation={"periods": RELATIVE,
                         "counts": "These are analyst counts, not magnitudes; a revision's size is not reported here."}),
     "analysts.trend": analyst(
         "get_eps_trend",

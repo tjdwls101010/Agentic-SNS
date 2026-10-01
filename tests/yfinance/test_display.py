@@ -6,6 +6,8 @@ trimmed value also checks, where it matters, that the stored copy was left alone
 import json
 import struct
 
+from conftest import arguments, document, fact, section
+
 META = {"currency": "USD", "symbol": "AAPL", "exchangeName": "NMS", "instrumentType": "EQUITY", "firstTradeDate": 345479400, "regularMarketTime": 1704387600,
         "gmtoffset": -18000, "timezone": "EST", "exchangeTimezoneName": "America/New_York", "regularMarketPrice": 110, "chartPreviousClose": 100,
         "priceHint": 2, "dataGranularity": "1d", "validRanges": ["1d", "5d", "1mo", "max"]}
@@ -143,39 +145,19 @@ def test_five_years_of_daily_bars_show_about_twice_the_rows_in_one_screen(cli):
     assert doc["results"][0]["coverage"]["shown"] >= 240
 
 
-# ---- schema density -----------------------------------------------------------------------------------------------
+# ---- a document states each argument once ----------------------------------------------------------------------------
 
-COMMON = {"--max-chars", "--filter", "--store", "--fields", "--list-fields", "--limit", "--timeout", "--out"}
-
-
-def test_a_leaf_schema_carries_its_own_arguments_and_points_at_the_shared_ones(cli):
-    proc = cli("schema", "prices", "history", raw=True)
-    assert len(proc.stdout.strip()) <= 2800, len(proc.stdout.strip())
-    described = json.loads(proc.stdout)["results"][0]["data"]
-    assert set(described["arguments"]) == {"symbols", "--start", "--end", "--period", "--interval", "--adjust", "--repair", "--prepost"}
-    assert "schema" in described["common"] and "--fields" in described["common"]
-    assert described["default_window"]["rows"] is None
+COMMON = {"--max-chars", "--filter", "--fields", "--list-fields", "--limit", "--timeout", "--out", "--ttl-days"}
 
 
-def test_the_root_schema_describes_each_shared_argument_once_with_where_it_applies(cli):
-    proc, doc = cli("schema")
-    shared = doc["results"][0]["data"]["common_arguments"]
-    assert COMMON | {"--ttl-days"} <= set(shared)
-    for name, spec in shared.items():
-        assert spec["help"] and spec["applies_to"], name
-    assert shared["--limit"]["default"] == "the command's default_window.rows"
-
-
-def test_every_leaf_schema_lists_exactly_the_options_its_help_offers_beyond_the_shared_ones(cli):
-    import re
-    proc, doc = cli("schema")
-    for group, leaves in doc["results"][0]["data"]["commands"].items():
-        for leaf in leaves:
-            scope = [group] + ([leaf] if leaf else [])
-            helped = set(re.findall(r"^  (--[a-z-]+)", cli(*scope, "--help", raw=True).stdout, re.M)) - COMMON - {"--help"}
-            proc, described = cli("schema", *scope)
-            options = {k for k in described["results"][0]["data"]["arguments"] if k.startswith("--")}
-            assert options == helped, scope
+def test_a_group_document_states_its_own_arguments_and_the_shared_ones_once(cli):
+    assert {"--from", "--start", "--end", "--period", "--interval", "--adjust", "--repair", "--prepost"} == set(arguments("prices")) - {"SYMBOL..."}
+    shared = section(document("prices"), "shared arguments")
+    named = [line.split()[0] for line in shared]
+    assert set(named) == COMMON and len(named) == len(COMMON)
+    for line in shared:
+        assert line.endswith("]") and "[" in line, f"{line} does not say where it applies"
+    assert fact("prices", "history", "default rows") is None, "history shows every row unless the budget or --limit cuts it"
 
 
 # ---- the cheap signals come before the costly detail ----------------------------------------------------------------

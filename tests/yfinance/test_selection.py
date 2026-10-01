@@ -4,7 +4,7 @@ import shlex
 
 import pytest
 
-from conftest import inflate, shape
+from conftest import inflate, kind_block, shape
 
 META = {"currency": "USD", "symbol": "AAPL", "exchangeName": "NMS", "instrumentType": "EQUITY", "firstTradeDate": 345479400, "regularMarketTime": 1704387600,
         "gmtoffset": -18000, "timezone": "EST", "exchangeTimezoneName": "America/New_York", "regularMarketPrice": 110, "chartPreviousClose": 100,
@@ -67,10 +67,8 @@ def test_a_limit_on_a_newest_first_series_still_keeps_the_newest_rows(cli):
 @pytest.mark.parametrize("group,leaf,newest", [("prices", "history", True), ("prices", "actions", True), ("company", "shares", True),
                                                ("analysts", "history", True), ("analysts", "upgrades", False),
                                                ("holders", "insider-transactions", False), ("company", "filings", False)])
-def test_schema_states_the_end_a_limit_keeps_as_measured_for_each_leaf(cli, group, leaf, newest):
-    proc, doc = cli("schema", group, leaf)
-    assert proc.returncode == 0
-    keeps = doc["results"][0]["data"]["default_window"]["limit_keeps"]
+def test_the_document_states_the_end_a_limit_keeps_as_measured_for_each_kind(group, leaf, newest):
+    keeps = next(line for line in kind_block(group, leaf) if line.startswith("a limit keeps "))
     assert ("newest" in keeps) is newest, keeps
 
 
@@ -289,6 +287,5 @@ def test_a_field_some_keyed_records_lack_is_null_on_every_page_rather_than_refus
     assert seen == {"A": {"shortName": "Ay", "regularMarketPrice": 1}, "M": {"shortName": "Em", "regularMarketPrice": None}, "Z": {"shortName": "Zed", "regularMarketPrice": None}}
 
 
-def test_the_market_summary_says_a_limit_keeps_the_first_keys_in_sorted_order(cli):
-    proc, doc = cli("schema", "market", "summary")
-    assert doc["results"][0]["data"]["default_window"]["limit_keeps"] == "the first keys in sorted order"
+def test_the_market_summary_says_a_limit_keeps_the_first_keys_in_sorted_order():
+    assert "a limit keeps the first keys in sorted order" in kind_block("market", "summary")

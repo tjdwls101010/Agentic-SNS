@@ -29,12 +29,12 @@ def exported(encoded, args, item):
 
 
 def retry(ident, args, coverage):
-    """The read that writes the same rows again: same store, same projection, same slice."""
+    """The read that writes the same rows again: same projection, same slice."""
     start = coverage.get("start", 0)
     if coverage.get("kept") == "newest":
         start = coverage["received"] - coverage["shown"]
     explicit = getattr(args, "limit", None)
-    names = [("--store", getattr(args, "store", None)), ("--fields", ",".join(args.fields) if getattr(args, "fields", None) else None),
+    names = [("--fields", ",".join(args.fields) if getattr(args, "fields", None) else None),
              ("--start", start or None), ("--limit", explicit)]
     return f"read {ident}" + budget.quoted(args, names) + " --out NEWPATH"
 

@@ -4,8 +4,6 @@ import json
 import re
 import shlex
 
-import pytest
-
 from test_display import META
 
 STAMPS = [1704205800 + 86400 * i for i in range(30)]
@@ -72,10 +70,11 @@ def test_an_option_chain_writes_each_side_under_a_side_column(cli, tmp_path):
 
 
 def test_a_list_of_values_is_one_value_column(cli, tmp_path):
-    proc, doc = cli("market", "sectors", "--out", str(tmp_path / "sectors.csv"))
+    chain = {"optionChain": {"result": [{"expirationDates": [1735689600, 1736294400, 1736899200], "quote": {"symbol": "AAPL"}, "options": []}], "error": None}}
+    proc, doc = cli("options", "expirations", "AAPL", "--out", str(tmp_path / "expirations.csv"), routes=[{"path": "/v7/finance/options/AAPL", "json": chain}])
     assert proc.returncode == 0, proc.stdout[:500]
-    written = rows(tmp_path / "sectors.csv")
-    assert list(written[0]) == ["target", "value"] and len(written) == 11
+    written = rows(tmp_path / "expirations.csv")
+    assert list(written[0]) == ["target", "value"] and [r["value"] for r in written] == ["2025-01-01", "2025-01-08", "2025-01-15"]
 
 
 def test_a_mapping_of_records_gets_a_key_column_and_a_colliding_field_is_renamed(cli, tmp_path):
@@ -90,9 +89,10 @@ def test_a_mapping_of_records_gets_a_key_column_and_a_colliding_field_is_renamed
 
 def test_a_single_record_command_offers_no_out(cli, tmp_path):
     proc = cli("prices", "quote", "AAPL", "--out", str(tmp_path / "q.csv"), raw=True)
-    assert proc.returncode == 2
-    assert "--out" not in cli("prices", "quote", "--help", raw=True).stdout
-    assert "--out" in cli("prices", "history", "--help", raw=True).stdout
+    assert proc.returncode == 2 and "unrecognized arguments: --out" in proc.stdout
+    from conftest import document, section
+    kinds = {line.split()[0]: line for line in section(document("prices"), "kinds")}
+    assert kinds["quote"].endswith("(no --out)") and not kinds["history"].endswith("(no --out)")
 
 
 def test_an_existing_file_is_never_overwritten(cli, tmp_path):
@@ -139,12 +139,11 @@ def test_read_exports_a_saved_observation_without_a_new_request(cli, tmp_path):
     assert [r["Close"] for r in rows(tmp_path / "slice.csv")] == [str(float(i)) for i in range(10, 15)]
 
 
-@pytest.mark.parametrize("code", ["local_io"])
-def test_the_root_schema_names_the_export_failure(cli, code):
-    proc, doc = cli("schema")
-    data = doc["results"][0]["data"]
-    assert data["output"]["exit_codes"][code] == 4
-    assert "--out" in data["common_arguments"]
+def test_every_document_names_the_export_failure_and_the_out_argument(cli):
+    from conftest import document, groups, section
+    for text in [document(group) for group in groups()] + [document("read")]:
+        assert re.search(r"(?m)^  4  local_io: ", text)
+        assert any(line.strip().startswith("--out FILE") for line in section(text, "shared arguments" if "shared arguments:" in text else "arguments"))
 
 
 # ---- defects found by an independent review of this feature --------------------------------------------------------

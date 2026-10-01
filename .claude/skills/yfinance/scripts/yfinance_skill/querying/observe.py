@@ -13,7 +13,7 @@ from yfinance_skill.shape import is_empty, is_sided, row_count
 
 def open_store(args):
     """Every command opens the store and applies retention before anything else runs."""
-    saved = store.Store(args.store)
+    saved = store.Store()
     saved.prune(args.ttl_days)
     return saved
 
@@ -32,7 +32,7 @@ def prepare(command, args):
         dataset.prepare(args)
 
 
-LOCAL_FIX = "Make the store directory (--store or $YF_STORE) and the --out directory writable, or choose other paths."
+LOCAL_FIX = "Make the store directory the message names (the skill's data/observations, or $YF_STORE) and the --out directory writable, or choose another --out path."
 
 
 def check_out(args, targets):
@@ -83,7 +83,7 @@ def upstream_fix(exc, item, args):
     if isinstance(exc, yahoo.SourceConstraint):
         days, interval = exc.days, getattr(args, "interval", None)
         asked = getattr(args, "period", None) or f"{getattr(args, 'start', '')}..{getattr(args, 'end', '')}"
-        coarser = f"; beyond that, a coarser --interval than {interval} (schema prices history lists the limits known)." if interval else "."
+        coarser = f"; beyond that, a coarser --interval than {interval} (prices --help states what is known of the intraday limits)." if interval else "."
         if exc.kind == "span":
             return (f"The source serves at most {days} days of this granularity per request, and {asked} is longer. "
                     f"Retry with --period {days}d or a --start/--end span of at most {days} days" + coarser)
@@ -91,7 +91,7 @@ def upstream_fix(exc, item, args):
                 f"Retry with --period {days}d or a --start inside the last {days} days" + coarser)
     if isinstance(exc, yahoo.NoData):
         return "The source has no data for this symbol and dataset. Confirm the symbol with search, which reports the exchange and instrument type, or choose a dataset this instrument type reports."
-    return f"Retry later, or confirm the symbol and dataset with search and schema {item.path}".rstrip() + "; use --timeout SECONDS if the target timed out."
+    return f"Retry later, or confirm the symbol and dataset with search and {item.group} --help; use --timeout SECONDS if the target timed out."
 
 
 def asked_for(coverage, requested):
@@ -130,7 +130,7 @@ def run(args, item, saved, request, commands):
             code = ("invalid" if isinstance(exc, InputError) else "local_io" if isinstance(exc, LocalFailure)
                     else "rate_limited" if isinstance(exc, yahoo.RateLimited) else "upstream")
             stopped = stopped or code == "rate_limited"
-            fix = (f"Correct the arguments; schema {item.path} reports this command's choices and defaults." if code == "invalid"
+            fix = (f"Correct the arguments; {item.group} --help states this command's choices and defaults." if code == "invalid"
                    else LOCAL_FIX if code == "local_io"
                    else "Retry later with fewer targets; remaining targets were not attempted." if code == "rate_limited"
                    else upstream_fix(exc, item, args))

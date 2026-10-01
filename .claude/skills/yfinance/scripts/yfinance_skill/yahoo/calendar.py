@@ -8,7 +8,7 @@ from yfinance_skill.yahoo.datasets import CURRENCY, PER_SHARE, PERCENT, Dataset
 
 CALENDARS = {"earnings": "get_earnings_calendar", "economic": "get_economic_events_calendar", "ipo": "get_ipo_info_calendar", "splits": "get_splits_calendar"}
 DATE_FIELDS = {"earnings": "Event Start Date", "economic": "Event Time", "ipo": "Date", "splits": "Payable On"}
-CALENDAR_DATES = "--start and --end are both inclusive. Yahoo's own range excludes the end date, so this CLI sends the day after --end; the conditions field reports whether the rows it returned actually fall inside the range you asked for."
+CALENDAR_DATES = "conditions.dates reports whether the rows returned fall inside the range asked for."
 
 
 def dates_applied(encoded, args, context):
@@ -79,9 +79,9 @@ DATASETS = {
         earnings,
         units={"Surprise(%)": PERCENT, "Marketcap": CURRENCY, "EPS Estimate": PER_SHARE, "Reported EPS": PER_SHARE},
         interpretation={"dates": CALENDAR_DATES,
-                        "two_modes": "With a SYMBOL this returns that company's own earnings history and upcoming dates, paged by --limit and --offset with no date filter, newest first. Without one it returns market-wide US earnings inside the date range.",
-                        "surprise": "Surprise(%) is on a percent scale: 33.33 means 33.33%. analysts history reports the same measurement as surprisePercent on a ratio scale, so the two are 100x apart.",
-                        "zero_loss": "Market-wide, yfinance converts zero to null in the estimate, actual and surprise columns, so a null there can be a real zero and the distinction is already lost upstream of this CLI. A single symbol's history keeps its zeros."}),
+                        "two_modes": "With a SYMBOL the rows are that company's own history and upcoming dates, newest first; without one, market-wide US earnings in the date range.",
+                        "surprise": "Surprise(%) is in percent (33.33 is 33.33%); analysts history reports the same measurement as surprisePercent, a ratio, 100x apart.",
+                        "zero_loss": "Market-wide, yfinance turns zero into null in the estimate, actual and surprise columns, so a null can be a real zero; a single symbol's history keeps its zeros."}),
     "calendar.economic": calendar(
         events,
         interpretation={"dates": CALENDAR_DATES,
@@ -89,9 +89,8 @@ DATASETS = {
                         "zero_loss": ZERO_LOSS}),
     "calendar.ipo": calendar(
         events,
-        interpretation={"dates": "A row matches when any of its listing Date, Filing Date or Amended Date falls in the range, so a returned row's Date can sit outside it.",
-                        "zero_loss": "yfinance converts zero to null in the price and share columns."},
-        gotchas=["Because three different date fields can match, the range cannot be confirmed from the returned rows the way the other calendars' can; conditions reports it as unverified rather than claiming it was applied."]),
+        interpretation={"dates": "A row matches when any of its listing Date, Filing Date or Amended Date falls in the range, so a returned row's Date can sit outside it and conditions reports the range as unverified.",
+                        "zero_loss": "yfinance converts zero to null in the price and share columns."}),
     "calendar.splits": calendar(
         events,
         interpretation={"dates": CALENDAR_DATES + " The date matched is the payable date, not the announcement or ex-date."}),

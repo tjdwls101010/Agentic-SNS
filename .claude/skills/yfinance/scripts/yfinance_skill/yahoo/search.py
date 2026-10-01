@@ -22,6 +22,5 @@ DATASETS = {
         shortfall=("{received} of the {requested} asked for arrived on the first page of search results, the only page read; "
                    "a short list does not show that nothing else matches."),
         interpretation={"identity": "Candidates are search matches, not a confirmed identity: an equity, its depositary receipt and a similarly named fund appear together.",
-                        "coverage": "quotes reads only the first Lookup page, and news and lists only the first page of search results; a symbol absent here is not proof it does not exist."},
-        gotchas=["--type filters --dataset quotes only; a --type other than all is rejected with any other dataset."]),
+                        "coverage": "quotes reads only the first Lookup page, and news and lists only the first page of search results; a symbol absent here is not proof it does not exist."}),
 }

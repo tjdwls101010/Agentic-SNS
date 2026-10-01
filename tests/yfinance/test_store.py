@@ -40,9 +40,9 @@ def test_retention_deletes_by_age_and_says_nothing_about_being_current(cli, tmp_
     ident = observe(cli, store)
     old = time.time() - 40 * 86400
     os.utime(store / f"{ident}.json", (old, old))
-    cli("--ttl-days", "0", "schema", "prices", routes=[], store=store)
+    cli("--ttl-days", "0", "screen", "presets", routes=[], store=store)
     assert (store / f"{ident}.json").exists(), "retention off deletes nothing"
-    cli("--ttl-days", "14", "schema", "prices", routes=[], store=store)
+    cli("--ttl-days", "14", "screen", "presets", routes=[], store=store)
     assert not (store / f"{ident}.json").exists()
 
 
@@ -218,7 +218,7 @@ def test_a_negative_retention_is_refused_before_anything_is_deleted(cli, tmp_pat
     """-1 days put the cutoff in the future, so every saved observation counted as expired and was deleted."""
     store = tmp_path / "s"
     ident = observe(cli, store)
-    proc, doc = cli("--ttl-days", "-1", "schema", routes=[], store=store)
+    proc, doc = cli("--ttl-days", "-1", "screen", "presets", routes=[], store=store)
     assert proc.returncode == 2, proc.stdout[:300]
     assert "--ttl-days" in doc["results"][0]["error"]["message"]
     proc, back = cli("read", ident, routes=[], store=store)
@@ -248,7 +248,7 @@ def assert_local_failure(proc):
 def test_a_store_path_under_a_regular_file_is_a_local_failure(cli, tmp_path):
     blocker = tmp_path / "a-file"
     blocker.write_text("not a directory\n")
-    assert_local_failure(cli("schema", routes=[], store=blocker / "store", raw=True))
+    assert_local_failure(cli("screen", "presets", routes=[], store=blocker / "store", raw=True))
 
 
 def test_an_unreadable_saved_observation_is_a_local_failure(cli, tmp_path):

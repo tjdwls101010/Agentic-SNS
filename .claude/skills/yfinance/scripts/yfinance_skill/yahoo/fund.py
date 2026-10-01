@@ -14,10 +14,10 @@ DATASETS = {
     # 선언하면 fix가 그 인자를 권하고, 따라간 결과가 같은 크기로 다시 실패한다.
     "fund.description": fund(
         "description", sliceable=False,
-        interpretation={"shape": "One text value. It cannot be narrowed by fields or rows; raise --max-chars, or read the saved id again with a larger --max-chars, which costs no new request."}),
+        interpretation={"shape": "One text value that neither --fields nor --limit narrows; a larger --max-chars on read ID returns it without a new request."}),
     "fund.holdings": fund(
         "top_holdings", units={"Holding Percent": WEIGHT},
-        interpretation={"coverage": "These are the top reported holdings only, so the weights do not sum to one and the rest of the portfolio is not described here."}),
+        interpretation={"coverage": "These are the top reported holdings, not guaranteed to cover the whole portfolio."}),
     "fund.asset-classes": fund(
         "asset_classes",
         units={"cashPosition": WEIGHT, "stockPosition": WEIGHT, "bondPosition": WEIGHT, "preferredPosition": WEIGHT,

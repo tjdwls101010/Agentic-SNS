@@ -72,13 +72,13 @@ def actions(ticker, args, context, warnings):
 DATASETS = {
     "prices.quote": Dataset(
         info, ticker=True, shares_info=True, source_time=info_time, units=INFO_UNITS,
-        interpretation={"sibling": "company profile selects the business side of this same assembled response; --from reuses the observation rather than requesting it again.",
+        interpretation={"sibling": "company profile selects the business side of this same assembled response.",
                         "timing": QUOTE_TIME, "currency": CURRENCY_SPLIT,
                         "assembly": "yfinance assembles this response from several endpoints, so its fields do not all share one timestamp; where a field has its own time field, that one governs."},
         gotchas=["An instrument that did not trade in the current session still returns regularMarket fields from the last session it did."]),
     "prices.history": Dataset(
         history, ticker=True, conditions=dates_applied, precise=PRICE_COLUMNS, recent=True, coarser=coarser,
-        interpretation={"dates": "start is inclusive and end is exclusive. A naive date is read in the exchange's timezone.",
+        interpretation={"dates": "A date is read in the exchange's timezone.",
                         "adjustment": "--adjust decides what Close means; adding dividends to an already adjusted return counts them twice.",
                         "repair": "--repair is a transformation with its own limits, not proof that a value equals the original trade.",
                         "precision": PRECISION},
@@ -87,6 +87,6 @@ DATASETS = {
         gotchas=["A 30m request is resampled from 15m, so Yahoo's refusal for it names 15m, not the interval asked for."]),
     "prices.actions": Dataset(
         actions, ticker=True, conditions=dates_applied, recent=True,
-        interpretation={"dates": "start is inclusive and end is exclusive; rows appear only on dates carrying an action.",
-                        "empty": "The default period is one month, which for a quarterly payer often holds no action at all. An empty return here is normal and is not evidence that the instrument pays nothing."}),
+        interpretation={"dates": "Rows appear only on dates carrying an action.",
+                        "empty": "The default month often holds no action for a quarterly payer; an empty result is not evidence that it pays nothing."}),
 }

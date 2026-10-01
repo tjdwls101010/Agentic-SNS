@@ -11,7 +11,7 @@ import shlex
 
 import pytest
 
-from conftest import inflate, shape
+from conftest import fact, inflate, shape
 from test_selection import closes, series_routes
 
 CHART = {"chart": {"error": None, "result": [{"meta": {"currency": "USD", "symbol": "AAPL", "exchangeName": "NMS", "instrumentType": "EQUITY", "firstTradeDate": 345479400, "regularMarketTime": 1704387600, "gmtoffset": -18000, "timezone": "EST", "exchangeTimezoneName": "America/New_York", "regularMarketPrice": 110, "chartPreviousClose": 100, "priceHint": 2, "dataGranularity": "1d", "validRanges": ["1d", "5d", "1mo", "max"]},
@@ -191,11 +191,26 @@ def test_an_upstream_failure_with_no_stated_constraint_still_says_where_to_look(
     assert "search" in doc["results"][0]["error"]["fix"]
 
 
-def test_schema_oversize_names_scoping_rather_than_a_selection_that_does_not_apply(cli):
-    proc, doc = cli("schema", "--max-chars", "1000")
-    assert proc.returncode == 9
-    fix = doc["results"][0]["error"]["fix"]
-    assert "schema GROUP" in fix and "--fields" not in fix and "--limit" not in fix
+def test_a_local_failure_document_reports_the_failure_within_its_budget(cli, tmp_path):
+    blocker = tmp_path / "a-file"
+    blocker.write_text("not a directory\n")
+    proc, doc = cli("screen", "presets", routes=[], store=blocker / "store")
+    assert proc.returncode == 4 and doc["results"][0]["error"]["code"] == "local_io", proc.stdout[:300]
+
+
+def test_a_local_failure_document_too_large_for_its_budget_names_the_budget_that_fits(cli, tmp_path):
+    """A document with no command behind it has nothing to narrow, so the fix only says how much room it needs."""
+    blocker = tmp_path / "a-file"
+    blocker.write_text("not a directory\n")
+    deep = blocker.joinpath(*["d" * 120] * 5, "store")  # the message names this path twice, past 1,000 characters
+    proc = cli("--max-chars", "1000", "screen", "presets", routes=[], store=deep, raw=True)
+    assert proc.returncode == 9, proc.stdout[:300]
+    assert len(proc.stdout.strip()) <= 1000
+    fix = json.loads(proc.stdout)["results"][0]["error"]["fix"]
+    needed = int(re.search(r"Rerun with --max-chars (\d+)", fix)[1])
+    assert "schema" not in fix
+    proc = cli("--max-chars", str(needed), "screen", "presets", routes=[], store=deep, raw=True)
+    assert proc.returncode == 4, proc.stdout[:300]
 
 
 # ---- defects found by an independent review of this rewrite --------------------------------------------------------
@@ -237,27 +252,8 @@ def test_an_option_chain_reads_back_under_the_same_selection_contract(cli, tmp_p
 def test_a_leaf_that_cannot_be_narrowed_does_not_claim_it_can(cli):
     """fund description returns one string: neither --fields nor --limit reduces it, so declaring either would put an
     argument in the recovery that returns the same size again. market summary's exchanges are rows, so --limit does narrow it."""
-    proc, doc = cli("schema", "fund", "description")
-    assert "narrowing" not in doc["results"][0]["data"]
-    proc, doc = cli("schema", "market", "summary")
-    assert "--limit" in doc["results"][0]["data"]["narrowing"]
-
-
-def earnings_page_routes(count=25):
-    head = "<table><thead><tr><th>Symbol</th><th>Company</th><th>Earnings Date</th><th>EPS Estimate</th><th>Reported EPS</th><th>Surprise (%)</th></tr></thead><tbody>"
-    rows = "".join(f"<tr><td>AAPL</td><td>Apple</td><td>January {25 - i:02d}, 2024 at 4 PM EST</td><td>1</td><td>1</td><td>0</td></tr>" for i in range(count))
-    return [{"path": "/calendar/earnings", "text": head + rows + "</tbody></table>"}]
-
-
-def test_a_single_symbol_earnings_recovery_never_names_a_date_range(cli, tmp_path):
-    """--start/--end is a real narrowing for market-wide calendar earnings and rejected outright for the
-    single-symbol form. With an explicit store the recovery commands grow enough that even one row refuses at the
-    minimum budget, so the refusal lists this leaf's narrowings."""
-    store = tmp_path / "an-explicitly-chosen-store"
-    proc, doc = cli("calendar", "earnings", "AAPL", "--limit", "25", "--max-chars", "1000", "--store", str(store), routes=earnings_page_routes(), store=tmp_path / "s")
-    assert proc.returncode == 9, proc.stdout[:300]
-    fix = doc["results"][0]["error"]["fix"]
-    assert "Narrow with" in fix and "--start" not in fix and "--end" not in fix, fix
+    assert fact("fund", "description", "narrow with") is None
+    assert "--limit" in fact("market", "summary", "narrow with").split(", ")
 
 
 def test_a_recovery_never_names_an_argument_this_mode_forbids(cli, tmp_path):
@@ -281,17 +277,6 @@ def test_a_single_row_over_the_budget_is_told_so_rather_than_sent_round_again(cl
     fix = doc["results"][0]["error"]["fix"]
     assert "single entry" in fix and "--max-chars" in fix, fix
     assert "--start 0 --limit 1" not in fix, "the recovery promises a slice that fails identically"
-
-
-def test_a_generated_recovery_points_at_the_store_the_observation_is_in(cli, tmp_path):
-    """An explicitly chosen store has to appear in the command the recovery names, or that command reads the default
-    cache, where the id it just printed does not exist."""
-    store = tmp_path / "custom-cache"
-    proc, doc = cli("prices", "history", "AAPL", "--period", "1y", "--max-chars", "1500", "--store", str(store), routes=chart_routes(), store=tmp_path / "unused")
-    assert proc.returncode in (8, 9), proc.stdout[:300]
-    text = json.dumps(doc, ensure_ascii=False)
-    assert str(store) in text, "a recovery command that omits --store sends the reader to a different cache"
-    assert (store / (doc["results"][0]["id"] + ".json")).exists()
 
 
 # ---- recoveries that leave the budget behind ------------------------------------------------------------------------
@@ -344,15 +329,6 @@ def test_reading_a_long_saved_series_under_a_small_budget_narrows_rather_than_cr
     proc, back = cli("read", doc["results"][0]["id"], "--max-chars", "1500", routes=[], store=store)
     assert proc.returncode == 8, proc.stdout[:400] + proc.stderr[-400:]
     assert back["results"][0]["continuation"]
-
-
-def test_a_multi_target_recovery_keeps_the_store_it_saved_to(cli, tmp_path):
-    store = tmp_path / "custom"
-    symbols = [f"S{i:02d}" for i in range(10)]
-    routes = [r for s in symbols for r in chart_routes(s)]
-    proc, doc = cli("prices", "history", *symbols, "--period", "1y", "--store", str(store), "--max-chars", "4000", routes=routes, store=tmp_path / "unused")
-    assert proc.returncode == 9, proc.stdout[:300]
-    assert f"--store {store}" in doc["results"][0]["error"]["fix"]
 
 
 # ---- B8: a refusal promises only the saves that happened ------------------------------------------------------------

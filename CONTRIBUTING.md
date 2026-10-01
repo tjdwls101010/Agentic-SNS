@@ -43,10 +43,10 @@ For yfinance, build the test environment from the dependencies the script declar
 
 ```bash
 bash -c 'set -euo pipefail; mkdir -p .tmp; uv export --quiet --script .claude/skills/yfinance/scripts/cli.py --no-hashes -o .tmp/yf-test-req.txt; uv run --isolated --no-project --python ">=3.12,<3.14" --with-requirements .tmp/yf-test-req.txt --with pytest==8.4.2 python -m pytest tests/yfinance tests/test_skill_layout.py'
-uvx ruff check --config pyproject.toml .claude/skills/yfinance/scripts tests/yfinance
+uvx ruff check --config pyproject.toml .claude/skills/yfinance/scripts tests/yfinance scenarios/yfinance
 ```
 
-These tests exercise the public CLI in isolated processes with controlled HTTP responses and the real yfinance parser; `tests/yfinance/test_portability.py` also runs the skill through a real `uv run` from paths outside the repository. Keep fixture provenance explicit and do not substitute mocked library getters for transport coverage. Live Yahoo queries and Claude/Codex skill-use scenarios are separate checks; a green offline suite does not establish either. The complete skill directory must run from another project without this repository's temporary source tree or system-installed yfinance.
+These tests exercise the public CLI in isolated processes with controlled HTTP responses and the real yfinance parser; `tests/yfinance/test_portability.py` also runs the skill through a real `uv run` from paths outside the repository. Keep fixture provenance explicit and do not substitute mocked library getters for transport coverage. Live Yahoo queries and Claude/Codex skill-use scenarios are separate checks; a green offline suite does not establish either. `python3 scenarios/yfinance/run.py --help` describes the runner for the model scenarios in `tests/yfinance/model-scenarios.json`. The complete skill directory must run from another project without this repository's temporary source tree or system-installed yfinance. The skill keeps the observations it saves in its own Git-ignored `data/observations` folder; the tests point `YF_STORE` elsewhere.
 
 For bugs, add a failing reproduction at the public behavior boundary before changing the implementation. Keep assertions focused on observable results, failures, privacy, and continuation behavior rather than private helper structure. For documentation-only changes, execute the changed commands, check links and output claims, and avoid tests that merely repeat the prose.
 

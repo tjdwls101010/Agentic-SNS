@@ -21,3 +21,6 @@ __pycache__/
 
 # Finviz keeps its locked runtime local.
 .claude/skills/finviz/.venv/
+
+# yfinance keeps the observations it saves in its own data folder.
+.claude/skills/yfinance/data/
