@@ -52,17 +52,6 @@ def monotonic(data, field, ascending):
 ORDER = ("target", "id", "observed_at", "source_time", "stored_age_seconds", "status", "context", "conditions", "coverage", "continuation", "warnings", "data", "error")
 
 
-def as_time(value):
-    """The source's own timestamp, in the same ISO form as every other time in the envelope.
-
-    Yahoo supplies it as a Unix epoch in some payloads; printing that next to an ISO observed_at invites the reader to
-    treat the two as incomparable, which is the opposite of the point of carrying both.
-    """
-    if isinstance(value, (int, float)) and value > 0:
-        return dt.datetime.fromtimestamp(value, dt.timezone.utc).isoformat()
-    return value
-
-
 def result(target, data=None, context=None, warnings=None, error=None, status=None, conditions=None, coverage=None, ident=None, observed_at=None, source_time=None, extra=None):
     """One target's answer. Only observations go in: an argument echoed back as though it were a measurement is a
     claim the CLI cannot support, and the request is already stated once at the document level."""
@@ -71,7 +60,7 @@ def result(target, data=None, context=None, warnings=None, error=None, status=No
     notices = list(warnings or [])
     if status == "empty":
         notices.append("An empty upstream return does not prove that the data does not exist.")
-    envelope = {"target": target, "id": ident, "observed_at": observed_at or now(), "source_time": as_time(source_time),
+    envelope = {"target": target, "id": ident, "observed_at": observed_at or now(), "source_time": source_time,
                 "status": status, "context": {k: v for k, v in (context or {}).items() if k != "rate_limited"},
                 "conditions": conditions or {}, "coverage": coverage or {},
                 "data": data, "warnings": notices, "error": error}

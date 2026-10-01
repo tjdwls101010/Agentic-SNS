@@ -44,7 +44,7 @@ DATASETS = {
         sectors,
         interpretation={"coverage": "These are the known Yahoo sector keys, not a live enumeration of what the source will accept today."}),
     "market.sector": Dataset(
-        domain(yf.Sector), rows=20, units=DOMAIN_UNITS, interpretation=REGION_INTERPRETATION, gotchas=[REGION_GOTCHA]),
+        domain(yf.Sector), units=DOMAIN_UNITS, interpretation=REGION_INTERPRETATION, gotchas=[REGION_GOTCHA]),
     "market.industry": Dataset(
-        domain(yf.Industry), rows=20, units=DOMAIN_UNITS, interpretation=REGION_INTERPRETATION, gotchas=[REGION_GOTCHA]),
+        domain(yf.Industry), units=DOMAIN_UNITS, interpretation=REGION_INTERPRETATION, gotchas=[REGION_GOTCHA]),
 }

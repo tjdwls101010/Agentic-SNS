@@ -27,7 +27,7 @@ DATASETS = {
         "get_recommendations_summary", units=ANALYST_COUNTS,
         interpretation={"periods": "period 0m is the current month; earlier months are relative offsets."}),
     "analysts.upgrades": analyst(
-        "get_upgrades_downgrades", rows=20,
+        "get_upgrades_downgrades",
         interpretation={"order": "Actions arrive newest first, so a limit keeps the most recent ones.",
                         "history": "The full history reaches back more than a decade; the default keeps one screen of the newest actions and coverage reports how many were received."}),
     "analysts.earnings-estimate": analyst(

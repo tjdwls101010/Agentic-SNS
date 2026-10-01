@@ -72,9 +72,10 @@ def export_command(ident, args):
 
 
 def coarser(item, args):
-    """A coarser view is a new request whose rows mean something else, so the sentence says both."""
-    found = item.coarser(args) if item.coarser else None
-    return f" For a coarser view, rerun the command with {found[0]}: a new request returning {found[1]}." if found else ""
+    """A coarser view is a new request whose rows mean something else, so the sentence says both. read has no interval: a coarser view is a new request the original command makes."""
+    interval = getattr(args, "interval", None)
+    found = item.coarser(interval) if item.coarser and interval is not None else None
+    return f" For a coarser view, rerun the command with --interval {found[0]}: a new request returning {found[1]} bars, not a slice of these {found[2]} ones." if found else ""
 
 
 def quoted(args, names):

@@ -8,6 +8,7 @@ import contextlib
 
 from yfinance_skill import budget, yahoo
 from yfinance_skill.envelope import STATUSES, InputError, ordered, result
+from yfinance_skill.leaf import Leaf
 
 ENVELOPE = {
     "target": "the symbol, query or key this result answers",
@@ -78,7 +79,7 @@ def schema_data(args, parsers, root, groups, commands, defaults, applies, pointe
         command = commands.get(scope[0] + (" " + scope[1] if scope[1] else ""))
         if command is None:
             raise InputError(f"No command {' '.join(scope)}; use schema {scope[0]} to list its commands.")
-        data = describe(parsers[scope], yahoo.bind(command), applies, pointer)
+        data = describe(parsers[scope], Leaf(command, yahoo.dataset(command.dataset)), applies, pointer)
         if args.filter:
             data["arguments"] = {k: v for k, v in data["arguments"].items() if args.filter.lower() in (k + str(v)).lower()}
         return data

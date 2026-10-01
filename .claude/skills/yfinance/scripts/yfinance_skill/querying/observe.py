@@ -5,10 +5,10 @@ import sys
 
 from yfinance_skill import budget, export, store, yahoo
 from yfinance_skill.envelope import InputError, LocalFailure, error_info, now, ordered, result
+from yfinance_skill.leaf import Leaf
 from yfinance_skill.querying.out import exported, write_out
 from yfinance_skill.selection import select, select_sides
 from yfinance_skill.shape import is_empty, is_sided, row_count
-from yfinance_skill.yahoo.refusals import is_rate_limited, upstream_fix
 
 
 def open_store(args):
@@ -27,7 +27,7 @@ def prepare(command, args):
         command.check(args)
     if command.defaults:
         command.defaults(args)
-    dataset = yahoo.DATASETS[command.dataset]
+    dataset = yahoo.dataset(command.dataset)
     if dataset.prepare:
         dataset.prepare(args)
 
@@ -58,18 +58,40 @@ def observe(target, args, item, saved, commands):
         record = saved.load(args.from_id)
         if record.get("target") != target:
             raise InputError(f"Observation {args.from_id} holds {record.get('target')}, not {target}; pass the id returned for this symbol or drop --from.")
-        sharing = {path for path, command in commands.items() if yahoo.DATASETS[command.dataset].shares_info}
+        sharing = {path for path, command in commands.items() if yahoo.dataset(command.dataset).shares_info}
         if record.get("command") not in sharing:
             raise InputError(f"Observation {args.from_id} came from {record.get('command')}, which does not hold this command's fields; drop --from to request it.")
         return record["data"], record.get("context") or {}, list(record.get("warnings") or []), record.get("conditions") or {}, record.get("observed_at"), record.get("source_time"), args.from_id, record.get("requested")
 
-    encoded = yahoo.fetch(item.command.dataset, target, args, context, warnings)
+    explicit = getattr(args, "limit", None)
+    rows = explicit if explicit is not None else item.command.rows  # a source sent a count is asked for the window this call shows
+    encoded = yahoo.fetch(item.command.dataset, target, args, context, warnings, rows)
     conditions = item.conditions(encoded, args, context) if item.conditions else {}
     when = context.pop("source_time", None) or (item.source_time(encoded) if item.source_time else None)
     requested, received = context.pop("requested", None), row_count(encoded)
     if item.dataset.shortfall and requested and received and received < requested:  # nothing at all is the empty status's to explain
         warnings.append(item.dataset.shortfall.format(received=received, requested=requested))
     return encoded, context, warnings, conditions, now(), when, None, requested
+
+
+def upstream_fix(exc, item, args):
+    """When the source's own refusal carries the constraint, that constraint is the prescription.
+
+    Every upstream failure used to receive the same sentence about verifying the symbol, so a message that said
+    plainly how many days were allowed was answered with advice to doubt the ticker.
+    """
+    if isinstance(exc, yahoo.SourceConstraint):
+        days, interval = exc.days, getattr(args, "interval", None)
+        asked = getattr(args, "period", None) or f"{getattr(args, 'start', '')}..{getattr(args, 'end', '')}"
+        coarser = f"; beyond that, a coarser --interval than {interval} (schema prices history lists the limits known)." if interval else "."
+        if exc.kind == "span":
+            return (f"The source serves at most {days} days of this granularity per request, and {asked} is longer. "
+                    f"Retry with --period {days}d or a --start/--end span of at most {days} days" + coarser)
+        return (f"The source serves this granularity only for the last {days} days, and {asked} reaches further back. "
+                f"Retry with --period {days}d or a --start inside the last {days} days" + coarser)
+    if isinstance(exc, yahoo.NoData):
+        return "The source has no data for this symbol and dataset. Confirm the symbol with search, which reports the exchange and instrument type, or choose a dataset this instrument type reports."
+    return f"Retry later, or confirm the symbol and dataset with search and schema {item.path}".rstrip() + "; use --timeout SECONDS if the target timed out."
 
 
 def asked_for(coverage, requested):
@@ -106,7 +128,7 @@ def run(args, item, saved, request, commands):
             results.append(ordered(envelope))
         except (Exception, DeadlineExpired) as exc:
             code = ("invalid" if isinstance(exc, InputError) else "local_io" if isinstance(exc, LocalFailure)
-                    else "rate_limited" if is_rate_limited(exc) else "upstream")
+                    else "rate_limited" if isinstance(exc, yahoo.RateLimited) else "upstream")
             stopped = stopped or code == "rate_limited"
             fix = (f"Correct the arguments; schema {item.path} reports this command's choices and defaults." if code == "invalid"
                    else LOCAL_FIX if code == "local_io"
@@ -122,5 +144,5 @@ def run(args, item, saved, request, commands):
 
 def answer(args, command, commands, saved, request, shown):
     """Run a data command and print its document; `request` is saved with each observation, `shown` is what prints."""
-    item = yahoo.bind(command)
+    item = Leaf(command, yahoo.dataset(command.dataset))
     return budget.emit(run(args, item, saved, request, commands), args, item, shown)

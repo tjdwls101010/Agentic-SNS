@@ -17,7 +17,7 @@ DATASETS = {
         interpretation={"float": "institutionsPercentHeld is of shares outstanding while institutionsFloatPercentHeld is of the float, so the second is the larger of the two."}),
 } | {
     f"holders.{name}": holder(
-        method, rows=20,
+        method,
         units={"pctHeld": RATE, "pctChange": RATE, "Shares": SHARES, "Value": dict(CURRENCY, as_of="current_quote")},
         interpretation={"mixed_times": HOLDER_MIX,
                         "coverage": "These are the largest reported holders, not every holder."})
@@ -27,11 +27,11 @@ DATASETS = {
         "get_insider_purchases", units={"Shares": SHARES, "Trans": COUNT},
         interpretation={"rows": "The first column labels each row; % rows carry ratios while the others carry share counts, in the same column."}),
     "holders.insider-transactions": holder(
-        "get_insider_transactions", rows=20, units={"Shares": SHARES, "Value": CURRENCY},
+        "get_insider_transactions", units={"Shares": SHARES, "Value": CURRENCY},
         interpretation={"order": "The index is a row number and says nothing about time; Start Date does, and rows arrive newest first, so a limit keeps the most recent transactions.",
                         "value": "Value is absent where the source reports no price, including every row whose Text is empty; that is a missing price, not a zero-value transfer."}),
     "holders.insider-roster": holder(
-        "get_insider_roster_holders", rows=20, units={"Shares Owned Directly": SHARES},
+        "get_insider_roster_holders", units={"Shares Owned Directly": SHARES},
         interpretation={"direct_only": "Shares Owned Directly excludes indirect holdings through trusts and partnerships, so it understates total control.",
                         "dates": "Latest Transaction Date is that insider's most recent reported transaction, so different rows are current as of different dates."}),
 }

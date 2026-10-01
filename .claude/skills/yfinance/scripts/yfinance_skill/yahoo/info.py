@@ -1,4 +1,6 @@
 """The assembled info response that prices quote and company profile both select from."""
+import datetime as dt
+
 from yfinance_skill.yahoo.datasets import PERCENT, RATE
 
 # 성진: 여기 있는 것은 전부 값만 보고는 판정할 수 없는 스케일이다. marketCap이 통화라는 것처럼 이름이 이미 말하는
@@ -23,11 +25,17 @@ SOURCE_TIME_FIELDS = ("regularMarketTime", "postMarketTime")
 
 
 def info_time(info):
+    """The source's own time on this response, as ISO like every other time in the envelope; Yahoo supplies it as a Unix epoch, and one no calendar holds is kept as received."""
     if not isinstance(info, dict):
         return None
     for field in SOURCE_TIME_FIELDS:
         value = info.get(field)
         if value:
+            if isinstance(value, (int, float)) and value > 0:
+                try:
+                    return dt.datetime.fromtimestamp(value, dt.timezone.utc).isoformat()
+                except (OverflowError, OSError, ValueError):
+                    return value
             return value
     return None
 

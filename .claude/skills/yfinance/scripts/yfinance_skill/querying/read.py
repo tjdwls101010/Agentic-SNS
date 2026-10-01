@@ -1,6 +1,7 @@
 """read: a saved observation, sliced again without a new request."""
 from yfinance_skill import budget, store, yahoo
 from yfinance_skill.envelope import InputError, ordered, result
+from yfinance_skill.leaf import Leaf
 from yfinance_skill.querying.observe import asked_for, check_out
 from yfinance_skill.querying.out import exported, write_out
 from yfinance_skill.selection import select, select_sides
@@ -18,7 +19,7 @@ def read(args, saved, commands):
     command = commands.get(record["command"])
     if command is None:
         raise InputError(f"Observation {args.id} came from {record['command']}, which this version no longer offers.")
-    item = yahoo.bind(command)
+    item = Leaf(command, yahoo.dataset(command.dataset))
     coverage = {}
     if is_sided(record["data"]) and not args.list_fields:
         data = select_sides(record["data"], args, item, coverage)

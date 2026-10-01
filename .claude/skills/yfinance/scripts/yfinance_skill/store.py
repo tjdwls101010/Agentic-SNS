@@ -10,6 +10,8 @@ closed, and a statement saved last week is not: freshness is what the source's o
 `source_time` travels with the record and `--ttl-days` only decides when bytes are deleted.
 """
 
+import contextlib
+import datetime as dt
 import hashlib
 import json
 import os
@@ -64,7 +66,13 @@ class Store:
             raise LocalFailure(f"Saved observation {ident} in {self.root} could not be read: {exc}") from None
         if digest(data)[:ID_LENGTH] != ident:
             raise InputError("Saved bytes do not match their identifier; use a fresh --store directory and rerun the original command.")
-        return json.loads(data)
+        found = json.loads(data)
+        when = found.get("source_time")
+        if isinstance(when, (int, float)) and when > 0:
+            # 성진: 2026-10 이전 기록은 원천 시각을 Yahoo의 epoch 그대로 저장했다. 바이트(따라서 id)는 그대로 두고 읽을 때만 새 기록과 같은 ISO로 맞춘다.
+            with contextlib.suppress(OverflowError, OSError, ValueError):
+                found["source_time"] = dt.datetime.fromtimestamp(when, dt.timezone.utc).isoformat()
+        return found
 
     def prune(self, ttl_days):
         """Delete bytes older than the retention window. This says nothing about whether newer bytes are current."""
@@ -96,8 +104,6 @@ def record(item, target, request, data, context, warnings, status, conditions, o
 
 
 def age_seconds(observed_at):
-    import datetime as dt
-
     try:
         return round((dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(observed_at)).total_seconds(), 1)
     except (TypeError, ValueError):

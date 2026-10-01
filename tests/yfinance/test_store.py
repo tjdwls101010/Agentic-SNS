@@ -169,6 +169,48 @@ def test_an_earlier_versions_quote_still_serves_the_sibling_profile(cli, tmp_pat
     assert doc["results"][0]["id"] == OLD_QUOTE
 
 
+# Written by hand in the form versions before 2026-10 saved a quote in: source_time as Yahoo's Unix epoch (1727380800 is 2024-09-26 20:00 UTC).
+OLD_EPOCH_QUOTE = "980e71a120088de0"
+EPOCH_AS_ISO = "2024-09-26T20:00:00+00:00"
+
+
+def test_an_earlier_versions_epoch_source_time_prints_as_an_iso_time(cli, tmp_path):
+    store = old_store(tmp_path)
+    proc, doc = cli("read", OLD_EPOCH_QUOTE, "--fields", "regularMarketPrice", routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert doc["results"][0]["source_time"] == EPOCH_AS_ISO
+    proc, doc = cli("company", "profile", "AAPL", "--from", OLD_EPOCH_QUOTE, "--fields", "sector", routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert doc["results"][0]["source_time"] == EPOCH_AS_ISO
+
+
+def test_a_fresh_quote_saves_its_source_time_as_an_iso_time(cli, tmp_path):
+    """The saved record carries the time in the form the envelope prints, so a reader of the store meets one time format."""
+    store = tmp_path / "s"
+    routes = [{"path": "/quoteSummary/AAPL", "json": {"quoteSummary": {"result": [{"assetProfile": {"sector": "Technology"}, "financialData": {"financialCurrency": "USD"}}], "error": None}}},
+              {"path": "/v7/finance/quote", "json": {"quoteResponse": {"result": [{"symbol": "AAPL", "currency": "USD", "regularMarketPrice": 100, "regularMarketTime": 1727380800}], "error": None}}},
+              {"path": "/timeseries/AAPL", "json": {"timeseries": {"result": [], "error": None}}}]
+    proc, doc = cli("prices", "quote", "AAPL", routes=routes, store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    r = doc["results"][0]
+    assert r["source_time"] == EPOCH_AS_ISO
+    assert json.loads((store / f"{r['id']}.json").read_text())["source_time"] == EPOCH_AS_ISO
+
+
+def test_a_source_time_no_calendar_can_hold_is_kept_as_received_and_the_response_saved(cli, tmp_path):
+    """Converting the time must not cost the paid response: a value outside any date keeps the form the source sent."""
+    store = tmp_path / "s"
+    routes = [{"path": "/quoteSummary/AAPL", "json": {"quoteSummary": {"result": [{"assetProfile": {"sector": "Technology"}, "financialData": {"financialCurrency": "USD"}}], "error": None}}},
+              {"path": "/v7/finance/quote", "json": {"quoteResponse": {"result": [{"symbol": "AAPL", "currency": "USD", "regularMarketPrice": 100, "regularMarketTime": 1e30}], "error": None}}},
+              {"path": "/timeseries/AAPL", "json": {"timeseries": {"result": [], "error": None}}}]
+    proc, doc = cli("prices", "quote", "AAPL", routes=routes, store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    r = doc["results"][0]
+    assert r["source_time"] == 1e30 and (store / f"{r['id']}.json").exists()
+    proc, back = cli("read", r["id"], routes=[], store=store)
+    assert proc.returncode == 0 and back["results"][0]["source_time"] == 1e30, proc.stdout[:400]
+
+
 # ---- the store's own contract: nothing lost to an argument, every failure a document -------------------------------
 
 
