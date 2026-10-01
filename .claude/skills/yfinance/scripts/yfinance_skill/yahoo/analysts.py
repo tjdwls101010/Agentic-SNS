@@ -25,7 +25,7 @@ DATASETS = {
         interpretation={"periods": "period 0m is the current month and -1m, -2m, -3m are earlier months, so rows are relative, not dated."}),
     "analysts.upgrades": analyst(
         "get_upgrades_downgrades",
-        interpretation={"order": "Actions arrive newest first, and the full history reaches back more than a decade."}),
+        interpretation={"order": "Actions arrive newest first."}),
     "analysts.earnings-estimate": analyst(
         "get_earnings_estimate",
         units={"growth": RATE, "avg": PER_SHARE, "low": PER_SHARE, "high": PER_SHARE, "yearAgoEps": PER_SHARE, "numberOfAnalysts": COUNT},

@@ -71,8 +71,9 @@ def test_each_kind_states_its_purpose_and_what_its_values_mean(key):
     else:
         purpose = document(group).splitlines()[1]
     assert purpose[0].isupper() and purpose.removesuffix(" (no --out)").endswith("."), purpose
-    keeps = next(line for line in kind_block(group, kind) if line.startswith("a limit keeps "))
-    assert keeps.removeprefix("a limit keeps ") in ("the newest rows of a series the source publishes oldest first", "the first rows in source order", "the first keys in sorted order")
+    keeps = next(line for line in kind_block(group, kind) if line.startswith(("a limit keeps ", "--limit does not apply")))
+    assert keeps.removeprefix("a limit keeps ") in ("the newest rows of a series the source publishes oldest first", "the first rows in source order",
+                                                    "the first keys in sorted order", "--limit does not apply: the result is a single record")
 
 
 @pytest.mark.parametrize("key", EVERY_KIND, ids=IDS)
@@ -83,6 +84,28 @@ def test_every_narrowing_a_kind_names_is_an_argument_it_takes(cli, key):
     for item in named.split(", ") if named else []:
         for flag in item.split("/"):
             assert parsed(cli, group, kind, flag if flag.startswith("--") else "--" + flag), (key, flag)
+
+
+# Each kind's own options, written here rather than read from the document, so an option the document drops is noticed.
+OWN = {("search", ""): {"--type", "--dataset"}, ("prices", "quote"): {"--from"}, ("company", "profile"): {"--from"},
+       ("company", "shares"): {"--start", "--end"}, ("company", "news"): {"--tab"}, ("options", "chain"): {"--date", "--side"},
+       ("screen", "presets"): {"--type"}, ("screen", "fields"): {"--type", "--field"}, ("screen", "values"): {"--type", "--field"},
+       ("screen", "run"): {"--type", "--query", "--preset", "--offset", "--sort", "--ascending"},
+       ("market", "summary"): {"--region"}, ("market", "sector"): {"--region", "--dataset"}, ("market", "industry"): {"--region", "--dataset"},
+       ("calendar", "earnings"): {"--start", "--end", "--offset", "--most-active"}}
+OWN.update({("prices", k): {"--start", "--end", "--period", "--interval", "--adjust", "--repair", "--prepost"} for k in ("history", "actions")})
+OWN.update({("financials", k): {"--frequency", "--periods"} for k in ("income", "balance", "cashflow", "valuation")})
+OWN.update({("calendar", k): {"--start", "--end", "--offset"} for k in ("economic", "ipo", "splits")})
+
+
+@pytest.mark.parametrize("key", EVERY_KIND, ids=IDS)
+def test_each_kind_documents_exactly_its_own_options(cli, key):
+    group, kind = key
+    documented = {flag for flag, entries in arguments(group).items() if flag.startswith("--")
+                  and any(tags is None or kind in tags for tags, _, _ in entries)}
+    assert documented == OWN.get(key, set()), key
+    for flag in OWN.get(key, set()):
+        assert parsed(cli, group, kind, flag), (key, flag)
 
 
 @pytest.mark.parametrize("group", sorted(groups()))

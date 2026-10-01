@@ -79,7 +79,7 @@ DATASETS = {
         earnings,
         units={"Surprise(%)": PERCENT, "Marketcap": CURRENCY, "EPS Estimate": PER_SHARE, "Reported EPS": PER_SHARE},
         interpretation={"dates": CALENDAR_DATES,
-                        "two_modes": "With a SYMBOL this returns that company's own earnings history and upcoming dates, paged by --limit and --offset with no date filter, newest first. Without one it returns market-wide US earnings inside the date range.",
+                        "two_modes": "With a SYMBOL the rows are that company's own history and upcoming dates, newest first; without one, market-wide US earnings in the date range.",
                         "surprise": "Surprise(%) is in percent (33.33 is 33.33%); analysts history reports the same measurement as surprisePercent, a ratio, 100x apart.",
                         "zero_loss": "Market-wide, yfinance turns zero into null in the estimate, actual and surprise columns, so a null can be a real zero; a single symbol's history keeps its zeros."}),
     "calendar.economic": calendar(

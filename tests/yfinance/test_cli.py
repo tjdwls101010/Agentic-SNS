@@ -11,7 +11,9 @@ def test_a_documents_arguments_carry_their_choices_and_defaults():
     assert adjust[1] == "--adjust {none,auto,back}" and adjust[2].endswith("(default auto)")
     assert arguments("prices")["--interval"][0][2].endswith("(default 1d)")
     assert [text.endswith("(default 5) (at least 1)") or text.endswith("(default 5) (at least 0)") for _, _, text in arguments("financials")["--periods"]] == [True, True]
-    assert "(default 20000)" in document() and "(default 14)" in document()
+    assert "(default 20000) (at least 1000)" in document() and "(default 14)" in document() and "0 keeps every one" in document()
+    assert arguments("calendar")["--offset"][0][2].endswith("(default 0)"), "a default of 0 is a default, not an absent one"
+    assert "--start N  Zero-based first row to return; each slice names the start of the next one. (default 0)" in document("read")
 
 
 def test_all_purpose_commands_are_discoverable_without_network(cli):

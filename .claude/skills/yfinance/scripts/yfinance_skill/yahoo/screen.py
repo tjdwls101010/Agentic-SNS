@@ -148,6 +148,5 @@ DATASETS = {
                "trailingPE": MULTIPLE, "regularMarketVolume": COUNT},
         interpretation={"query_scale": "A growth threshold in the query is in percentage points while the same measurement in a quote is a ratio: BTWN quarterlyrevenuegrowth.quarterly 20 30 matches quote revenueGrowth 0.2-0.3, and 0.20 0.30 matches growth of a fifth of a percent. Neither fails, so a ratio reused as a bound returns a plausible list for a hundredfold smaller threshold.",
                         "matches_not_a_census": "These are the rows matching the query, ordered by the sort field. They are not a verified census of a market, and total is the provider's own claim.",
-                        "paging": "--offset continues a query rather than reading an immutable snapshot; rows can move between pages.",
-                        "default_fields": "Each row carries far more fields than the default projection."}),
+                        "paging": "--offset continues a query rather than reading an immutable snapshot; rows can move between pages."}),
 }

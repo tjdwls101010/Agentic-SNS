@@ -4,10 +4,10 @@ import datetime as dt
 from yfinance_skill.shape import column, is_empty
 
 STATUSES = {
-    "ok": "usable data in the default window (exit 0)",
-    "empty": "nothing usable came back (exit 7)",
-    "partial": "usable data with a stated gap (exit 8)",
-    "error": "no usable result; error.code names which exit code below, and error.fix says what to do",
+    "ok": "usable data in the command's default window",
+    "empty": "nothing usable came back; not proof the data does not exist",
+    "partial": "usable data the budget narrowed; coverage says how far",
+    "error": "no usable result; error.code says why and error.fix what to do",
     "not_attempted": "not asked, because the source rate-limited an earlier target",
 }
 
@@ -65,11 +65,11 @@ ENVELOPE = {
     "stored_age_seconds": "read only: seconds since the observation was saved, not a sign its values are current",
     "status": "see statuses",
     "context": "what the source said besides the rows: currency, timezone, the chosen expiration, next_offset for the next source page (a new request)",
-    "conditions": "the arguments this response carries evidence for: {requested, status: confirmed|not_applied|unverified, evidence}; a successful call is not evidence a condition was applied",
+    "conditions": "for each argument this response carries evidence for, {name: {requested, status: confirmed|not_applied|unverified, evidence}}; a successful call is not evidence a condition was applied",
     "coverage": "requested: rows asked of the source, only where a count is sent; fewer received is not proof there are no more. received: rows the response holds. start: where a read began. shown: rows printed or written. kept: which end a limit kept (window for read). truncated_by: leaf_default (status ok), explicit_limit, or budget (status partial). fields: how many offered fields were kept. A chain reports each side under its name; received and shown total them",
     "continuation": "the read command for the next slice of this saved observation (no new request); restart: true with shown [a, b] means the newest rows [a, b) were shown and reading starts over at row 0",
     "warnings": "limits on how this data can be used",
-    "data": "the selected value; a table is {index, columns, data, index_names, column_names}; with --out, {out, rows, columns, first, last}",
+    "data": "the selected value; a table is {index, columns, data}, with index_names and column_names when they name something; with --out, {out, rows, columns} — columns is the file's header, or its length when the summary would not fit — plus first and last, the first and last row's identifying value, where rows have one",
     "error": "{code, message, fix}",
 }
 

@@ -17,7 +17,7 @@ DATASETS = {
         interpretation={"shape": "One text value that neither --fields nor --limit narrows; a larger --max-chars on read ID returns it without a new request."}),
     "fund.holdings": fund(
         "top_holdings", units={"Holding Percent": WEIGHT},
-        interpretation={"coverage": "These are the top reported holdings only; their weights do not sum to one."}),
+        interpretation={"coverage": "These are the top reported holdings, not the whole portfolio."}),
     "fund.asset-classes": fund(
         "asset_classes",
         units={"cashPosition": WEIGHT, "stockPosition": WEIGHT, "bondPosition": WEIGHT, "preferredPosition": WEIGHT,

@@ -45,7 +45,7 @@ def exit_code(status, codes):
 
 GLOBAL_DEFAULTS = {"max_chars": 20000, "ttl_days": 14}
 MAX_CHARS_HELP = "Largest JSON document to print. Each command's default window keeps a result to one screen; this is the boundary behind it, and a result over it comes back narrowed (partial) or refused (too_large) with a recovery."
-TTL_HELP = "Delete saved observations older than this many days. Retention only: source_time, not age, says whether a value is current."
+TTL_HELP = "Delete saved observations older than this many days; 0 keeps every one. Retention only: source_time, not age, says whether a value is current."
 
 OUT_HELP = ("Write every saved row to a new CSV file (an existing one is never overwritten) and print a summary instead: values and timestamps as saved, "
             "a target column, index levels as columns, option sides as side, mapping keys as key, a list of values as value, nested records as dotted columns, "
@@ -86,9 +86,9 @@ def field_list(value):
 # The arguments every data command takes, each with where it applies; read takes all but --timeout. --filter defaults to None so that a given one, even "", can be told apart and refused where it narrows nothing.
 SHARED = [
     (Arg("--fields", type=field_list, metavar="A,B", help="Comma-separated fields replacing the default projection; nested payloads take dotted paths such as content.title, and --list-fields names them."), "every data command and read"),
-    (Arg("--list-fields", action="store_true", help="List the fields this result offers instead of its values."), "every data command and read"),
+    (Arg("--list-fields", action="store_true", help="List the fields this result offers instead of its values; refused with --out."), "every data command and read"),
     (Arg("--filter", metavar="TEXT", help="Case-insensitive substring narrowing a catalog or a --list-fields listing."), "screen presets, fields and values, and --list-fields; refused elsewhere"),
-    (Arg("--limit", type=int, metavar="N", help="Maximum rows, replacing the default window; each kind's 'a limit keeps' line says which end."), "every data command and read; screen caps it at 250, calendar at 100"),
+    (Arg("--limit", type=int, metavar="N", help="Maximum rows, replacing the default window; each kind's 'a limit keeps' line says which end."), "every data command and read; screen run and calendars cap it at 250 and 100 when they ask the source"),
     (Arg("--timeout", type=int, default=30, metavar="SECONDS", help="Seconds per target, library calls included."), "every data command; not read, which makes no request"),
 ]
 OUT = "data commands whose results are rows, and read; the kinds list marks the ones without it"
@@ -155,7 +155,7 @@ FROM = Arg("--from", dest="from_id", metavar="ID", help="Select from this saved 
 
 INTERVALS = ["1m", "2m", "5m", "15m", "30m", "60m", "90m", "1h", "1d", "5d", "1wk", "1mo", "3mo"]
 BAR_ARGS = [SYMBOLS, *dates("ISO date YYYY-MM-DD; inclusive.", "ISO date YYYY-MM-DD; exclusive: bars dated on or after it are not returned."),
-            Arg("--period", metavar="RANGE", help="Relative range such as 5d, 1mo, 1y, ytd or max; default 1mo only when start/end are absent."),
+            Arg("--period", metavar="RANGE", help="Relative range such as 5d, 1mo, 1y, ytd or max; refused with --start or --end, and 1mo when all three are absent."),
             Arg("--interval", choices=INTERVALS, default="1d", help="Bar size. Intraday intervals carry range limits the source enforces; history's limit lines below say what is known."),
             Arg("--adjust", choices=["none", "auto", "back"], default="auto", help="none: unadjusted OHLC as supplied plus Adj Close; auto: Open/High/Low/Close scaled for splits and dividends, Adj Close removed; back: Close kept raw while Open/High/Low are scaled by the adjustment ratio, Adj Close removed."),
             Arg("--repair", action="store_true", help="Opt into yfinance price repair; off by default, and refused with --interval 5d, which yfinance does not repair."),
@@ -254,7 +254,7 @@ def calendar_check(args):
 # ---- the commands -------------------------------------------------------------------------------------------------
 
 GROUPS = {
-    "search": "Find instruments by name, symbol or keyword",
+    "search": "Find instruments, news, curated lists or research reports by name, symbol or keyword",
     "prices": "Quotes, historical bars and corporate actions",
     "company": "Profile, shares outstanding, news and filing links",
     "financials": "Income, balance sheet, cash flow and valuation measures by period",
@@ -359,7 +359,7 @@ COMMANDS = {command.path: command for command in [
             args=[TYPE, FIELD], check=screen_check, narrow=["--filter", "--field", "--type"], exportable=False, catalog=True),
     Command("screen", "run", "Run a preset or a JSON query and return matching instruments.", "screen.run",
             args=[TYPE, OneOf(Arg("--query", metavar="JSON", help="JSON operator/operands object; the grammar is under [run] below."),
-                              Arg("--preset", choices=PRESETS, help="Named screener; screen presets shows the query each runs. Its name does not state its condition: describe results by context.preset_query, the query it actually ran."), required=True),
+                              Arg("--preset", choices=PRESETS, help="Named screener; describe its results by context.preset_query, the query it ran, not by its name."), required=True),
                   Arg("--offset", type=int, default=0, metavar="N", help="Remote row offset for the next page; context.next_offset supplies it."),
                   Arg("--sort", metavar="FIELD", help="Sort field from screen fields; custom query default ticker, preset uses its defined sort."),
                   Arg("--ascending", action=argparse.BooleanOptionalAction, default=None, help="Sort direction; omitted means the preset's own direction, or descending for a custom query.")],
@@ -376,8 +376,8 @@ COMMANDS = {command.path: command for command in [
             narrow=["--fields", "--limit", "--dataset"], rows=20),
 
     calendar_command("earnings", "Earnings events, market-wide over a date range or one company's history.",
-                     args=[*RANGE, Arg("symbol", nargs="?", help="Optional single symbol; omit for market-wide US earnings."),
-                           Arg("--most-active", action="store_true", help="Opt into native most-active filter; only market earnings at offset 0.")],
+                     args=[*RANGE, Arg("symbol", nargs="?", help="Optional single symbol: that company's earnings history and upcoming dates, paged by --limit and --offset, and refused with --start, --end or --most-active; omit for market-wide US earnings."),
+                           Arg("--most-active", action="store_true", help="Opt into Yahoo's most-active filter; market-wide earnings at --offset 0 only.")],
                      forbidden=lambda args: ["--start/--end"] if getattr(args, "symbol", None) else []),
     calendar_command("economic", "Scheduled economic releases over a date range."),
     calendar_command("ipo", "IPO listings, filings and amendments over a date range."),
@@ -394,7 +394,7 @@ READ_PURPOSE = "Read a saved observation again, in slices, by fields or to a fil
 READ_ARGS = [Arg("id", metavar="ID", help="Observation id from an earlier result."),
              Arg("--start", dest="row_start", type=int, default=0, metavar="N", help="Zero-based first row to return; each slice names the start of the next one.")]
 READ_LIMIT = "Maximum rows, counted forward from --start in saved order; unlike the first call, read does not keep the newest end. The same slice goes to --out."
-DOCUMENT = ["stdout is one JSON document {status, request, results}: status combines the results', request echoes what you chose and what a default filled in, results holds one envelope per target in the order given.",
+DOCUMENT = ["stdout is one JSON document {status, request, results}: status is the results' own when they share one, partial when they differ, and error when none is usable; request echoes what you chose and what a default filled in; results holds one envelope per target in the order given.",
             "If an --out file was written but its summaries do not fit --max-chars, a receipt replaces results: {out, rows (the file's total), and each target's status and rows, or in_file and missing (targets without rows, by status)}."]
 
 
@@ -436,12 +436,14 @@ def spec(arg, help=None):
     if not arg.flags[0].startswith("-") and kwargs.get("choices"):
         typed += " {" + ",".join(kwargs["choices"]) + "}"
     default = kwargs.get("default")
-    shown = f" (default {default})" if default not in (None, False) and kwargs.get("action") != "store_true" else ""
+    shown = f" (default {default})" if default is not None and default is not False and kwargs.get("action") != "store_true" else ""
     return typed, (help or kwargs.get("help", "")) + shown
 
 
 def exit_lines():
-    return [f"  {number}  {name}: {meaning}" for name, (number, meaning) in EXIT_CODES.items()]
+    lead = ("  The exit code is the document's: its status ok, empty, partial or too_large as such; when no result is usable, the most actionable error among them,"
+            " rate_limited before invalid before local_io, else upstream.")
+    return [lead] + [f"  {number}  {name}: {meaning}" for name, (number, meaning) in EXIT_CODES.items()]
 
 
 def argument_lines(kinds):
@@ -473,7 +475,7 @@ def shared_lines(read=False):
         typed, text = spec(arg, READ_LIMIT if read and arg.dest == "limit" else None)
         lines.append(f"  {typed}  {text} [{applies}]")
     lines.append(f"  --out FILE  {OUT_HELP} [{OUT}]")
-    lines.append(f"  --max-chars N  {MAX_CHARS_HELP} (default {GLOBAL_DEFAULTS['max_chars']}) [before COMMAND or after the whole command]")
+    lines.append(f"  --max-chars N  {MAX_CHARS_HELP} (default {GLOBAL_DEFAULTS['max_chars']}) (at least {budget.MIN_CHARS}) [before COMMAND or after the whole command]")
     lines.append(f"  --ttl-days N  {TTL_HELP} (default {GLOBAL_DEFAULTS['ttl_days']}) [before COMMAND only]")
     return lines
 
@@ -496,7 +498,7 @@ def kind_lines(command, seen):
         lines.append(f"  default rows: {command.rows}")
     if command.fields:
         lines.append(f"  default fields: {', '.join(command.fields)}")
-    lines.append(f"  a limit keeps {facts['limit_keeps']}")
+    lines.append(f"  a limit keeps {facts['limit_keeps']}" if command.exportable else "  --limit does not apply: the result is a single record")
     if command.narrow:
         lines.append(f"  narrow with: {', '.join(command.narrow)}")
     meaning = [("units", json.dumps(facts["units"], ensure_ascii=False, separators=(",", ":")))] if facts.get("units") else []
@@ -533,9 +535,9 @@ def group_document(group):
 def read_document():
     lines = [f"{LEAD} read ID [--start N] [options]", READ_PURPOSE, "", "arguments:"]
     lines += [f"  {typed}  {text}" for typed, text in (spec(arg) for arg in READ_ARGS)] + shared_lines(read=True)
-    lines += ["", "output:", "  The same document and envelope as the command that saved the observation, with stored_age_seconds; continuation names the next slice, forward from --start in saved order."]
+    lines += ["", "output:", "  The same document and envelope as the command that saved the observation, except that request is {read: ID} and each envelope adds stored_age_seconds; continuation names the next slice, forward from --start in saved order."]
     lines += output_lines()
-    lines += ["", "read cannot reach an id saved in another store (the skill's data/observations, or $YF_STORE when it is set), one --ttl-days deleted, or one saved by a command this version no longer has: rerun the original command."]
+    lines += ["", "read cannot reach an id saved in another store (the skill's data/observations, or $YF_STORE when it is set) or one --ttl-days deleted — rerun the original command — nor one saved by a command this version no longer has: choose a command from --help instead."]
     lines += ["", "exit codes:"] + exit_lines()
     return "\n".join(lines)
 
@@ -546,7 +548,7 @@ def root_map():
     lines = [f"{LEAD} COMMAND ...", "Yahoo Finance data by purpose. stdout: one JSON document; stderr: diagnostics.",
              "`COMMAND --help` states that command's kinds, arguments, output, what each kind's values mean, and exit codes.", "", "commands:"]
     lines += [f"  {typed:<{width}}{purpose}" if len(typed) < width else f"  {typed}  {purpose}" for typed, purpose in commands]
-    lines += ["", "options:", f"  --max-chars N  {MAX_CHARS_HELP} (default {GLOBAL_DEFAULTS['max_chars']}) [before COMMAND or after the whole command]",
+    lines += ["", "options:", f"  --max-chars N  {MAX_CHARS_HELP} (default {GLOBAL_DEFAULTS['max_chars']}) (at least {budget.MIN_CHARS}) [before COMMAND or after the whole command]",
               f"  --ttl-days N  {TTL_HELP} (default {GLOBAL_DEFAULTS['ttl_days']}) [before COMMAND only]", "", "exit codes:"] + exit_lines()
     return "\n".join(lines)
 
