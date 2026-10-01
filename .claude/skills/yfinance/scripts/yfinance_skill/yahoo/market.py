@@ -13,8 +13,9 @@ def summary(target, args, context, warnings):
 REGION_INTERPRETATION = {
     "region": "Yahoo answers an unserved country code with the United States result and no warning, so only served codes are offered.",
     "keys": "Sector keys are hyphenated (consumer-cyclical); fund sector-weights uses underscores.",
-    "overview": "--dataset overview returns one record, which --limit does not cut; the other datasets return rows.",
 }
+SECTOR_INTERPRETATION = dict(REGION_INTERPRETATION, overview="--dataset overview returns one record and top-etfs and top-funds a mapping of symbol to name, none of which --limit cuts; the other datasets return rows.")
+INDUSTRY_INTERPRETATION = dict(REGION_INTERPRETATION, overview="--dataset overview returns one record, which --limit does not cut; the other datasets return rows.")
 # 성진: 같은 값을 overview는 market_weight(밑줄), 구성종목 표는 "market weight"(공백)로 부른다. 한쪽만 선언하면
 # 다른 쪽이 계약 없이 나간다. ytd return은 특히 위험하다 — 실측 raw 3.654가 원천 표기로 "365.40%"다.
 DOMAIN_UNITS = {"market weight": WEIGHT, "market_weight": WEIGHT,
@@ -37,7 +38,7 @@ DATASETS = {
         summary, keyed=True,
         interpretation={"shape": "A mapping keyed by exchange in which each exchange is a row, in sorted key order on every path: --fields names the records' fields, --limit and read --start count exchanges in that order, and --out writes one row per exchange under a key column."}),
     "market.sector": Dataset(
-        domain(yf.Sector), units=DOMAIN_UNITS, interpretation=REGION_INTERPRETATION, gotchas=[REGION_GOTCHA]),
+        domain(yf.Sector), units=DOMAIN_UNITS, interpretation=SECTOR_INTERPRETATION, gotchas=[REGION_GOTCHA]),
     "market.industry": Dataset(
-        domain(yf.Industry), units=DOMAIN_UNITS, interpretation=REGION_INTERPRETATION, gotchas=[REGION_GOTCHA]),
+        domain(yf.Industry), units=DOMAIN_UNITS, interpretation=INDUSTRY_INTERPRETATION, gotchas=[REGION_GOTCHA]),
 }
