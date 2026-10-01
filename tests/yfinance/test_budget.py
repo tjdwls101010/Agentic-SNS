@@ -457,18 +457,45 @@ def strikes(result, side):
     return [row[0] for row in result["data"][side]["data"]]
 
 
-@pytest.mark.parametrize("calls,puts,budget", [(60, 45, []), (60, 25, []), (5, 0, []), (60, 45, ["--max-chars", "1500"])])
-def test_reading_a_chain_page_by_page_reaches_every_contract_of_both_sides_once(cli, tmp_path, calls, puts, budget):
+@pytest.mark.parametrize("calls,puts", [(60, 45), (60, 25), (5, 0)])
+def test_reading_a_chain_page_by_page_reaches_every_contract_of_both_sides_once(cli, tmp_path, calls, puts):
     """Each side is cut from the same start, so the next start is the furthest row any side reached; adding the two sides' counts skipped rows of both, and a side that ran out first was refused."""
     store = tmp_path / "s"
     proc, doc = cli("options", "chain", "AAPL", "--fields", "strike", routes=chain_routes(calls, puts), store=store)
     assert proc.returncode == 0, proc.stdout[:400]
     ident = doc["results"][0]["id"]
-    proc, page = cli("read", ident, "--fields", "strike", "--start", "0", "--limit", "20", *budget, routes=[], store=store)
-    assert proc.returncode in (0, 8), proc.stdout[:400]
-    pages = [page["results"][0]] + follow(cli, store, page["results"][0].get("continuation"), budget)
+    proc, page = cli("read", ident, "--fields", "strike", "--start", "0", "--limit", "20", routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    pages = [page["results"][0]] + follow(cli, store, page["results"][0].get("continuation"))
     assert [s for p in pages for s in strikes(p, "calls")] == [100 + i for i in range(calls)]
     assert [s for p in pages for s in strikes(p, "puts")] == [200 + i for i in range(puts)]
+
+
+def test_a_chain_read_the_budget_narrows_page_by_page_still_reaches_every_contract_once(cli, tmp_path):
+    """Padded symbols make every 20-row page too large for 1,500 characters, so each page is narrowed below the --limit asked for and the next start has to follow what was actually shown."""
+    store = tmp_path / "s"
+    proc, doc = cli("options", "chain", "AAPL", "--fields", "contractSymbol,strike", "--limit", "1", routes=chain_routes(60, 45, wide=40), store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    ident = doc["results"][0]["id"]
+    proc, page = cli("read", ident, "--fields", "contractSymbol,strike", "--start", "0", "--limit", "20", "--max-chars", "1500", routes=[], store=store)
+    assert proc.returncode == 8, proc.stdout[:400]
+    first = page["results"][0]
+    assert first["coverage"]["calls"]["truncated_by"] == "budget" and first["coverage"]["calls"]["shown"] < 20
+    pages = [first] + follow(cli, store, first.get("continuation"), ("--max-chars", "1500"))
+    assert [row[1] for p in pages for row in p["data"]["calls"]["data"]] == [100 + i for i in range(60)]
+    assert [row[1] for p in pages for row in p["data"]["puts"]["data"]] == [200 + i for i in range(45)]
+
+
+def test_a_chain_whose_smallest_page_is_too_large_is_told_so_and_the_size_it_names_works(cli, tmp_path):
+    """One contract per side is the smallest page, so a recovery that names --limit 1 repeats the same refusal."""
+    store = tmp_path / "s"
+    routes = chain_routes(3, 3, wide=30000)
+    proc, doc = cli("options", "chain", "AAPL", "--max-chars", "3000", routes=routes, store=store)
+    assert proc.returncode == 9, proc.stdout[:400]
+    fix = doc["results"][0]["error"]["fix"]
+    assert "single entry" in fix and "--limit 1" not in fix, fix
+    proc, doc = cli("options", "chain", "AAPL", *parse(fix, "max-chars"), routes=routes, store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
 
 
 CHAIN_COLUMNS = ["contractSymbol", "lastTradeDate", "strike", "lastPrice", "bid", "ask", "change", "percentChange", "volume", "openInterest",

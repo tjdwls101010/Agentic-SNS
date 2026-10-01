@@ -1,6 +1,8 @@
 """--out: every row an observation received, in one long CSV a computation can read, and never half a file."""
 import csv
 import json
+import re
+import shlex
 
 import pytest
 
@@ -209,6 +211,28 @@ def test_an_unwritable_directory_is_a_local_failure_that_keeps_the_rows_reachabl
     assert proc.returncode == 4, proc.stdout[:300]
     r = json.loads(proc.stdout)["results"][0]
     assert r["error"]["code"] == "local_io" and f"read {r['id']}" in r["error"]["fix"]
+
+
+def test_a_failed_chain_file_names_a_retry_that_writes_the_same_slice(cli, tmp_path):
+    """A read from --start 50 of a 60-call, 45-put chain holds calls 50-59 only; a retry without --start writes other rows of both sides."""
+    from test_budget import chain_routes
+
+    store = tmp_path / "s"
+    proc, doc = cli("options", "chain", "AAPL", "--fields", "strike", routes=chain_routes(60, 45), store=store)
+    ident = doc["results"][0]["id"]
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    locked.chmod(0o555)
+    try:
+        proc = cli("read", ident, "--start", "50", "--limit", "10", "--fields", "strike", "--out", str(locked / "c.csv"), routes=[], store=store, raw=True)
+    finally:
+        locked.chmod(0o755)
+    assert proc.returncode == 4, proc.stdout[:400]
+    retry = re.search(r"(read [0-9a-f]{16}.*?) --out NEWPATH", json.loads(proc.stdout)["results"][0]["error"]["fix"])[1]
+    out = tmp_path / "again.csv"
+    proc, doc = cli(*shlex.split(retry), "--out", str(out), routes=[], store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    assert [(r["side"], r["strike"]) for r in rows(out)] == [("calls", str(150.0 + i)) for i in range(10)]
 
 
 # ---- the file is written before the budget is judged, so the document never loses the fact of it --------------------

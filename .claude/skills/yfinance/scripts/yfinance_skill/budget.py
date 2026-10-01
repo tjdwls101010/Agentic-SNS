@@ -124,16 +124,15 @@ def narrowings(item, args):
     return [n for n in item.narrow if n not in forbidden]
 
 
-def too_large_fix(results, item, size, max_chars, args, needed=None):
+def too_large_fix(results, item, size, max_chars, args, needed=None, shown=None):
     """One sentence that names a narrowing this leaf actually has, and a saved id that reaches the rest.
 
     `size` is what the document being refused measured, which sizes the slice; `needed` is what the whole result would
-    take, which is the budget the sentence promises.
+    take, which is the budget the sentence promises; `shown` is the rows one page of it held.
     """
     needed = size if needed is None else needed
     head = f"Result needs {needed} characters; limit is {max_chars}. "
     saved = [(r.get("target"), r.get("id")) for r in results if r.get("id")]
-    shown = next((r["coverage"]["shown"] for r in results if isinstance(r.get("coverage"), dict) and r["coverage"].get("shown")), None)
     keep = max(1, int(shown * max_chars * 0.7 / size)) if shown else None
     if getattr(args, "list_fields", False):
         # 성진: 필드 목록을 요청한 호출에 --fields를 권하면 존재하지 않는 축을 가리킨다; 이 출력을 줄이는 것은 --filter다.
@@ -260,7 +259,9 @@ def emit(results, args, item, request=None, scoped=False):
                 return outcome(results, status)
 
     clean = [strip(r, item) for r in results]
-    fix = schema_fix(needed, max_chars, scoped, bool(getattr(args, "filter", ""))) if item is None else too_large_fix(clean, item, len(text), max_chars, args, needed)
+    # the page size comes from the selected values: the printed copy drops a chain side's empty name lists, after which it no longer reads as a chain
+    shown = next((page_rows(r.get("data"), r["coverage"]) for r in results if isinstance(r.get("coverage"), dict) and r["coverage"].get("shown")), None)
+    fix = schema_fix(needed, max_chars, scoped, bool(getattr(args, "filter", ""))) if item is None else too_large_fix(clean, item, len(text), max_chars, args, needed, shown)
     error = error_info("too_large", f"Result requires {needed} characters; limit is {max_chars}.", fix)
     print(too_large_document(clean, error, max_chars, request))
     return "too_large", {"too_large"}

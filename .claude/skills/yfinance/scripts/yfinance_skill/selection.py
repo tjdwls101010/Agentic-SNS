@@ -121,9 +121,9 @@ def select(data, args, item, coverage=None, keep=None, past_end=False):
     if start and received is not None:
         if start >= received and not past_end:
             raise InputError(f"--start {start} is past the {received} rows this observation holds; its last row is at {received - 1}.")
-        data = dict(data, data=data["data"][start:], index=data["index"][start:]) if is_table(data) else data[start:]
         coverage["start"] = start
 
+    # 성진: 필드가 있는지는 페이지가 아니라 관측 전체의 사실이다. --start로 자른 뒤에 투영하면 앞 행에만 있던 필드가 뒤 페이지에서 거절된다 — 투영을 먼저 하고 자른다.
     requested = getattr(args, "fields", None)
     fields = requested or (list(item.fields) if item and item.fields else None)
     if fields:
@@ -138,6 +138,8 @@ def select(data, args, item, coverage=None, keep=None, past_end=False):
                 coverage["fields"] = {"received": len(offered), "shown": len(fields), "source": "requested" if requested else "leaf_default"}
         elif requested:
             coverage["unverified_fields"] = requested  # nothing came back at all, so the names could not be checked against a real shape
+    if start and received is not None:
+        data = dict(data, data=data["data"][start:], index=data["index"][start:]) if is_table(data) else data[start:]
 
     explicit = getattr(args, "limit", None)
     limit = keep if keep is not None else explicit if explicit is not None else (item.limit if item else None)

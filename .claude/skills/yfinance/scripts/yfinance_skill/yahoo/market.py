@@ -38,7 +38,7 @@ def domain(kind):
 
 DATASETS = {
     "market.summary": Dataset(
-        summary,
+        summary, keyed=True,
         interpretation={"shape": "A mapping keyed by exchange in which each exchange is a row, in sorted key order on every path: --fields names the records' fields, --limit and read --start count exchanges in that order, and --out writes one row per exchange under a key column."}),
     "market.sectors": Dataset(
         sectors,

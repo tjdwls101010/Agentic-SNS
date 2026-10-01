@@ -20,7 +20,7 @@ def exported(encoded, args, item):
             args.fields = ["key", *args.fields]
     if is_sided(encoded):
         data = select_sides(encoded, args, whole, coverage)
-        coverage = {"received": coverage["received"], "shown": coverage["shown"]}
+        coverage = {k: coverage[k] for k in ("start", "received", "shown") if k in coverage}  # start is what a retry needs to write the same slice
     else:
         data, coverage = select(encoded, args, whole, coverage)
     if is_empty(data):

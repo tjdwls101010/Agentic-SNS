@@ -269,3 +269,26 @@ def test_a_mapping_of_records_cut_by_the_budget_continues_to_every_key(cli, tmp_
         seen += list(page["results"][0]["data"])
         continuation = page["results"][0].get("continuation")
     assert seen == ["A", "M", "Z"], seen
+
+
+def test_a_field_some_keyed_records_lack_is_null_on_every_page_rather_than_refused(cli, tmp_path):
+    """Whether a field exists is a fact about the observation, not about the page: a field only A has must read as null for M and Z when the continuation reaches them."""
+    store = tmp_path / "s"
+    result = [{"exchange": "Z", "shortName": "Zed"}, {"exchange": "A", "shortName": "Ay", "regularMarketPrice": 1.0}, {"exchange": "M", "shortName": "Em"}]
+    routes = [{"path": "/v6/finance/quote/marketSummary", "json": {"marketSummaryResponse": {"result": result, "error": None}}},
+              {"path": "/v6/finance/markettime", "json": MARKET_STATUS}]
+    proc, doc = cli("market", "summary", "--fields", "shortName,regularMarketPrice", "--limit", "1", routes=routes, store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    ident = doc["results"][0]["id"]
+    seen, start = {}, 0
+    while start is not None:
+        proc, page = cli("read", ident, "--fields", "shortName,regularMarketPrice", "--start", str(start), "--limit", "1", routes=[], store=store)
+        assert proc.returncode == 0, proc.stdout[:400]
+        seen.update(page["results"][0]["data"])
+        start = (page["results"][0].get("continuation") or {}).get("start")
+    assert seen == {"A": {"shortName": "Ay", "regularMarketPrice": 1}, "M": {"shortName": "Em", "regularMarketPrice": None}, "Z": {"shortName": "Zed", "regularMarketPrice": None}}
+
+
+def test_the_market_summary_says_a_limit_keeps_the_first_keys_in_sorted_order(cli):
+    proc, doc = cli("schema", "market", "summary")
+    assert doc["results"][0]["data"]["default_window"]["limit_keeps"] == "the first keys in sorted order"
