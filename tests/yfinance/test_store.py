@@ -197,6 +197,20 @@ def test_a_fresh_quote_saves_its_source_time_as_an_iso_time(cli, tmp_path):
     assert json.loads((store / f"{r['id']}.json").read_text())["source_time"] == EPOCH_AS_ISO
 
 
+def test_a_source_time_no_calendar_can_hold_is_kept_as_received_and_the_response_saved(cli, tmp_path):
+    """Converting the time must not cost the paid response: a value outside any date keeps the form the source sent."""
+    store = tmp_path / "s"
+    routes = [{"path": "/quoteSummary/AAPL", "json": {"quoteSummary": {"result": [{"assetProfile": {"sector": "Technology"}, "financialData": {"financialCurrency": "USD"}}], "error": None}}},
+              {"path": "/v7/finance/quote", "json": {"quoteResponse": {"result": [{"symbol": "AAPL", "currency": "USD", "regularMarketPrice": 100, "regularMarketTime": 1e30}], "error": None}}},
+              {"path": "/timeseries/AAPL", "json": {"timeseries": {"result": [], "error": None}}}]
+    proc, doc = cli("prices", "quote", "AAPL", routes=routes, store=store)
+    assert proc.returncode == 0, proc.stdout[:400]
+    r = doc["results"][0]
+    assert r["source_time"] == 1e30 and (store / f"{r['id']}.json").exists()
+    proc, back = cli("read", r["id"], routes=[], store=store)
+    assert proc.returncode == 0 and back["results"][0]["source_time"] == 1e30, proc.stdout[:400]
+
+
 # ---- the store's own contract: nothing lost to an argument, every failure a document -------------------------------
 
 

@@ -25,13 +25,18 @@ SOURCE_TIME_FIELDS = ("regularMarketTime", "postMarketTime")
 
 
 def info_time(info):
-    """The source's own time on this response, as ISO like every other time in the envelope; Yahoo supplies it as a Unix epoch."""
+    """The source's own time on this response, as ISO like every other time in the envelope; Yahoo supplies it as a Unix epoch, and one no calendar holds is kept as received."""
     if not isinstance(info, dict):
         return None
     for field in SOURCE_TIME_FIELDS:
         value = info.get(field)
         if value:
-            return dt.datetime.fromtimestamp(value, dt.timezone.utc).isoformat() if isinstance(value, (int, float)) and value > 0 else value
+            if isinstance(value, (int, float)) and value > 0:
+                try:
+                    return dt.datetime.fromtimestamp(value, dt.timezone.utc).isoformat()
+                except (OverflowError, OSError, ValueError):
+                    return value
+            return value
     return None
 
 
