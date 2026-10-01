@@ -142,8 +142,8 @@ def allowed_tools(skill_md):
     return line[1].strip() if line else None
 
 
-def violations(skill_dir, tests_dir, package, children, extra_scope=(), units=None, jobs=()):
-    """Every layout rule broken by one skill, as readable strings; empty when it conforms. `units` (a UNITS entry) adds the unit rules, with `jobs` the job folders it names."""
+def violations(skill_dir, tests_dir, package, children, extra_scope=(), units=None, jobs=(), repo=None):
+    """Every layout rule broken by one skill, as readable strings; empty when it conforms. `units` (a UNITS entry) adds the unit rules, with `jobs` the job folders it names inside the repository rooted at `repo`; an attribute chain then counts as an import of the module it lands in."""
     found = []
     scripts = skill_dir / 'scripts'
     entries = {p.name for p in scripts.iterdir()} - IGNORED
@@ -167,6 +167,12 @@ def violations(skill_dir, tests_dir, package, children, extra_scope=(), units=No
         name = module_name(path, scripts)
         modules[name] = path
     modules['cli'] = scripts / 'cli.py'
+    repository = [*(python_files(tests_dir) if tests_dir.is_dir() else ()),
+                  *(path for job in jobs if job.is_dir() for path in python_files(job))]
+    reached = {}
+    if units is not None:
+        unit_found, reached = unit_violations(package, modules, repository, repo)
+        found += unit_found
     for name, path in modules.items():
         tree = ast.parse(path.read_text(encoding='utf-8'))
         imports = imported_modules(tree, name, path.name == '__init__.py')
@@ -174,7 +180,7 @@ def violations(skill_dir, tests_dir, package, children, extra_scope=(), units=No
                        if any(i == target or i.startswith(target + '.') for i in imports) and target != name}
         edges[name] = {t for t in edges[name]
                        if not any(o != t and o.startswith(t + '.') and o in edges[name] for o in edges[name])
-                       or t == 'cli'}
+                       or t == 'cli'} | {t for t in reached.get(name, ()) if t != package}
         for edit in path_edits(tree):
             found.append(f'{name} edits the import path ({edit})')
 
@@ -218,10 +224,6 @@ def violations(skill_dir, tests_dir, package, children, extra_scope=(), units=No
 
     if not tests_dir.is_dir():
         found.append(f'tests/{tests_dir.name} is missing')
-    repository = [*(python_files(tests_dir) if tests_dir.is_dir() else ()),
-                  *(path for job in jobs if job.is_dir() for path in python_files(job))]
-    if units is not None:
-        found += unit_violations(scripts, package, modules, repository)
     for path in [*repository, *extra_scope]:
         tree = ast.parse(path.read_text(encoding='utf-8'))
         for edit in path_edits(tree):
@@ -240,23 +242,50 @@ def violations(skill_dir, tests_dir, package, children, extra_scope=(), units=No
     return found
 
 
-def bound_names(tree, current, is_package, modules):
-    """What a module's imports bind: {local name: (dotted target, whether that target is a module)}. A plain `import a.b` binds `a` to `a`."""
-    names = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.asname:
-                    names[alias.asname] = (alias.name, alias.name in modules)
-                else:
-                    root = alias.name.split('.')[0]
-                    names[root] = (root, root in modules)
-        elif isinstance(node, ast.ImportFrom):
-            base = imported_modules(ast.Module(body=[node], type_ignores=[]), current, is_package)[0]
-            for alias in node.names:
-                target = base + '.' + alias.name
-                names[alias.asname or alias.name] = (target, target in modules)
-    return names
+SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+COMPREHENSIONS = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+# Calls whose first string argument names an import path; like pkgutil.resolve_name, they take each part as a module while one exists.
+PATCHERS = {'patch', 'setattr', 'delattr', 'import_module', '__import__', 'resolve_name'}
+
+
+def import_targets(node, current, is_package):
+    """(bound name, target) for each name an import binds. A target is (dotted name, how many leading parts are an explicit module path)."""
+    if isinstance(node, ast.Import):
+        return [(a.asname, (a.name, len(a.name.split('.')))) if a.asname else (a.name.split('.')[0], (a.name.split('.')[0], 1))
+                for a in node.names]
+    base = imported_modules(ast.Module(body=[node], type_ignores=[]), current, is_package)[0]
+    return [(a.asname or a.name, (base + '.' + a.name, len(base.split('.')))) for a in node.names if a.name != '*']
+
+
+def scope_bindings(scope, current, is_package):
+    """What one scope binds: {name: {import target, or None for an argument, assignment, def or class}}. A nested scope's body binds in that scope, not here."""
+    found = {}
+    if isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+        arguments = scope.args
+        for arg in [*arguments.posonlyargs, *arguments.args, *arguments.kwonlyargs, arguments.vararg, arguments.kwarg]:
+            if arg is not None:
+                found.setdefault(arg.arg, set()).add(None)
+    if isinstance(scope, COMPREHENSIONS):
+        for generator in scope.generators:
+            for name in ast.walk(generator.target):
+                if isinstance(name, ast.Name):
+                    found.setdefault(name.id, set()).add(None)
+
+    def visit(node):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, SCOPES):
+                if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    found.setdefault(child.name, set()).add(None)
+                continue
+            if isinstance(child, (ast.Import, ast.ImportFrom)):
+                for name, target in import_targets(child, current, is_package):
+                    found.setdefault(name, set()).add(target)
+            elif isinstance(child, ast.Name) and isinstance(child.ctx, (ast.Store, ast.Del)):
+                found.setdefault(child.id, set()).add(None)
+            visit(child)
+
+    visit(scope)
+    return found
 
 
 def dotted(node):
@@ -268,80 +297,113 @@ def dotted(node):
     return [node.id, *reversed(parts)] if isinstance(node, ast.Name) else None
 
 
-def docstrings(tree):
-    found = set()
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and node.body:
-            first = node.body[0]
-            if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) and isinstance(first.value.value, str):
-                found.add(id(first.value))
+def name_uses(tree, current, is_package):
+    """Every name a module reaches statically, as (target, whether it is an attribute chain); a target is as in import_targets. The names are its imports, each attribute chain that starts at an imported name, and each patch-style string.
+
+    A name is looked up through the scopes enclosing its use, so a local import, an argument or an assignment hides an outer import of the same name; a class body's names are not seen from its methods.
+    """
+    found = []
+
+    def lookup(name, chain):
+        for depth, (bindings, is_class) in enumerate(reversed(chain)):
+            if is_class and depth:
+                continue
+            if name in bindings:
+                return bindings[name]
+        return set()
+
+    def walk(node, chain):
+        if isinstance(node, ast.Import):
+            found.extend(((a.name, len(a.name.split('.'))), False) for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            found.extend((target, False) for _, target in import_targets(node, current, is_package))
+            base = imported_modules(ast.Module(body=[node], type_ignores=[]), current, is_package)[0]
+            found.append(((base, len(base.split('.'))), False))
+        elif isinstance(node, ast.Attribute) and not isinstance(getattr(node, 'parent', None), ast.Attribute):
+            parts = dotted(node)
+            if parts:
+                found.extend((('.'.join([target, *parts[1:]]), explicit), True) for target, explicit in filter(None, lookup(parts[0], chain)))
+        elif isinstance(node, ast.Call) and node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+            called = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, 'id', None)
+            if called in PATCHERS:
+                found.append(((node.args[0].value, len(node.args[0].value.split('.'))), False))
+        for child in ast.iter_child_nodes(node):
+            child.parent = node
+        if isinstance(node, SCOPES):
+            outer = [*getattr(node, 'decorator_list', ()), *getattr(node, 'bases', ()), *getattr(node, 'keywords', ())]
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                outer += [*node.args.defaults, *filter(None, node.args.kw_defaults)]
+            inner = chain + [(scope_bindings(node, current, is_package), isinstance(node, ast.ClassDef))]
+            for child in ast.iter_child_nodes(node):
+                walk(child, chain if child in outer else inner)
+            return
+        for child in ast.iter_child_nodes(node):
+            walk(child, chain)
+
+    walk(tree, [(scope_bindings(tree, current, is_package), False)])
     return found
 
 
-def unit_violations(scripts, package, modules, repository):
-    """The unit rules: outside a subpackage, only the names its `__init__.py` binds as values are reachable; the entry never binds one of its own modules; the skill never imports the repository's tests or jobs.
+def resolve(target, modules, exports, seen=frozenset()):
+    """(the modules a target passes through, the parts left unresolved). Its leading explicit parts are module paths; after them a module's own binding of a name wins over its submodule of that name, as attribute lookup does, and a binding to a module continues into it. A binding that names itself (`from . import client` in its own package) is the submodule."""
+    seen = seen | {target}
+    name, explicit = target
+    parts = name.split('.')
+    if parts[0] not in modules:
+        return [], parts
+    path = [parts[0]]
+    for index, part in enumerate(parts[1:], 1):
+        current = path[-1]
+        bound = exports(current).get(part, set()) - seen if index >= explicit else set()
+        if bound:
+            into = [t for t in bound if t and not resolve(t, modules, exports, seen)[1]]
+            if not into:
+                return path, parts[index:]  # a value: the name stops in this module
+            path.append(resolve(into[0], modules, exports, seen)[0][-1])
+        elif current + '.' + part in modules:
+            path.append(current + '.' + part)
+        else:
+            return path, parts[index:]
+    return path, []
 
-    `modules` maps every dotted module name in the skill to its file, `repository` lists the test and job files.
+
+def unit_violations(package, modules, repository, repo):
+    """The unit rules. Returns (violations, {module: the skill modules its attribute chains land in}).
+
+    Outside a subpackage, code reaches it only through the names its `__init__.py` binds as values: an entry that binds one of its own modules, directly or through another module, is a violation, and so is any use that steps from a subpackage into one of its modules from outside. The skill never imports the repository's tests or jobs (`repository`, named by stem and by dotted path from `repo`).
     """
     found = []
     units = sorted(name for name, path in modules.items() if path.name == '__init__.py' and name != package)
-    children = {unit: {name[len(unit) + 1:].split('.')[0] for name in modules if name.startswith(unit + '.')} for unit in units}
-    public = {}
+    trees = {name: ast.parse(path.read_text(encoding='utf-8')) for name, path in modules.items()}
+    exported = {name: scope_bindings(tree, name, modules[name].name == '__init__.py') for name, tree in trees.items()}
+
+    def exports(module):
+        return exported.get(module, {})
+
     for unit in units:
-        tree = ast.parse(modules[unit].read_text(encoding='utf-8'))
-        values = set()
-        for name, (target, is_module) in bound_names(tree, unit, True, modules).items():
-            if is_module and target.startswith(unit + '.'):
-                found.append(f'{unit} binds its module {target[len(unit) + 1:]} in its __init__')
-            elif not is_module:
-                values.add(name)
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                values.add(node.name)
-            elif isinstance(node, ast.Assign):
-                values.update(t.id for t in node.targets if isinstance(t, ast.Name))
-        public[unit] = values
+        for target in set().union(*exports(unit).values()) - {None}:
+            path, rest = resolve(target, modules, exports)
+            if not rest and path[-1].startswith(unit + '.'):
+                found.append(f'{unit} binds its module {path[-1][len(unit) + 1:]} in its __init__')
 
-    def past(where, owner, dotted_name, through_entry):
-        """A dotted name that lands inside a unit `owner` is not part of, past what its entry binds."""
-        for unit in units:
-            if owner == unit or owner.startswith(unit + '.') or not dotted_name.startswith(unit + '.'):
-                continue
-            child = dotted_name[len(unit) + 1:].split('.')[0]
-            if child in children[unit] and not (through_entry and child in public[unit]):
-                found.append(f'{where} reaches past {unit} into {child}')
-
+    names = set()
+    for path in repository:
+        parts = path.relative_to(repo).with_suffix('').parts
+        names |= {path.stem} | {'.'.join(parts[:i]) for i in range(1, len(parts) + 1)}
+    reached = {}
     sources = [(name, name, path) for name, path in modules.items()] + [(path.name, '', path) for path in repository]
-    test_modules = {path.stem for path in repository} | {'tests'}
     for where, owner, path in sources:
-        tree = ast.parse(path.read_text(encoding='utf-8'))
-        is_package = path.name == '__init__.py'
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    past(where, owner, alias.name, False)
-                    if owner and alias.name.split('.')[0] in test_modules:
-                        found.append(f'{where} imports repository code {alias.name}')
-            elif isinstance(node, ast.ImportFrom):
-                base = imported_modules(ast.Module(body=[node], type_ignores=[]), owner or 'tests', is_package)[0]
-                past(where, owner, base, False)
-                for alias in node.names:
-                    if base in units:
-                        past(where, owner, base + '.' + alias.name, True)
-                if owner and not node.level and base.split('.')[0] in test_modules:
-                    found.append(f'{where} imports repository code {base}')
-        bound = bound_names(tree, owner or 'tests', is_package, modules)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Attribute):
-                parts = dotted(node)
-                if parts and parts[0] in bound:
-                    past(where, owner, '.'.join([bound[parts[0]][0], *parts[1:]]), True)
-        skip = docstrings(tree)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in skip:
-                for text in re.findall(r'[A-Za-z_][\w.]*', node.value):
-                    past(where, owner, text, True)
-    return list(dict.fromkeys(found))
+        tree = trees[owner] if owner else ast.parse(path.read_text(encoding='utf-8'))
+        for target, chained in name_uses(tree, owner or 'tests', path.name == '__init__.py'):
+            passed = resolve(target, modules, exports)[0]
+            for before, after in zip(passed, passed[1:]):
+                if before in units and after.startswith(before + '.') and not (owner == before or owner.startswith(before + '.')):
+                    found.append(f'{where} reaches past {before} into {after[len(before) + 1:].split(".")[0]}')
+            if chained and owner and passed and passed[-1] != owner:
+                reached.setdefault(owner, set()).add(passed[-1])
+            if owner and any(target[0] == n or target[0].startswith(n + '.') for n in names):
+                found.append(f'{where} imports repository code {target[0]}')
+    return list(dict.fromkeys(found)), reached
 
 
 def check_skill(root, skill, package, children, extra_scope=(), units=None):
@@ -350,7 +412,7 @@ def check_skill(root, skill, package, children, extra_scope=(), units=None):
     tests = root / 'tests' / skill.replace('-', '_')
     jobs = (units or {}).get('jobs', ())
     missing = [f'{job} is missing' for job in jobs if not (root / job).is_dir()]
-    return violations(root / '.claude/skills' / skill, tests, package, children, extra_scope, units, [root / job for job in jobs]) + missing
+    return violations(root / '.claude/skills' / skill, tests, package, children, extra_scope, units, [root / job for job in jobs], root) + missing
 
 
 @pytest.mark.parametrize('skill', sorted(SKILLS))
@@ -480,7 +542,7 @@ UNIT_TREE = {
     '.claude/skills/demo/scripts/demo/reading/read.py': 'from demo import web\nfrom demo.web import fetch\nfrom . import helpers\nfrom .helpers import tidy\n\n\ndef read():\n    return web.fetch(), web.TIMEOUT, fetch, helpers, tidy\n\n\ndef run():\n    pass\n',
     '.claude/skills/demo/scripts/demo/reading/helpers.py': 'def tidy():\n    pass\n',
     '.claude/skills/demo/scripts/demo/render.py': 'import demo.reading\nfrom demo import reading\nfrom demo.reading import read\n\nVALUE = reading.read, demo.reading.run, read\n',
-    'tests/demo/test_demo.py': 'from demo.reading import read\nimport demo.web as web\n\nPATCH = "demo.web.fetch"\nVALUE = web.fetch, read\n',
+    'tests/demo/test_demo.py': 'from unittest.mock import patch\n\nfrom demo.reading import read\nimport demo.web as web\n\nPATCH = patch("demo.web.fetch")\nVALUE = web.fetch, read\n',
     'jobs/demo/run.py': 'import subprocess\n\nfrom demo.web import fetch\n',
 }
 UNIT_RULES = {'edges': {('render', 'reading')}, 'jobs': ['jobs/demo']}
@@ -495,8 +557,14 @@ def unit_tree(tmp_path, files=None, units=UNIT_RULES):
 SKILL = '.claude/skills/demo/scripts/demo/'
 
 
-def test_a_conforming_unit_tree_has_no_violations(tmp_path):
-    assert unit_tree(tmp_path) == []
+@pytest.mark.parametrize('files', [
+    {},
+    {SKILL + 'web/__init__.py': 'from demo.web.client import Failure, fetch\n\nTIMEOUT = 30\n\n\ndef lazy():\n    from . import client\n    return client\n'},
+    {SKILL + 'render.py': 'from demo import reading\n\n\ndef show(reading):\n    return reading.helpers\n'},
+    {'tests/demo/test_demo.py': 'MESSAGE = "the client lives in demo.web.client"\n'},
+], ids=['tree', 'local import inside an entry', 'parameter shadowing an import', 'a module path as plain text'])
+def test_a_conforming_unit_tree_has_no_violations(tmp_path, files):
+    assert unit_tree(tmp_path, files) == []
 
 
 @pytest.mark.parametrize('files,expected', [
@@ -511,7 +579,12 @@ def test_a_conforming_unit_tree_has_no_violations(tmp_path):
     ({SKILL + 'reading/__init__.py': 'from demo.reading.read import read\nfrom demo.reading import helpers\n'}, 'demo.reading binds its module helpers'),
     ({SKILL + 'web/__init__.py': 'from . import client\n'}, 'demo.web binds its module client'),
     ({'tests/demo/test_demo.py': 'from demo.web.client import fetch\n'}, 'test_demo.py reaches past demo.web into client'),
-    ({'tests/demo/test_demo.py': 'PATCH = "demo.web.client.fetch"\n'}, 'test_demo.py reaches past demo.web into client'),
+    ({'tests/demo/test_demo.py': 'from unittest.mock import patch\n\nPATCH = patch("demo.web.client.fetch")\n'}, 'test_demo.py reaches past demo.web into client'),
+    ({'tests/demo/test_demo.py': 'import pytest\n\n\ndef test_x(monkeypatch):\n    monkeypatch.setattr("demo.reading.read.helpers", None)\n'}, 'test_demo.py reaches past demo.reading into read'),
+    ({SKILL + 'render.py': 'from demo import reading as x\n\nLEAK = x.helpers\n\n\ndef other():\n    import json as x\n    return x\n'}, 'demo.render reaches past demo.reading into helpers'),
+    ({SKILL + 'reading/__init__.py': 'from demo.reading.read import read\nfrom .read import run\nfrom .bridge import public\n', SKILL + 'reading/bridge.py': 'from . import helpers as public\n'}, 'demo.reading binds its module helpers'),
+    ({SKILL + 'reading/read.py': 'import demo as pkg\n\n\ndef read():\n    return pkg.render.VALUE\n\n\ndef run():\n    pass\n'}, 'demo.reading.read (feature) imports demo.render (feature)'),
+    ({SKILL + 'state.py': 'from jobs.demo.run import fetch\n'}, 'demo.state imports repository code jobs.demo.run'),
     ({'jobs/demo/run.py': 'from demo.reading.helpers import tidy\n'}, 'run.py reaches past demo.reading into helpers'),
     ({'jobs/demo/run.py': 'import sys\nsys.path.insert(0, "x")\n'}, 'run.py edits the import path'),
     ({'jobs/demo/run.py': 'from cli import main\n'}, 'run.py imports cli'),
