@@ -12,7 +12,7 @@ TARGETS = {"search": ["apple"], ("market", "sector"): ["technology"], ("market",
 SAMPLE = {"--from": "0123456789abcdef", "--start": "2024-01-02", "--end": "2024-01-09", "--period": "5d", "--frequency": None,
           "--periods": "1", "--date": "2024-01-19", "--field": "region", "--query": '{"operator":"EQ","operands":["region","us"]}',
           "--offset": "1", "--sort": "ticker", "--fields": "x", "--limit": "1", "--filter": "x"}
-FLAGS_WITHOUT_VALUE = {"--repair", "--prepost", "--ascending", "--most-active"}
+FLAGS_WITHOUT_VALUE = {"--repair", "--prepost", "--ascending", "--no-ascending", "--most-active"}
 
 
 def targets(group, kind):
@@ -90,7 +90,7 @@ def test_every_narrowing_a_kind_names_is_an_argument_it_takes(cli, key):
 OWN = {("search", ""): {"--type", "--dataset"}, ("prices", "quote"): {"--from"}, ("company", "profile"): {"--from"},
        ("company", "shares"): {"--start", "--end"}, ("company", "news"): {"--tab"}, ("options", "chain"): {"--date", "--side"},
        ("screen", "presets"): {"--type"}, ("screen", "fields"): {"--type", "--field"}, ("screen", "values"): {"--type", "--field"},
-       ("screen", "run"): {"--type", "--query", "--preset", "--offset", "--sort", "--ascending"},
+       ("screen", "run"): {"--type", "--query", "--preset", "--offset", "--sort", "--ascending", "--no-ascending"},
        ("market", "summary"): {"--region"}, ("market", "sector"): {"--region", "--dataset"}, ("market", "industry"): {"--region", "--dataset"},
        ("calendar", "earnings"): {"--start", "--end", "--offset", "--most-active"}}
 OWN.update({("prices", k): {"--start", "--end", "--period", "--interval", "--adjust", "--repair", "--prepost"} for k in ("history", "actions")})

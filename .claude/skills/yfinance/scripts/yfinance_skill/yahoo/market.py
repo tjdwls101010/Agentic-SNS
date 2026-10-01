@@ -13,6 +13,7 @@ def summary(target, args, context, warnings):
 REGION_INTERPRETATION = {
     "region": "Yahoo answers an unserved country code with the United States result and no warning, so only served codes are offered.",
     "keys": "Sector keys are hyphenated (consumer-cyclical); fund sector-weights uses underscores.",
+    "overview": "--dataset overview returns one record, which --limit does not cut; the other datasets return rows.",
 }
 # 성진: 같은 값을 overview는 market_weight(밑줄), 구성종목 표는 "market weight"(공백)로 부른다. 한쪽만 선언하면
 # 다른 쪽이 계약 없이 나간다. ytd return은 특히 위험하다 — 실측 raw 3.654가 원천 표기로 "365.40%"다.

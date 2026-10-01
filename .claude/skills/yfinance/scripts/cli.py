@@ -88,7 +88,7 @@ SHARED = [
     (Arg("--fields", type=field_list, metavar="A,B", help="Comma-separated fields replacing the default projection; nested payloads take dotted paths such as content.title, and --list-fields names them."), "every data command and read"),
     (Arg("--list-fields", action="store_true", help="List the fields this result offers instead of its values; refused with --out."), "every data command and read"),
     (Arg("--filter", metavar="TEXT", help="Case-insensitive substring narrowing a catalog or a --list-fields listing."), "screen presets, fields and values, and --list-fields; refused elsewhere"),
-    (Arg("--limit", type=int, metavar="N", help="Maximum rows, replacing the default window; each kind's 'a limit keeps' line says which end."), "every data command and read; screen run and calendars cap it at 250 and 100 when they ask the source"),
+    (Arg("--limit", type=int, metavar="N", help="Maximum rows, replacing the default window; each kind's 'a limit keeps' line says which end."), "every data command and read; screen commands refuse more than 250 and calendar commands more than 100, read does not"),
     (Arg("--timeout", type=int, default=30, metavar="SECONDS", help="Seconds per target, library calls included."), "every data command; not read, which makes no request"),
 ]
 OUT = "data commands whose results are rows, and read; the kinds list marks the ones without it"
@@ -394,7 +394,7 @@ READ_PURPOSE = "Read a saved observation again, in slices, by fields or to a fil
 READ_ARGS = [Arg("id", metavar="ID", help="Observation id from an earlier result."),
              Arg("--start", dest="row_start", type=int, default=0, metavar="N", help="Zero-based first row to return; each slice names the start of the next one.")]
 READ_LIMIT = "Maximum rows, counted forward from --start in saved order; unlike the first call, read does not keep the newest end. The same slice goes to --out."
-DOCUMENT = ["stdout is one JSON document {status, request, results}: status is the results' own when they share one, partial when they differ, and error when none is usable; request echoes what you chose and what a default filled in; results holds one envelope per target in the order given.",
+DOCUMENT = ["stdout is one JSON document {status, request, results}: status is error when every result is error or not_attempted, the results' own when they all share one, and partial otherwise; request echoes what you chose and what a default filled in; results holds one envelope per target in the order given.",
             "If an --out file was written but its summaries do not fit --max-chars, a receipt replaces results: {out, rows (the file's total), and each target's status and rows, or in_file and missing (targets without rows, by status)}."]
 
 
@@ -441,8 +441,8 @@ def spec(arg, help=None):
 
 
 def exit_lines():
-    lead = ("  The exit code is the document's: its status ok, empty, partial or too_large as such; when no result is usable, the most actionable error among them,"
-            " rate_limited before invalid before local_io, else upstream.")
+    lead = ("  The exit code follows the document: 0 ok, 7 empty, 8 partial; a document refused for size has status error with error.code too_large and exits 9;"
+            " any other error document exits with its most actionable code, rate_limited before invalid before local_io, else upstream.")
     return [lead] + [f"  {number}  {name}: {meaning}" for name, (number, meaning) in EXIT_CODES.items()]
 
 

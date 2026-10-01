@@ -125,5 +125,6 @@ def arguments(group):
         typed, rest = line.strip().split("  ", 1)
         tagged = re.match(r"\[([^\]]*)\] (.*)", rest)
         kinds = tagged[1].split(", ") if tagged else None
-        found.setdefault(typed.split()[0].rstrip(","), []).append((kinds, typed, tagged[2] if tagged else rest))
+        for name in re.findall(r"(?:^|, )(--[\w-]+)", typed) or [typed.split()[0]]:  # every spelling, --no-ascending included
+            found.setdefault(name, []).append((kinds, typed, tagged[2] if tagged else rest))
     return found
