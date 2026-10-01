@@ -5,12 +5,13 @@ sentence recommended --fields to a payload --fields could not reach, so the chec
 never worked. Here every recovery is parsed out of the error and executed, and the result has to answer the same
 question the failed call asked.
 """
+import json
 import re
 import shlex
 
 import pytest
 
-from conftest import inflate, shape
+from conftest import fact, inflate, shape
 from test_selection import closes, series_routes
 
 CHART = {"chart": {"error": None, "result": [{"meta": {"currency": "USD", "symbol": "AAPL", "exchangeName": "NMS", "instrumentType": "EQUITY", "firstTradeDate": 345479400, "regularMarketTime": 1704387600, "gmtoffset": -18000, "timezone": "EST", "exchangeTimezoneName": "America/New_York", "regularMarketPrice": 110, "chartPreviousClose": 100, "priceHint": 2, "dataGranularity": "1d", "validRanges": ["1d", "5d", "1mo", "max"]},
@@ -190,11 +191,26 @@ def test_an_upstream_failure_with_no_stated_constraint_still_says_where_to_look(
     assert "search" in doc["results"][0]["error"]["fix"]
 
 
-def test_schema_oversize_names_scoping_rather_than_a_selection_that_does_not_apply(cli):
-    proc, doc = cli("schema", "--max-chars", "1000")
-    assert proc.returncode == 9
-    fix = doc["results"][0]["error"]["fix"]
-    assert "schema GROUP" in fix and "--fields" not in fix and "--limit" not in fix
+def test_a_local_failure_document_reports_the_failure_within_its_budget(cli, tmp_path):
+    blocker = tmp_path / "a-file"
+    blocker.write_text("not a directory\n")
+    proc, doc = cli("screen", "presets", routes=[], store=blocker / "store")
+    assert proc.returncode == 4 and doc["results"][0]["error"]["code"] == "local_io", proc.stdout[:300]
+
+
+def test_a_local_failure_document_too_large_for_its_budget_names_the_budget_that_fits(cli, tmp_path):
+    """A document with no command behind it has nothing to narrow, so the fix only says how much room it needs."""
+    blocker = tmp_path / "a-file"
+    blocker.write_text("not a directory\n")
+    deep = blocker.joinpath(*["d" * 120] * 5, "store")  # the message names this path twice, past 1,000 characters
+    proc = cli("--max-chars", "1000", "screen", "presets", routes=[], store=deep, raw=True)
+    assert proc.returncode == 9, proc.stdout[:300]
+    assert len(proc.stdout.strip()) <= 1000
+    fix = json.loads(proc.stdout)["results"][0]["error"]["fix"]
+    needed = int(re.search(r"Rerun with --max-chars (\d+)", fix)[1])
+    assert "schema" not in fix
+    proc = cli("--max-chars", str(needed), "screen", "presets", routes=[], store=deep, raw=True)
+    assert proc.returncode == 4, proc.stdout[:300]
 
 
 # ---- defects found by an independent review of this rewrite --------------------------------------------------------
@@ -236,10 +252,8 @@ def test_an_option_chain_reads_back_under_the_same_selection_contract(cli, tmp_p
 def test_a_leaf_that_cannot_be_narrowed_does_not_claim_it_can(cli):
     """fund description returns one string: neither --fields nor --limit reduces it, so declaring either would put an
     argument in the recovery that returns the same size again. market summary's exchanges are rows, so --limit does narrow it."""
-    proc, doc = cli("schema", "fund", "description")
-    assert "narrowing" not in doc["results"][0]["data"]
-    proc, doc = cli("schema", "market", "summary")
-    assert "--limit" in doc["results"][0]["data"]["narrowing"]
+    assert fact("fund", "description", "narrow with") is None
+    assert "--limit" in fact("market", "summary", "narrow with").split(", ")
 
 
 def test_a_recovery_never_names_an_argument_this_mode_forbids(cli, tmp_path):

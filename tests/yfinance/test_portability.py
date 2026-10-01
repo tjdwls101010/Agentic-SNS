@@ -47,9 +47,9 @@ def test_the_installed_copy_runs_from_an_unrelated_directory(installed, tmp_path
     assert proc.returncode == 0, proc.stderr[-800:]
     assert proc.stdout.startswith("usage: cli.py")
 
-    proc = run(installed, cwd, "schema", "prices", "history")
+    proc = run(installed, cwd, "prices", "--help")
     assert proc.returncode == 0, proc.stderr[-800:]
-    assert json.loads(proc.stdout)["results"][0]["data"]["command"] == "prices history"
+    assert "\n[history]\n" in proc.stdout
 
     out = cwd / "five years.csv"
     proc = run(installed, cwd, "prices", "history", "AAPL", "--period", "5y", "--out", str(out), routes=chart_routes())

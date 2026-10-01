@@ -1,35 +1,34 @@
+from datetime import date, timedelta
 import re
 
 import pytest
 
-def test_scoped_schema_is_offline_and_describes_inputs(cli):
-    proc, doc = cli("schema", "prices", "history")
-    assert proc.returncode == 0
-    assert doc["status"] == "ok"
-    assert doc["results"][0]["data"]["arguments"]["--adjust"]["choices"] == ["none", "auto", "back"]
+from conftest import arguments, document, fact, groups
+
+
+def test_a_documents_arguments_carry_their_choices_and_defaults():
+    adjust = arguments("prices")["--adjust"][0]
+    assert adjust[1] == "--adjust {none,auto,back}" and adjust[2].endswith("(default auto)")
+    assert arguments("prices")["--interval"][0][2].endswith("(default 1d)")
+    assert [text.endswith("(default 5) (at least 1)") or text.endswith("(default 5) (at least 0)") for _, _, text in arguments("financials")["--periods"]] == [True, True]
+    assert "(default 20000)" in document() and "(default 14)" in document()
 
 
 def test_all_purpose_commands_are_discoverable_without_network(cli):
-    proc, doc = cli("schema")
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert set(doc["results"][0]["data"]["commands"]) == {"search", "prices", "company", "financials", "analysts", "holders", "fund", "options", "screen", "market", "calendar"}
-    proc = cli("screen", "run", "--help", raw=True)
-    assert proc.returncode == 0
-    assert '"operator":"AND"' in proc.stdout
-    assert "BTWN [field, number, number]" in proc.stdout
-    proc, doc = cli("schema", "financials")
-    assert set(doc["results"][0]["data"]["commands"]) == {"income", "balance", "cashflow", "valuation"}
+    assert set(groups()) == {"search", "prices", "company", "financials", "analysts", "holders", "fund", "options", "screen", "market", "calendar"}
+    text = document("screen", "run")
+    assert '"operator":"AND"' in text and "BTWN [field, number, number]" in text
+    assert groups()["financials"] == ["income", "balance", "cashflow", "valuation"]
 
 
-def test_global_output_budget_is_honored_and_schema_recovery_is_scoped(cli):
-    proc, doc = cli("--max-chars", "1000", "schema")
-    assert proc.returncode == 9, proc.stdout + proc.stderr
-    assert doc["results"][0]["error"]["code"] == "too_large"
-    assert "schema" in doc["results"][0]["error"]["fix"]
-    assert "--fields" not in doc["results"][0]["error"]["fix"]
-    proc, doc = cli("schema", "--filter", "options", "--max-chars", "1000")
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert list(doc["results"][0]["data"]["commands"]) == ["options"]
+@pytest.mark.parametrize("scope", [[], ["prices"], ["prices", "history"], ["screen", "run"], ["search"], ["read"]])
+def test_help_needs_no_target_ignores_the_budget_and_opens_no_store(cli, tmp_path, scope):
+    """A document is not a result: it needs none of the command's required arguments, is not cut to --max-chars, and makes no store or request."""
+    store = tmp_path / "never-created"
+    proc = cli("--max-chars", "1000", *scope, "--help", routes=[], store=store, raw=True)
+    assert proc.returncode == 0, proc.stdout[:300]
+    assert len(proc.stdout) > 1000 and proc.stdout == document(*scope)
+    assert not store.exists()
 
 
 def test_timeout_cannot_be_swallowed_by_library_fallback(cli):
@@ -98,15 +97,7 @@ def test_empty_search_is_not_proof_of_absence(cli):
     assert "does not prove" in doc["results"][0]["warnings"][0]
 
 
-def test_schema_preserves_effective_global_defaults(cli):
-    proc, doc = cli("schema")
-    assert proc.returncode == 0
-    shared = doc["results"][0]["data"]["common_arguments"]
-    assert shared["--max-chars"]["default"] == 20000
-    assert shared["--filter"]["default"] == ""
-
-
-@pytest.mark.parametrize("argv", [["schema", "--max-chars", "0"], ["prices", "quote", ""], ["search", "   "]])
+@pytest.mark.parametrize("argv", [["--max-chars", "0", "search", "apple"], ["prices", "quote", ""], ["search", "   "]])
 def test_invalid_empty_targets_and_budgets_are_rejected_before_network(cli, argv):
     proc, doc = cli(*argv)
     assert proc.returncode == 2, proc.stdout + proc.stderr
@@ -130,39 +121,54 @@ def test_explicit_empty_date_is_not_an_omitted_date(cli, argv):
     assert doc['results'][0]['error']['code'] == 'invalid'
 
 
-def test_schema_and_requests_share_omitted_option_defaults(cli):
-    from datetime import date, timedelta
-    proc, doc = cli('schema', 'calendar', 'economic')
-    schema = doc['results'][0]['data']['arguments']
-    assert doc['results'][0]['data']['default_window']['rows'] == 12
-    assert schema['--start']['default'] == date.today().isoformat()
-    assert schema['--end']['default'] == (date.today() + timedelta(days=7)).isoformat()
-    for scope, limit in [(('search',), 10), (('screen', 'run'), 25)]:
-        proc, doc = cli('schema', *scope)
-        assert doc['results'][0]['data']['default_window']['rows'] == limit
-    proc, doc = cli('schema', 'prices', 'history')
-    assert doc['results'][0]['data']['arguments']['--period']['default'] == '1mo'
+def test_the_defaults_a_command_fills_in_are_the_ones_its_request_echoes(cli):
+    """The document states the default windows; the computed defaults (a calendar's dates, a series' period) show in the request the call echoes."""
+    assert fact("calendar", "economic", "default rows") == "12"
+    assert fact("search", "", "default rows") == "10" and fact("screen", "run", "default rows") == "25"
+    economic = cli("calendar", "economic", "--limit", "101", routes=[], raw=True)
+    assert economic.returncode == 2, "the limit cap is checked before the defaults are filled and anything is asked"
+    route = {"path": "/v1/finance/visualization", "json": {"finance": {"result": [{"documents": [{"columns": [], "rows": []}]}], "error": None}}}
+    proc, doc = cli("calendar", "economic", routes=[route])
+    assert doc["request"]["start"] == date.today().isoformat()
+    assert doc["request"]["end"] == (date.today() + timedelta(days=7)).isoformat()
+    from test_budget import chart_routes
+    proc, doc = cli("prices", "history", "AAPL", routes=chart_routes())
+    assert doc["request"]["period"] == "1mo"
 
 
-def test_scoped_schema_states_its_own_defaults_and_the_document_contract(cli):
-    proc, doc = cli("schema", "holders", "major")
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    data = doc["results"][0]["data"]
-    assert "default_window" in data and "narrowing" in data
-    assert "schema (no scope)" in data["common"], "the shared envelope is described once, not on every leaf"
-    proc, doc = cli("schema", "screen", "run", "--filter", "ascending")
-    assert "--ascending" in doc["results"][0]["data"]["arguments"]
-    assert list(doc["results"][0]["data"]["arguments"]) == ["--ascending"], "a filtered schema keeps only what matched"
-
-
-def test_the_root_help_and_schema_state_every_exit_code(cli):
+def test_the_root_map_states_every_exit_code(cli):
     """Exit codes other than 0 and 2 are defined by --help; a caller that branches on 8 must be able to read what 8 is."""
     expected = {"ok": 0, "invalid": 2, "local_io": 4, "rate_limited": 5, "upstream": 6, "empty": 7, "partial": 8, "too_large": 9}
     text = cli("--help", raw=True).stdout
     listed = {name: int(code) for code, name in re.findall(r"(?m)^\s+(\d)\s+(\w+): \S", text)}
     assert listed == expected, text[-900:]
-    proc, doc = cli("schema")
-    assert doc["results"][0]["data"]["output"]["exit_codes"] == expected
+
+
+# ---- --filter narrows a listing and nothing else -------------------------------------------------------------------
+
+
+def test_filter_narrows_a_catalog_alone_and_a_field_listing(cli, tmp_path):
+    proc, doc = cli("screen", "presets", routes=[])
+    assert proc.returncode == 0, proc.stdout[:300]
+    every = [p["name"] for p in doc["results"][0]["data"]]
+    proc, doc = cli("screen", "presets", "--filter", "gainers", routes=[])
+    assert proc.returncode == 0 and [p["name"] for p in doc["results"][0]["data"]] == [n for n in every if "gainers" in n]
+    assert "filter" not in cli("screen", "presets", routes=[])[1]["request"], "an omitted --filter is not echoed"
+    from test_budget import chart_routes
+    store = tmp_path / "s"
+    proc, doc = cli("prices", "history", "AAPL", "--list-fields", "--filter", "clo", routes=chart_routes(), store=store)
+    assert proc.returncode == 0 and doc["results"][0]["data"] == ["Close"], proc.stdout[:300]
+    proc, back = cli("read", doc["results"][0]["id"], "--list-fields", "--filter", "vol", routes=[], store=store)
+    assert proc.returncode == 0 and back["results"][0]["data"] == ["Volume"], proc.stdout[:300]
+
+
+@pytest.mark.parametrize("argv", [["prices", "history", "AAPL", "--filter", "Close"], ["prices", "history", "AAPL", "--filter", ""],
+                                  ["read", "0123456789abcdef", "--filter", "x"], ["screen", "run", "--preset", "day_gainers", "--filter", "x"]])
+def test_filter_where_it_narrows_nothing_is_refused_before_anything_is_opened(cli, tmp_path, argv):
+    store = tmp_path / "never-created"
+    proc, doc = cli(*argv, routes=[], store=store)
+    assert proc.returncode == 2 and "--filter" in doc["results"][0]["error"]["message"], proc.stdout[:300]
+    assert not store.exists()
 
 
 def test_a_range_a_default_completes_is_checked_again_before_anything_is_asked(cli, tmp_path):

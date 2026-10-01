@@ -66,9 +66,6 @@ def test_sector_industry_keys_are_reusable(cli):
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert doc["results"][0]["data"]["index"] == ["semiconductors"]
     assert doc["results"][0]["data"]["data"] == [["Semiconductors", "^SOX", 0.2]]
-    proc, doc = cli("market", "sectors", "--filter", "technology")
-    assert proc.returncode == 0
-    assert doc["results"][0]["data"] == ["technology"]
 
 
 
@@ -157,13 +154,6 @@ def test_a_value_outside_a_small_closed_set_is_refused_with_the_set(cli, argv, n
     proc, doc = cli(*argv, routes=[])
     assert proc.returncode == 2, proc.stdout[:300]
     assert named in doc["results"][0]["error"]["message"]
-
-
-def test_the_sector_keys_market_sector_accepts_are_the_ones_market_sectors_lists(cli):
-    proc, listed = cli("market", "sectors")
-    assert proc.returncode == 0, proc.stdout[:300]
-    proc, doc = cli("schema", "market", "sector")
-    assert doc["results"][0]["data"]["arguments"]["key"]["choices"] == listed["results"][0]["data"]
 
 
 def test_a_calendar_carries_the_count_it_asked_for_without_a_shortfall_claim(cli):

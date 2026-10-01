@@ -38,12 +38,12 @@ def filtered(value, term):
 
 
 def presets(target, args, context, warnings):
-    return [{"name": name, "query": spec["query"].to_dict(), "sortField": spec["sortField"], "sortType": spec["sortType"]} for name, spec in yf.PREDEFINED_SCREENER_QUERIES.items() if isinstance(spec["query"], QUERY_TYPES[args.type]) and args.filter.lower() in name.lower()]
+    return [{"name": name, "query": spec["query"].to_dict(), "sortField": spec["sortField"], "sortType": spec["sortType"]} for name, spec in yf.PREDEFINED_SCREENER_QUERIES.items() if isinstance(spec["query"], QUERY_TYPES[args.type]) and (args.filter or "").lower() in name.lower()]
 
 
 def fields(target, args, context, warnings):
     catalog = query_catalog(args.type)
-    return [{"category": category, "field": field} for category, names in catalog.valid_fields.items() for field in sorted(names) if (not args.field or args.field == field) and args.filter.lower() in (category + field).lower()]
+    return [{"category": category, "field": field} for category, names in catalog.valid_fields.items() for field in sorted(names) if (not args.field or args.field == field) and (args.filter or "").lower() in (category + field).lower()]
 
 
 def values(target, args, context, warnings):
@@ -53,7 +53,7 @@ def values(target, args, context, warnings):
         if args.field not in known_fields(catalog):
             raise InputError(f"Unknown query field {args.field}; use screen fields --type {args.type}")
         found = {args.field: found.get(args.field, "No enumerated restriction; use an appropriate finite numeric value or string.")}
-    return filtered(found, args.filter)
+    return filtered(found, args.filter or "")
 
 
 def parse_query(text, kind):
@@ -79,7 +79,7 @@ def parse_query(text, kind):
         try:
             return QUERY_TYPES[kind](op, operands)
         except (ValueError, TypeError) as exc:
-            raise InputError(f"{path}.operands: {exc}; see schema screen run and screen fields/values --type {kind}") from None
+            raise InputError(f"{path}.operands: {exc}; see screen --help and screen fields/values --type {kind}") from None
 
     try:
         node = json.loads(text)

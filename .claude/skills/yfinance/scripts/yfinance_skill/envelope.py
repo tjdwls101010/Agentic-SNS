@@ -4,10 +4,11 @@ import datetime as dt
 from yfinance_skill.shape import column, is_empty
 
 STATUSES = {
-    "ok": "usable data within this leaf's own default window",
+    "ok": "usable data within this command's own default window",
     "empty": "the source answered with nothing usable; not proof the data does not exist",
     "partial": "usable data with a stated gap: a budget-narrowed window, or a mix of succeeded and failed targets",
     "error": "no usable result; error.code and error.fix say what to do",
+    "not_attempted": "a later target the CLI did not ask for after the source rate-limited an earlier one",
 }
 
 
@@ -54,6 +55,23 @@ def monotonic(data, field, ascending):
 
 # 성진: 싼 신호(상태·범위·경고)를 비싼 상세(data) 앞에 둔다 — 잘린 출력이나 앞부분만 읽는 쪽도 경고는 본다.
 ORDER = ("target", "id", "observed_at", "source_time", "stored_age_seconds", "status", "context", "conditions", "coverage", "continuation", "warnings", "data", "error")
+
+# What each envelope key means, in ORDER; a command's --help prints it.
+ENVELOPE = {
+    "target": "the symbol, query or key this result answers",
+    "id": "saved observation id; every response is saved before anything is selected from it, so a result that did not fit is still reachable with read",
+    "observed_at": "when this CLI received the response",
+    "source_time": "the time the source itself put on this data, where it supplies one; after a close it can be hours before observed_at",
+    "stored_age_seconds": "read only: how long ago the observation was saved, which says nothing about whether its values are current",
+    "status": "one of the statuses below",
+    "context": "what the source said about this response besides its rows: currency, timezone, the expiration chosen, the next source page (next_offset — a new request), and the like",
+    "conditions": "only the arguments this response carries evidence for: {requested, status: confirmed|not_applied|unverified, evidence}. A successful call is not evidence that a condition was applied",
+    "coverage": "requested = rows asked of the source, present only for commands that send it a count (company news, screen run, calendars, search except research); fewer received than requested is not by itself proof the source has no more, and where a command knows what a shortfall means, a warning says so. received = rows the response holds, start = the first row a read began at, shown = rows printed (or written with --out), kept = which end a limit kept (window for read), truncated_by = leaf_default (this command's own window, status ok), explicit_limit, or budget (your range did not fit, status partial), fields = how many of the available fields the projection kept. An option chain reports each side under its own name, and received and shown total the sides",
+    "continuation": "the read command for the next slice of the same saved observation — no new request. restart: true with shown [a, b] means the rows shown were the newest end [a, b) and the command starts over from row 0, so following it reaches every row once",
+    "warnings": "limitations that affect how this data can be used",
+    "data": "the selected value; tables are {index, columns, data, index_names, column_names}. With --out: {out, rows, columns, first, last}, where rows is this target's share of the file and columns may become a count when the summary would not fit",
+    "error": "{code, message, fix}",
+}
 
 
 def result(target, data=None, context=None, warnings=None, error=None, status=None, conditions=None, coverage=None, ident=None, observed_at=None, source_time=None, extra=None):

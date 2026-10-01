@@ -27,7 +27,6 @@ def test_profile_and_quote_query_real_info_and_select_fields(cli, group, leaf, f
 
 @pytest.mark.parametrize("leaf,module,payload,index,column,value", [
     ("recommendations", "recommendationTrend", {"trend": [{"period": "0m", "strongBuy": 7}]}, 0, "strongBuy", 7),
-    ("summary", "recommendationTrend", {"trend": [{"period": "0m", "strongBuy": 7}]}, 0, "strongBuy", 7),
     ("upgrades", "upgradeDowngradeHistory", {"history": [{"epochGradeDate": 1704067200, "firm": "Example", "toGrade": "Buy", "fromGrade": "Hold", "action": "up"}]}, "2024-01-01", "ToGrade", "Buy"),
     ("earnings-estimate", "earningsTrend", {"trend": [{"period": "0q", "earningsEstimate": {"avg": {"raw": 2.5}, "earningsCurrency": "USD"}}]}, "0q", "avg", 2.5),
     ("revenue-estimate", "earningsTrend", {"trend": [{"period": "0q", "revenueEstimate": {"avg": {"raw": 200}, "revenueCurrency": "USD"}}]}, "0q", "avg", 200),

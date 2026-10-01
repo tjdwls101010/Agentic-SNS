@@ -41,7 +41,7 @@ SKILLS = {
         'leaf': 'common',
         'yahoo': 'system',
         'store': 'store', 'export': 'store',
-        'querying': 'feature', 'schema': 'feature',
+        'querying': 'feature', 'describe': 'feature',
     }),
 }
 # Skills held to the unit rules: `edges` are the (from, to) feature imports allowed, `jobs` the repository folders whose maintenance code runs the skill. The other registered skills keep the contract above until their own migration.

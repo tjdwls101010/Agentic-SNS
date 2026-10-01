@@ -1,6 +1,6 @@
 """A command bound to the dataset it reads: what the caller can ask (cli.py) joined to what the source returns (yahoo).
 
-Selection, recovery, export and schema read one object for both, so none of them has to know which side owns a fact.
+Selection, recovery, export and describe read one object for both, so none of them has to know which side owns a fact.
 """
 
 

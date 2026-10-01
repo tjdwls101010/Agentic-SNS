@@ -3,16 +3,11 @@ import yfinance as yf
 
 from yfinance_skill.yahoo.datasets import RATE, WEIGHT, Dataset
 
-SECTORS = ["basic-materials", "communication-services", "consumer-cyclical", "consumer-defensive", "energy", "financial-services", "healthcare", "industrials", "real-estate", "technology", "utilities"]
 DOMAIN_DATA = {"overview": "overview", "top-companies": "top_companies", "research-reports": "research_reports", "industries": "industries", "top-etfs": "top_etfs", "top-funds": "top_mutual_funds", "top-performing": "top_performing_companies", "top-growth": "top_growth_companies"}
 
 
 def summary(target, args, context, warnings):
     return yf.Market(args.region, timeout=args.timeout).summary
-
-
-def sectors(target, args, context, warnings):
-    return [key for key in SECTORS if args.filter.lower() in key]
 
 
 REGION_INTERPRETATION = {
@@ -40,9 +35,6 @@ DATASETS = {
     "market.summary": Dataset(
         summary, keyed=True,
         interpretation={"shape": "A mapping keyed by exchange in which each exchange is a row, in sorted key order on every path: --fields names the records' fields, --limit and read --start count exchanges in that order, and --out writes one row per exchange under a key column."}),
-    "market.sectors": Dataset(
-        sectors,
-        interpretation={"coverage": "These are the known Yahoo sector keys, not a live enumeration of what the source will accept today."}),
     "market.sector": Dataset(
         domain(yf.Sector), units=DOMAIN_UNITS, interpretation=REGION_INTERPRETATION, gotchas=[REGION_GOTCHA]),
     "market.industry": Dataset(

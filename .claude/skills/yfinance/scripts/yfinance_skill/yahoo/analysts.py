@@ -23,9 +23,6 @@ DATASETS = {
     "analysts.recommendations": analyst(
         "get_recommendations", units=ANALYST_COUNTS,
         interpretation={"periods": "period 0m is the current month and -1m, -2m, -3m are earlier months, so rows are relative, not dated."}),
-    "analysts.summary": analyst(
-        "get_recommendations_summary", units=ANALYST_COUNTS,
-        interpretation={"periods": "period 0m is the current month; earlier months are relative offsets."}),
     "analysts.upgrades": analyst(
         "get_upgrades_downgrades",
         interpretation={"order": "Actions arrive newest first, so a limit keeps the most recent ones.",

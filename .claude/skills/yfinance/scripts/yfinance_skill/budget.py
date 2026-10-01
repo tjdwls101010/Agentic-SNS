@@ -160,16 +160,6 @@ def too_large_fix(results, item, size, max_chars, args, needed=None, shown=None)
     return head + f"Rerun with --max-chars {needed}."
 
 
-def schema_fix(size, max_chars, scoped, filtered=False):
-    head = f"Result needs {size} characters; limit is {max_chars}. "
-    if scoped:
-        return head + f"Narrow with --filter TEXT, or rerun with --max-chars {size}."
-    if filtered:
-        # 성진: 이미 --filter를 준 호출에 --filter를 권하면 방금 한 일을 다시 하라는 말이 된다.
-        return head + f"Use a narrower --filter, or scope it with schema GROUP LEAF. Or rerun with --max-chars {size}."
-    return head + "Scope it with schema GROUP or schema GROUP LEAF, or add --filter TEXT."
-
-
 def too_large_document(results, error, max_chars, request):
     """The replacement for an oversized document is itself checked against the budget.
 
@@ -211,7 +201,7 @@ def too_large_document(results, error, max_chars, request):
     return text  # below this a document cannot both parse and say what went wrong
 
 
-def emit(results, args, item, request=None, scoped=False):
+def emit(results, args, item, request=None):
     """Print one document, narrowing an oversized window before refusing and refusing before truncating silently.
 
     Returns what the printed document says happened — its status and the error codes its results carry — for the
@@ -257,7 +247,8 @@ def emit(results, args, item, request=None, scoped=False):
     clean = [strip(r, item) for r in results]
     # the page size comes from the selected values: the printed copy drops a chain side's empty name lists, after which it no longer reads as a chain
     shown = next((page_rows(r.get("data"), r["coverage"]) for r in results if isinstance(r.get("coverage"), dict) and r["coverage"].get("shown")), None)
-    fix = schema_fix(needed, max_chars, scoped, bool(getattr(args, "filter", ""))) if item is None else too_large_fix(clean, item, len(text), max_chars, args, needed, shown)
+    # a document with no command behind it (an invalid argument or a local failure) has nothing to narrow; it only needs room
+    fix = f"Result needs {needed} characters; limit is {max_chars}. Rerun with --max-chars {needed}." if item is None else too_large_fix(clean, item, len(text), max_chars, args, needed, shown)
     error = error_info("too_large", f"Result requires {needed} characters; limit is {max_chars}.", fix)
     print(too_large_document(clean, error, max_chars, request))
     return "too_large", {"too_large"}

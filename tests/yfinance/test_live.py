@@ -12,9 +12,10 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
-import sys
 
 import pytest
+
+from conftest import fact, groups, kind_block, units
 
 CLI = Path(__file__).resolve().parents[2] / ".claude/skills/yfinance/scripts/cli.py"
 
@@ -38,14 +39,8 @@ def run(arguments, store, timeout=180):
     return proc, (json.loads(proc.stdout) if proc.stdout.strip().startswith("{") else None)
 
 
-def schema(*scope):
-    """Offline, and the only catalogue a reader has; the live checks enumerate from it rather than from the source."""
-    proc = subprocess.run([sys.executable, str(CLI), "schema", *scope], capture_output=True, text=True, timeout=60,
-                          env=dict(os.environ, YF_STORE=os.environ.get("YF_STORE", "/tmp/yf-live-schema")))
-    return json.loads(proc.stdout)["results"][0]["data"]
-
-
-EVERY_LEAF = sorted((group, leaf) for group, leaves in schema()["commands"].items() for leaf in leaves)
+# The root map is offline and the only catalogue a reader has; the live checks enumerate from it rather than from the source.
+EVERY_LEAF = sorted((group, leaf) for group, leaves in groups().items() for leaf in leaves)
 
 # The column each leaf's rows are dated by. The order a source publishes in is the one fact a fixture cannot confirm,
 # so this table is the test's own expectation, checked against what the source actually sends.
@@ -58,7 +53,7 @@ DATED_BY = {("prices", "history"): "index", ("prices", "actions"): "index", ("co
 
 
 def keeps_newest(group, name):
-    return "newest" in schema(group, *([name] if name else []))["default_window"]["limit_keeps"]
+    return "a limit keeps the newest rows of a series the source publishes oldest first" in kind_block(group, name)
 
 
 @pytest.mark.live
@@ -183,7 +178,7 @@ def test_a_statement_reports_the_currency_it_is_reported_in(tmp_path):
 @pytest.mark.parametrize("interval,days", [("1m", 8), ("5m", 60), ("30m", 60)])
 def test_every_declared_interval_limit_has_a_probe_behind_it(interval, days, tmp_path):
     """Yahoo's intraday range limits are its own and can change, so `limits` states them as a refusal and its fix rather than as numbers; this probes that the source still refuses with a readable limit and that the fix names it rather than telling the reader to doubt the symbol."""
-    assert "intraday_range" in schema("prices", "history")["limits"]
+    assert any(line.startswith("limit: Yahoo limits the days one intraday request spans") for line in kind_block("prices", "history"))
     proc, doc = run(["prices", "history", "AAPL", "--period", "1y", "--interval", interval], tmp_path / "store")
     assert proc.returncode == 6, proc.stdout[:400]
     error = doc["results"][0]["error"]
@@ -264,7 +259,7 @@ def test_a_growth_threshold_in_a_query_is_on_a_different_scale_from_the_same_fie
     assert growth is None or 0.15 < growth < 0.40, (
         f"the query bound 20..30 selected {symbols[0]}, whose quote reports {growth}; the two scales are 100x apart "
         "and the leaf's query_scale contract states it")
-    assert "percentage points" in schema("screen", "run")["interpretation"]["query_scale"]
+    assert "percentage points" in fact("screen", "run", "query_scale")
 
 
 @pytest.mark.live
@@ -277,4 +272,4 @@ def test_52_week_change_changes_scale_with_the_instrument_type(tmp_path):
     proc, stock = run(["prices", "quote", "AAPL", "--fields", "52WeekChange,fiftyTwoWeekChangePercent"], tmp_path / "store")
     s = stock["results"][0]["data"]
     assert abs(s["52WeekChange"] * 100 - s["fiftyTwoWeekChangePercent"]) < 0.01
-    assert schema("prices", "quote")["units"]["52WeekChange"]["scale_by_quote_type"] == {"INDEX": "percent"}
+    assert units("prices", "quote")["52WeekChange"]["scale_by_quote_type"] == {"INDEX": "percent"}
