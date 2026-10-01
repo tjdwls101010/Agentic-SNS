@@ -182,10 +182,8 @@ def test_a_statement_reports_the_currency_it_is_reported_in(tmp_path):
 @pytest.mark.live
 @pytest.mark.parametrize("interval,days", [("1m", 8), ("5m", 60), ("30m", 60)])
 def test_every_declared_interval_limit_has_a_probe_behind_it(interval, days, tmp_path):
-    """Each value in `limits` comes from the source's own refusal, and the fix names the argument to change rather
-    than telling the reader to doubt the symbol."""
-    declared = schema("prices", "history")["limits"]
-    assert any(interval in key for key in declared), f"{interval} is probed here but not declared"
+    """Yahoo's intraday range limits are its own and can change, so `limits` states them as a refusal and its fix rather than as numbers; this probes that the source still refuses with a readable limit and that the fix names it rather than telling the reader to doubt the symbol."""
+    assert "intraday_range" in schema("prices", "history")["limits"]
     proc, doc = run(["prices", "history", "AAPL", "--period", "1y", "--interval", interval], tmp_path / "store")
     assert proc.returncode == 6, proc.stdout[:400]
     error = doc["results"][0]["error"]
