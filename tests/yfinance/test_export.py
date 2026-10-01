@@ -172,7 +172,7 @@ def test_a_mapping_of_records_honours_an_explicit_limit(cli, tmp_path):
     routes = [{"path": "/v6/finance/quote/marketSummary", "json": summary}, {"path": "/v6/finance/markettime", "json": status}]
     proc, doc = cli("market", "summary", "--limit", "1", "--out", str(tmp_path / "m.csv"), routes=routes)
     assert proc.returncode == 0, proc.stdout[:400]
-    assert [r["key"] for r in rows(tmp_path / "m.csv")] == ["SNP"]
+    assert [r["key"] for r in rows(tmp_path / "m.csv")] == ["DJI"], "exchanges are rows in sorted key order, as the store saves them"
     assert doc["results"][0]["coverage"]["received"] == 2 and doc["results"][0]["coverage"]["shown"] == 1
 
 

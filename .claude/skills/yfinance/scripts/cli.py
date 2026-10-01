@@ -372,7 +372,7 @@ COMMANDS = {command.path: command for command in [
             narrow=["--fields", "--limit", "--query", "--preset", "--offset"], rows=25, fields=SCREEN_FIELDS),
 
     Command("market", "summary", "Benchmark index quotes for a market region.", "market.summary",
-            args=[Arg("--region", choices=MARKET_REGIONS, default="US", help="Yahoo market region.")], narrow=["--fields", "--region"]),
+            args=[Arg("--region", choices=MARKET_REGIONS, default="US", help="Yahoo market region.")], narrow=["--fields", "--limit", "--region"]),
     Command("market", "sectors", "Sector keys accepted by market sector.", "market.sectors", narrow=["--filter"]),
     Command("market", "sector", "One sector's overview, industries, top companies, funds or research.", "market.sector",
             args=domain_args(Arg("key", choices=SECTOR_KEYS, help="Sector key."), ["industries", "top-etfs", "top-funds"]),

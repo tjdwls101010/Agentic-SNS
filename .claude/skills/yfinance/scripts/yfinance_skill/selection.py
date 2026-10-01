@@ -3,7 +3,7 @@
 It runs on the encoded value, so the first call and every later `read` of the same observation select through this one
 function and cannot disagree about what a row or a field was.
 """
-from yfinance_skill.shape import is_sided, is_table, row_count
+from yfinance_skill.shape import is_keyed, is_sided, is_table, row_count
 from yfinance_skill.envelope import InputError
 
 
@@ -107,6 +107,8 @@ def select(data, args, item, coverage=None, keep=None, past_end=False):
     projection or the direction. `past_end` lets a --start beyond the last row return no rows instead of refusing, for one side of a chain whose other side goes on.
     """
     coverage = {} if coverage is None else coverage
+    if is_keyed(data):
+        return select_keyed(data, args, item, coverage, keep, past_end)
     if getattr(args, "list_fields", False):
         term = (getattr(args, "filter", "") or "").lower()
         if is_sided(data):  # a chain's fields are its sides' columns, which --fields selects on every side
@@ -150,6 +152,17 @@ def select(data, args, item, coverage=None, keep=None, past_end=False):
     if shown is not None:
         coverage["shown"] = shown
     return data, coverage
+
+
+def select_keyed(data, args, item, coverage, keep, past_end):
+    """Records keyed by name are rows in sorted key order, the order the store saves them in, so the first call, a read and --out name the same rows; --fields reaches the records' fields and the result keeps its keys."""
+    keys = sorted(data)
+    rows, coverage = select([data[k] for k in keys], args, item, coverage, keep, past_end)
+    if getattr(args, "list_fields", False):
+        return rows, coverage
+    keys = keys[coverage.get("start", 0):]
+    keys = keys[len(keys) - len(rows):] if coverage.get("kept") == "newest" else keys[:len(rows)]
+    return dict(zip(keys, rows)), coverage
 
 
 def select_sides(encoded, args, item, coverage, keep=None):

@@ -236,11 +236,11 @@ def test_an_option_chain_reads_back_under_the_same_selection_contract(cli, tmp_p
 
 def test_a_leaf_that_cannot_be_narrowed_does_not_claim_it_can(cli):
     """fund description returns one string: neither --fields nor --limit reduces it, so declaring either would put an
-    argument in the recovery that returns the same size again."""
+    argument in the recovery that returns the same size again. market summary's exchanges are rows, so --limit does narrow it."""
     proc, doc = cli("schema", "fund", "description")
     assert "narrowing" not in doc["results"][0]["data"]
     proc, doc = cli("schema", "market", "summary")
-    assert "--limit" not in doc["results"][0]["data"]["narrowing"]
+    assert "--limit" in doc["results"][0]["data"]["narrowing"]
 
 
 def earnings_page_routes(count=25):
