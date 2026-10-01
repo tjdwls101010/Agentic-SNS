@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import yfinance as yf
 
 from yfinance_skill.envelope import condition, within_dates
-from yfinance_skill.yahoo.datasets import CURRENCY, PER_SHARE, PERCENT, Dataset, asked
+from yfinance_skill.yahoo.datasets import CURRENCY, PER_SHARE, PERCENT, Dataset
 
 CALENDARS = {"earnings": "get_earnings_calendar", "economic": "get_economic_events_calendar", "ipo": "get_ipo_info_calendar", "splits": "get_splits_calendar"}
 DATE_FIELDS = {"earnings": "Event Start Date", "economic": "Event Time", "ipo": "Date", "splits": "Payable On"}
@@ -21,7 +21,7 @@ def dates_applied(encoded, args, context):
     return {"dates": found} if found else {}
 
 
-def market_wide(args, context, warnings):
+def market_wide(args, context, warnings, rows):
     """--start and --end are inclusive here.
 
     Yahoo's own range excludes the end date, so a caller asking for one day received nothing while the CLI declared
@@ -30,7 +30,7 @@ def market_wide(args, context, warnings):
     """
     native_end = (date.fromisoformat(args.end) + timedelta(days=1)).isoformat()
     native = yf.Calendars(start=args.start, end=native_end)
-    requested = asked(args, DATASETS["calendar." + args.leaf]) or 10
+    requested = rows
     context["requested"] = requested
     kwargs = {"limit": requested, "offset": args.offset}
     if args.leaf == "earnings":
@@ -45,8 +45,8 @@ def market_wide(args, context, warnings):
     return data
 
 
-def one_company(args, context):
-    requested = asked(args, DATASETS["calendar.earnings"]) or 10
+def one_company(args, context, rows):
+    requested = rows
     batch = 25 if requested <= 25 else 50 if requested <= 50 else 100
     context.update(native_batch_size=batch, scope="single_symbol")
     context["requested"] = requested
@@ -59,19 +59,19 @@ def one_company(args, context):
     return data
 
 
-def earnings(target, args, context, warnings):
-    return one_company(args, context) if args.symbol else market_wide(args, context, warnings)
+def earnings(target, args, context, warnings, rows):
+    return one_company(args, context, rows) if args.symbol else market_wide(args, context, warnings, rows)
 
 
-def events(target, args, context, warnings):
-    return market_wide(args, context, warnings)
+def events(target, args, context, warnings, rows):
+    return market_wide(args, context, warnings, rows)
 
 
 ZERO_LOSS = "yfinance converts zero to null in the numeric columns, so a null actual or expected can be a real zero."
 
 
 def calendar(fetch, **spec):
-    return Dataset(fetch, rows=12, conditions=dates_applied, **spec)
+    return Dataset(fetch, counted=True, conditions=dates_applied, **spec)
 
 
 DATASETS = {

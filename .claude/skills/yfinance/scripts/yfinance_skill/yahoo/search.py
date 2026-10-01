@@ -1,25 +1,24 @@
 """Instrument discovery by name, symbol or keyword."""
 import yfinance as yf
 
-from yfinance_skill.yahoo.datasets import Dataset, asked
+from yfinance_skill.yahoo.datasets import Dataset
 
 LOOKUP = {"all": "get_all", "stock": "get_stock", "mutualfund": "get_mutualfund", "etf": "get_etf", "index": "get_index", "future": "get_future", "currency": "get_currency", "cryptocurrency": "get_cryptocurrency"}
 
 
-def search(target, args, context, warnings):
+def search(target, args, context, warnings, rows):
     context["coverage_scope"] = "first_page_only"
-    requested = asked(args, DATASETS["search"]) or 10
     if args.dataset != "research":  # research takes no count, so there is nothing a short answer falls short of
-        context["requested"] = requested
+        context["requested"] = rows
     if args.dataset == "quotes":
-        return getattr(yf.Lookup(args.query, timeout=args.timeout), LOOKUP[args.type])(count=requested)
-    found = yf.Search(args.query, max_results=0, news_count=requested if args.dataset == "news" else 0, lists_count=requested if args.dataset == "lists" else 0, include_research=args.dataset == "research", include_nav_links=False, timeout=args.timeout)
+        return getattr(yf.Lookup(args.query, timeout=args.timeout), LOOKUP[args.type])(count=rows)
+    found = yf.Search(args.query, max_results=0, news_count=rows if args.dataset == "news" else 0, lists_count=rows if args.dataset == "lists" else 0, include_research=args.dataset == "research", include_nav_links=False, timeout=args.timeout)
     return getattr(found, args.dataset)
 
 
 DATASETS = {
     "search": Dataset(
-        search, rows=10,
+        search, counted=True,
         shortfall=("{received} of the {requested} asked for arrived on the first page of search results, the only page read; "
                    "a short list does not show that nothing else matches."),
         interpretation={"identity": "Candidates are search matches, not a confirmed identity: an equity, its depositary receipt and a similarly named fund appear together.",

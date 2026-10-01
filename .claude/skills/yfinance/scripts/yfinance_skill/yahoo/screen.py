@@ -6,7 +6,7 @@ import math
 import yfinance as yf
 
 from yfinance_skill.envelope import InputError, condition, monotonic
-from yfinance_skill.yahoo.datasets import COUNT, CURRENCY, MULTIPLE, PERCENT, Dataset, asked
+from yfinance_skill.yahoo.datasets import COUNT, CURRENCY, MULTIPLE, PERCENT, Dataset
 
 QUERY_TYPES = {"equity": yf.EquityQuery, "fund": yf.FundQuery, "etf": yf.ETFQuery}
 
@@ -107,7 +107,7 @@ def screen_conditions(encoded, args, context):
         applied = upstream.get("start") == args.offset
         found["offset"] = condition(args.offset, "confirmed" if applied else "not_applied", {"upstream_start": upstream.get("start")})
     if "count" in upstream:
-        size = asked(args, DATASETS["screen.run"])
+        size = context["requested"]
         found["limit"] = condition(size, "confirmed" if upstream.get("count") <= size else "not_applied", {"upstream_count": upstream.get("count"), "total": upstream.get("total")})
     if args.sort:
         judged = monotonic(encoded, args.sort, bool(args.ascending))
@@ -115,16 +115,12 @@ def screen_conditions(encoded, args, context):
     return found
 
 
-SCREEN_FIELDS = ("symbol", "shortName", "regularMarketPrice", "regularMarketChangePercent", "regularMarketVolume",
-                 "marketCap", "trailingPE", "fiftyTwoWeekChangePercent", "averageAnalystRating", "fullExchangeName")
-
-
-def run(target, args, context, warnings):
+def run(target, args, context, warnings, rows):
     catalog = query_catalog(args.type)
     query = args.preset or parse_query(args.query, args.type)
     if args.sort and args.sort not in known_fields(catalog) and args.sort != "ticker":
         raise InputError("Unknown --sort field; use screen fields --filter TEXT")
-    size = asked(args, DATASETS["screen.run"]) or 10
+    size = rows
     context["requested"] = size
     response = yf.screen(query, offset=args.offset, size=size, count=size, sortField=args.sort, sortAsc=args.ascending)
     if not isinstance(response, dict):
@@ -147,7 +143,7 @@ DATASETS = {
     "screen.fields": Dataset(fields),
     "screen.values": Dataset(values),
     "screen.run": Dataset(
-        run, rows=25, fields=SCREEN_FIELDS, conditions=screen_conditions, prepare=preset_defaults,
+        run, counted=True, conditions=screen_conditions, prepare=preset_defaults,
         units={"regularMarketChangePercent": PERCENT, "fiftyTwoWeekChangePercent": PERCENT, "marketCap": CURRENCY,
                "trailingPE": MULTIPLE, "regularMarketVolume": COUNT},
         interpretation={"query_scale": "A growth threshold in the query is in percentage points, while the same measurement in a quote is a ratio: BTWN quarterlyrevenuegrowth.quarterly 20 30 selects companies whose quote revenueGrowth is 0.2-0.3, and 0.20 0.30 selects companies growing a fifth of a percent. Neither call fails, so an output ratio reused as a bound screens for something a hundredfold smaller and still returns a plausible list.",

@@ -34,7 +34,7 @@ DATASETS = {
         expirations, ticker=True,
         interpretation={"use": "Pass one of these to options chain --date; an omitted --date selects the nearest."}),
     "options.chain": Dataset(
-        chain, ticker=True, rows=20, conditions=date_applied,
+        chain, ticker=True, conditions=date_applied,
         units={"strike": CURRENCY, "lastPrice": CURRENCY, "bid": CURRENCY, "ask": CURRENCY, "change": CURRENCY,
                "percentChange": PERCENT, "impliedVolatility": RATE, "volume": COUNT, "openInterest": COUNT},
         interpretation={"sides": "calls and puts are selected separately and each is limited on its own, so a limit of 20 with --side both returns 20 of each.",

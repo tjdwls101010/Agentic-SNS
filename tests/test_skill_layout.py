@@ -45,7 +45,9 @@ SKILLS = {
     }),
 }
 # Skills held to the unit rules: `edges` are the (from, to) feature imports allowed, `jobs` the repository folders whose maintenance code runs the skill. The other registered skills keep the contract above until their own migration.
-UNITS = {}
+UNITS = {
+    'yfinance': {'edges': set(), 'jobs': []},
+}
 # What each kind of top-level child may import; features also import themselves, and another feature only along an edge UNITS names.
 ALLOWED = {
     'common': {'common'},

@@ -113,14 +113,15 @@ class Command:
 
     `defaults` fills the namespace (execution, schema and the echoed request all read it), `check` only reads it, and
     `forbidden` names the narrowings this call's own mode rejects so a recovery never recommends them. `narrow` is
-    every argument a recovery may name, and `coarser` the new request a budget-cut series can step up to.
+    every argument a recovery may name. `rows` and `fields` are the default window, what one screen shows when --limit and --fields are omitted; for a command whose source is sent a count, `rows` is also that count.
     """
 
     def __init__(self, group, name, purpose, dataset, *, args=(), defaults=None, check=None, narrow=(), forbidden=None,
-                 coarser=None, end_exclusive=False, epilog=None, exportable=True):
+                 rows=None, fields=(), end_exclusive=False, epilog=None, exportable=True):
         self.group, self.name, self.purpose, self.dataset = group, name, purpose, dataset
         self.args, self.defaults, self.check, self.narrow = tuple(args), defaults, check, tuple(narrow)
-        self.forbidden, self.coarser, self.end_exclusive = forbidden, coarser, end_exclusive
+        self.forbidden, self.end_exclusive = forbidden, end_exclusive
+        self.rows, self.fields = rows, tuple(fields)
         self.epilog, self.exportable = epilog, exportable
 
     @property
@@ -135,7 +136,22 @@ class Command:
         return {arg.dest: arg.minimum for arg in self.args if isinstance(arg, Arg) and arg.minimum is not None}
 
 
-# ---- argument bundles and closed choices ----------------------------------------------------------------------------
+# ---- argument bundles, closed choices and default projections -------------------------------------------------------
+
+QUOTE_FIELDS = ("symbol", "shortName", "quoteType", "currency", "financialCurrency", "marketState", "exchange", "fullExchangeName", "exchangeTimezoneName",
+                "regularMarketPrice", "regularMarketChange", "regularMarketChangePercent", "regularMarketTime", "regularMarketOpen", "regularMarketDayHigh",
+                "regularMarketDayLow", "regularMarketPreviousClose", "regularMarketVolume", "bid", "ask", "bidSize", "askSize",
+                "postMarketPrice", "postMarketChangePercent", "postMarketTime", "fiftyTwoWeekHigh", "fiftyTwoWeekLow", "fiftyTwoWeekChangePercent",
+                "fiftyDayAverage", "twoHundredDayAverage", "averageDailyVolume10Day", "averageDailyVolume3Month", "marketCap", "sharesOutstanding",
+                "trailingPE", "forwardPE", "epsTrailingTwelveMonths", "dividendYield", "dividendRate", "exDividendDate", "beta")
+PROFILE_FIELDS = ("symbol", "longName", "quoteType", "currency", "financialCurrency", "sector", "sectorKey", "industry", "industryKey",
+                  "country", "state", "city", "address1", "zip", "phone", "website", "irWebsite", "fullTimeEmployees", "longBusinessSummary",
+                  "auditRisk", "boardRisk", "compensationRisk", "shareHolderRightsRisk", "overallRisk", "governanceEpochDate",
+                  "heldPercentInsiders", "heldPercentInstitutions", "lastFiscalYearEnd", "mostRecentQuarter", "lastSplitDate", "lastSplitFactor")
+NEWS_FIELDS = ("content.title", "content.pubDate", "content.provider.displayName", "content.canonicalUrl.url", "content.summary")
+FILING_FIELDS = ("date", "type", "title", "edgarUrl")
+SCREEN_FIELDS = ("symbol", "shortName", "regularMarketPrice", "regularMarketChangePercent", "regularMarketVolume",
+                 "marketCap", "trailingPE", "fiftyTwoWeekChangePercent", "averageAnalystRating", "fullExchangeName")
 
 SYMBOLS = Arg("symbols", nargs="+", help="One or more Yahoo symbols; each is queried separately.")
 FROM = Arg("--from", dest="from_id", help="Read this saved observation instead of making a new request. prices quote and company profile select different sides of the same assembled response, so the second one costs nothing.")
@@ -200,21 +216,6 @@ def period_unless_dates(args):
         args.period = "1mo"
 
 
-BAR_NAMES = {"1d": "daily", "5d": "five-day", "1wk": "weekly", "1mo": "monthly", "3mo": "quarterly"}
-COARSER = {"1d": "1wk", "5d": "1wk", "1wk": "1mo", "1mo": "3mo"}
-
-
-def coarser_bars(args):
-    """The next interval up, for a window too long to read row by row; intraday bars step up to daily."""
-    if getattr(args, "interval", None) is None:
-        return None  # read has no interval: a coarser view is a new request the original command makes
-    step = COARSER.get(args.interval) or (None if args.interval == "3mo" else "1d")
-    if step is None:
-        return None
-    was = BAR_NAMES.get(args.interval, args.interval)
-    return f"--interval {step}", f"{BAR_NAMES[step]} bars, not a slice of these {was} ones"
-
-
 def search_check(args):
     if args.dataset != "quotes" and args.type != "all":
         raise InputError("--type only filters instrument quotes; use --dataset quotes")
@@ -272,7 +273,7 @@ def symbol_command(group, name, purpose, narrow, **spec):
 
 def calendar_command(name, purpose, args=RANGE, **spec):
     return Command("calendar", name, purpose, f"calendar.{name}", args=args, defaults=week_from_today, check=calendar_check,
-                   narrow=["--fields", "--limit", "--start/--end", "--offset"], **spec)
+                   narrow=["--fields", "--limit", "--start/--end", "--offset"], rows=12, **spec)
 
 
 def statement_command(name, what):
@@ -289,26 +290,26 @@ COMMANDS = {command.path: command for command in [
             args=[Arg("query", help="Company name, symbol fragment or keyword."),
                   Arg("--type", choices=SEARCH_TYPES, default="all", help="Instrument type filter; applies to --dataset quotes only."),
                   Arg("--dataset", choices=["quotes", "news", "lists", "research"], default="quotes", help="quotes: instrument candidates; news: articles; lists: Yahoo curated lists; research: research reports.")],
-            narrow=["--limit", "--type", "--dataset"], check=search_check,
+            narrow=["--limit", "--type", "--dataset"], check=search_check, rows=10,
             forbidden=lambda args: ["--type"] if getattr(args, "dataset", "quotes") != "quotes" else []),
 
     Command("prices", "quote", "Current price, trading session and market-capitalisation fields for one instrument.", "prices.quote",
-            args=[SYMBOLS, FROM], narrow=["--fields"], exportable=False),
+            args=[SYMBOLS, FROM], narrow=["--fields"], fields=QUOTE_FIELDS, exportable=False),
     Command("prices", "history", "OHLCV bars, dividends and splits over a date range or relative period.", "prices.history",
-            args=BAR_ARGS, end_exclusive=True, defaults=period_unless_dates, coarser=coarser_bars,
+            args=BAR_ARGS, end_exclusive=True, defaults=period_unless_dates,
             narrow=["--fields", "--limit", "--period", "--start/--end", "--interval"]),
     Command("prices", "actions", "Dividends, splits and capital gains within a date range or relative period.", "prices.actions",
             args=BAR_ARGS, end_exclusive=True, defaults=period_unless_dates, narrow=["--limit", "--period", "--start/--end"]),
 
     Command("company", "profile", "Business description, sector, governance risk and headquarters for one company.", "company.profile",
-            args=[SYMBOLS, FROM], narrow=["--fields"], exportable=False),
+            args=[SYMBOLS, FROM], narrow=["--fields"], fields=PROFILE_FIELDS, exportable=False),
     Command("company", "shares", "Shares outstanding as Yahoo observed it over a date range.", "company.shares",
             args=[SYMBOLS, *dates("ISO date YYYY-MM-DD; default is about 18 months before --end.", "ISO date YYYY-MM-DD; default is now.")],
             narrow=["--limit", "--start/--end"]),
     Command("company", "news", "Recent article and press-release entries referencing this company.", "company.news",
             args=[SYMBOLS, Arg("--tab", choices=["news", "all", "press releases"], default="news", help="Article source: news articles, press releases, or all.")],
-            narrow=["--fields", "--limit", "--tab"]),
-    symbol_command("company", "filings", "SEC filing entries with their Yahoo EDGAR links.", ["--fields", "--limit"]),
+            narrow=["--fields", "--limit", "--tab"], rows=10, fields=NEWS_FIELDS),
+    symbol_command("company", "filings", "SEC filing entries with their Yahoo EDGAR links.", ["--fields", "--limit"], rows=20, fields=FILING_FIELDS),
 
     statement_command("income", "Income statement"),
     statement_command("balance", "Balance sheet"),
@@ -321,7 +322,7 @@ COMMANDS = {command.path: command for command in [
     symbol_command("analysts", "targets", "Current analyst price target range.", ["--fields"], exportable=False),
     symbol_command("analysts", "recommendations", "Analyst recommendation counts by month.", ["--fields", "--limit"]),
     symbol_command("analysts", "summary", "Analyst recommendation summary by month.", ["--fields", "--limit"]),
-    symbol_command("analysts", "upgrades", "Rating upgrade and downgrade actions with their firms and dates.", ["--fields", "--limit"]),
+    symbol_command("analysts", "upgrades", "Rating upgrade and downgrade actions with their firms and dates.", ["--fields", "--limit"], rows=20),
     symbol_command("analysts", "earnings-estimate", "EPS estimates for the current and next quarter and year.", ["--fields"]),
     symbol_command("analysts", "revenue-estimate", "Revenue estimates for the current and next quarter and year.", ["--fields"]),
     symbol_command("analysts", "history", "Reported EPS against the estimate for past quarters.", ["--fields", "--limit"]),
@@ -330,15 +331,15 @@ COMMANDS = {command.path: command for command in [
     symbol_command("analysts", "growth", "Expected growth for this instrument against its index.", ["--fields"]),
 
     symbol_command("holders", "major", "Insider and institutional ownership percentages for the whole company.", ["--limit"]),
-    symbol_command("holders", "institutional", "Institutional holders with their reported share counts.", ["--fields", "--limit"]),
-    symbol_command("holders", "fund", "Mutual fund holders with their reported share counts.", ["--fields", "--limit"]),
+    symbol_command("holders", "institutional", "Institutional holders with their reported share counts.", ["--fields", "--limit"], rows=20),
+    symbol_command("holders", "fund", "Mutual fund holders with their reported share counts.", ["--fields", "--limit"], rows=20),
     symbol_command("holders", "insider-purchases", "Insider purchase and sale totals over the last six months.", ["--fields"]),
-    symbol_command("holders", "insider-transactions", "Individual insider transactions with dates, roles and values.", ["--fields", "--limit"]),
-    symbol_command("holders", "insider-roster", "Insiders and the shares they hold directly.", ["--fields", "--limit"]),
+    symbol_command("holders", "insider-transactions", "Individual insider transactions with dates, roles and values.", ["--fields", "--limit"], rows=20),
+    symbol_command("holders", "insider-roster", "Insiders and the shares they hold directly.", ["--fields", "--limit"], rows=20),
 
     symbol_command("fund", "overview", "Fund family, category and legal type.", ["--fields"], exportable=False),
     symbol_command("fund", "description", "The fund's own investment objective text.", (), exportable=False),
-    symbol_command("fund", "holdings", "Largest reported holdings and their weights.", ["--fields", "--limit"]),
+    symbol_command("fund", "holdings", "Largest reported holdings and their weights.", ["--fields", "--limit"], rows=20),
     symbol_command("fund", "asset-classes", "Allocation across cash, stock, bond, preferred and convertible.", ["--fields"], exportable=False),
     symbol_command("fund", "sector-weights", "Portfolio weight by sector.", ["--fields"], exportable=False),
     symbol_command("fund", "equity", "Valuation multiples and growth for the fund's equity holdings.", ["--fields"]),
@@ -348,7 +349,7 @@ COMMANDS = {command.path: command for command in [
     Command("options", "chain", "Option contracts for one expiration, by side.", "options.chain",
             args=[SYMBOLS, Arg("--date", help="Expiration YYYY-MM-DD; omitted selects the nearest available expiry."),
                   Arg("--side", choices=["calls", "puts", "both"], default="both", help="Contract side to return; each side is limited separately.")],
-            narrow=["--fields", "--limit", "--side", "--date"]),
+            narrow=["--fields", "--limit", "--side", "--date"], rows=20),
 
     Command("screen", "presets", "Named screeners with the query each one actually runs.", "screen.presets",
             args=[TYPE], check=screen_check, narrow=["--filter", "--type"]),
@@ -363,17 +364,17 @@ COMMANDS = {command.path: command for command in [
                   Arg("--sort", help="Sort field from screen fields; custom query default ticker, preset uses its defined sort."),
                   Arg("--ascending", action=argparse.BooleanOptionalAction, default=None, help="Sort direction: --ascending or --no-ascending; omitted means the preset's own direction, or descending for a custom query.")],
             epilog=QUERY_HELP, check=screen_check, defaults=custom_sort,
-            narrow=["--fields", "--limit", "--query", "--preset", "--offset"]),
+            narrow=["--fields", "--limit", "--query", "--preset", "--offset"], rows=25, fields=SCREEN_FIELDS),
 
     Command("market", "summary", "Benchmark index quotes for a market region.", "market.summary",
             args=[Arg("--region", choices=MARKET_REGIONS, default="US", help="Yahoo market region.")], narrow=["--fields", "--region"]),
     Command("market", "sectors", "Sector keys accepted by market sector.", "market.sectors", narrow=["--filter"]),
     Command("market", "sector", "One sector's overview, industries, top companies, funds or research.", "market.sector",
             args=domain_args(Arg("key", choices=SECTOR_KEYS, help="Sector key."), ["industries", "top-etfs", "top-funds"]),
-            narrow=["--fields", "--limit", "--dataset"]),
+            narrow=["--fields", "--limit", "--dataset"], rows=20),
     Command("market", "industry", "One industry's overview, companies or research.", "market.industry",
             args=domain_args(Arg("key", help="Industry key from market sector KEY --dataset industries."), ["top-performing", "top-growth"]),
-            narrow=["--fields", "--limit", "--dataset"]),
+            narrow=["--fields", "--limit", "--dataset"], rows=20),
 
     calendar_command("earnings", "Earnings events, market-wide over a date range or one company's history.",
                      args=[*RANGE, Arg("symbol", nargs="?", help="Optional single symbol; omit for market-wide US earnings."),

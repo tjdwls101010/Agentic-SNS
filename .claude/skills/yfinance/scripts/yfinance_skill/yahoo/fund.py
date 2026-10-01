@@ -16,7 +16,7 @@ DATASETS = {
         "description", sliceable=False,
         interpretation={"shape": "One text value. It cannot be narrowed by fields or rows; raise --max-chars, or read the saved id again with a larger --max-chars, which costs no new request."}),
     "fund.holdings": fund(
-        "top_holdings", rows=20, units={"Holding Percent": WEIGHT},
+        "top_holdings", units={"Holding Percent": WEIGHT},
         interpretation={"coverage": "These are the top reported holdings only, so the weights do not sum to one and the rest of the portfolio is not described here."}),
     "fund.asset-classes": fund(
         "asset_classes",

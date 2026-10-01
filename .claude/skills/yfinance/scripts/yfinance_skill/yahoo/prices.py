@@ -6,13 +6,6 @@ from yfinance_skill.yahoo.datasets import Dataset
 from yfinance_skill.yahoo.info import CURRENCY_SPLIT, INFO_UNITS, QUOTE_TIME, info, info_time
 from yfinance_skill.yahoo.refusals import is_rate_limited
 
-QUOTE_FIELDS = ("symbol", "shortName", "quoteType", "currency", "financialCurrency", "marketState", "exchange", "fullExchangeName", "exchangeTimezoneName",
-                "regularMarketPrice", "regularMarketChange", "regularMarketChangePercent", "regularMarketTime", "regularMarketOpen", "regularMarketDayHigh",
-                "regularMarketDayLow", "regularMarketPreviousClose", "regularMarketVolume", "bid", "ask", "bidSize", "askSize",
-                "postMarketPrice", "postMarketChangePercent", "postMarketTime", "fiftyTwoWeekHigh", "fiftyTwoWeekLow", "fiftyTwoWeekChangePercent",
-                "fiftyDayAverage", "twoHundredDayAverage", "averageDailyVolume10Day", "averageDailyVolume3Month", "marketCap", "sharesOutstanding",
-                "trailingPE", "forwardPE", "epsTrailingTwelveMonths", "dividendYield", "dividendRate", "exDividendDate", "beta")
-
 
 def dates_applied(encoded, args, context):
     """Judge --start/--end from the rows themselves rather than from the arguments that were sent."""
@@ -56,6 +49,18 @@ def history(ticker, args, context, warnings):
     return bars(ticker, args, context, warnings)
 
 
+BAR_NAMES = {"1d": "daily", "5d": "five-day", "1wk": "weekly", "1mo": "monthly", "3mo": "quarterly"}
+COARSER = {"1d": "1wk", "5d": "1wk", "1wk": "1mo", "1mo": "3mo"}
+
+
+def coarser(interval):
+    """The next interval up, for a window too long to read row by row; intraday bars step up to daily."""
+    step = COARSER.get(interval) or (None if interval == "3mo" else "1d")
+    if step is None:
+        return None
+    return step, BAR_NAMES[step], BAR_NAMES.get(interval, interval)
+
+
 def actions(ticker, args, context, warnings):
     frame = bars(ticker, args, context, warnings)
     if not frame.empty:
@@ -66,13 +71,13 @@ def actions(ticker, args, context, warnings):
 
 DATASETS = {
     "prices.quote": Dataset(
-        info, ticker=True, shares_info=True, source_time=info_time, fields=QUOTE_FIELDS, units=INFO_UNITS,
+        info, ticker=True, shares_info=True, source_time=info_time, units=INFO_UNITS,
         interpretation={"sibling": "company profile selects the business side of this same assembled response; --from reuses the observation rather than requesting it again.",
                         "timing": QUOTE_TIME, "currency": CURRENCY_SPLIT,
                         "assembly": "yfinance assembles this response from several endpoints, so its fields do not all share one timestamp; where a field has its own time field, that one governs."},
         gotchas=["An instrument that did not trade in the current session still returns regularMarket fields from the last session it did."]),
     "prices.history": Dataset(
-        history, ticker=True, conditions=dates_applied, precise=PRICE_COLUMNS, recent=True,
+        history, ticker=True, conditions=dates_applied, precise=PRICE_COLUMNS, recent=True, coarser=coarser,
         interpretation={"dates": "start is inclusive and end is exclusive. A naive date is read in the exchange's timezone.",
                         "adjustment": "--adjust decides what Close means; adding dividends to an already adjusted return counts them twice.",
                         "repair": "--repair is a transformation with its own limits, not proof that a value equals the original trade.",
