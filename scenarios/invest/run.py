@@ -4,7 +4,7 @@ Conditions: `invest` (this repository's skill) and `L` (the baseline: one SKILL.
 
 Phases: `tune` runs freely; `eval` refuses to run while the skill, the bank or the judge rules have uncommitted changes, records their committed hashes and refuses to mix results made under different ones; `holdout` runs only held-out scenarios. `--pairs N` with `--cond invest,L` runs N pairs, alternating which condition goes first per scenario, and saves Yahoo's current session before and after each pair so a pair can be counted as run in the US regular session.
 
-Writes <out>/meta.json, <out>/results.jsonl and <out>/runs/<id>-<cond>-p<pair>-<n>/{prompt.txt, stream.jsonl, calls.jsonl, answer.md, summary.json, results/, expected.json}. cli_runs counts real cli.py processes (instrument/sitecustomize.py, on the child's PYTHONPATH); help and receipt characters are read from the tool outputs. Judging is separate: scenarios/invest/judge.md and judge-schema.json.
+Writes <out>/meta.json, <out>/results.jsonl and <out>/runs/<id>-<cond>-p<pair>-<n>/{prompt.txt, stream.jsonl, calls.jsonl, answer.md, summary.json, results/, expected.json}. cli_runs counts runs of the copied CLI itself (a line count_runs puts into the copy logs each one, set off by INVEST_CALL_LOG); help and receipt characters are read from the tool outputs. Judging is separate: scenarios/invest/judge.md and judge-schema.json.
 """
 import argparse
 import concurrent.futures
@@ -29,12 +29,28 @@ CLI_RUN = re.compile(r"\buv run\b[^\n;|&]*cli\.py")
 KINDED = {"company", "financials", "analysts", "holders", "fund", "options", "screen", "market", "calendar"}  # commands whose second word is a kind
 
 
+COUNTER = """
+if __import__("os").environ.get("INVEST_CALL_LOG"):  # scenarios/invest/run.py: one line per run of this copy, whatever started it
+    with open(__import__("os").environ["INVEST_CALL_LOG"], "a", encoding="utf-8") as _log:
+        _log.write(__import__("json").dumps({"argv": __import__("sys").argv[1:]}) + "\\n")
+"""
+
+
+def count_runs(cli):
+    """Put the run counter into the copy's cli.py, right after its PEP 723 block; the repository's file is untouched."""
+    text = cli.read_text(encoding="utf-8")
+    end = text.index("# ///\n", text.index("# /// script")) + len("# ///\n")
+    cli.write_text(text[:end] + COUNTER + text[end:], encoding="utf-8")
+
+
 def copy_skill(cond, run):
     source = SKILL if cond == "invest" else BASELINE
     skill = run / "skill copy" / ("invest" if cond == "invest" else "yfinance")
     shutil.copytree(source, skill, ignore=shutil.ignore_patterns("__pycache__", "data", ".DS_Store", ".ruff_cache"))
     text = (skill / "SKILL.md").read_text(encoding="utf-8")
     (skill / "SKILL.md").write_text(text.replace("${CLAUDE_SKILL_DIR}", str(skill)), encoding="utf-8")
+    if cond == "invest":
+        count_runs(skill / "scripts" / "cli.py")
     with WARM:
         warm = (["uv", "run", "--quiet", str(skill / "scripts/cli.py"), "--help"] if cond == "invest"
                 else ["uv", "run", "--quiet", "--no-project", "--with", "yfinance[repair]==1.7.0", "python", "-c", "import yfinance"])
@@ -201,10 +217,10 @@ def run_one(scenario, cond, pair, n, args, work, out):
     hidden = skill / "scripts"
     prompt = f"{skill / 'SKILL.md'} 스킬을 읽고 그 지침대로 요청을 처리해줘. {hidden} 아래 소스 코드는 읽지 마.\n\n요청: {scenario['prompt']}"
     record = out / "runs" / name
-    record.mkdir(parents=True, exist_ok=True)
+    shutil.rmtree(record, ignore_errors=True)  # a rerun into the same --out starts from nothing, so no earlier log is read as this run's
+    record.mkdir(parents=True)
     (record / "prompt.txt").write_text(prompt, encoding="utf-8")
-    env = dict(os.environ, INVEST_DATA=str(run / "data"), INVEST_CALL_LOG=str(run / "calls.jsonl"),
-               PYTHONPATH=str(Path(__file__).with_name("instrument")))  # counts real cli.py runs; see instrument/sitecustomize.py
+    env = dict(os.environ, INVEST_DATA=str(run / "data"), INVEST_CALL_LOG=str(run / "calls.jsonl"))
     started = dt.datetime.now(dt.timezone.utc).isoformat()
     with open(record / "stream.jsonl", "w", encoding="utf-8") as stream:
         proc = subprocess.run(["claude", "-p", "--safe-mode", "--restricted", "--permission-mode", "acceptEdits", "--tools", args.tools, "--allowedTools", args.tools,

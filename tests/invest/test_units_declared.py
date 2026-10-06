@@ -32,7 +32,8 @@ def numeric_fields(run):
         return set()
     if run.doc["file"]["format"] == "csv":
         rows = run.rows
-        if run.receipt["units"].get("value") == "per row: see the unit column":
+        if list(rows[0]) == ["target", "metric", "source_column", "value", "unit"]:  # the mixed layout, read from the file itself
+            assert run.receipt["units"]["value"] == "per row: see the unit column"
             statuses = run.receipt["unit_status"]
             for r in rows:
                 assert r["unit"] in VOCABULARY, f"{r['metric']}: unit {r['unit']!r} is not in the vocabulary"
