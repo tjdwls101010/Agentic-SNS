@@ -99,7 +99,8 @@ COMMANDS = {c.name: c for c in [
                   Arg("--adjust", choices=["auto", "back", "none"], default="auto", help="auto: OHLC adjusted for splits and dividends; back: Close as traded, Open/High/Low scaled; none: as traded plus Adj Close."),
                   Arg("--repair", action="store_true", help="Apply yfinance's price repair (not with --interval 5d)."),
                   Arg("--prepost", action="store_true", help="Include pre- and post-market bars where Yahoo has them."),
-                  Arg("--actions", action="store_true", help="Only dates carrying a dividend, split or capital gain.")]),
+                  Arg("--actions", action="store_true", help="Only dates carrying a dividend, split or capital gain.")],
+            failures=["not_found", "no_data", "source_constraint", "rate_limited", "upstream", "invalid", "local_io"]),
     Command("company", "One company's profile, shares outstanding, news entries or SEC filing entries.",
             kinds={"profile": "business description, sector, governance risk, headquarters: the same info response as quote (json)",
                    "shares": "shares outstanding as Yahoo reports it over a date range (csv)",
@@ -193,6 +194,7 @@ RECEIPT = [
     "  (financial_currency) | :unconfirmed, date, datetime, text, unverified (do not compute with it).",
 ]
 EXIT_LINE = "exit codes: " + " · ".join(f"{n} {name}" for name, (n, _) in receipts.EXIT_CODES.items())
+GLOBAL_LINE = "before COMMAND: --ttl-days N deletes saved results older than N days (default 14; 0 keeps all)."
 
 
 def lead():
@@ -234,7 +236,7 @@ def command_document(command):
         lines += ["", "kinds:"] + [f"  {k:<{width}}{text}" for k, text in command.kinds.items()]
     lines += ["", "arguments:"] + [spec(a) for a in command.args]
     lines += ["", "receipt:"] + RECEIPT + [f"  file: {command.file}."]
-    lines += ["", "failures (error.code): " + ", ".join(command.failures) + "; error.fix says what to do.", EXIT_LINE]
+    lines += ["", "failures (error.code): " + ", ".join(command.failures) + "; error.fix says what to do.", EXIT_LINE, GLOBAL_LINE]
     return "\n".join(lines)
 
 
@@ -314,8 +316,9 @@ def prepare(command, args):
     """Check the arguments and fill in the defaults that depend on the kind; nothing is opened or requested here."""
     kind = getattr(args, "kind", None)
     for arg in command.args:
-        if arg.kinds and kind not in arg.kinds and given(args, arg) and arg.dest != "targets":
-            raise receipts.Invalid(f"{arg.flags[0]} applies to {command.name} {' or '.join(arg.kinds)}, not {kind}")
+        if arg.kinds and kind not in arg.kinds and given(args, arg):
+            name = arg.kwargs.get("metavar", arg.dest.upper()) if arg.dest == "targets" else arg.flags[0]
+            raise receipts.Invalid(f"{name} applies to {command.name} {' or '.join(arg.kinds)}, not {kind}")
     refuse(getattr(args, "timeout", 1) <= 0, "--timeout must be a positive number of seconds")
     refuse(args.ttl_days < 0, "--ttl-days must be 0 or more; 0 keeps every saved result")
     refuse(args.max_chars <= 0, "--max-chars must be positive")

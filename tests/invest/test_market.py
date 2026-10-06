@@ -188,9 +188,7 @@ def test_one_companys_earnings_take_no_date_range(cli):
     assert run.code == 2, run
 
 
-def test_market_summary_has_one_row_per_exchange_and_each_rows_currency(cli):
+def test_market_summary_has_one_row_per_exchange(cli):
     run = cli("market", "summary", routes=recorded("market-summary"))
     assert run.code == 0, run
     assert len(run.rows) == run.result()["rows"] and all(r["exchange"] for r in run.rows)
-    assert any("currency column" in n for n in run.doc["notes"])
-    assert "currency_unconfirmed" not in run.result()["warnings"]

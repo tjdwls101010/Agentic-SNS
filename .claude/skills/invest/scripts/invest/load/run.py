@@ -52,7 +52,7 @@ def run(key, args):
     yahoo.check(key, args)
     ident = results.new_id()
     receipt_path = results.paths(ident)["receipt"]
-    receipts.precheck(args.command, args.targets, yahoo.warning_codes(key), receipt_path, args.max_chars)
+    receipts.precheck(args.command, args.targets, yahoo.warning_codes(key), receipt_path, args.max_chars, document_codes=("not_saved",))
     results.prune(args.ttl_days)
     outcomes, stopped = [], False
     for target in args.targets:
@@ -76,9 +76,10 @@ def run(key, args):
 
 
 def saving_failed(document, exc):
-    """Nothing was saved, so no path is named; a target that returned data now reports local_io, and a rate limit already met keeps its own code."""
+    """Nothing was saved, so no path is named and the warnings say so; a target that returned data now reports local_io, and targets a rate limit left unattempted stay so."""
     document.pop("receipt_path", None)
     document["file"] = None
+    document["warnings"] = document.get("warnings", []) + [{"code": "not_saved", "text": f"Nothing was saved, so no file or receipt path exists: {str(exc)[:90]}"}]
     for result in document["results"]:
         if result["status"] in ("ok", "empty"):
             result["status"] = "error"

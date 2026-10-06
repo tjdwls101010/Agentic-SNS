@@ -3,7 +3,7 @@ import yfinance as yf
 
 from invest.yahoo.datasets import Dataset
 from invest.yahoo.info import ASSEMBLED, INFO_UNITS, PROFILE_FIELDS, RISK, SIBLING, info
-from invest.yahoo.units import DATETIME, EPOCH, SHARES, u
+from invest.yahoo.units import COUNT, DATETIME, EPOCH, SHARES, u
 
 
 def shares(ticker, args, context):
@@ -53,7 +53,7 @@ DATASETS = {
                "Entries are not strictly ordered by time."),
         possible=("shortfall",)),
     "company.filings": Dataset(
-        filings, form="records", preview=filing_preview,
+        filings, form="records", preview=filing_preview, units={"epochDate": u(DATETIME, EPOCH), "maxAge": u(COUNT)},
         coverage="the SEC filings Yahoo currently lists for the symbol, newest first; Form 4 and older filings may be absent",
         notes=("date is the filing date; exhibits map each document type to Yahoo's copy of the SEC document.",)),
 }

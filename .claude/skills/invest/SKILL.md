@@ -8,8 +8,6 @@ allowed-tools: Bash(uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" *)
 
 Run `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" <command> …` on one line. `--help` maps the commands; `<command> --help` gives that command's kinds, arguments, receipt, failures and exit codes. Each call prints a short JSON receipt and saves the whole result as a file the receipt names.
 
-The numbers Yahoo carries come from these commands: prices, statements, estimates, holders, fund data, options, screens and calendars.
-
 ## Turning a result into an answer
 
 Compute from the file the receipt names (`file.path`), reading it with your own Python: the inline rows, or the first and last rows of a trimmed receipt, are there to check a result, not to stand for it. Values arrive on one scale — a rate is a ratio (0.0245 is 2.45%), a multiple is a multiple — and `units` names each column's unit, so convert nothing; a value whose unit is `unverified` is not one to compute with.

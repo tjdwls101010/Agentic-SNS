@@ -120,5 +120,5 @@ DATASETS = {
     "history": Dataset(
         history, units=BAR_UNITS, precise=PRICE_COLUMNS,
         coverage="the bars Yahoo serves for this range and interval",
-        possible=("last_bar_provisional", "last_bar_unknown", "inverse_of_zero")),
+        possible=("last_bar_provisional", "last_bar_unknown")),
 }

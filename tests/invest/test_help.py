@@ -40,6 +40,7 @@ def test_each_command_document_is_short_and_self_contained(command):
     assert set(failures) <= FAILURES and {"rate_limited", "invalid", "local_io"} <= set(failures)
     assert "exit codes: 0 ok · 2 invalid · 4 local_io · 5 rate_limited · 6 upstream · 7 empty · 8 partial" in text
     assert "ratio (0.25 = 25%)" in text, "the unit vocabulary a receipt uses is explained"
+    assert "--ttl-days N deletes saved results older than N days" in text
 
 
 @pytest.mark.parametrize("command", COMMANDS)
@@ -53,6 +54,11 @@ def test_every_kind_and_argument_appears_once_in_its_own_document(command):
     for other in COMMANDS:
         if other != command:
             assert not any(re.search(rf"^  {re.escape(k)}\s", document(other), re.M) for k in kinds if k not in load.kinds()[other]), (command, other)
+
+
+@pytest.mark.parametrize("command,code", [("history", "source_constraint"), ("fund", "not_applicable"), ("quote", "not_found")])
+def test_a_command_lists_the_failure_codes_it_can_return(command, code):
+    assert code in re.search(r"failures \(error\.code\): ([a-z_, ]+);", document(command))[1].split(", ")
 
 
 def test_an_argument_some_kinds_take_names_them():

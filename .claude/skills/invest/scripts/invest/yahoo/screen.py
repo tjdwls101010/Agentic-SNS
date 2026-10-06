@@ -12,7 +12,7 @@ import yfinance as yf
 from invest.receipts import Invalid
 from invest.yahoo.conditions import condition
 from invest.yahoo.datasets import Dataset
-from invest.yahoo.info import INFO_UNITS
+from invest.yahoo.info import CROSS_CURRENCY, INFO_UNITS
 from invest.yahoo.units import RATIO, numeric
 
 QUERY_TYPES = {"equity": yf.EquityQuery, "fund": yf.FundQuery, "etf": yf.ETFQuery}
@@ -302,8 +302,8 @@ def run(target, args, context):
     rows = response.get("quotes") or []
     total = response.get("total")
     context.coverage.update(requested=args.limit, offset=args.offset, total=total)
-    if rows and isinstance(total, int) and args.offset + len(rows) < total:
-        context.coverage["next_offset"] = args.offset + len(rows)
+    if rows and ((isinstance(total, int) and args.offset + len(rows) < total) or (total is None and len(rows) >= args.limit)):
+        context.coverage["next_offset"] = args.offset + len(rows)  # without a total, a full page may or may not be the last
     if rows:
         context.warn("pages_move", "Rows can move between pages, and total is Yahoo's own claim.")
     normalised = [{k: (v / 100 if INFO_UNITS.get(k) and INFO_UNITS[k].convert == "percent" and numeric(v) else v) for k, v in r.items()} for r in rows]
@@ -313,6 +313,10 @@ def run(target, args, context):
         context.conditions["query"] = query_condition(node, normalised, source_units)
         if context.conditions["query"]["status"] == "confirmed":
             context.warn("sample_only", "Confirmed means the returned rows satisfy the query; it is not evidence that Yahoo applied it to every match.")
+    if "count" in response:
+        count = response.get("count")
+        context.conditions["limit"] = condition(args.limit, "confirmed" if isinstance(count, int) and count <= args.limit and len(rows) <= args.limit else "not_applied",
+                                                {"source_count": count, "rows": len(rows)})
     if "start" in response:
         context.conditions["offset"] = condition(args.offset, "confirmed" if response.get("start") == args.offset else "not_applied", {"source_start": response.get("start")})
     column = RETURNED.get(sort)
@@ -329,7 +333,7 @@ DATASETS = {
     "screen.fields": Dataset(fields, form="rows", ticker=False, keys=("field",), coverage="every query field yfinance accepts for --type"),
     "screen.values": Dataset(values, form="records", ticker=False, coverage="the enumerated values query fields accept for --type"),
     "screen.run": Dataset(
-        run, form="rows", ticker=False, counted=True, units=INFO_UNITS, keys=("symbol",), row_currency="currency", check=check_run,
+        run, form="rows", ticker=False, counted=True, units=INFO_UNITS, keys=("symbol",), row_currency="currency", check=check_run, cross_currency=CROSS_CURRENCY,
         coverage="the rows matching the query, in the sort order, for this page: not a census of the market",
         possible=("source_units", "sample_only", "pages_move")),
 }

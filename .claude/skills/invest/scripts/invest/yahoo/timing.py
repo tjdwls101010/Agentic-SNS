@@ -3,13 +3,15 @@
 A daily bar dated today, fetched while the exchange is open, is the price so far. The verdict compares the observation time with the end of the regular session Yahoo reports for the bar's day, never with the time of the last trade, and it is `unknown` rather than `final` whenever the session or time zone is missing.
 """
 import datetime as dt
+import time
 
 PERIODS = {"1wk": dt.timedelta(days=7)}
 INTRADAY = {"1m": 1, "2m": 2, "5m": 5, "15m": 15, "30m": 30, "60m": 60, "90m": 90, "1h": 60}
 
 
 def now():
-    return dt.datetime.now(dt.timezone.utc)
+    """The observation time, read from the process clock."""
+    return dt.datetime.fromtimestamp(time.time(), dt.timezone.utc)
 
 
 def stamp(value):

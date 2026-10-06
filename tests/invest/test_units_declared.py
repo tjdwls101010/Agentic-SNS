@@ -18,6 +18,33 @@ UNVERIFIED = {"Actual", "Expected", "Last", "Revised",  # economic releases: eac
 CASES = sorted(p.stem for p in (FIXTURES / "yahoo").glob("*.json") if p.stem not in FAILING)
 
 
+def number(text):
+    try:
+        float(text)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def numeric_fields(run):
+    """Every numeric column or record field the saved file holds, read from the file itself rather than from what the receipt declares."""
+    if not run.doc["file"]:
+        return set()
+    if run.doc["file"]["format"] == "csv":
+        rows = run.rows
+        if "unit" in rows[0]:
+            assert all(r["unit"] for r in rows if r["value"] != ""), "a metric row with a value has no unit"
+            return set()
+        return {c for c in rows[0] if c != "target" and any(number(r[c]) and r[c] != "" for r in rows) and all(number(r[c]) for r in rows if r[c] != "")}
+    found = set()
+    for entry in run.records:
+        data = entry["data"]
+        for item in data if isinstance(data, list) else [data]:
+            if isinstance(item, dict):
+                found |= {k for k, v in item.items() if isinstance(v, (int, float)) and not isinstance(v, bool)}
+    return found
+
+
 @pytest.mark.parametrize("case", CASES)
 def test_every_numeric_column_has_a_declared_unit(cli, case):
     argv = json.loads((FIXTURES / "yahoo" / f"{case}.json").read_text())["provenance"]["argv"]
@@ -29,6 +56,8 @@ def test_every_numeric_column_has_a_declared_unit(cli, case):
     assert "unit_undeclared" not in [w["code"] for w in receipt["warnings"]]
     assert set(receipt["units"].values()) <= VOCABULARY, set(receipt["units"].values()) - VOCABULARY
     assert set(receipt["unit_status"].values()) <= {"verified", "declared"}
+    for name in numeric_fields(run):
+        assert name in receipt["units"] and receipt["unit_status"].get(name) in ("verified", "declared"), f"{case}: {name} is numeric in the file but has no declared unit"
     unverified = {name for name, unit in receipt["units"].items() if unit == "unverified"}
     if run.doc["file"] and run.doc["file"]["format"] == "csv" and "unit" in receipt["columns"]:
         unverified |= {r["metric"] for r in run.rows if r["unit"] == "unverified"}

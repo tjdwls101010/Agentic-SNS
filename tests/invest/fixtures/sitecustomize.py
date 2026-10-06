@@ -1,9 +1,8 @@
 """Test-process-only transport: every Yahoo request is answered from $YF_HTTP_FIXTURE, and anything it does not hold exits 97.
 
-Routes match on path and on the parameters and body fields they name, first match wins, so a fixture recorded by scenarios/invest/record_yahoo.py replays without its volatile parameters. Each request is appended to $YF_HTTP_LOG when set, so a test can count what the CLI actually asked for. $YF_FIXTURE_NOW fixes the skill's clock (invest.yahoo.timing.now), the one time source its timing verdicts read, so a test can move the observation time while the session data stays the same.
+Routes match on path and on the parameters and body fields they name, first match wins, so a fixture recorded by scenarios/invest/record_yahoo.py replays without its volatile parameters. Each request is appended to $YF_HTTP_LOG when set, so a test can count what the CLI actually asked for. $YF_FIXTURE_NOW fixes the process clock (time.time), so a test can move the observation time while the session data stays the same.
 """
 import datetime as dt
-import importlib.machinery
 import json
 import os
 import sys
@@ -57,24 +56,7 @@ def request(self, method, url, **kwargs):
 requests.Session.request = request
 
 FROZEN = os.environ.get("YF_FIXTURE_NOW")
-
-
-class FrozenClock:
-    """Replace invest.yahoo.timing.now once that module loads; the skill's own code is otherwise untouched."""
-
-    def find_spec(self, name, path, target=None):
-        if name != "invest.yahoo.timing":
-            return None
-        spec = importlib.machinery.PathFinder.find_spec(name, path)
-        load = spec.loader.exec_module
-
-        def exec_module(module):
-            load(module)
-            module.now = lambda: dt.datetime.fromisoformat(FROZEN)
-
-        spec.loader.exec_module = exec_module
-        return spec
-
-
 if FROZEN:
-    sys.meta_path.insert(0, FrozenClock())
+    # The process clock, the one time source the skill's observation times and timing verdicts read; nothing inside the skill is replaced.
+    _frozen = dt.datetime.fromisoformat(FROZEN).timestamp()
+    time.time = lambda: _frozen

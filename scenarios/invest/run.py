@@ -49,6 +49,27 @@ def invocations(command):
     return [part for part in re.split(r"\s*(?:;|&&|\|\||\n|\|)\s*", command) if CLI_RUN.search(part)]
 
 
+def outputs(text):
+    """(help documents, receipts) printed by the CLI inside one tool output: a receipt is a JSON line with status and command, a help document runs from `usage: cli.py` to the next receipt or the end."""
+    helps, receipts, current = [], [], None
+    for line in text.splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped.startswith('{"status":') and '"command":' in stripped:
+            if current is not None:
+                helps.append(current)
+                current = None
+            receipts.append(stripped)
+        elif line.startswith("usage: cli.py"):
+            if current is not None:
+                helps.append(current)
+            current = line
+        elif current is not None:
+            current += line
+    if current is not None:
+        helps.append(current)
+    return helps, receipts
+
+
 def parse_stream(stream):
     tools, results, final, answer = [], {}, {}, ""
     for line in stream.read_text(encoding="utf-8").splitlines():
@@ -75,7 +96,7 @@ def parse_stream(stream):
 
 def summarise(stream, skill_md_chars):
     tools, results, final, answer = parse_stream(stream)
-    m = {"bash_calls": 0, "cli_runs": 0, "help_runs": 0, "help_chars": 0, "receipt_chars": 0, "mixed_chars": 0, "file_reads": 0, "file_read_chars": 0,
+    m = {"bash_calls": 0, "cli_runs": 0, "help_runs": 0, "help_chars": 0, "receipt_chars": 0, "file_reads": 0, "file_read_chars": 0,
          "python_runs": 0, "python_chars": 0, "other_tool_calls": 0, "failed_calls": [], "commands": set(), "observed_at": set(), "signals": {}}
     total = 0
     for ident, name, given in tools:
@@ -95,20 +116,16 @@ def summarise(stream, skill_md_chars):
         m["bash_calls"] += 1
         command = given.get("command", "")
         runs = invocations(command)
-        m["cli_runs"] += len(runs)
-        helps = [r for r in runs if re.search(r"(?:^|\s)(?:--help|-h)(?:\s|$)", r)]
-        m["help_runs"] += len(helps)
         for run in runs:
-            if run not in helps:
+            if not re.search(r"(?:^|\s)(?:--help|-h)(?:\s|$)", run):
                 words = re.split(r"\s+", run.split("cli.py", 1)[1].lstrip("\"' ").strip())
                 words = [w for w in words if w and not w.startswith("-") and not re.fullmatch(r"\d+", w)]
                 m["commands"].add(" ".join(words[:2] if words and words[0] in KINDED else words[:1]) or "?")
-        if runs and len(helps) == len(runs):
-            m["help_chars"] += len(text)
-        elif runs and not helps:
-            m["receipt_chars"] += len(text)
-        elif runs:
-            m["mixed_chars"] += len(text)
+        helps, receipts = outputs(text)
+        m["cli_runs"] += len(helps) + len(receipts)  # counted from what came back, so a chained call or a loop counts every run
+        m["help_runs"] += len(helps)
+        m["help_chars"] += sum(len(h) for h in helps)
+        m["receipt_chars"] += sum(len(r) for r in receipts)
         if re.search(r"\bpython", command) and not runs:
             m["python_runs"] += 1
             m["python_chars"] += len(text)
@@ -198,13 +215,16 @@ def frozen_hashes(phase):
 
 
 def choose(bank, args):
-    chosen = [s for s in bank if (not args.scenario or s["id"] in args.scenario) and (not args.kind or s["kind"] in args.kind)]
+    if args.scenario or args.kind:  # --scenario and --kind add up: each names more scenarios to run
+        chosen = [s for s in bank if s["id"] in (args.scenario or ()) or s["kind"] in (args.kind or ())]
+    else:
+        chosen = list(bank)
     if args.phase == "holdout":
         chosen = [s for s in chosen if s["heldout"]]
-    elif not args.scenario:
-        chosen = [s for s in chosen if not s["heldout"]]
-    elif any(s["heldout"] for s in chosen):
+    elif any(s["heldout"] and s["id"] in (args.scenario or ()) for s in chosen):
         raise SystemExit("held-out scenarios run only with --phase holdout")
+    else:
+        chosen = [s for s in chosen if not s["heldout"]]
     return chosen
 
 

@@ -107,18 +107,23 @@ class Dataset:
     """
 
     def __init__(self, fetch, *, form="table", units=None, coverage=None, notes=(), possible=(), ticker=True, counted=False, precise=(),
-                 fields=(), preview=None, mixed=None, label=None, index=True, keys=(), row_currency=None, check=None):
+                 fields=(), preview=None, mixed=None, label=None, index=True, keys=(), row_currency=None, check=None, cross_currency=()):
         self.fetch, self.form, self.units = fetch, form, units or {}
         self.coverage, self.notes, self.possible = coverage, tuple(notes), tuple(possible)
         self.ticker, self.counted, self.precise, self.fields, self.preview = ticker, counted, tuple(precise), tuple(fields), preview
         self.mixed, self.label, self.index, self.keys, self.row_currency = mixed, label, index, tuple(keys), row_currency
+        self.cross_currency = tuple(cross_currency)
         if check:
             self.check = check
 
     def warning_codes(self):
-        """Every code this dataset's receipts can carry, the shared ones included."""
-        shared = ("unit_undeclared", "currency_unconfirmed", "secondary_rate_limited")
-        return tuple(dict.fromkeys(self.possible + shared))
+        """Every code one target of this dataset can carry: its own, and the shared ones its declarations make possible."""
+        shared = ["unit_undeclared", "currency_unconfirmed", "secondary_rate_limited"]
+        if self.form == "mixed" or units.UNVERIFIED in {u.name for u in self.units.values() if u}:
+            shared.append("unverified_value")
+        if self.row_currency or "cross_currency_fields" in self.possible:
+            shared.append("cross_currency_fields")
+        return tuple(dict.fromkeys(self.possible + tuple(shared)))
 
     def check(self, args):
         """Refuse, before any request, an argument this dataset can judge without the network; most have none."""
@@ -140,11 +145,12 @@ class Dataset:
         if self.coverage and "statement" not in context.coverage:
             context.coverage = {"statement": self.coverage, **context.coverage}
         found = self.shape(value, context)
-        if self.ticker and not found.empty and found.currency is None and self.needs_quote_currency(found):
+        if self.ticker and not found.empty and found.currency is None and not context.rate_limited and self.needs_quote_currency(found):
             quote_currency(subject, context)
             found.currency, found.rate_limited = context.currency, context.rate_limited
             found.warnings.update(context.warnings)
         self.check_currency(found, context)
+        self.check_unverified(found)
         if found.count is not None:
             found.coverage = {**found.coverage, "received": found.count}
         return found
@@ -209,6 +215,51 @@ class Dataset:
             found[f"{metric} | {column}"] = self.mixed(metric, column).status
         return found
 
+    def check_unverified(self, found):
+        """A value whose unit is declared unverified says so in warnings, which no cut removes, not only in a note."""
+        names = []
+        if found.format == "csv" and found.rows:
+            if "unit" in found.columns:
+                names = sorted({f"{r[0]} ({r[1]})" for r in found.rows if r[3] == units.UNVERIFIED and r[2] is not None})
+            else:
+                names = [c for i, c in enumerate(found.columns) if found.units.get(c) == units.UNVERIFIED and found.statuses.get(c) != units.UNDECLARED
+                         and any(r[i] is not None for r in found.rows)]
+        elif isinstance(found.records, dict):
+            names = [k for k, u in found.units.items() if u == units.UNVERIFIED and found.statuses.get(k) != units.UNDECLARED and found.records.get(k) is not None]
+        if names:
+            shown = ", ".join(names[:4]) + (", ..." if len(names) > 4 else "")
+            found.warnings.setdefault("unverified_value", f"{shown}: no confirmed unit or scale; do not compute with them.")
+
+    def check_row_currencies(self, found):
+        """Rows that are different instruments: each row's own currency columns tie its money values, so each row is checked.
+
+        A row whose money values come without a currency is unconfirmed, and a row whose quote and reporting currencies differ makes the fields that divide one by the other meaningless for it.
+        """
+        if found.format != "csv" or not found.rows:
+            return
+        position = {c: i for i, c in enumerate(found.columns)}
+        quote_money = [position[c] for c, u in found.units.items() if u in (units.MONEY_QUOTE, units.PER_SHARE_QUOTE) and c in position]
+        financial_money = [position[c] for c, u in found.units.items() if u in (units.MONEY_FINANCIAL, units.PER_SHARE_FINANCIAL) and c in position]
+        currency, reporting, symbol = position.get("currency"), position.get("financialCurrency"), position.get("symbol")
+        crossed = [position[c] for c in self.cross_currency if c in position]
+        unconfirmed, mixed = 0, []
+        for row in found.rows:
+            if any(row[i] is not None for i in quote_money) and (currency is None or not row[currency]):
+                unconfirmed += 1
+            if any(row[i] is not None for i in financial_money) and (reporting is None or not row[reporting]):
+                unconfirmed += 1
+            if currency is not None and reporting is not None and row[currency] and row[reporting] and row[currency] != row[reporting] \
+                    and any(row[i] is not None for i in crossed):
+                mixed.append(str(row[symbol]) if symbol is not None else "?")
+        if currency is not None:
+            found.notes.append("Each row is its own instrument: its currency column names the currency of its quote values"
+                               + (" and financialCurrency that of its statement values." if reporting is not None else "."))
+        if unconfirmed:
+            found.warnings.setdefault("currency_unconfirmed", f"{unconfirmed} rows carry money values with no currency of their own; their currency is unconfirmed.")
+        if mixed:
+            names = ", ".join(c for c in self.cross_currency if c in position)
+            found.warnings.setdefault("cross_currency_fields", f"For {len(mixed)} rows quoted and reporting in different currencies ({', '.join(mixed[:5])}{', ...' if len(mixed) > 5 else ''}), {names} mix the two; do not use them.")
+
     def needs_quote_currency(self, found):
         roles = set(found.units.values()) | ({r[3] for r in found.rows} if found.format == "csv" and "unit" in (found.columns or []) else set())
         return bool(roles & {units.MONEY_QUOTE, units.PER_SHARE_QUOTE})
@@ -216,8 +267,7 @@ class Dataset:
     def check_currency(self, found, context):
         """A money value whose currency the source did not give keeps its value and says so."""
         if self.row_currency:
-            found.notes.append(f"Each row is its own instrument: its {self.row_currency} column names the currency of its money values.")
-            return
+            return self.check_row_currencies(found)
         roles = {MONEY_ROLES[u] for u in found.units.values() if u in MONEY_ROLES}
         if found.format == "csv" and "unit" in (found.columns or []):
             roles |= {MONEY_ROLES[r[3]] for r in found.rows if r[3] in MONEY_ROLES}

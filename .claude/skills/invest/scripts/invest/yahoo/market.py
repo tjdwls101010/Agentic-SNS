@@ -2,7 +2,7 @@
 import yfinance as yf
 
 from invest.yahoo.datasets import Dataset
-from invest.yahoo.info import INFO_UNITS
+from invest.yahoo.info import CROSS_CURRENCY, INFO_UNITS
 from invest.yahoo.units import COUNT, MONEY_UNCONFIRMED, PER_SHARE_UNCONFIRMED, RATIO, TEXT, u
 
 PARTS = {"overview": "overview", "top-companies": "top_companies", "research-reports": "research_reports", "industries": "industries",
@@ -45,7 +45,7 @@ class Domain(Dataset):
 
 REGION = "Yahoo answers a country code it does not serve with the United States' result and no warning, so --region offers only the codes it serves."
 DATASETS = {
-    "market.summary": Dataset(summary, form="rows", ticker=False, units={"exchange": u(TEXT), **INFO_UNITS}, keys=("exchange",), row_currency="currency",
+    "market.summary": Dataset(summary, form="rows", ticker=False, units={"exchange": u(TEXT), **INFO_UNITS}, keys=("exchange",), row_currency="currency", cross_currency=CROSS_CURRENCY,
                               coverage="the benchmark quotes Yahoo shows for the region, one row per exchange"),
     "market.sector": Domain(domain(yf.Sector), ticker=False, units=DOMAIN_UNITS, coverage="the part of the sector --dataset names, as Yahoo lists it",
                             notes=(REGION,), possible=("names_null_outside_us",)),

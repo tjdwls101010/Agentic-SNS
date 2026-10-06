@@ -77,11 +77,15 @@ def exit_code(document):
     status = document["status"]
     if status in ("ok", "partial", "empty"):
         return EXIT_CODES[status][0]
-    codes = [(r.get("error") or {}).get("code") for r in document.get("results", [])]
-    if codes and all(c == "unsupported" for c in codes):
+    failed = [(r.get("error") or {}).get("code") for r in document.get("results", [])]
+    if failed and all(c == "unsupported" for c in failed):
         return EXIT_CODES["empty"][0]
+    if "not_attempted" in failed:  # only a rate limit leaves targets unattempted, whatever later failed on the ones before
+        failed.append("rate_limited")
+    if "not_saved" in codes(document.get("warnings")):
+        failed.append("local_io")
     for code in PRIORITY:
-        if code in codes:
+        if code in failed:
             return EXIT_CODES[code][0]
     return EXIT_CODES["upstream"][0]
 
@@ -173,10 +177,10 @@ def fit(document, max_chars, preview=lambda i: None):
     return ordered(found, DOCUMENT_ORDER)
 
 
-def precheck(command, targets, warning_codes, receipt_path, max_chars):
-    """Refuse before any request a --max-chars too small for the receipt that cannot be cut: every warning this command can raise, for every target."""
+def precheck(command, targets, warning_codes, receipt_path, max_chars, document_codes=()):
+    """Refuse before any request a --max-chars too small for the receipt that cannot be cut: every warning this command can raise, for every target, and the ones only the document carries."""
     longest = max(ERROR_CODES, key=len)
-    sample = {"status": "partial", "command": command, "receipt_path": receipt_path, "warnings": list(warning_codes),
+    sample = {"status": "partial", "command": command, "receipt_path": receipt_path, "warnings": list(warning_codes) + list(document_codes),
               "results": [{"target": t, "status": "not_attempted", "warnings": list(warning_codes), "error": {"code": longest}} for t in targets],
               "trimmed": True}
     needed = size(sample)

@@ -78,6 +78,9 @@ def publish(ident, receipt, table=None, records=None):
         shutil.rmtree(staging, ignore_errors=True)
         raise LocalIO(f"The result could not be saved in {folder()}: {exc}",
                       fix="Make the skill's data folder writable (or INVEST_DATA's, when it is set) and run the command again.") from None
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)  # whatever stopped the write, no half-written folder stays behind
+        raise
     return target
 
 

@@ -4,6 +4,7 @@ Expected values are the raw values in Yahoo's recorded responses (fixtures/yahoo
 """
 import json
 import math
+import re
 
 import pytest
 
@@ -208,19 +209,31 @@ def test_source_ko_dividend_yield_is_rate_over_price_in_percent():
     assert math.isclose(v7["dividendYield"], summary["dividendRate"] / v7["regularMarketPrice"] * 100, abs_tol=0.05)
 
 
+def calendar_surprise(date_text):
+    """The Surprise (%) cell Yahoo's earnings page shows for one announcement date, from the recorded page itself."""
+    page = next(r["text"] for r in recorded("calendar-earnings-aapl") if "calendar" in r["path"])
+    for row in re.findall(r"<tr[^>]*>(.*?)</tr>", page, re.S):
+        cells = [re.sub(r"<[^>]+>|\s+", " ", c).strip() for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.S)]
+        if len(cells) == 6 and cells[2].startswith(date_text):
+            return float(cells[5].replace("+", ""))
+    raise AssertionError(f"no row for {date_text}")
+
+
 def test_source_surprise_percent_is_a_ratio_and_the_calendar_reports_it_times_100():
     history = source("analysts-eps-history-aapl", "quoteSummary")["quoteSummary"]["result"][0]["earningsHistory"]["history"]
     june = next(h for h in history if h["quarter"]["fmt"] == "2026-06-30")
     actual, estimate, surprise = june["epsActual"]["raw"], june["epsEstimate"]["raw"], june["surprisePercent"]["raw"]
     assert math.isclose(surprise, (actual - estimate) / abs(estimate), abs_tol=0.0005)
     assert june["surprisePercent"]["fmt"] == "6.74%", "Yahoo formats the ratio as a percent itself"
-    assert math.isclose(6.74, surprise * 100, abs_tol=0.05)  # calendar earnings shows +6.74 for this quarter
+    assert math.isclose(calendar_surprise("July 30, 2026"), surprise * 100, abs_tol=0.05)
 
 
 def test_source_index_52_week_change_equals_its_percent_field():
+    """For an index Yahoo's quoteSummary 52WeekChange equals the v7 quote's fiftyTwoWeekChangePercent: both are percent."""
     v7 = source("quote-gspc", "/v7/finance/quote")["quoteResponse"]["result"][0]
+    statistics = source("quote-gspc", "quoteSummary")["quoteSummary"]["result"][0]["defaultKeyStatistics"]
     assert v7["quoteType"] == "INDEX"
-    assert v7["fiftyTwoWeekChangePercent"] == pytest.approx(14.575661)
+    assert math.isclose(statistics["52WeekChange"], v7["fiftyTwoWeekChangePercent"], abs_tol=1e-6)
 
 
 def test_source_ko_debt_to_equity_is_debt_over_equity_in_percent():

@@ -2,7 +2,7 @@
 import yfinance as yf
 
 from invest.yahoo.datasets import Dataset
-from invest.yahoo.info import INFO_UNITS
+from invest.yahoo.info import CROSS_CURRENCY, INFO_UNITS
 from invest.yahoo.units import DATETIME, EPOCH, PERCENT, RATIO, UNVERIFIED, u
 
 LOOKUP = {"all": "get_all", "stock": "get_stock", "mutualfund": "get_mutualfund", "etf": "get_etf", "index": "get_index", "future": "get_future",
@@ -36,7 +36,7 @@ def search(target, args, context):
 
 DATASETS = {
     "search": Search(
-        search, ticker=False, counted=True, row_currency="currency",
+        search, ticker=False, counted=True, row_currency="currency", cross_currency=CROSS_CURRENCY,
         units={**INFO_UNITS, "providerPublishTime": u(DATETIME, EPOCH), "rank": u(UNVERIFIED),
                "regularMarketPercentChange": u(RATIO, PERCENT, evidence="regularMarketChange / (regularMarketPrice - regularMarketChange) x 100 (AAPL)")},
         coverage="the first page of Yahoo's matches, not every match",

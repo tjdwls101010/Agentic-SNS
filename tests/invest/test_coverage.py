@@ -125,3 +125,32 @@ def test_an_empty_result_confirms_nothing(cli):
     assert run.code == 7 and run.result()["status"] == "empty", run
     assert run.result()["conditions"]["query"]["status"] == "unverified"
     assert run.result()["warnings"] == []
+
+
+def test_screen_rows_quoted_and_reporting_in_different_currencies_are_flagged(cli):
+    """ZTOEF quotes in USD and reports in CNY: its trailingAnnualDividendYield divides a CNY dividend by a USD price."""
+    query = '{"operator":"AND","operands":[{"operator":"EQ","operands":["region","us"]},{"operator":"GT","operands":["intradaymarketcap",10000000000]},{"operator":"GT","operands":["quarterlyrevenuegrowth.quarterly",0.2]}]}'
+    run = cli("screen", "run", "--query", query, "--limit", "25", routes=recorded("screen-run-growth"))
+    warning = {w["code"]: w["text"] for w in run.doc["warnings"]}["cross_currency_fields"]
+    assert "ZTOEF" in warning and "trailingAnnualDividendYield" in warning
+
+
+def test_rows_without_a_currency_of_their_own_are_unconfirmed(cli):
+    run = cli("market", "summary", routes=recorded("market-summary"))
+    assert run.code == 0, run
+    assert "currency_unconfirmed" in run.result()["warnings"]
+    assert not any("currency column" in n for n in run.doc["notes"]), "no note about a column the rows do not have"
+
+
+def test_a_screen_page_reports_the_count_yahoo_returned_and_a_next_offset_without_a_total(cli):
+    rows = [{"symbol": f"S{i}", "currency": "USD", "region": "US"} for i in range(2)]
+    routes = [{"path": "/v1/finance/screener", "json": {"finance": {"result": [{"quotes": rows, "start": 0, "count": 2}], "error": None}}}]
+    run = cli("screen", "run", "--query", '{"operator":"EQ","operands":["region","us"]}', "--limit", "2", routes=routes)
+    assert run.result()["conditions"]["limit"]["status"] == "confirmed" and run.result()["conditions"]["limit"]["evidence"]["source_count"] == 2
+    assert run.result()["coverage"]["next_offset"] == 2
+
+
+def test_values_without_a_confirmed_unit_say_so_in_warnings(cli):
+    run = cli("fund", "operations", "QQQ", routes=recorded("fund-operations-qqq"))
+    text = {w["code"]: w["text"] for w in run.doc["warnings"]}["unverified_value"]
+    assert "Total Net Assets" in text

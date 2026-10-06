@@ -94,3 +94,32 @@ def test_a_nested_value_is_written_as_json(cli):
               routes=screener([{"symbol": "EX", "currency": "USD", "corporateActions": [{"header": "Dividend", "meta": {"amount": 0.5}}]}]))
     assert run.code == 0, run
     assert json.loads(run.rows[0]["corporateActions"]) == [{"header": "Dividend", "meta": {"amount": 0.5}}]
+
+
+def test_a_write_that_fails_midway_leaves_neither_a_folder_nor_a_staging_copy(tmp_path, monkeypatch):
+    """result.csv is written, then the records cannot be serialised: nothing may remain under data/results."""
+    from invest import results
+    monkeypatch.setenv("INVEST_DATA", str(tmp_path / "data"))
+    try:
+        results.publish("20240101T000000-aaaaaa", {"id": "x"}, table=(["target", "v"], [["A", 1]]), records={"bad": float("nan")})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("an unserialisable value must fail the publish")
+    assert list((tmp_path / "data" / "results").iterdir()) == []
+
+
+def test_publishing_onto_an_existing_folder_fails_and_keeps_that_folder(tmp_path, monkeypatch):
+    from invest import receipts, results
+    monkeypatch.setenv("INVEST_DATA", str(tmp_path / "data"))
+    existing = tmp_path / "data" / "results" / "20240101T000000-bbbbbb"
+    existing.mkdir(parents=True)
+    (existing / "receipt.json").write_text("earlier")
+    try:
+        results.publish("20240101T000000-bbbbbb", {"id": "y"}, table=(["target"], [["A"]]))
+    except receipts.LocalIO:
+        pass
+    else:
+        raise AssertionError("an existing folder must never be overwritten")
+    assert (existing / "receipt.json").read_text() == "earlier"
+    assert sorted(p.name for p in existing.parent.iterdir()) == ["20240101T000000-bbbbbb"]

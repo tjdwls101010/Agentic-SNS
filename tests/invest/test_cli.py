@@ -139,6 +139,7 @@ def test_a_receipt_whose_uncuttable_part_does_not_fit_prints_it_whole_and_says_o
     (["--ttl-days", "-1", "quote", "AAPL"], "--ttl-days"),
     (["market", "summary", "--region", "KR"], "summary --region"),
     (["market", "industry", "semiconductors", "--dataset", "industries"], "--dataset"),
+    (["calendar", "ipo", "AAPL"], "SYMBOL applies to calendar earnings"),
 ])
 def test_a_refused_argument_asks_nothing_and_saves_nothing(cli, tmp_path, argv, phrase):
     run = cli(*argv, routes=[], data=tmp_path / "fresh")

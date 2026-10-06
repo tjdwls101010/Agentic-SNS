@@ -122,7 +122,8 @@ def test_a_save_failure_after_a_rate_limit_keeps_the_remaining_targets_not_attem
     assert "receipt_path" not in run.doc and run.doc["file"] is None, "nothing was saved, so no path is named"
     first, second = run.doc["results"]
     assert first["error"]["code"] == "local_io" and second["status"] == "not_attempted"
-    assert run.code == 4, run
+    assert "not_saved" in [w["code"] for w in run.doc["warnings"]]
+    assert run.code == 5, "the rate limit already met outranks the save failure that followed it"
 
 
 def test_a_rate_limited_first_target_exits_5_and_attempts_nothing_else(cli):
@@ -216,3 +217,34 @@ def test_rate_limited_outranks_invalid_and_local_io(cli):
     run = cli("options", "chain", "AAPL", "RATE", "--date", "2030-01-18", routes=routes)
     assert [r["error"]["code"] for r in run.doc["results"]] == ["invalid", "rate_limited"]
     assert run.code == 5, run
+
+
+def test_a_save_failure_is_reported_even_when_every_target_had_already_failed(cli, tmp_path):
+    data = tmp_path / "locked"
+    data.mkdir()
+    data.chmod(stat.S_IRUSR | stat.S_IXUSR)
+    try:
+        run = cli("quote", "XYZQQ", routes=recorded("quote-xyzqq"), data=data)
+    finally:
+        data.chmod(stat.S_IRWXU)
+    assert run.result()["error"]["code"] == "not_found"
+    assert "not_saved" in [w["code"] for w in run.doc["warnings"]] and "receipt_path" not in run.doc
+    assert run.code == 4, run
+
+
+def test_a_rate_limit_on_the_currency_lookup_is_the_last_request_for_that_target(cli):
+    targets = {"path": "/quoteSummary/AAPL", "params": {"modules": "financialData"}, "json": {"quoteSummary": {"result": [{"financialData": {"targetMeanPrice": 120, "currentPrice": 100}}], "error": None}}}
+    run = cli("analysts", "targets", "AAPL", "MSFT", routes=[targets, {"path": "/v8/finance/chart/AAPL", **TOO_MANY}])
+    assert [r["status"] for r in run.doc["results"]] == ["ok", "not_attempted"], run
+    assert "secondary_rate_limited" in run.result()["warnings"] and "currency_unconfirmed" in run.result()["warnings"]
+    assert sum("/chart/" in r["path"] for r in run.requests) <= 2, "one lookup (yfinance retries a refused request once), never a second lookup"
+    assert run.code == 8
+
+
+def test_after_a_rate_limit_no_further_lookup_is_made_for_the_same_target(cli):
+    """valuation's currency lookup is refused with 429; its Market Cap still lacks a quote currency, and asking the chart for one would spend another request."""
+    payload = {"timeseries": {"result": [{"meta": {"type": ["trailingPeRatio"]}, "trailingPeRatio": [{"asOfDate": "2025-01-01", "reportedValue": {"raw": 30}}]}]}}
+    routes = [{"path": "/timeseries/AAPL", "json": payload}, {"path": "/quoteSummary/AAPL", **TOO_MANY}, {"path": "/v7/finance/quote", **TOO_MANY}]
+    run = cli("financials", "valuation", "AAPL", "MSFT", routes=routes)
+    assert [r["status"] for r in run.doc["results"]] == ["ok", "not_attempted"], run
+    assert not any("/chart/" in r["path"] for r in run.requests)
