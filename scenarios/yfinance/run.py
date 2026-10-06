@@ -17,7 +17,7 @@ import tempfile
 import threading
 
 REPO = Path(__file__).resolve().parents[2]
-BANK = REPO / "tests/yfinance/model-scenarios.json"
+BANK = REPO / "tests/invest/model-scenarios.json"
 BUDGET = "이 환경의 출력 한도는 작다 — 모든 CLI 호출에 `--max-chars 3000`을 붙이고 이 값을 올리지 않는다."
 WARM = threading.Lock()  # cold uv environments built in parallel stalled past the Bash tool's timeout
 
