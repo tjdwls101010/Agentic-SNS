@@ -156,12 +156,48 @@ def test_a_paragraph_is_wrapped_in_stars_exactly_when_four_fifths_of_its_letters
     assert any(text.startswith("**") and text.endswith("**") for text in lines_of(result)) is bold
 
 
-def test_the_starred_lines_of_a_real_document_are_exactly_its_wholly_bold_paragraphs(files):
-    document, result = files["apple.html"]
-    expected = sorted(item["text"] for item in document.outline
-                      if item["kind"] == "emphasis" and "table_id" not in item and item["bold_chars"] * 5 >= item["chars"] * 4)
-    starred = sorted(text[2:-2] for text in lines_of(result) if text.startswith("**") and text.endswith("**"))
-    assert starred == expected and len(starred) > 100
+def wholly_bold(body):
+    """Paragraphs outside tables with at least 4/5 of their letters bold, measured on the original with lxml alone: b/strong or an inline font-weight."""
+    from lxml import html
+    root = html.document_fromstring(re.sub(rb"^\s*<\?xml[^?]*\?>", b"", body))
+    found = []
+
+    def letters(text):
+        return len(re.sub(r"[\s\u200b]", "", text or ""))
+
+    for block in root.iter("div", "p"):
+        if next(block.iterancestors("table"), None) is not None or any(c.tag in ("div", "p", "table") for c in block.iter() if c is not block):
+            continue
+        counts = [0, 0]
+
+        def walk(node, heavy):
+            style = (node.get("style") or "").replace(" ", "").lower()
+            if node.tag in ("b", "strong") or re.search(r"font-weight:(bold|[6-9]00)", style):
+                heavy = True
+            elif re.search(r"font-weight:(normal|[1-5]00)", style):
+                heavy = False
+            for text, owner in [(node.text, heavy)] + [(c.tail, heavy) for c in node]:
+                counts[0] += letters(text)
+                counts[1] += letters(text) if owner else 0
+            for child in node:
+                if isinstance(child.tag, str):
+                    walk(child, heavy)
+
+        walk(block, False)
+        if counts[0] and counts[1] * 5 >= counts[0] * 4:
+            found.append(re.sub(r"[\s\u200b]+", "", block.text_content()))
+    return found
+
+
+def test_the_starred_lines_of_a_real_document_are_its_wholly_bold_paragraphs_measured_on_the_original(files):
+    _, result = files["apple.html"]
+    starred = sorted(re.sub(r"[\s\u200b]+", "", text[2:-2]) for text in lines_of(result) if text.startswith("**") and text.endswith("**"))
+    assert starred == sorted(wholly_bold(original("apple.html"))) and len(starred) == 176  # 176: the plan's own count, made before this renderer
+
+
+def test_mrvl_has_the_wholly_bold_paragraph_count_measured_before_the_renderer(files):
+    _, result = files["mrvl.html"]
+    assert sum(1 for text in lines_of(result) if text.startswith("**") and text.endswith("**")) == 183
 
 
 def test_a_heading_row_inside_a_one_row_table_is_a_set_apart_line():
@@ -285,3 +321,88 @@ def test_images_and_links_match_the_originals_count(files, name):
     assert images[:len(expected["image_sample"])] == expected["image_sample"]
     assert [x["url"] for x in external[:3]] == [s if s.startswith("http") else f"{SOURCE.rsplit('/', 1)[0]}/{s}" for s in expected["external_sample"]]
     assert all(line(result, i["line"]).count("[image:") for i in result.map["images"])
+
+
+def test_an_image_alt_with_a_line_break_keeps_every_line_coordinate():
+    _, result = rendered('<p><a href="#t">to target</a></p><p><img src="c.jpg" alt="Revenue&#10;2025"/></p><p id="t">Target text</p>')
+    assert result.text.count("\n") == result.map["lines"]
+    assert line(result, int(MARK.findall(line(result, 2))[0])) == "Target text"
+
+
+def test_a_hidden_image_inside_a_table_cell_is_left_out_with_the_cell():
+    markup = ('<html xmlns:ix="http://www.xbrl.org/2013/inlineXBRL"><body><table><tr><td>Revenue</td>'
+              '<td><ix:hidden><img src="h.jpg"/>secret</ix:hidden></td></tr></table></body></html>')
+    document, result = rendered(markup)
+    assert result.map["images"] == [] and "secret" not in result.text and "inline_xbrl_metadata_excluded" in document.limits
+
+
+def test_links_images_and_text_in_a_caption_are_kept():
+    markup = '<table><caption>Revenue <a href="#n">(see note)</a> <img src="c.jpg" alt="chart"/></caption><tr><td>1</td></tr></table><p id="n">The note</p>'
+    _, result = rendered(markup)
+    assert len(result.map["images"]) == 1 and [x["kind"] for x in result.map["links"]] == ["internal"]
+    assert line(result, result.map["images"][0]["line"]).startswith("[image: chart |")
+    assert line(result, result.map["links"][0]["target_line"]) == "The note"
+
+
+def test_a_group_that_straddles_its_first_target_is_not_the_contents():
+    group = '<table><tr><td><a href="#s0">Section 0</a></td></tr><tr><td id="s0">Section 0 body.</td></tr>' \
+            '<tr><td><a href="#s1">Section 1</a></td></tr><tr><td><a href="#s2">Section 2</a></td></tr></table>'
+    _, result = rendered(group + '<p id="s1">Section 1 body.</p><p id="s2">Section 2 body.</p>')
+    assert result.map["contents"] is None and result.map["candidates"][0]["before"] is False
+
+
+def test_an_ordering_just_under_nine_tenths_does_not_qualify():
+    """1808 of 2010 steps forward is 0.89950: it rounds to 0.9 in the map but is under the rule's nine tenths."""
+    order = list(range(2011))
+    for k in range(0, 202 * 4, 4):  # 202 disjoint adjacent swaps, one backward step each
+        order[k + 1], order[k + 2] = order[k + 2], order[k + 1]
+    assert sum(1 for a, b in zip(order, order[1:]) if b < a) == 202
+    links = "".join(f'<tr><td><a href="#s{i}">S{i}</a></td></tr>' for i in order)
+    body = "".join(f'<p id="s{i}">Body {i}.</p>' for i in range(2011))
+    _, result = rendered(f"<table>{links}</table>{body}")
+    assert result.map["candidates"][0]["ordered"] == 0.9 and result.map["contents"] is None
+
+
+def test_a_caption_alone_is_readable_text():
+    document, _ = rendered("<table><caption>Only a caption</caption><tr><td>​</td></tr></table>")
+    assert document.tables[0]["caption"]["text"] == "Only a caption"
+
+
+def after_text(target, limit=30):
+    """The first visible text at or after `target` in the original, read with lxml alone (the method expected-map.json used)."""
+    out, started = [], False
+    for node in target.getroottree().iter():
+        if node is target:
+            started = True
+        if not started or not isinstance(node.tag, str) or node.tag in ("script", "style"):
+            continue
+        if node.text and node.text.strip():
+            out.append(node.text)
+        if node is not target and node.tail:
+            out.append(node.tail)
+        if len(re.sub(r"\s+", " ", " ".join(out)).strip()) >= limit:
+            break
+    return re.sub(r"[\s​|]+", "", " ".join(out))[:limit]
+
+
+@pytest.mark.parametrize("name", ["apple.html", "mrvl.html", "nbis.html"])
+def test_every_internal_link_lands_where_the_original_anchor_is(files, name):
+    from lxml import html
+    root = html.document_fromstring(re.sub(rb"^\s*<\?xml[^?]*\?>", b"", original(name)))
+    anchors = {}
+    for node in root.iter():
+        for key in (node.get("id"), node.get("name") if node.tag == "a" else None):
+            if key and key not in anchors:
+                anchors[key] = node
+    _, result = files[name]
+    checked = 0
+    for link in result.map["links"]:
+        if link["kind"] != "internal" or "target_line" not in link:
+            continue
+        destination = after_text(anchors[link["url"].split("#", 1)[1]])
+        if not destination:
+            continue
+        found = reading(result, link["target_line"]).find(destination)
+        assert 0 <= found < len(reading(result, link["target_line"], 1)), (link, destination)
+        checked += 1
+    assert checked >= EXPECTED["elements"][name]["internal_links"] * 0.9

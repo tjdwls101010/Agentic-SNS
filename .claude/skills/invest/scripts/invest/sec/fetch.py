@@ -1,4 +1,8 @@
-"""Receiving one document from Yahoo's copy: no redirect followed, one retry for a connection error or server fault, and the whole attempt inside one deadline."""
+"""Receiving one document from Yahoo's copy: no redirect followed, one retry for a connection error or server fault, and the whole attempt inside one deadline.
+
+The socket timeout alone bounds only a silence, so a body that keeps arriving a byte at a time would outlast any --timeout; an interval timer (SIGALRM, a Unix main-thread contract like the Yahoo commands' deadline) interrupts the read wherever it is.
+"""
+import signal
 import time
 
 from invest.receipts import Failure
@@ -15,15 +19,31 @@ class Retryable(Failure):
     """A connection error or a server fault: worth one more attempt while the deadline allows."""
 
 
+class Expired(BaseException):
+    """A BaseException, so no library handler of Exception swallows the deadline."""
+
+
+def expired(signum, frame):
+    raise Expired()
+
+
 def fetch(located, timeout):
     """Return Fetched for located.fetch, or raise NotFound (404) or Failure('upstream') for anything else; `timeout` covers the retry too."""
     deadline = time.monotonic() + timeout
-    for attempt in (1, 2):
-        try:
-            return receive(located, deadline)
-        except Retryable as error:
-            if attempt == 2 or deadline - time.monotonic() <= 0:
-                raise Failure(f"{error} after {attempt} attempt{'s' if attempt > 1 else ''}.", fix=RETRY) from None
+    previous = signal.signal(signal.SIGALRM, expired)
+    signal.setitimer(signal.ITIMER_REAL, timeout)
+    try:
+        for attempt in (1, 2):
+            try:
+                return receive(located, deadline)
+            except Retryable as error:
+                if attempt == 2 or deadline - time.monotonic() <= 0:
+                    raise Failure(f"{error} after {attempt} attempt{'s' if attempt > 1 else ''}.", fix=RETRY) from None
+    except Expired:
+        raise Failure(f"The --timeout deadline ({timeout} s) passed before {located.fetch} had fully arrived.", fix="Raise --timeout, or retry later.") from None
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)
 
 
 def receive(located, deadline):

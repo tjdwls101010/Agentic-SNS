@@ -59,6 +59,10 @@ def one(url, timeout):
             f"original{extension(located.fetch)}": fetched.body})
     except receipts.Failure as exc:
         return {"target": url, "status": "error", "observed_at": observed, "error": receipts.failure(exc.code, exc, exc.fix)}
+    except Exception as exc:  # a document the reader cannot convert is that document's result; the other URLs are still read
+        return {"target": url, "status": "error", "observed_at": observed,
+                "error": receipts.failure("unsupported", f"The document could not be converted ({type(exc).__name__}: {exc}).",
+                                          "Open the source URL in a browser; nothing was saved for it.")}
     found = rendered.map
     entry = {"target": url, "status": "ok", "source": located.source, "path": str(folder / "document.txt"), "map_path": str(folder / "map.json"),
              "lines": found["lines"], "chars": found["chars"]}

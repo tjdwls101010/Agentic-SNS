@@ -12,6 +12,7 @@ from invest.sec.failures import Unsupported
 CDN = "https://cdn.yahoofinance.com/prod/sec-filings/{cik:010d}/{accession}/{name}"
 ARCHIVE = "https://www.sec.gov/Archives/edgar/data/{cik}/{accession}/{name}"
 NAME = r"[A-Za-z0-9][A-Za-z0-9._-]*"
+SPREADSHEET = re.compile(rf"/finance-pri-uw2/sec-filings(?:/{NAME})+\.xlsx")
 PATHS = {"cdn.yahoofinance.com": re.compile(rf"/prod/sec-filings/(?P<cik>\d{{10}})/(?P<accession>\d{{18}})/(?P<name>{NAME})"),
          "www.sec.gov": re.compile(rf"/Archives/edgar/data/(?P<cik>\d{{1,10}})/(?P<accession>\d{{18}})/(?P<name>{NAME})")}
 ACCEPTED = ("https://cdn.yahoofinance.com/prod/sec-filings/<cik10>/<accession18>/<file> (an exhibits URL from `company filings`) "
@@ -26,14 +27,21 @@ class Located:
 
 def locate(url):
     """Map a filing URL to its archive identity and Yahoo's copy; refuse any other URL with Invalid, and Yahoo's spreadsheet copies with Unsupported."""
-    parts = urlsplit(url)
-    if parts.hostname == "s3.amazonaws.com" and parts.path.startswith("/finance-pri-uw2/sec-filings/"):
+    refused = Invalid(f"{url} is not a filing document URL this skill reads.", fix=f"Pass {ACCEPTED}, without a query or fragment.")
+    try:
+        parts = urlsplit(url)
+        host = parts.hostname or ""
+    except ValueError:
+        raise refused from None
+    # A netloc that is exactly the host carries no credentials and no port.
+    if parts.scheme != "https" or parts.netloc.lower() != host or parts.query or parts.fragment:
+        raise refused
+    if host == "s3.amazonaws.com" and SPREADSHEET.fullmatch(parts.path):
         raise Unsupported("This is Yahoo's spreadsheet of the filing's financial report, which this skill does not convert.",
                           fix="Open the filing's main HTML document from `company filings` exhibits; its statements are tables there.")
-    pattern = PATHS.get(parts.hostname or "")
+    pattern = PATHS.get(host)
     match = pattern.fullmatch(parts.path) if pattern else None
-    # A netloc that is exactly the host carries no credentials and no port.
-    if parts.scheme != "https" or match is None or parts.netloc.lower() != parts.hostname or parts.query or parts.fragment:
-        raise Invalid(f"{url} is not a filing document URL this skill reads.", fix=f"Pass {ACCEPTED}, without a query or fragment.")
+    if match is None:
+        raise refused
     cik, accession, name = int(match["cik"]), match["accession"], match["name"]
     return Located(ARCHIVE.format(cik=cik, accession=accession, name=name), CDN.format(cik=cik, accession=accession, name=name))

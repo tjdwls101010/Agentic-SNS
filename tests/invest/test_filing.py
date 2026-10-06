@@ -177,3 +177,14 @@ def test_old_documents_are_deleted_by_age_when_filing_runs_and_zero_keeps_them(c
     assert kept.code == 0 and old.exists()
     pruned = cli("filing", OTHER, routes=[copy(OTHER, b"<p>New.</p>")])
     assert pruned.code == 0 and not old.exists()
+
+
+def test_a_receipt_that_could_not_be_saved_exits_local_io_even_when_every_document_was_empty(cli, copy, tmp_path):
+    results = tmp_path / "data" / "results"
+    results.mkdir(parents=True)
+    results.chmod(0o500)
+    try:
+        run = cli("filing", OTHER, routes=[copy(OTHER, b"")])
+    finally:
+        results.chmod(0o700)
+    assert run.code == 4 and "receipt_path" not in run.doc and [w["code"] if isinstance(w, dict) else w for w in run.doc["warnings"]] == ["not_saved"]

@@ -5,7 +5,6 @@ Internal links are grouped by where they sit: one table, or one block outside ta
 from urllib.parse import unquote, urlsplit
 
 MIN_TARGETS = 3
-ORDERED = 0.9
 
 
 def groups(document):
@@ -25,18 +24,19 @@ def judge(name, pairs):
     targets = list(dict.fromkeys(target for _, target, _ in pairs))
     positions = [position for _, _, position in pairs]
     steps = list(zip(positions, positions[1:]))
-    ordered = sum(1 for a, b in steps if b >= a) / len(steps) if steps else 1.0
-    first = pairs[0][0]
-    before = (first["block"], first.get("row", -1), first.get("offset", 0)) < min(positions)
-    return {"group": name, "block": first["block"], "targets": len(targets), "ordered": round(ordered, 3), "before": before, "chosen": False,
-            "pairs": pairs}
+    forward = sum(1 for a, b in steps if b >= a)
+    last = pairs[-1][0]
+    # Every link of the group, not only its first, sits before the earliest target: a group that straddles one of its targets is not a contents list.
+    before = (last["block"], last.get("row", -1), last.get("offset", 0)) < min(positions)
+    return {"group": name, "block": pairs[0][0]["block"], "targets": len(targets), "ordered": round(forward / len(steps), 3) if steps else 1.0,
+            "qualifies_order": not steps or forward * 10 >= len(steps) * 9, "before": before, "chosen": False, "pairs": pairs}
 
 
 def choose(document):
     """(chosen candidate or None, every candidate in document order); a chosen candidate keeps its links under "pairs"."""
     candidates = [judge(name, pairs) for name, pairs in groups(document).items()]
     candidates.sort(key=lambda c: c["block"])
-    qualifying = sorted((c for c in candidates if c["targets"] >= MIN_TARGETS and c["ordered"] >= ORDERED and c["before"]),
+    qualifying = sorted((c for c in candidates if c["targets"] >= MIN_TARGETS and c["qualifies_order"] and c["before"]),
                         key=lambda c: -c["targets"])
     chosen = None
     if qualifying and (len(qualifying) == 1 or qualifying[0]["targets"] > qualifying[1]["targets"]):

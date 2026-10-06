@@ -200,7 +200,7 @@ class _Document:
         self.marks.append((item, len(self.out)))
 
     def link_record(self, node, tag, target):
-        label = node.get("alt", "") if tag == "img" else collapse("".join(node.itertext()))
+        label = collapse(node.get("alt", "")) if tag == "img" else collapse("".join(node.itertext()))
         kind = "image" if tag == "img" else "internal" if target.startswith("#") else "external"
         item = {"id": self.link_ids[node], "kind": kind, "url": urljoin(self.url, target),
                 "text": label, "block": len(self.blocks), "offset": 0}
@@ -313,7 +313,9 @@ class _Document:
             if element is node or next(element.iterancestors("table"), None) is not node:
                 continue
             tag = tag_of(element)
-            if tag in SKIP_TAGS or tag in self.nonbody:
+            if tag in self.nonbody:
+                self.excluded = True
+            if tag in SKIP_TAGS or tag in self.nonbody or self.inside_metadata(element, node):
                 continue
             if tag == "tr":  # a row's own id lands on that row, through its first placed cell
                 cell = next((c for c in element if c in coords), None)
@@ -321,10 +323,13 @@ class _Document:
                 cell = element if tag in CELL_TAGS else next((a for a in element.iterancestors() if tag_of(a) in CELL_TAGS), None)
             place = coords.get(cell)
             self.block_of_node[element] = table["block"]
-            if place is None:
+            if place is not None:
+                where = {"block": table["block"], "offset": starts.get(place, 0),
+                         "table_id": table["table_id"], "row": place[0], "column": place[1]}
+            elif any(tag_of(a) == "caption" for a in element.iterancestors()):
+                where = {"block": table["block"], "offset": 0, "table_id": table["table_id"]}  # the caption belongs to the table, not to a cell
+            else:
                 continue
-            where = {"block": table["block"], "offset": starts.get(place, 0),
-                     "table_id": table["table_id"], "row": place[0], "column": place[1]}
             key = element.get("id") or (element.get("name") if tag == "a" else None)
             if key:
                 item = {"kind": "anchor", "text": key, "url": self.url + "#" + quote(key), **where}

@@ -66,7 +66,7 @@ def frame(name, table):
 
 
 def image_text(image):
-    return f"[image: {image['text'] or 'no alt text'} | {image['url']}]"
+    return " ".join(f"[image: {image['text'] or 'no alt text'} | {image['url']}]".split())
 
 
 def render(document, identity):
@@ -89,6 +89,9 @@ def render(document, identity):
             table = tables[block["table_id"]]
             name = names[table["table_id"]]
             lines += frame(name, table)
+            for image in images.get((index, table["table_id"], None, None), []):  # an image in the caption, right after it
+                image_line[image["id"]] = len(lines) + 1
+                lines.append(image_text(image))
             for row, _, _ in table["row_ranges"]:
                 extra = {}
                 for field, column in enumerate(table["kept_columns"]):

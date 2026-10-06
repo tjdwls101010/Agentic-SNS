@@ -145,3 +145,46 @@ def test_the_deadline_covers_the_retry(server):
     with pytest.raises(Failure) as error:
         fetch(server.located("/a.htm", {"delay": 0.6, "status": 503}), 1.0)
     assert error.value.code == "upstream" and time.monotonic() - started < 1.9
+
+
+def test_the_deadline_bounds_a_body_that_keeps_dripping(server):
+    """Each byte arrives before the socket would time out, so only a deadline over the whole read stops it."""
+    class Drip(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Length", "100")
+            self.end_headers()
+            for _ in range(100):
+                self.wfile.write(b"x")
+                self.wfile.flush()
+                time.sleep(0.05)
+
+    drip = ThreadingHTTPServer(("127.0.0.1", 0), Drip)
+    threading.Thread(target=drip.serve_forever, daemon=True).start()
+    started = time.monotonic()
+    try:
+        with pytest.raises(Failure) as error:
+            fetch(Located(ARCHIVE, f"http://127.0.0.1:{drip.server_port}/a.htm"), 0.5)
+    finally:
+        drip.shutdown()
+    assert error.value.code == "upstream" and time.monotonic() - started < 1.5
+
+
+@pytest.mark.parametrize("url", ["https://[invalid/path", "https://cdn.yahoofinance.com:99999/prod/sec-filings/0000320193/000032019325000079/a.htm"])
+def test_a_url_that_does_not_parse_is_invalid(url):
+    with pytest.raises(Invalid):
+        locate(url)
+
+
+@pytest.mark.parametrize("url", [
+    "https://u:p@s3.amazonaws.com/finance-pri-uw2/sec-filings/0000320193/000032019325000079/Financial_Report.xlsx",
+    "https://s3.amazonaws.com/finance-pri-uw2/sec-filings/0000320193/000032019325000079/Financial_Report.xlsx#x",
+    "https://s3.amazonaws.com/finance-pri-uw2/sec-filings/../x/Financial_Report.xlsx",
+    "http://s3.amazonaws.com/finance-pri-uw2/sec-filings/0000320193/000032019325000079/Financial_Report.xlsx",
+], ids=["credentials", "fragment", "dot-dot", "http"])
+def test_a_malformed_spreadsheet_url_is_invalid_not_unsupported(url):
+    with pytest.raises(Invalid):
+        locate(url)

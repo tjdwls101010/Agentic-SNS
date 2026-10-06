@@ -81,8 +81,7 @@ def exit_code(document):
     if status in ("ok", "partial", "empty"):
         return EXIT_CODES[status][0]
     failed = [(r.get("error") or {}).get("code") for r in document.get("results", [])]
-    if failed and all(c in NOTHING_USABLE for c in failed):
-        return EXIT_CODES["empty"][0]
+    usable = bool(failed) and all(c in NOTHING_USABLE for c in failed)
     warned = codes(document.get("warnings"))
     if "not_attempted" in failed or "secondary_rate_limited" in warned:  # a rate limit met stays the answer, whatever failed after it
         failed.append("rate_limited")
@@ -91,7 +90,7 @@ def exit_code(document):
     for code in PRIORITY:
         if code in failed:
             return EXIT_CODES[code][0]
-    return EXIT_CODES["upstream"][0]
+    return EXIT_CODES["empty" if usable else "upstream"][0]
 
 
 def ordered(mapping, order):

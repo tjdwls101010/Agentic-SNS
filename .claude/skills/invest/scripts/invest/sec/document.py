@@ -56,7 +56,7 @@ def parse(fetched):
             limits.append("inline_xbrl_metadata_excluded")
     else:
         blocks = [{"kind": "text", "text": line, "url": fetched.url} for line in map(collapse, text.splitlines()) if not blank(line)]
-    if not any(not blank(block["text"]) for block in blocks):
+    if not any(not blank(block["text"]) for block in blocks) and not any(table.get("caption") for table in tables):
         raise EmptyDocument("The document has no readable text.", fix="Open the original URL; it may hold only images or layout, which are not converted.")
     if any(item["kind"] == "image" for item in links):
         limits.append("image_content_not_extracted")
