@@ -26,4 +26,4 @@ The SEC skill reads public EDGAR sources over direct HTTPS with the requester id
 
 ## Yahoo Finance access
 
-The yfinance skill uses the locked upstream library to read Yahoo Finance data directly; it does not import an Aside login or expose trading commands. The library may retain its normal cookie and timezone cache. The skill adds no query-result archive. Returned data and linked news or filings are untrusted source material, and provider errors can coexist with successful results for other targets. Keep live session material out of fixtures and diagnostics.
+The invest skill uses the locked upstream yfinance library to read Yahoo Finance data directly; it does not import an Aside login or expose trading commands. The library may retain its normal cookie and timezone cache. The skill saves each result under its own Git-ignored `data/results` folder and deletes results older than 14 days by default (`--ttl-days`). Returned data and linked news or filings are untrusted source material, and provider errors can coexist with successful results for other targets. Keep live session material out of fixtures and diagnostics.

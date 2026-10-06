@@ -87,11 +87,41 @@ def stored():
     return pd.DataFrame([{"target": s, "date": d, "close": c} for s, values in closes.items() for d, c in values])
 
 
+def from_run(data, scenario):
+    """The answer each history result a run saved implies, with how its 2025 closes compare with the stored reference."""
+    import pandas as pd
+    found = []
+    stored = stored_closes()
+    for receipt_path in sorted(Path(data).glob("results/*/receipt.json")):
+        receipt = json.loads(receipt_path.read_text())
+        csv_path = receipt_path.with_name("result.csv")
+        if receipt.get("command") != "history" or not csv_path.exists():
+            continue
+        frame = pd.read_csv(csv_path)
+        frame = frame.assign(date=frame["Date"].str[:10], close=frame["Close"])[["target", "date", "close"]]
+        frame = frame[frame["date"].str.startswith("2025")]
+        if frame["target"].nunique() < 2:
+            continue
+        joined = frame.set_index(["target", "date"])["close"].to_frame("run").join(stored.to_frame("stored"), how="inner")
+        found.append({"receipt": receipt["id"], "adjust": receipt["request"].get("adjust"), "targets": int(frame["target"].nunique()), "rows": len(frame),
+                      "answer": compute(scenario, frame),
+                      "against_stored": {"rows_compared": len(joined), "max_abs_diff": float((joined["run"] - joined["stored"]).abs().max()) if len(joined) else None}})
+    return found
+
+
+def stored_closes():
+    return stored().set_index(["target", "date"])["close"]
+
+
 def main():
     parser = argparse.ArgumentParser(description="Expected answers for the large-result scenarios; see the module docstring.")
     parser.add_argument("--reference", action="store_true", help=f"Fetch the 2025 closes from yfinance and write {REFERENCE.name}.")
+    parser.add_argument("--from-run", metavar="DATA", help="Print, as JSON, the answer each history result under a run's INVEST_DATA folder implies.")
+    parser.add_argument("--scenario", choices=sorted(CALCULATORS), help="With --from-run: which scenario's answer to compute.")
     args = parser.parse_args()
-    if args.reference:
+    if args.from_run:
+        print(json.dumps(from_run(args.from_run, args.scenario), ensure_ascii=False, indent=1))
+    elif args.reference:
         found = reference()
         print(json.dumps(found["answers"], ensure_ascii=False, indent=1))
 

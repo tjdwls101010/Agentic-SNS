@@ -24,7 +24,7 @@ Keep the requested scope bounded. A displayed item limit is not necessarily a li
 
 ## Use the skills in other projects
 
-Each skill is self-contained: copy its complete directory. For SEC this includes `Scripts/` with its `pyproject.toml` and `uv.lock`; for yfinance and the SNS skills it includes `scripts/`. Keep the cloned repository if you link to it.
+Each skill is self-contained: copy its complete directory. For SEC this includes `Scripts/` with its `pyproject.toml` and `uv.lock`; for invest and the SNS skills it includes `scripts/`. Keep the cloned repository if you link to it.
 
 From the clone's root, install the Twitter skill for all your projects in the host you use. Before running a link command, check whether the destination already exists; keep any existing installation rather than creating a link inside it.
 
@@ -47,7 +47,7 @@ mkdir -p "$HOME/.agents/skills"
 ln -s "$PWD/.claude/skills/twitter" "$HOME/.agents/skills/twitter"
 ```
 
-For another skill, replace both occurrences of `twitter` in the selected command with `reddit`, `facebook`, `threads`, `naver-blog`, `sec`, or `yfinance`. Alternatively, copy the complete skill directory into a destination that does not already exist. Restart your agent if it does not discover the installation.
+For another skill, replace both occurrences of `twitter` in the selected command with `reddit`, `facebook`, `threads`, `naver-blog`, `sec`, or `invest`. Alternatively, copy the complete skill directory into a destination that does not already exist. Restart your agent if it does not discover the installation.
 
 For project-only installation, use that project's `.claude/skills` or `.agents/skills` directory instead. After installation outside the clone, resolve CLI commands relative to the installed `SKILL.md`, rather than to your current working directory. `${CLAUDE_SKILL_DIR}` in a skill denotes that skill directory; hosts that do not substitute it must use the actual absolute path.
 
@@ -69,14 +69,14 @@ For example, ask: “Find Microsoft's latest annual filing and read the end of i
 
 ## Yahoo Finance
 
-Install `uv` and copy the complete yfinance skill directory if using it outside this clone. The first run prepares a Python 3.12 or 3.13 environment and installs the dependencies pinned in the header of `scripts/cli.py`; no Aside setup or API key is required.
+Install `uv` and copy the complete invest skill directory if using it outside this clone. The first run prepares a Python 3.12 or 3.13 environment and installs the dependencies pinned in the header of `scripts/cli.py`; no Aside setup or API key is required.
 
 ```bash
-uv run .claude/skills/yfinance/scripts/cli.py --help
-uv run .claude/skills/yfinance/scripts/cli.py financials --help
+uv run .claude/skills/invest/scripts/cli.py --help
+uv run .claude/skills/invest/scripts/cli.py financials --help
 ```
 
-Ask, for example: “Find Apple's reported revenue for the latest four quarters and identify the reporting periods and currency.” The agent discovers the appropriate command and available fields, selects the query and reads its structured result. For another question it can follow returned tickers, option expirations or screener fields without writing Python integration code. `--help` maps the commands, and each command's `--help` owns its interface and what each kind's values mean — units, timing and known gotchas; [skill guidance](../.claude/skills/yfinance/SKILL.md) says how to run the CLI, and each result's status, `coverage`, warnings and `fix` say what to do when it comes back short.
+Ask, for example: “Find Apple's reported revenue for the latest four quarters and identify the reporting periods and currency.” The agent picks the command, reads the short receipt it prints and computes from the file the receipt names. For another question it can follow returned tickers, option expirations or screener fields without writing Python integration code. `--help` maps the commands, and each command's `--help` owns its arguments, receipt and failures; each result carries its own units, times, coverage, confirmed conditions and warnings, and each failure its code and `fix`. [Skill guidance](../.claude/skills/invest/SKILL.md) says how to turn a result into an answer.
 
 Queries always return JSON, and every command answers with one screen by default: the `coverage` field reports how many rows arrived, how many were printed and which end a limit kept, and — for commands that ask the source for a set number, such as news, screens and calendars — how many were asked for; fewer arriving than asked is not by itself the end of what the source has. A table that does not fit the budget is narrowed and comes back as `partial` rather than `ok`, so a narrowed window is never mistaken for the whole range; a result that cannot be narrowed comes back as `too_large`, with the saved `id` and a `fix` that says how to read it. For a computation over every row, such as a five-year drawdown, `--out FILE` writes the rows the query received to a CSV (one `target` column across tickers, every digit as received) and prints only a summary; `read ID --out FILE` does the same for a saved result without a new request.
 

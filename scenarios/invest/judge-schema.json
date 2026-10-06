@@ -1,0 +1,40 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["runs", "groups", "summary"],
+  "properties": {
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["run", "id", "cond", "verdict", "premise_held", "reason", "evidence", "semantic_errors"],
+        "properties": {
+          "run": {"type": "string", "description": "the run folder name"},
+          "id": {"type": "string"},
+          "cond": {"type": "string", "enum": ["invest", "L"]},
+          "verdict": {"type": "string", "enum": ["pass", "fail", "inconclusive"]},
+          "premise_held": {"type": ["boolean", "null"], "description": "null when the scenario has no premise"},
+          "reason": {"type": "string"},
+          "evidence": {"type": "string"},
+          "semantic_errors": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "cond", "invariants_held", "reason"],
+        "properties": {
+          "id": {"type": "string"},
+          "cond": {"type": "string", "enum": ["invest", "L"]},
+          "invariants_held": {"type": "boolean"},
+          "reason": {"type": "string"}
+        }
+      }
+    },
+    "summary": {"type": "string"}
+  }
+}

@@ -14,7 +14,7 @@ jobs:
         with:
           node-version: '22'
       - run: python -m pip install pytest==8.4.2 ruff
-      - run: python -m pytest tests/ --ignore=tests/sec --ignore=tests/finviz --ignore=tests/yfinance
+      - run: python -m pytest tests/ --ignore=tests/sec --ignore=tests/finviz --ignore=tests/invest
       - run: node --test tests/facebook/js/*.js
       - run: python tests/facebook/tools/check_fixtures_pii.py
       - run: ruff check --config pyproject.toml .claude/skills/facebook/scripts tests/facebook
@@ -40,7 +40,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - run: uv run --isolated --frozen --group dev --project .claude/skills/sec/Scripts python -m pytest tests/sec
       - run: uv run --isolated --frozen --group dev --project .claude/skills/sec/Scripts ruff check --config pyproject.toml .claude/skills/sec/Scripts tests/sec
-  yfinance:
+  invest:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,5 +48,5 @@ jobs:
         with:
           python-version: '3.12'
       - uses: astral-sh/setup-uv@v6
-      - run: bash -c 'set -euo pipefail; mkdir -p .tmp; uv export --quiet --script .claude/skills/yfinance/scripts/cli.py --no-hashes -o .tmp/yf-test-req.txt; uv run --isolated --no-project --python ">=3.12,<3.14" --with-requirements .tmp/yf-test-req.txt --with pytest==8.4.2 python -m pytest tests/yfinance tests/test_skill_layout.py'
-      - run: uvx ruff check --config pyproject.toml .claude/skills/yfinance/scripts tests/yfinance scenarios/yfinance
+      - run: bash -c 'set -euo pipefail; mkdir -p .tmp; uv export --quiet --script .claude/skills/invest/scripts/cli.py --no-hashes -o .tmp/invest-req.txt; uv run --isolated --no-project --python ">=3.12,<3.14" --with-requirements .tmp/invest-req.txt --with pytest==8.4.2 python -m pytest tests/invest tests/test_skill_layout.py'
+      - run: uvx ruff check --config pyproject.toml .claude/skills/invest/scripts tests/invest scenarios/invest
