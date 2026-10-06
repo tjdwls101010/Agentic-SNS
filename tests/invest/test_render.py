@@ -412,7 +412,10 @@ def test_every_internal_link_lands_where_the_original_anchor_is(files, name):
             landed = reading(result, mark)
             assert any(d is not None and 0 <= landed.find(d) < len(reading(result, mark, 1)) for d in destinations.get(number, []) if d), (number, mark)
             checked += 1
-    assert checked >= 10
+    # And every link outside the chosen contents whose target is in the document has its marker on its own line.
+    unmarked = [x for x in result.map["links"] if x["kind"] == "internal" and "target_line" in x and not x.get("contents")
+                and f"[→L{x['target_line']}]" not in line(result, x["line"])]
+    assert unmarked == [] and checked >= 10
 
 
 def test_a_caption_link_is_marked_on_the_caption_line_and_an_id_on_the_caption_is_a_target():
@@ -433,13 +436,13 @@ def test_a_footer_declared_first_is_read_last_when_judging_before():
     assert result.map["contents"] is None and result.map["candidates"][0]["before"] is False
 
 
-# Any change to what render writes for the same bytes must raise VERSION, or a folder saved under the old text is reused for the new one.
-RENDERED_BY_VERSION = {2: "51883321959b882f"}
+# Any change to what render writes for the same bytes (file or map) must raise VERSION, or a folder saved under the old output is reused for the new one.
+RENDERED_BY_VERSION = {3: "7497965e2af4435f"}
 
 
 def test_the_rendered_text_is_the_one_its_version_names(files):
     import hashlib
     _, result = files["nbis.html"]
     VERSION = int(line(result, 1).rsplit("text v", 1)[1])  # the version the file names on its first line
-    digest = hashlib.sha256(result.text.encode()).hexdigest()[:16]
+    digest = hashlib.sha256((result.text + json.dumps(result.map, sort_keys=True, ensure_ascii=False)).encode()).hexdigest()[:16]
     assert RENDERED_BY_VERSION.get(VERSION) == digest, f"render output changed: raise VERSION and record {digest} for it"

@@ -171,8 +171,8 @@ def summarise(stream, skill_md_chars, log=None):
         m["output_runs"] += len(helps) + len(fresh)
         m["help_chars"] += sum(len(h) for h in helps)
         m["receipt_chars"] += sum(len(r) for r in receipts)
-        if "/filings/" in command and not runs:  # grep, sed or head over a saved filing document or its map
-            m["filing_reads"] += 1
+        if any(re.match(r"\s*(cat|sed|head|tail|grep|rg|awk|less|wc|python3?)\b", part) and "/filings/" in part for part in re.split(r"&&|\|\||[;|\n]", command)):
+            m["filing_reads"] += 1  # a reading subcommand over a saved filing document or its map, beside a CLI run or not
             m["filing_read_chars"] += len(text)
         if re.search(r"\bpython", command) and not runs:
             m["python_runs"] += 1

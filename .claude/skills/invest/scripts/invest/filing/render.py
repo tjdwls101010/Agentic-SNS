@@ -6,8 +6,8 @@ from dataclasses import dataclass
 
 from invest.filing.contents import choose
 
-# Raised whenever a line of the file can change for the same bytes, so a saved file is never reused across a change in how it is written.
-VERSION = 2
+# Raised whenever the file or its map can change for the same bytes, so a saved folder is never reused across a change in how it is written.
+VERSION = 3
 # A wholly bold paragraph: at least four of every five of its letters set bold.
 BOLD = (4, 5)
 # A contents range larger than this lists the set-apart lines inside it, where a reader needs a finer place to start.
@@ -128,7 +128,9 @@ def render(document, identity):
         entry = {"line": at, "kind": link["kind"], "text": link["text"], "url": link["url"]}
         if "target_block" in link:
             entry["target_line"] = landing(link)
-            if id(link) not in in_contents:
+            if id(link) in in_contents:
+                entry["contents"] = True  # a link of the chosen contents: the map's contents list gives it, so the file carries no marker
+            else:
                 marks.setdefault(at, []).append(entry["target_line"])
         links.append(entry)
     for at, targets in marks.items():
