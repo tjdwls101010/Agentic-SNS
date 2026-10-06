@@ -42,6 +42,18 @@ def lined(item):
     return f"L{item['line']} {item['text']}"
 
 
+def convert(fetched, located, digest):
+    """(Rendered, Document); a document the reader cannot convert fails as unsupported, so the other URLs are still read."""
+    try:
+        document = sec.parse(fetched)
+        return render(document, {"source": located.source, "fetch": located.fetch, "sha256": digest}), document
+    except receipts.Failure:
+        raise
+    except Exception as exc:
+        raise receipts.Failure(f"The document could not be converted ({type(exc).__name__}: {exc}).", fix="Open the source URL in a browser; nothing was saved for it.",
+                               code="unsupported") from None
+
+
 def one(url, timeout):
     """The receipt entry for one URL; the document is saved when it was read."""
     observed = now()
@@ -49,9 +61,8 @@ def one(url, timeout):
         located = sec.locate(url)
         fetched = sec.fetch(located, timeout)
         observed = now()
-        document = sec.parse(fetched)
         digest = hashlib.sha256(fetched.body).hexdigest()
-        rendered = render(document, {"source": located.source, "fetch": located.fetch, "sha256": digest})
+        rendered, document = convert(fetched, located, digest)
         source = {"source": located.source, "fetch": located.fetch, "sha256": digest, "bytes": len(fetched.body), "content_type": fetched.content_type or None,
                   "fetched_at": observed, "text_version": VERSION, "encoding": document.encoding}
         folder, reused = documents.publish(documents.key(located.source, digest, VERSION, fetched.content_type), {
@@ -59,10 +70,6 @@ def one(url, timeout):
             f"original{extension(located.fetch)}": fetched.body})
     except receipts.Failure as exc:
         return {"target": url, "status": "error", "observed_at": observed, "error": receipts.failure(exc.code, exc, exc.fix)}
-    except Exception as exc:  # a document the reader cannot convert is that document's result; the other URLs are still read
-        return {"target": url, "status": "error", "observed_at": observed,
-                "error": receipts.failure("unsupported", f"The document could not be converted ({type(exc).__name__}: {exc}).",
-                                          "Open the source URL in a browser; nothing was saved for it.")}
     found = rendered.map
     entry = {"target": url, "status": "ok", "source": located.source, "path": str(folder / "document.txt"), "map_path": str(folder / "map.json"),
              "lines": found["lines"], "chars": found["chars"]}

@@ -326,8 +326,9 @@ class _Document:
             if place is not None:
                 where = {"block": table["block"], "offset": starts.get(place, 0),
                          "table_id": table["table_id"], "row": place[0], "column": place[1]}
-            elif any(tag_of(a) == "caption" for a in element.iterancestors()):
-                where = {"block": table["block"], "offset": 0, "table_id": table["table_id"]}  # the caption belongs to the table, not to a cell
+            elif tag == "caption" or any(tag_of(a) == "caption" for a in element.iterancestors()):
+                # The caption belongs to the table, not to a cell: row -1 is the caption's own line, between the frame and row 0.
+                where = {"block": table["block"], "offset": 0, "table_id": table["table_id"], "row": -1}
             else:
                 continue
             key = element.get("id") or (element.get("name") if tag == "a" else None)

@@ -188,3 +188,17 @@ def test_a_url_that_does_not_parse_is_invalid(url):
 def test_a_malformed_spreadsheet_url_is_invalid_not_unsupported(url):
     with pytest.raises(Invalid):
         locate(url)
+
+
+def test_fetch_refuses_to_replace_a_timer_already_running(server):
+    import signal
+    signal.signal(signal.SIGALRM, lambda *a: None)
+    signal.setitimer(signal.ITIMER_REAL, 10, 2)
+    try:
+        with pytest.raises(RuntimeError):
+            fetch(server.located("/a.htm", {"body": b"<p>x</p>"}), 5)
+        remaining, interval = signal.getitimer(signal.ITIMER_REAL)
+        assert remaining > 5 and interval == 2
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, signal.SIG_DFL)

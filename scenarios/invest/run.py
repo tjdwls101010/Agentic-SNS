@@ -9,6 +9,7 @@ Writes <out>/meta.json, <out>/results.jsonl and <out>/runs/<id>-<cond>-p<pair>-<
 import argparse
 import concurrent.futures
 import datetime as dt
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -23,7 +24,8 @@ BANK = REPO / "tests/invest/model-scenarios.json"
 SKILL = REPO / ".claude/skills/invest"
 BASELINE = REPO / ".tmp/invest-plan/proto/skillL"
 PINNED = ["--exclude-newer", "2026-09-13T13:10:00Z", "--with", "yfinance[repair]==1.7.0"]
-FROZEN = [".claude/skills/invest", "tests/invest/model-scenarios.json", "scenarios/invest/judge.md", "scenarios/invest/judge-schema.json"]
+# The runner is frozen too: it decides what each condition's copy of the skill holds (invest-noread's READING).
+FROZEN = [".claude/skills/invest", "tests/invest/model-scenarios.json", "scenarios/invest/judge.md", "scenarios/invest/judge-schema.json", "scenarios/invest/run.py"]
 WARM = threading.Lock()  # cold uv environments built in parallel stalled past the Bash tool's timeout
 CLI_RUN = re.compile(r"\buv run\b[^\n;|&]*cli\.py")
 KINDED = {"company", "financials", "analysts", "holders", "fund", "options", "screen", "market", "calendar"}  # commands whose second word is a kind
@@ -135,6 +137,7 @@ def summarise(stream, skill_md_chars, log=None):
     tools, results, final, answer = parse_stream(stream)
     seen = set()
     m = {"bash_calls": 0, "cli_runs": None, "help_runs": None, "output_runs": 0, "help_chars": 0, "receipt_chars": 0, "file_reads": 0, "file_read_chars": 0,
+         "filing_reads": 0, "filing_read_chars": 0,
          "python_runs": 0, "python_chars": 0, "other_tool_calls": 0, "failed_calls": [], "commands": set(), "observed_at": set(), "signals": {}}
     total = 0
     for ident, name, given in tools:
@@ -144,7 +147,10 @@ def summarise(stream, skill_md_chars, log=None):
             m["failed_calls"].append(f"{name}: {str(given)[:200]} => {text[:200]}")
         if name == "Read":
             path = str(given.get("file_path", ""))
-            if "/data/results/" in path or path.endswith(("result.csv", "result.json", "receipt.json")):
+            if "/data/filings/" in path or path.endswith(("document.txt", "map.json")):
+                m["filing_reads"] += 1
+                m["filing_read_chars"] += len(text)
+            elif "/data/results/" in path or path.endswith(("result.csv", "result.json", "receipt.json")):
                 m["file_reads"] += 1
                 m["file_read_chars"] += len(text)
             continue
@@ -165,6 +171,9 @@ def summarise(stream, skill_md_chars, log=None):
         m["output_runs"] += len(helps) + len(fresh)
         m["help_chars"] += sum(len(h) for h in helps)
         m["receipt_chars"] += sum(len(r) for r in receipts)
+        if "/filings/" in command and not runs:  # grep, sed or head over a saved filing document or its map
+            m["filing_reads"] += 1
+            m["filing_read_chars"] += len(text)
         if re.search(r"\bpython", command) and not runs:
             m["python_runs"] += 1
             m["python_chars"] += len(text)
@@ -238,6 +247,7 @@ def run_one(scenario, cond, pair, n, args, work, out):
     if (run / "calls.jsonl").exists():
         shutil.copy(run / "calls.jsonl", record / "calls.jsonl")
     summary, answer = summarise(record / "stream.jsonl", len((skill / "SKILL.md").read_text(encoding="utf-8")), record / "calls.jsonl")
+    summary["skill_md_sha256"] = hashlib.sha256((skill / "SKILL.md").read_bytes()).hexdigest()  # the text this condition's copy actually held
     (record / "answer.md").write_text(answer, encoding="utf-8")
     for kind in ("results", "filings"):  # filings: the documents the run read, which judging checks each quoted claim against
         if (run / "data" / kind).is_dir():

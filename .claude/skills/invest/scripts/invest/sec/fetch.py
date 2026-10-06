@@ -29,6 +29,8 @@ def expired(signum, frame):
 
 def fetch(located, timeout):
     """Return Fetched for located.fetch, or raise NotFound (404) or Failure('upstream') for anything else; `timeout` covers the retry too."""
+    if signal.getitimer(signal.ITIMER_REAL)[0] > 0:
+        raise RuntimeError("fetch needs the interval timer for its deadline, and another one is running")
     deadline = time.monotonic() + timeout
     previous = signal.signal(signal.SIGALRM, expired)
     signal.setitimer(signal.ITIMER_REAL, timeout)

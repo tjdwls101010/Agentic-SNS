@@ -25,9 +25,8 @@ def judge(name, pairs):
     positions = [position for _, _, position in pairs]
     steps = list(zip(positions, positions[1:]))
     forward = sum(1 for a, b in steps if b >= a)
-    last = pairs[-1][0]
-    # Every link of the group, not only its first, sits before the earliest target: a group that straddles one of its targets is not a contents list.
-    before = (last["block"], last.get("row", -1), last.get("offset", 0)) < min(positions)
+    # Every link of the group sits before the earliest target, in reading order (a footer declared first is read last): a group that straddles one of its targets is not a contents list.
+    before = max((link["block"], link.get("row", -1), link.get("offset", 0)) for link, _, _ in pairs) < min(positions)
     return {"group": name, "block": pairs[0][0]["block"], "targets": len(targets), "ordered": round(forward / len(steps), 3) if steps else 1.0,
             "qualifies_order": not steps or forward * 10 >= len(steps) * 9, "before": before, "chosen": False, "pairs": pairs}
 

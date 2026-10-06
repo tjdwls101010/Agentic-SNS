@@ -162,13 +162,11 @@ def wholly_bold(body):
     root = html.document_fromstring(re.sub(rb"^\s*<\?xml[^?]*\?>", b"", body))
     found = []
 
-    def letters(text):
-        return len(re.sub(r"[\s\u200b]", "", text or ""))
 
     for block in root.iter("div", "p"):
         if next(block.iterancestors("table"), None) is not None or any(c.tag in ("div", "p", "table") for c in block.iter() if c is not block):
             continue
-        counts = [0, 0]
+        chars = []  # (character, bold) in reading order
 
         def walk(node, heavy):
             style = (node.get("style") or "").replace(" ", "").lower()
@@ -176,15 +174,24 @@ def wholly_bold(body):
                 heavy = True
             elif re.search(r"font-weight:(normal|[1-5]00)", style):
                 heavy = False
-            for text, owner in [(node.text, heavy)] + [(c.tail, heavy) for c in node]:
-                counts[0] += letters(text)
-                counts[1] += letters(text) if owner else 0
+            chars.extend((c, heavy) for c in node.text or "")
             for child in node:
                 if isinstance(child.tag, str):
                     walk(child, heavy)
+                chars.extend((c, heavy) for c in child.tail or "")  # a tail is its parent's flow
 
         walk(block, False)
-        if counts[0] and counts[1] * 5 >= counts[0] * 4:
+        shown = []  # a whitespace run reads as one space, owned by its first character; the ends are trimmed
+        for c, heavy in chars:
+            if c.isspace():
+                if shown and not shown[-1][0].isspace():
+                    shown.append((" ", heavy))
+            else:
+                shown.append((c, heavy))
+        while shown and shown[-1][0] == " ":
+            shown.pop()
+        counted = [heavy for c, heavy in shown if c != "\u200b"]
+        if counted and sum(counted) * 5 >= len(counted) * 4:
             found.append(re.sub(r"[\s\u200b]+", "", block.text_content()))
     return found
 
@@ -395,14 +402,44 @@ def test_every_internal_link_lands_where_the_original_anchor_is(files, name):
             if key and key not in anchors:
                 anchors[key] = node
     _, result = files[name]
-    checked = 0
+    destinations = {}  # line -> what the original shows after each anchor linked from that line
     for link in result.map["links"]:
-        if link["kind"] != "internal" or "target_line" not in link:
-            continue
-        destination = after_text(anchors[link["url"].split("#", 1)[1]])
-        if not destination:
-            continue
-        found = reading(result, link["target_line"]).find(destination)
-        assert 0 <= found < len(reading(result, link["target_line"], 1)), (link, destination)
-        checked += 1
-    assert checked >= EXPECTED["elements"][name]["internal_links"] * 0.9
+        if link["kind"] == "internal":
+            destinations.setdefault(link["line"], []).append(after_text(anchors[link["url"].split("#", 1)[1]]) if link["url"].split("#", 1)[1] in anchors else None)
+    checked = 0
+    for number, text in enumerate(lines_of(result), start=1):
+        for mark in map(int, MARK.findall(text)):
+            landed = reading(result, mark)
+            assert any(d is not None and 0 <= landed.find(d) < len(reading(result, mark, 1)) for d in destinations.get(number, []) if d), (number, mark)
+            checked += 1
+    assert checked >= 10
+
+
+def test_a_caption_link_is_marked_on_the_caption_line_and_an_id_on_the_caption_is_a_target():
+    markup = ('<p><a href="#cap">to the caption</a></p><table><caption id="cap">Revenue <a href="#n">(see note)</a></caption>'
+              '<tr><td>1</td></tr></table><p id="n">The note</p>')
+    _, result = rendered(markup)
+    caption = next(i + 1 for i, text in enumerate(lines_of(result)) if text.startswith("caption: "))
+    assert MARK.findall(line(result, caption)) and line(result, int(MARK.findall(line(result, caption))[0])) == "The note"
+    assert int(MARK.findall(line(result, 2))[0]) == caption
+
+
+def test_a_footer_declared_first_is_read_last_when_judging_before():
+    """The footer link to C is read after target A, so the group straddles A even though the footer comes first in the markup."""
+    group = ('<table><tfoot><tr><td><a href="#c">C</a></td></tr></tfoot><tbody>'
+             + "".join('<tr><td><a href="#a">A</a></td></tr>' for _ in range(10))
+             + '<tr><td><a href="#b">B</a></td></tr><tr><td id="a">A body</td></tr></tbody></table>')
+    _, result = rendered(group + '<p id="b">B body</p><p id="c">C body</p>')
+    assert result.map["contents"] is None and result.map["candidates"][0]["before"] is False
+
+
+# Any change to what render writes for the same bytes must raise VERSION, or a folder saved under the old text is reused for the new one.
+RENDERED_BY_VERSION = {2: "51883321959b882f"}
+
+
+def test_the_rendered_text_is_the_one_its_version_names(files):
+    import hashlib
+    _, result = files["nbis.html"]
+    VERSION = int(line(result, 1).rsplit("text v", 1)[1])  # the version the file names on its first line
+    digest = hashlib.sha256(result.text.encode()).hexdigest()[:16]
+    assert RENDERED_BY_VERSION.get(VERSION) == digest, f"render output changed: raise VERSION and record {digest} for it"

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from invest.filing.contents import choose
 
 # Raised whenever a line of the file can change for the same bytes, so a saved file is never reused across a change in how it is written.
-VERSION = 1
+VERSION = 2
 # A wholly bold paragraph: at least four of every five of its letters set bold.
 BOLD = (4, 5)
 # A contents range larger than this lists the set-apart lines inside it, where a reader needs a finer place to start.
@@ -45,7 +45,7 @@ def frame(name, table):
     kept = table["kept_columns"]
     lines = [f"[{name} | {table['original_rows']} rows x {len(kept)} columns]"]
     if table.get("caption"):
-        lines.append(f"caption: {table['caption']['text']}")
+        lines.append(" ".join(f"caption: {table['caption']['text']}".split()))
     spans = []
     for span in table["spans"]:
         if span["column"] not in kept:
@@ -89,7 +89,8 @@ def render(document, identity):
             table = tables[block["table_id"]]
             name = names[table["table_id"]]
             lines += frame(name, table)
-            for image in images.get((index, table["table_id"], None, None), []):  # an image in the caption, right after it
+            row_line[(table["table_id"], -1)] = block_line[index] + 1 if table.get("caption") else block_line[index]
+            for image in images.get((index, table["table_id"], -1, None), []):  # an image in the caption, right after it
                 image_line[image["id"]] = len(lines) + 1
                 lines.append(image_text(image))
             for row, _, _ in table["row_ranges"]:
