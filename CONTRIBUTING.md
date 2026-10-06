@@ -2,17 +2,17 @@
 
 New SNS skills, features, bug fixes, and documentation improvements are welcome. Maintenance is best effort; there are no guaranteed response or merge times. For a large feature or a new platform, opening an issue first helps establish scope and avoid duplicate work.
 
-Keep the project focused on reading and exploring SNS through the user's logged-in Aside browser, original EDGAR company filings through the SEC skill's identified HTTPS transport, and structured market data through the invest skill. Posting, reactions, following actions, trade execution, credential collection, and bypassing account access controls are outside this project's scope. Do not include real-account captures, credentials, private posts, or personal datasets in issues or pull requests.
+Keep the project focused on reading and exploring SNS through the user's logged-in Aside browser, and structured market data and the SEC filing documents Yahoo lists through the invest skill. Posting, reactions, following actions, trade execution, credential collection, and bypassing account access controls are outside this project's scope. Do not include real-account captures, credentials, private posts, or personal datasets in issues or pull requests.
 
 ## Development setup
 
-SNS runtime scripts require Python 3.11+ and Aside. SEC uses Python 3.11+ with its own `uv.lock` environment; invest uses Python 3.12 or 3.13 and the dependencies its `scripts/cli.py` header declares, which `uv` prepares. Offline checks do not need Aside or SNS accounts. CI uses Python 3.12 and Node.js 22; pytest and Ruff are development dependencies.
+SNS runtime scripts require Python 3.11+ and Aside. invest uses Python 3.12 or 3.13 and the dependencies its `scripts/cli.py` header declares, which `uv` prepares. Offline checks do not need Aside or SNS accounts. CI uses Python 3.12 and Node.js 22; pytest and Ruff are development dependencies.
 
 ```bash
 python3 -m venv .tmp/dev-venv
 source .tmp/dev-venv/bin/activate
 python -m pip install pytest==8.4.2 ruff
-python -m pytest tests/ --ignore=tests/sec --ignore=tests/finviz --ignore=tests/invest
+python -m pytest tests/ --ignore=tests/finviz --ignore=tests/invest
 ```
 
 The default pytest configuration excludes tests marked `live`. This command does not read your logged-in accounts.
@@ -28,16 +28,7 @@ python tests/twitter/tools/check_fixtures_pii.py
 ruff check --config pyproject.toml .claude/skills/twitter/scripts tests/twitter
 ```
 
-The [CI workflow](.github/workflows/test.yml) contains the corresponding commands for the SNS skills and separate SEC and invest jobs. Naver Blog uses `naver-blog` for its skill directory and `naver_blog` for its test directory. Run the complete offline suite when shared behavior or documentation examples change.
-
-For the SEC skill, run its locked development environment:
-
-```bash
-uv run --isolated --frozen --group dev --project .claude/skills/sec/Scripts python -m pytest tests/sec
-uv run --isolated --frozen --group dev --project .claude/skills/sec/Scripts ruff check --config pyproject.toml .claude/skills/sec/Scripts tests/sec
-```
-
-Its fixture provenance distinguishes recorded public SEC responses from constructed edge cases. Live checks require the local requester identity; never record that identity in a fixture or diagnostic. The SEC skill's whole directory, including `Scripts/` with its `pyproject.toml` and `uv.lock`, must work independently of this repository.
+The [CI workflow](.github/workflows/test.yml) contains the corresponding commands for the SNS skills and a separate invest job. Naver Blog uses `naver-blog` for its skill directory and `naver_blog` for its test directory. Run the complete offline suite when shared behavior or documentation examples change.
 
 For invest, build the test environment from the dependencies the script declares, so the suite runs against what `uv run` gives the skill:
 
