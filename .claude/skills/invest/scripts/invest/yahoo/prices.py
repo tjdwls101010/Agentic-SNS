@@ -1,0 +1,92 @@
+"""Quotes, and bars and corporate actions with explicit adjustment and date semantics."""
+import pandas as pd
+
+from invest.yahoo.conditions import within_dates
+from invest.yahoo.datasets import Dataset
+from invest.yahoo.info import CURRENCY_SPLIT, INFO_UNITS, QUOTE_TIME, info, info_time
+from invest.yahoo.refusals import is_rate_limited
+
+
+def dates_applied(encoded, args, context):
+    """Judge --start/--end from the rows themselves rather than from the arguments that were sent."""
+    if not (args.start or args.end):
+        return {}
+    end = args.end
+    if end:
+        end = (pd.Timestamp(end) - pd.Timedelta(days=1)).date().isoformat()  # end is exclusive here, so the last row it can contain is the day before
+    found = within_dates(encoded, "index", args.start, end)
+    return {"dates": found} if found else {}
+
+
+# 성진: 원천 정밀도가 실측된 열만 7자리로 표기한다 — 비조정 OHLC 6,270값 전부 float32 정확값(2026-09-24 AAPL 5y).
+# 옵션 체인은 52%만 float32라 선언하지 않는다; 새 열을 여기 넣으려면 같은 측정이 먼저다.
+PRICE_COLUMNS = ("Open", "High", "Low", "Close", "Adj Close")
+PRECISION = "Prices print to 7 significant digits, the precision Yahoo serves; the saved observation and --out keep every digit."
+
+
+def bars(ticker, args, context, warnings):
+    frame = ticker.history(period=args.period, start=args.start, end=args.end, interval=args.interval, auto_adjust=args.adjust == "auto", back_adjust=args.adjust == "back", repair=args.repair, actions=True, keepna=True, prepost=args.prepost, timeout=args.timeout)
+    if not frame.empty:
+        timezone = getattr(frame.index, "tz", None)
+        if args.start:
+            frame = frame.loc[frame.index >= pd.Timestamp(args.start, tz=timezone)]
+        if args.end:
+            frame = frame.loc[frame.index < pd.Timestamp(args.end, tz=timezone)]
+    context.update(adjustment=args.adjust, repair=args.repair, currency=None, timezone=str(frame.index.tz) if hasattr(frame.index, "tz") else None)
+    try:
+        metadata = ticker.get_history_metadata()
+        context.update(currency=metadata.get("currency"), timezone=metadata.get("exchangeTimezoneName") or context["timezone"])
+    except Exception as exc:
+        warnings.append(f"History metadata unavailable; price data retained: {exc}")
+        if is_rate_limited(exc):
+            context["rate_limited"] = True
+    if context["currency"] is None:
+        warnings.append("Source currency is unconfirmed.")
+    return frame
+
+
+def history(ticker, args, context, warnings):
+    return bars(ticker, args, context, warnings)
+
+
+BAR_NAMES = {"1d": "daily", "5d": "five-day", "1wk": "weekly", "1mo": "monthly", "3mo": "quarterly"}
+COARSER = {"1d": "1wk", "5d": "1wk", "1wk": "1mo", "1mo": "3mo"}
+
+
+def coarser(interval):
+    """The next interval up, for a window too long to read row by row; intraday bars step up to daily."""
+    step = COARSER.get(interval) or (None if interval == "3mo" else "1d")
+    if step is None:
+        return None
+    return step, BAR_NAMES[step], BAR_NAMES.get(interval, interval)
+
+
+def actions(ticker, args, context, warnings):
+    frame = bars(ticker, args, context, warnings)
+    if not frame.empty:
+        columns = [c for c in ("Dividends", "Stock Splits", "Capital Gains") if c in frame.columns]
+        frame = frame.loc[(frame[columns].fillna(0) != 0).any(axis=1), columns]
+    return frame
+
+
+DATASETS = {
+    "prices.quote": Dataset(
+        info, ticker=True, shares_info=True, source_time=info_time, units=INFO_UNITS,
+        interpretation={"sibling": "company profile selects the business side of this same assembled response.",
+                        "timing": QUOTE_TIME, "currency": CURRENCY_SPLIT,
+                        "assembly": "yfinance assembles this response from several endpoints, so its fields do not all share one timestamp; where a field has its own time field, that one governs."},
+        gotchas=["An instrument that did not trade in the current session still returns regularMarket fields from the last session it did."]),
+    "prices.history": Dataset(
+        history, ticker=True, conditions=dates_applied, precise=PRICE_COLUMNS, recent=True, coarser=coarser,
+        interpretation={"dates": "A date is read in the exchange's timezone.",
+                        "adjustment": "--adjust decides what Close means; adding dividends to an already adjusted return counts them twice.",
+                        "repair": "--repair is a transformation with its own limits, not proof that a value equals the original trade.",
+                        "precision": PRECISION},
+        limits={"period_max": "With an intraday interval --period max is not the whole history: yfinance 1.7.0 asks for the last 8 days of 1m, 60 days of 2m/5m/15m/30m/90m and 730 days of 60m/1h bars.",
+                "intraday_range": "Yahoo limits the days one intraday request spans and how far back intraday bars go. When its refusal states the limit, the fix gives --period or --start with that number; otherwise the general fix."},
+        gotchas=["A 30m request is resampled from 15m, so Yahoo's refusal for it names 15m, not the interval asked for."]),
+    "prices.actions": Dataset(
+        actions, ticker=True, conditions=dates_applied, recent=True,
+        interpretation={"dates": "Rows appear only on dates carrying an action.",
+                        "empty": "The default month often holds no action for a quarterly payer; an empty result is not evidence that it pays nothing."}),
+}

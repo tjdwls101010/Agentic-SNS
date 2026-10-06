@@ -1,0 +1,37 @@
+"""Institutional, fund and insider ownership."""
+from invest.yahoo.datasets import COUNT, CURRENCY, RATE, SHARES, Dataset
+
+
+def holder(method, **spec):
+    def fetch(ticker, args, context, warnings):
+        return getattr(ticker, method)()
+    return Dataset(fetch, ticker=True, **spec)
+
+
+HOLDER_MIX = "Date Reported is the quarter end the position is reported as of, while Value is that share count priced at the current quote, so it is not the position's worth on that date."
+
+DATASETS = {
+    "holders.major": holder(
+        "get_major_holders",
+        units={"insidersPercentHeld": RATE, "institutionsPercentHeld": RATE, "institutionsFloatPercentHeld": RATE, "institutionsCount": COUNT},
+        interpretation={"float": "institutionsPercentHeld is of shares outstanding, institutionsFloatPercentHeld of the float."}),
+} | {
+    f"holders.{name}": holder(
+        method,
+        units={"pctHeld": RATE, "pctChange": RATE, "Shares": SHARES, "Value": dict(CURRENCY, as_of="current_quote")},
+        interpretation={"mixed_times": HOLDER_MIX,
+                        "coverage": "These are the largest reported holders, not every holder."})
+    for name, method in [("institutional", "get_institutional_holders"), ("fund", "get_mutualfund_holders")]
+} | {
+    "holders.insider-purchases": holder(
+        "get_insider_purchases", units={"Shares": SHARES, "Trans": COUNT},
+        interpretation={"rows": "The first column labels each row; % rows carry ratios while the others carry share counts, in the same column."}),
+    "holders.insider-transactions": holder(
+        "get_insider_transactions", units={"Shares": SHARES, "Value": CURRENCY},
+        interpretation={"order": "The index is a row number; Start Date carries the time, and rows arrive newest first.",
+                        "value": "Value is absent where the source reports no price, including every row whose Text is empty; that is a missing price, not a zero-value transfer."}),
+    "holders.insider-roster": holder(
+        "get_insider_roster_holders", units={"Shares Owned Directly": SHARES},
+        interpretation={"direct_only": "Shares Owned Directly excludes indirect holdings through trusts and partnerships, so it understates total control.",
+                        "dates": "Latest Transaction Date is that insider's most recent reported transaction, so different rows are current as of different dates."}),
+}
