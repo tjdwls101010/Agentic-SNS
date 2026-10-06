@@ -115,9 +115,12 @@ class _Document:
         for item, offset in self.marks:
             item["block"] = len(self.blocks)
             item["offset"] = min(len(value), offset)
+        image = any(item["kind"] == "image" for item, _ in self.marks)
         self.marks.clear()
         if not value.strip(LAYOUT + " "):
             value = ""
+        if not value and image:  # an image with no text beside it still has its place in the reading order
+            self.blocks.append({"kind": "image", "text": "", "url": self.url})
         if value:
             signals = Signals()
             for (style, link), group in _runs(self.out, self.owners):
@@ -224,6 +227,12 @@ class _Document:
             self.blocks.append({"kind": "grid", "text": table["text"],
                                 "table_id": table["table_id"], "url": self.url})
             self.tables.append(table)
+            key = element.get("id")
+            if key:  # an id on the table itself is a place a link can reach: the table's frame
+                item = {"kind": "anchor", "text": key, "url": self.url + "#" + quote(key), "block": table["block"], "offset": 0,
+                        "table_id": table["table_id"]}
+                self.outline.append(item)
+                self.anchor_items[element] = item
             self.mark_inside(element, table, coords)
             self.observe_rows(element, table, coords)
 
@@ -282,7 +291,8 @@ class _Document:
                 continue
             entry = {"kind": "emphasis", "text": item["text"], "block": item["block"],
                      "offset": item["offset"], "signals": signals.report(size, item["text"]),
-                     "navigation": not item["in_table"] and signals.navigation(size, item["text"])}
+                     "navigation": not item["in_table"] and signals.navigation(size, item["text"]),
+                     "chars": signals.chars, "bold_chars": signals.bold}
             for key in ("table_id", "row"):
                 if key in item:
                     entry[key] = item[key]
@@ -305,9 +315,10 @@ class _Document:
             tag = tag_of(element)
             if tag in SKIP_TAGS or tag in self.nonbody:
                 continue
-            cell = element if tag in CELL_TAGS else next(
-                (a for a in element.iterancestors() if tag_of(a) in CELL_TAGS), None
-            )
+            if tag == "tr":  # a row's own id lands on that row, through its first placed cell
+                cell = next((c for c in element if c in coords), None)
+            else:
+                cell = element if tag in CELL_TAGS else next((a for a in element.iterancestors() if tag_of(a) in CELL_TAGS), None)
             place = coords.get(cell)
             self.block_of_node[element] = table["block"]
             if place is None:
