@@ -322,5 +322,104 @@
     "premise": "Yahoo returns rows outside the requested range (the receipt's conditions.dates is not_applied and names the outside dates).",
     "prompt": "다음 달 첫째 주(월~금)에 예정된 전 세계 경제지표 발표 건수를 지역별로 세어 줘. 어느 기간 기준인지도 밝혀 줘.",
     "expect": "Pass requires: the range (the first Monday to Friday of next month) and its timezone stated; counts per region that match the run's own files restricted to that range, with rows the receipt marks outside the request excluded or named rather than counted; rows repeated across pages counted once or the choice stated; a region with no rows is not presented as having no releases unless the run's data covers the whole range."
+  },
+  {
+    "id": "filing-nbis-warrants",
+    "kind": "filing",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "Nebius Group(NBIS)의 2026년 6월 30일 종료 반기 지분변동표(statement of shareholders' equity)에서 선불워런트(pre-funded warrants) 발행이 자본의 어느 항목에 얼마로 반영됐는지 알려줘. 근거가 된 공시와 문서도 밝혀줘.",
+    "expect": "Ground truth from the original (6-K filed 2026-08-12, EX-99.2 nbis-20260812xex99d2.htm, statement of shareholders' equity for the six months ended 2026-06-30, row 'Issuance of pre-funded warrants (Note 14)'): additional paid-in capital $2,000.0 million, total equity attributable to the company $2,000.0 million, total equity $2,000.0 million, the share-count columns '—'; Note 14: issued to NVIDIA, 21,065,936 warrants, exercise price $0.0001. Pass requires: the columns and amounts as above and no share count invented. The answer cites the original documents (form, exhibit where there is one, filing date) and the section or table each claim comes from; a claim the cited document does not support is a failure."
+  },
+  {
+    "id": "filing-mrvl-supply",
+    "kind": "filing",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "Marvell(MRVL)의 최근 세 분기 10-Q(2025년 11월 1일, 2026년 5월 2일, 2026년 8월 1일 종료 분기)에서 공급 제약(supply constraints)에 대한 회사의 설명이 어떻게 달라졌는지 원문 근거와 함께 알려줘.",
+    "expect": "Ground truth from the three 10-Qs, Part II Item 1A: the wording moves from 'in the first few quarters of fiscal 2023 ... supply constraints' to a 'tight supply environment for AI related components' to 'We are currently in a supply constrained environment.'; the subheading changes from 'No Guarantee of Capacity or Supply' to 'Supply Constraints'; capacity reservation deposits of $870.0 million. Pass requires: the change across the three quarters in the company's own words, each quoted passage tied to its 10-Q. The answer cites the original documents (form, exhibit where there is one, filing date) and the section or table each claim comes from; a claim the cited document does not support is a failure."
+  },
+  {
+    "id": "filing-aapl-risk",
+    "kind": "filing",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "애플(AAPL)의 2025 회계연도 10-K 위험요인(Item 1A)이 2024 회계연도 10-K와 비교해 무엇이 새로 생기거나 크게 바뀌었는지 핵심만 원문 근거와 함께 정리해줘.",
+    "expect": "Ground truth from the two 10-Ks, Item 1A: 2025 tariffs (named countries, retaliatory tariffs, the Section 232 semiconductor investigation); the DOJ ruling on the Google search agreement (2024-08-05), remedies and appeal risk; the US court order barring App Store commissions; expanded AI risk; retitled factors (ESG to 'Varied stakeholder expectations', quarterly variability to 'net sales and gross margins are subject to volatility and downward pressure') and a retail-store risk title removed. Pass requires: most of these, each tied to the passage that shows it, and nothing presented as new that the FY2024 10-K already said. The answer cites the original documents (form, exhibit where there is one, filing date) and the section or table each claim comes from; a claim the cited document does not support is a failure."
+  },
+  {
+    "id": "filing-nvda-outlook",
+    "kind": "filing",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "엔비디아 경영진은 최근 분기 실적을 어떻게 해석하고, 다음 분기를 어떻게 전망하고 있어?",
+    "expect": "The latest company documents at the time of judging are the 8-K of 2026-08-26 (EX-99.1 q2fy27pr.htm, EX-99.2 q2fy27cfocommentary.htm): Q2 FY27 revenue $96.2 billion, data center $89.0 billion; the CEO's 'AI has reached its inflection point ... compute is revenue ... demand is accelerating'; Q3 outlook revenue $108.0 billion ±2% (excluding China data center compute), gross margin 74.0% ±50 bp, operating expenses $9.2 billion GAAP / $9.0 billion non-GAAP. Pass requires: management's interpretation and the outlook from the company's latest documents (or a later company document if one exists), with the figures as the documents state them. A conference call transcript or news is acceptable evidence only when it is at least as recent and is cited as such; opening a filing is not itself the criterion."
+  },
+  {
+    "id": "filing-tsm-view",
+    "kind": "filing",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "TSMC는 반도체 산업과 AI 수요를 어떻게 보고 있어?",
+    "expect": "Company documents: 6-K of 2026-07-16 EX-99.1 (CFO: 'continued strong demand for our leading-edge process technologies, including the steep ramp-up of our 2-nanometer technology'; Q3 guidance revenue $44.6-45.8 billion, gross margin 65-67%, operating margin 56-58%) and the 20-F of 2026-04-16 ('entering a period of higher growth as the multiyear megatrends of 5G, AI and HPC ...', HPC 58% of 2025 revenue, 2026 capex $52-56 billion at the 20-F's date, since raised on the July call). Pass requires: the company's view from its own most recent statements, each dated; a figure later revised is reported with its date or the revision. The most recent correct evidence decides, not whether a filing was opened."
+  },
+  {
+    "id": "filing-mrvl-customers",
+    "kind": "filing",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "마벨은 아마존·마이크로소프트 같은 큰 고객과 어떤 관계야?",
+    "expect": "Company documents (10-K 2026-03-11, 10-Q 2026-08-01, 8-K 2024-12-02 EX-99.1, 8-K 2025-12-02): two customers above 10% of revenue (a distributor and a direct customer), top ten customers 82%; the five-year multi-generational agreement with AWS (2024-12-02 release); warrants for up to 4.2 million shares in FY2025 and 1 million shares in December 2025 tied to Celestial AI. The filings name customers as 'a customer' and do not mention Microsoft. Pass requires: the relationships the documents state, and saying that the filings do not name Microsoft rather than asserting a relationship they do not show; speculation presented as fact is a failure."
+  },
+  {
+    "id": "filing-aapl-tariffs",
+    "kind": "filing",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "애플은 관세가 실적에 주는 영향을 어떻게 설명하고 있어?",
+    "expect": "Company documents (10-Q of 2026-07-31, MD&A 'Tariffs and Other Measures'; 8-K of 2026-07-30 EX-99.1): the Supreme Court IEEPA ruling (2026-02-20), refund claims and their treatment as a reduction of cost of sales; about 2 percentage points of the Q3 gross margin of 50.1% from the refunds; the first Section 232 result (2026-01-14) with no additional tariff; new Section 301 tariffs. Pass requires: Apple's own explanation from its latest documents with these elements, each dated. The answer cites the original documents (form, exhibit where there is one, filing date) and the section or table each claim comes from; a claim the cited document does not support is a failure."
+  },
+  {
+    "id": "boundary-nvda-segment",
+    "kind": "boundary",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "엔비디아의 최근 분기 데이터센터 부문 매출과 그 전년 동기 대비 증가율을 알려줘.",
+    "expect": "A segment figure Yahoo's statements do not carry, so it comes from the company's own document (the latest 8-K EX-99.1 or 10-Q): data center revenue for the latest quarter and its year-over-year growth as the document states them. Pass requires: the figure and the growth from the document, cited; using total revenue as the segment, or a figure the document does not contain, is a failure."
+  },
+  {
+    "id": "boundary-msft-margin",
+    "kind": "boundary",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "마이크로소프트의 최근 4개 분기 영업이익률 추이를 알려줘.",
+    "expect": "Quarterly revenue and operating income are numbers Yahoo's statements carry. Pass requires: four quarters with their fiscal period ends, operating margin = operating income / revenue computed from the run's own data, in one currency. Reading a filing is not required; figures that do not match the data the run received are a failure."
+  },
+  {
+    "id": "hold-amd-datacenter",
+    "kind": "filing",
+    "heldout": true,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "AMD 경영진은 최근 분기 실적 발표에서 데이터센터 사업의 현황과 전망을 어떻게 설명했어?",
+    "expect": "Pass requires: the latest company earnings document (8-K EX-99.1 or a later company statement) identified with its date; management's description of the data center business and outlook in the company's words, with the figures as stated; anything from another source labelled as such. The answer cites the original documents (form, exhibit where there is one, filing date) and the section or table each claim comes from; a claim the cited document does not support is a failure."
+  },
+  {
+    "id": "hold-ba-787",
+    "kind": "filing",
+    "heldout": true,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "보잉(BA)의 최신 10-Q에서 787 생산률과 관련해 회사가 밝힌 계획이나 위험은 뭐야?",
+    "expect": "Pass requires: the latest 10-Q identified with its period and filing date; the 787 production-rate statements (plans, constraints, risks) in the company's words with the section they come from; no rate or date the document does not state. The answer cites the original documents (form, exhibit where there is one, filing date) and the section or table each claim comes from; a claim the cited document does not support is a failure."
   }
 ]
