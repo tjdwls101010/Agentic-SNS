@@ -357,7 +357,7 @@ def prepare_history(args, targets):
 
 def prepare_company(args, targets):
     if args.kind == "news":
-        args.limit = args.limit or 20
+        args.limit = 20 if args.limit is None else args.limit
     if args.kind == "shares":
         refuse(args.start and args.end and args.start > args.end, "--start must not be after --end")
 
@@ -382,9 +382,9 @@ def prepare_screen(args, targets):
         refuse(bool(args.query) == bool(args.preset), "screen run needs exactly one of --query or --preset")
         refuse(args.source_units and not args.query, "--source-units applies to --query")
         refuse(args.preset and args.type is not None, "A --preset fixes its own universe; drop --type")
-        args.limit = args.limit or 100
+        args.limit = 100 if args.limit is None else args.limit
         refuse(args.limit > 250, "Yahoo returns at most 250 screen rows per request; use --limit 250 and --offset for the next page")
-        args.offset = args.offset or 0
+        args.offset = 0 if args.offset is None else args.offset
         args.label = [args.preset or "query"]
     else:
         args.label = [args.type or "equity"]
@@ -410,7 +410,7 @@ def prepare_market(args, targets):
 
 
 def prepare_calendar(args, targets):
-    args.limit = args.limit or 100
+    args.limit = 100 if args.limit is None else args.limit
     refuse(args.limit > 100, "Yahoo returns at most 100 calendar rows per request; use --offset for the next page")
     refuse(len(targets) > 1, "calendar earnings takes at most one SYMBOL")
     args.symbol = targets[0] if targets else None
