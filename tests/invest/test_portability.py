@@ -61,3 +61,19 @@ def test_results_are_kept_in_the_skills_own_data_folder(tmp_path):
     receipt = json.loads(proc.stdout)
     assert Path(receipt["receipt_path"]).resolve().parent.parent == (installed / "data" / "results").resolve()
     assert not (cwd / "data").exists()
+
+
+def test_filing_documents_are_kept_in_the_skills_own_data_folder(tmp_path):
+    """With no $INVEST_DATA, a filing document lands in <skill>/data/filings whatever the cwd."""
+    installed = install(tmp_path, "installed copy")
+    cwd = tmp_path / "elsewhere"
+    cwd.mkdir()
+    body = cwd / "body.htm"
+    body.write_bytes(b"<p><b>Item 1. Business</b></p><p>We make things.</p>")
+    url = "https://cdn.yahoofinance.com/prod/sec-filings/0000320193/000032019324000123/x.htm"
+    route = {"host": "cdn.yahoofinance.com", "path": url.split(".com", 1)[1], "file": str(body), "headers": {"Content-Type": "text/html"}}
+    proc = run(installed, cwd, "filing", url, routes=[route], data=False)
+    assert proc.returncode == 0, proc.stdout[:400] + proc.stderr[-800:]
+    path = Path(json.loads(proc.stdout)["results"][0]["path"])
+    assert path.resolve().parent.parent == (installed / "data" / "filings").resolve() and path.is_file()
+    assert not (cwd / "data").exists()

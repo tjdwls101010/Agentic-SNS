@@ -174,6 +174,7 @@ def test_filings_are_records_with_their_document_map(cli):
     assert all(url.startswith("https://cdn.yahoofinance.com/prod/sec-filings/") for url in first["exhibits"].values() if url.endswith(".htm"))
     shown = run.result().get("data") or run.result().get("first")
     assert shown, run
+    assert "date is the filing date; exhibits map document types to Yahoo's copies of the SEC documents, which `filing` reads." in run.receipt["notes"]
 
 
 def test_holder_lists_keep_their_columns(cli):

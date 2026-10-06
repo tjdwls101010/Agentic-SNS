@@ -44,7 +44,10 @@ EXIT_CODES = {
 PRIORITY = ("rate_limited", "invalid", "local_io")
 STATUSES = ("ok", "empty", "error", "not_attempted")
 # Every error code a target can carry; the receipt that cannot be cut is sized with the longest.
-ERROR_CODES = ("not_found", "no_data", "not_applicable", "source_constraint", "rate_limited", "upstream", "invalid", "local_io", "not_attempted", "unsupported")
+ERROR_CODES = ("not_found", "no_data", "not_applicable", "source_constraint", "rate_limited", "upstream", "invalid", "local_io", "not_attempted", "unsupported",
+               "empty_document")
+# A filing document that is in a form this skill does not convert, or has no text, answered with nothing usable: the document exits as empty.
+NOTHING_USABLE = ("unsupported", "empty_document")
 
 DOCUMENT_ORDER = ("status", "command", "receipt_path", "file", "units", "warnings", "notes", "results", "trimmed", "projected", "over_budget")
 TARGET_ORDER = ("target", "status", "rows", "warnings", "observed_at", "as_of", "currency", "financial_currency", "coverage", "conditions",
@@ -78,7 +81,7 @@ def exit_code(document):
     if status in ("ok", "partial", "empty"):
         return EXIT_CODES[status][0]
     failed = [(r.get("error") or {}).get("code") for r in document.get("results", [])]
-    if failed and all(c == "unsupported" for c in failed):
+    if failed and all(c in NOTHING_USABLE for c in failed):
         return EXIT_CODES["empty"][0]
     warned = codes(document.get("warnings"))
     if "not_attempted" in failed or "secondary_rate_limited" in warned:  # a rate limit met stays the answer, whatever failed after it
@@ -158,15 +161,15 @@ def reductions(document, preview):
     return [no_data, no_preview, no_notes, no_units, no_detail]
 
 
-def fit(document, max_chars, preview=lambda i: None):
+def fit(document, max_chars, preview=lambda i: None, steps=None):
     """The document as printed: whole if it fits, else cut step by step, else the minimal receipt, marked over_budget when even that does not fit.
 
-    Keeping every warning code is worth more than the limit: a receipt that fits by dropping "last bar provisional" answers a different question.
+    Keeping every warning code is worth more than the limit: a receipt that fits by dropping "last bar provisional" answers a different question. `steps` replaces the Yahoo commands' cutting order.
     """
     if size(document) <= max_chars:
         return document
     current = copy.deepcopy(document)
-    for step in reductions(document, preview):
+    for step in steps or reductions(document, preview):
         current = step(current)
         current["trimmed"] = True
         current = ordered(current, DOCUMENT_ORDER)

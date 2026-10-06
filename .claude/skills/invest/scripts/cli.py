@@ -7,7 +7,7 @@
 # ///
 """Investment research data. `--help` maps the commands; `<command> --help` documents one.
 
-This file is the whole command surface: every command, kind and argument with its help, the closed choices, the argument checks made before any request, the documents --help prints, and the exit codes. What Yahoo returns and what its values mean live in invest/yahoo and arrive in each receipt.
+This file is the whole command surface: every command, kind and argument with its help, the closed choices, the argument checks made before any request, the documents --help prints, and the exit codes. What Yahoo returns and what its values mean live in invest/yahoo and arrive in each receipt; how a filing document is read lives in invest/sec and invest/filing.
 """
 import argparse
 from datetime import date, timedelta
@@ -15,7 +15,7 @@ import json
 import re
 import sys
 
-from invest import load, receipts
+from invest import filing, load, receipts
 
 PROG = "cli.py"
 DEFAULTS = {"max_chars": 8000, "ttl_days": 14, "timeout": 30}
@@ -42,10 +42,13 @@ class Arg:
 class Command:
     """A command: what it answers, its kinds (each a one-line purpose), its targets, its arguments and what its file holds."""
 
-    def __init__(self, name, purpose, kinds=None, targets="SYMBOL...", args=(), file="result.csv, long format with a target column", failures=None):
+    def __init__(self, name, purpose, kinds=None, targets="SYMBOL...", args=(), file="result.csv, long format with a target column", failures=None,
+                 receipt=None, sections=(), exits=None):
         self.name, self.purpose, self.kinds, self.targets = name, purpose, kinds or {}, targets
         self.args, self.file = list(args), file
         self.failures = failures or ["not_found", "no_data", "rate_limited", "upstream", "invalid", "local_io"]
+        # A command whose receipt is not the Yahoo commands' own states it here, with any further sections ({title: lines}) and exit note.
+        self.receipt, self.sections, self.exits = receipt, dict(sections), exits
 
 
 def csv_list(value):
@@ -171,11 +174,32 @@ COMMANDS = {c.name: c for c in [
                   Arg("--offset", type=int, default=0, metavar="N", help="Row offset for the next page (coverage.next_offset gives it)."),
                   Arg("--most-active", action="store_true", kinds=["earnings"], help="Yahoo's most-active filter; market-wide, at --offset 0 only.")],
             failures=["no_data", "rate_limited", "upstream", "invalid", "local_io"]),
+    Command("filing", "SEC filing document from Yahoo's copy: a text file to read with Read and grep, and its map.", targets="URL...",
+            args=[Arg("targets", nargs="*", metavar="URL", help="A document URL from company filings exhibits (https://cdn.yahoofinance.com/prod/sec-filings/...), or the same document's https://www.sec.gov/Archives/edgar/data/CIK/ACCESSION/FILE; each is a target."),
+                  Arg("--timeout", type=int, default=DEFAULTS["timeout"], metavar="SECONDS", help="Seconds to receive each document, one retry included (default 30).")],
+            failures=["invalid", "unsupported", "empty_document", "not_found", "upstream", "local_io"],
+            receipt=["stdout is one JSON receipt; the full receipt is data/results/<id>/receipt.json, and each document is saved in data/filings/<key>/.",
+                     "status ok|partial|error, command, receipt_path, warnings, results[]: target, status ok|error, source (the original on sec.gov: what to cite), path (document.txt), map_path (map.json), lines, chars, contents or headings (see the map), tables, images, links (counts), limits, warnings [{code,text}], observed_at, reused, error {code,message,fix}.",
+                     "trimmed: when the receipt does not fit, inside lists go first, then headings, then contents; map.json keeps them all."],
+            sections={
+                "the file": ["Line 1 names the original, Yahoo's copy and the bytes' sha256. After it, one paragraph or one table row is one line.",
+                             "A paragraph with at least 4/5 of its letters in bold is wrapped in ** ** (grep -n '^\\*\\*' lists them).",
+                             "A table opens with [tN | R rows x C columns], then caption:, spans: and th: lines when it has them, then one line per original row: tN.<row>|cell|cell...; consecutive pipes are empty cells and \\| is a pipe inside a cell.",
+                             "Fields count from 0 after the row number. A span rRcA cA-B rows R-S is the cell at row R, field A, covering fields A..B and rows R..S; th: lists the cells the original declared as headers (=col or =row its scope). No other row is marked: read a table's labels from its first rows.",
+                             "A link inside the document is [→L123] at the end of the line holding it (line 123 is where it lands); an image is [image: alt | URL], in its cell when it sits in a table."],
+                "the map": ["contents: the document's own linked table of contents, given only when exactly one group of its links qualifies. Each entry has its title, lines (from the entry's target to the line before the next entry's) and chars; an entry over 20,000 characters lists the set-apart lines inside it. A range is where to start reading, not a boundary the document declares.",
+                            "headings, when there are no contents: every set-apart line (wholly bold paragraphs, larger or capitalised headings, a one-row table's title), each place it occurs.",
+                            "map.json also holds every candidate group of links, and each table, image and link with its line."],
+                "identity": ["A document is saved under a key from its sec.gov URL, its bytes' sha256, the text version and the declared charset: opening it again reuses that folder (reused: true), changed bytes are saved anew, and nothing is overwritten.",
+                             "Line numbers are places in this file; cite the source document and its section."],
+                "formats": ["HTML (with inline XBRL, or inside one <DOCUMENT> wrapper) and plain text are converted. PDF, spreadsheets, images, XML records and multi-document SGML are unsupported; a response with no readable text is empty_document.",
+                            "limits names what conversion left out: inline_xbrl_metadata_excluded, image_content_not_extracted, encoding_loss (also a warning)."]},
+            exits="7 also when every document is unsupported or empty_document."),
 ]}
 for _command in COMMANDS.values():
     if _command.targets == "SYMBOL...":
         _command.args.insert(0, SYMBOLS)
-    _command.args += [FIELDS, TIMEOUT, MAX_CHARS]
+    _command.args += [MAX_CHARS] if _command.name == "filing" else [FIELDS, TIMEOUT, MAX_CHARS]
 
 
 # ---- the documents --help prints ------------------------------------------------------------------------------------
@@ -201,7 +225,7 @@ def lead():
 
 def usage(command):
     kind = " KIND" if command.kinds else ""
-    targets = {"SYMBOL...": " SYMBOL...", "QUERY": " QUERY", "": ""}[command.targets]
+    targets = {"SYMBOL...": " SYMBOL...", "QUERY": " QUERY", "URL...": " URL...", "": ""}[command.targets]
     if command.name == "market":
         targets = " [KEY]"
     if command.name == "calendar":
@@ -212,7 +236,7 @@ def usage(command):
 def spec(arg):
     kwargs = arg.kwargs
     if not arg.flags[0].startswith("-"):
-        typed = kwargs.get("metavar", arg.dest.upper()) + ("..." if arg.dest == "targets" and kwargs.get("metavar") == "SYMBOL" else "")
+        typed = kwargs.get("metavar", arg.dest.upper()) + ("..." if arg.dest == "targets" and kwargs.get("metavar") in ("SYMBOL", "URL") else "")
     elif kwargs.get("action") == argparse.BooleanOptionalAction:
         typed = f"{arg.flags[0]}, --no-{arg.flags[0][2:]}"
     elif kwargs.get("action") == "store_true":
@@ -233,14 +257,17 @@ def command_document(command):
         width = max(len(k) for k in command.kinds) + 2
         lines += ["", "kinds:"] + [f"  {k:<{width}}{text}" for k, text in command.kinds.items()]
     lines += ["", "arguments:"] + [spec(a) for a in command.args]
-    lines += ["", "receipt:"] + RECEIPT + [f"  file: {command.file}."]
-    lines += ["", "failures (error.code): " + ", ".join(command.failures) + "; error.fix says what to do.", EXIT_LINE, GLOBAL_LINE]
+    lines += ["", "receipt:"] + ([f"  {line}" for line in command.receipt] if command.receipt else RECEIPT + [f"  file: {command.file}."])
+    for title, body in command.sections.items():
+        lines += ["", f"{title}:"] + [f"  {line}" for line in body]
+    lines += ["", "failures (error.code): " + ", ".join(command.failures) + "; error.fix says what to do.", EXIT_LINE]
+    lines += ([command.exits] if command.exits else []) + [GLOBAL_LINE]
     return "\n".join(lines)
 
 
 def root_document():
     width = max(len(usage(c)) for c in COMMANDS.values()) + 2
-    lines = [f"{lead()} COMMAND ...", "Yahoo Finance data. stdout: a JSON receipt; the whole result is a file under data/.",
+    lines = [f"{lead()} COMMAND ...", "Yahoo Finance data and SEC filing documents. stdout: a JSON receipt; the whole result is a file under data/.",
              "`COMMAND --help`: that command's kinds, arguments, receipt, failures and exit codes.", "", "commands:"]
     for command in COMMANDS.values():
         kinds = " | ".join(command.kinds) if command.kinds else command.purpose.split(":")[0].rstrip(".")
@@ -426,6 +453,11 @@ def prepare_calendar(args, targets):
     args.label = [f"{args.start}..{args.end}"]
 
 
+def prepare_filing(args, targets):
+    refuse(not targets, "filing needs at least one URL", "Pass a document URL from `company filings SYMBOL` exhibits.")
+    filing.check(targets)
+
+
 def emit(document):
     print(json.dumps(document, ensure_ascii=False, allow_nan=False, separators=(",", ":")))
     return receipts.exit_code(document)
@@ -439,7 +471,7 @@ def main(argv=None):
         command = COMMANDS[args.name]
         command_text = f"{args.name} {getattr(args, 'kind', '')}".strip()
         key = prepare(command, args)
-        document, code = load.run(key, args)
+        document, code = filing.open_documents(args) if command.name == "filing" else load.run(key, args)
         print(json.dumps(document, ensure_ascii=False, allow_nan=False, separators=(",", ":")))
         return code
     except receipts.Invalid as exc:
