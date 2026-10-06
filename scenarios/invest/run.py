@@ -4,7 +4,7 @@ Conditions: `invest` (this repository's skill) and `L` (the baseline: one SKILL.
 
 Phases: `tune` runs freely; `eval` refuses to run while the skill, the bank or the judge rules have uncommitted changes, records their committed hashes and refuses to mix results made under different ones; `holdout` runs only held-out scenarios. `--pairs N` with `--cond invest,L` runs N pairs, alternating which condition goes first per scenario, and saves Yahoo's current session before and after each pair so a pair can be counted as run in the US regular session.
 
-Writes <out>/meta.json, <out>/results.jsonl and <out>/runs/<id>-<cond>-p<pair>-<n>/{prompt.txt, stream.jsonl, answer.md, summary.json, results/, expected.json}. Judging is separate: scenarios/invest/judge.md and judge-schema.json.
+Writes <out>/meta.json, <out>/results.jsonl and <out>/runs/<id>-<cond>-p<pair>-<n>/{prompt.txt, stream.jsonl, calls.jsonl, answer.md, summary.json, results/, expected.json}. cli_runs counts real cli.py processes (instrument/sitecustomize.py, on the child's PYTHONPATH); help and receipt characters are read from the tool outputs. Judging is separate: scenarios/invest/judge.md and judge-schema.json.
 """
 import argparse
 import concurrent.futures
@@ -94,9 +94,23 @@ def parse_stream(stream):
     return tools, results, final, answer
 
 
-def summarise(stream, skill_md_chars):
+def receipt_path(line):
+    found = re.search(r'"receipt_path":"([^"]+)"', line)
+    return found[1] if found else line
+
+
+def calls(log):
+    """(CLI runs, of which --help) from the instrumentation log: every Python process started on cli.py, whatever its output did."""
+    if not log or not log.exists():
+        return None, None
+    entries = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return len(entries), sum(1 for e in entries if "--help" in e["argv"] or "-h" in e["argv"])
+
+
+def summarise(stream, skill_md_chars, log=None):
     tools, results, final, answer = parse_stream(stream)
-    m = {"bash_calls": 0, "cli_runs": 0, "help_runs": 0, "help_chars": 0, "receipt_chars": 0, "file_reads": 0, "file_read_chars": 0,
+    seen = set()
+    m = {"bash_calls": 0, "cli_runs": None, "help_runs": None, "output_runs": 0, "help_chars": 0, "receipt_chars": 0, "file_reads": 0, "file_read_chars": 0,
          "python_runs": 0, "python_chars": 0, "other_tool_calls": 0, "failed_calls": [], "commands": set(), "observed_at": set(), "signals": {}}
     total = 0
     for ident, name, given in tools:
@@ -122,8 +136,9 @@ def summarise(stream, skill_md_chars):
                 words = [w for w in words if w and not w.startswith("-") and not re.fullmatch(r"\d+", w)]
                 m["commands"].add(" ".join(words[:2] if words and words[0] in KINDED else words[:1]) or "?")
         helps, receipts = outputs(text)
-        m["cli_runs"] += len(helps) + len(receipts)  # counted from what came back, so a chained call or a loop counts every run
-        m["help_runs"] += len(helps)
+        fresh = [r for r in receipts if receipt_path(r) not in seen]  # a receipt printed again is read again, but it is not a new run
+        seen.update(receipt_path(r) for r in fresh)
+        m["output_runs"] += len(helps) + len(fresh)
         m["help_chars"] += sum(len(h) for h in helps)
         m["receipt_chars"] += sum(len(r) for r in receipts)
         if re.search(r"\bpython", command) and not runs:
@@ -135,6 +150,7 @@ def summarise(stream, skill_md_chars):
                 m["signals"][signal] = True
         for code in re.findall(r'"error":\{"code":"([a-z_]+)"', text):
             m["signals"].setdefault("error_codes", set()).add(code)
+    m["cli_runs"], m["help_runs"] = calls(log)
     usage = final.get("usage") or {}
     m["commands"], m["observed_at"] = sorted(m["commands"]), sorted(m["observed_at"])
     if "error_codes" in m["signals"]:
@@ -187,14 +203,17 @@ def run_one(scenario, cond, pair, n, args, work, out):
     record = out / "runs" / name
     record.mkdir(parents=True, exist_ok=True)
     (record / "prompt.txt").write_text(prompt, encoding="utf-8")
-    env = dict(os.environ, INVEST_DATA=str(run / "data"))
+    env = dict(os.environ, INVEST_DATA=str(run / "data"), INVEST_CALL_LOG=str(run / "calls.jsonl"),
+               PYTHONPATH=str(Path(__file__).with_name("instrument")))  # counts real cli.py runs; see instrument/sitecustomize.py
     started = dt.datetime.now(dt.timezone.utc).isoformat()
     with open(record / "stream.jsonl", "w", encoding="utf-8") as stream:
         proc = subprocess.run(["claude", "-p", "--safe-mode", "--restricted", "--permission-mode", "acceptEdits", "--tools", args.tools, "--allowedTools", args.tools,
                                "--model", args.model, "--output-format", "stream-json", "--verbose", prompt],
                               stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.PIPE, text=True, cwd=run, env=env, timeout=args.timeout)
     finished = dt.datetime.now(dt.timezone.utc).isoformat()
-    summary, answer = summarise(record / "stream.jsonl", len((skill / "SKILL.md").read_text(encoding="utf-8")))
+    if (run / "calls.jsonl").exists():
+        shutil.copy(run / "calls.jsonl", record / "calls.jsonl")
+    summary, answer = summarise(record / "stream.jsonl", len((skill / "SKILL.md").read_text(encoding="utf-8")), record / "calls.jsonl")
     (record / "answer.md").write_text(answer, encoding="utf-8")
     if (run / "data" / "results").is_dir():
         shutil.copytree(run / "data" / "results", record / "results", dirs_exist_ok=True)
@@ -245,7 +264,12 @@ def main():
     args = parser.parse_args()
     bank = json.loads(BANK.read_text(encoding="utf-8"))
     if args.summarise:
-        rows = [json.loads((r / "summary.json").read_text()) for r in sorted((args.summarise / "runs").iterdir()) if (r / "summary.json").exists()]
+        rows = []
+        for record in sorted((args.summarise / "runs").iterdir()):
+            if (record / "summary.json").exists():
+                row = json.loads((record / "summary.json").read_text())
+                row.update(summarise(record / "stream.jsonl", 0, record / "calls.jsonl")[0] | {"read_chars_total": row.get("read_chars_total")})
+                rows.append(row)
         (args.summarise / "results.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
         return
     conds = [c.strip() for c in args.cond.split(",")]

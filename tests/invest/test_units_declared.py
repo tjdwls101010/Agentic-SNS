@@ -32,8 +32,11 @@ def numeric_fields(run):
         return set()
     if run.doc["file"]["format"] == "csv":
         rows = run.rows
-        if "unit" in rows[0]:
-            assert all(r["unit"] for r in rows if r["value"] != ""), "a metric row with a value has no unit"
+        if run.receipt["units"].get("value") == "per row: see the unit column":
+            statuses = run.receipt["unit_status"]
+            for r in rows:
+                assert r["unit"] in VOCABULARY, f"{r['metric']}: unit {r['unit']!r} is not in the vocabulary"
+                assert statuses.get(f"{r['metric']} | {r['source_column']}") in ("verified", "declared"), f"{r['metric']} | {r['source_column']} has no declaration status"
             return set()
         return {c for c in rows[0] if c != "target" and any(number(r[c]) and r[c] != "" for r in rows) and all(number(r[c]) for r in rows if r[c] != "")}
     found = set()

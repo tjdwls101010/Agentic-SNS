@@ -154,3 +154,10 @@ def test_values_without_a_confirmed_unit_say_so_in_warnings(cli):
     run = cli("fund", "operations", "QQQ", routes=recorded("fund-operations-qqq"))
     text = {w["code"]: w["text"] for w in run.doc["warnings"]}["unverified_value"]
     assert "Total Net Assets" in text
+
+
+def test_a_row_missing_both_currencies_counts_once(cli):
+    rows = [{"symbol": "EX", "regularMarketPrice": 10.0, "totalRevenue": 100.0}]  # one quote value and one statement value, neither currency given
+    routes = [{"path": "/v1/finance/screener", "json": {"finance": {"result": [{"quotes": rows, "total": 1, "start": 0, "count": 1}], "error": None}}}]
+    run = cli("screen", "run", "--query", '{"operator":"EQ","operands":["region","us"]}', routes=routes)
+    assert {w["code"]: w["text"] for w in run.doc["warnings"]}["currency_unconfirmed"].startswith("1 rows")

@@ -80,9 +80,10 @@ def exit_code(document):
     failed = [(r.get("error") or {}).get("code") for r in document.get("results", [])]
     if failed and all(c == "unsupported" for c in failed):
         return EXIT_CODES["empty"][0]
-    if "not_attempted" in failed:  # only a rate limit leaves targets unattempted, whatever later failed on the ones before
+    warned = codes(document.get("warnings"))
+    if "not_attempted" in failed or "secondary_rate_limited" in warned:  # a rate limit met stays the answer, whatever failed after it
         failed.append("rate_limited")
-    if "not_saved" in codes(document.get("warnings")):
+    if "not_saved" in warned:
         failed.append("local_io")
     for code in PRIORITY:
         if code in failed:

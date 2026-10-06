@@ -33,8 +33,8 @@ class Observation:
     """
 
     def __init__(self, context, *, columns=None, rows=None, records=None, units=None, statuses=None, empty=False, precise=(),
-                 fields=(), preview=None, keys=()):
-        self.columns, self.rows, self.records, self.keys = columns, rows, records, tuple(keys)
+                 fields=(), preview=None, keys=(), mixed=False):
+        self.columns, self.rows, self.records, self.keys, self.mixed = columns, rows, records, tuple(keys), mixed
         self.format = "csv" if columns is not None else "json"
         self.units, self.statuses = units or {}, statuses or {}
         self.empty, self.precise, self.fields, self.preview = empty, tuple(precise), tuple(fields), preview
@@ -176,7 +176,8 @@ class Dataset:
         if form == "mixed":
             columns, rows = self.mixed_rows(value, warn)
             return Observation(context, columns=columns, rows=rows, units={"metric": units.TEXT, "source_column": units.TEXT, "value": units.MIXED, "unit": units.TEXT},
-                               statuses=self.mixed_statuses(value), empty=not rows or all(r[2] is None for r in rows), keys=("metric", "source_column", "unit"))
+                               statuses=self.mixed_statuses(value), empty=not rows or all(r[2] is None for r in rows), keys=("metric", "source_column", "unit"),
+                               mixed=True)
         keys = self.keys
         if form == "row":
             mapping = encode.encode(value) if value is not None else {}
@@ -219,7 +220,7 @@ class Dataset:
         """A value whose unit is declared unverified says so in warnings, which no cut removes, not only in a note."""
         names = []
         if found.format == "csv" and found.rows:
-            if "unit" in found.columns:
+            if found.mixed:
                 names = sorted({f"{r[0]} ({r[1]})" for r in found.rows if r[3] == units.UNVERIFIED and r[2] is not None})
             else:
                 names = [c for i, c in enumerate(found.columns) if found.units.get(c) == units.UNVERIFIED and found.statuses.get(c) != units.UNDECLARED
@@ -244,10 +245,9 @@ class Dataset:
         crossed = [position[c] for c in self.cross_currency if c in position]
         unconfirmed, mixed = 0, []
         for row in found.rows:
-            if any(row[i] is not None for i in quote_money) and (currency is None or not row[currency]):
-                unconfirmed += 1
-            if any(row[i] is not None for i in financial_money) and (reporting is None or not row[reporting]):
-                unconfirmed += 1
+            quote_missing = any(row[i] is not None for i in quote_money) and (currency is None or not row[currency])
+            financial_missing = any(row[i] is not None for i in financial_money) and (reporting is None or not row[reporting])
+            unconfirmed += quote_missing or financial_missing
             if currency is not None and reporting is not None and row[currency] and row[reporting] and row[currency] != row[reporting] \
                     and any(row[i] is not None for i in crossed):
                 mixed.append(str(row[symbol]) if symbol is not None else "?")
@@ -261,7 +261,7 @@ class Dataset:
             found.warnings.setdefault("cross_currency_fields", f"For {len(mixed)} rows quoted and reporting in different currencies ({', '.join(mixed[:5])}{', ...' if len(mixed) > 5 else ''}), {names} mix the two; do not use them.")
 
     def needs_quote_currency(self, found):
-        roles = set(found.units.values()) | ({r[3] for r in found.rows} if found.format == "csv" and "unit" in (found.columns or []) else set())
+        roles = set(found.units.values()) | ({r[3] for r in found.rows} if found.mixed else set())
         return bool(roles & {units.MONEY_QUOTE, units.PER_SHARE_QUOTE})
 
     def check_currency(self, found, context):
@@ -269,7 +269,7 @@ class Dataset:
         if self.row_currency:
             return self.check_row_currencies(found)
         roles = {MONEY_ROLES[u] for u in found.units.values() if u in MONEY_ROLES}
-        if found.format == "csv" and "unit" in (found.columns or []):
+        if found.mixed:
             roles |= {MONEY_ROLES[r[3]] for r in found.rows if r[3] in MONEY_ROLES}
         missing = [role for role in sorted(roles) if getattr(found, role) is None]
         if missing and not found.empty:

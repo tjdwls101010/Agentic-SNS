@@ -243,8 +243,30 @@ def test_a_rate_limit_on_the_currency_lookup_is_the_last_request_for_that_target
 
 def test_after_a_rate_limit_no_further_lookup_is_made_for_the_same_target(cli):
     """valuation's currency lookup is refused with 429; its Market Cap still lacks a quote currency, and asking the chart for one would spend another request."""
-    payload = {"timeseries": {"result": [{"meta": {"type": ["trailingPeRatio"]}, "trailingPeRatio": [{"asOfDate": "2025-01-01", "reportedValue": {"raw": 30}}]}]}}
-    routes = [{"path": "/timeseries/AAPL", "json": payload}, {"path": "/quoteSummary/AAPL", **TOO_MANY}, {"path": "/v7/finance/quote", **TOO_MANY}]
+    payload = {"timeseries": {"result": [{"meta": {"type": ["trailingMarketCap"]}, "trailingMarketCap": [{"asOfDate": "2025-01-01", "reportedValue": {"raw": 3.0e12}}]}]}}
+    routes = [{"path": "/timeseries/AAPL", "json": payload}, {"path": "/quoteSummary/AAPL", **TOO_MANY}, {"path": "/v7/finance/quote", **TOO_MANY},
+              {"path": "/v8/finance/chart/AAPL", "json": {"chart": {"result": [{"meta": {"currency": "USD", "exchangeTimezoneName": "America/New_York"}}], "error": None}}}]
     run = cli("financials", "valuation", "AAPL", "MSFT", routes=routes)
+    assert "Market Cap" in run.rows[0], "the value that needs a quote currency arrived"
     assert [r["status"] for r in run.doc["results"]] == ["ok", "not_attempted"], run
     assert not any("/chart/" in r["path"] for r in run.requests)
+
+
+def test_a_single_targets_secondary_rate_limit_outranks_a_later_save_failure(cli, tmp_path):
+    data = tmp_path / "locked"
+    data.mkdir()
+    data.chmod(stat.S_IRUSR | stat.S_IXUSR)
+    try:
+        routes = [{"path": "/timeseries/AAPL", "json": STATEMENT}, {"path": "/quoteSummary/AAPL", **TOO_MANY}, {"path": "/v7/finance/quote", **TOO_MANY}]
+        run = cli("financials", "income", "AAPL", routes=routes, data=data)
+    finally:
+        data.chmod(stat.S_IRWXU)
+    assert run.result()["error"]["code"] == "local_io" and "secondary_rate_limited" in [w["code"] for w in run.doc["warnings"]]
+    assert run.code == 5, run
+
+
+def test_a_source_column_named_unit_is_an_ordinary_column(cli):
+    rows = [{"symbol": "EX", "unit": "lots", "regularMarketPrice": 10.0}]  # three columns: no fourth to mistake for a mixed table's unit
+    routes = [{"path": "/v1/finance/screener", "json": {"finance": {"result": [{"quotes": rows, "total": 1, "start": 0, "count": 1}], "error": None}}}]
+    run = cli("screen", "run", "--query", '{"operator":"EQ","operands":["region","us"]}', routes=routes)
+    assert run.code == 0 and run.rows[0]["unit"] == "lots" and float(run.rows[0]["regularMarketPrice"]) == 10.0, run
