@@ -145,7 +145,7 @@ def summarise(stream, skill_md_chars):
 
 
 SIGNALS = {"trimmed": r'"trimmed":true', "preview": r'"first":\[', "provisional": r'"last_bar_status":"provisional"', "unknown_bar": r'"last_bar_status":"unknown"',
-           "shortfall": r'"shortfall"', "source_units": r'"source_units"', "over_budget": r'"over_budget":true'}
+           "shortfall": r'"code":"shortfall"|"shortfall"\]|"shortfall",', "source_units": r'"code":"source_units"', "over_budget": r'"over_budget":true'}
 
 
 # ---- expected answers from the run's own files ------------------------------------------------------------------------

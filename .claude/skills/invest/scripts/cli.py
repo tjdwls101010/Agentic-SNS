@@ -74,12 +74,12 @@ QUERY_HELP = ('JSON {"operator":OP,"operands":[...]}: EQ [field, value]; IS-IN [
               'input_unit and whether its scale was measured, and a rate with an unmeasured scale is refused. Amounts, prices, counts and multiples '
               'are as Yahoo reports them; text fields take screen values.')
 
-SYMBOLS = Arg("targets", nargs="*", metavar="SYMBOL", help="One or more Yahoo symbols (AAPL, 005930.KS, ^GSPC, EURUSD=X); each is a target.")
-FIELDS = Arg("--fields", type=csv_list, metavar="A,B", help="Show only these columns or fields inline (identifying columns stay); the file keeps all.")
+SYMBOLS = Arg("targets", nargs="*", metavar="SYMBOL", help="Yahoo symbols (AAPL, 005930.KS, ^GSPC); each is a target.")
+FIELDS = Arg("--fields", type=csv_list, metavar="A,B", help="Columns or fields to show inline (identifying ones stay); the file keeps all.")
 TIMEOUT = Arg("--timeout", type=int, default=DEFAULTS["timeout"], metavar="SECONDS",
-              help="Seconds per target (default 30). A Unix alarm: it stops Python code, not a call blocked inside a native network read.")
+              help="Seconds per target (default 30); stops Python code, not a blocked native read.")
 MAX_CHARS = Arg("--max-chars", type=int, default=argparse.SUPPRESS, metavar="N",
-                help="Largest receipt to print, in characters (default 8000); a larger receipt is cut in the order the receipt section gives.")
+                help="Largest receipt to print, in characters (default 8000).")
 
 COMMANDS = {c.name: c for c in [
     Command("search", "Instruments, news, curated lists or research reports matching a name or keyword.", targets="QUERY",
@@ -181,17 +181,15 @@ for _command in COMMANDS.values():
 # ---- the documents --help prints ------------------------------------------------------------------------------------
 
 RECEIPT = [
-    "stdout is one JSON receipt; the whole result is a file under the skill's data/results/<id>/, never overwritten.",
-    "  status ok|partial|empty|error, command, receipt_path (receipt.json: every unit, warning, note and time, untrimmed),",
-    "  file {path, format, rows, columns} (null when nothing came back), units {column: unit, \"*\": every other column},",
-    "  warnings [{code, text}]: facts that change how a value may be used; notes: explanations;",
-    "  results, one per target: target, status ok|empty|error|not_attempted, rows, warnings (codes), observed_at (UTC),",
-    "  as_of (source times, last bar final|provisional|unknown), currency, financial_currency, coverage (what the rows",
-    "  cover; requested, received, next_offset where a count is sent), conditions ({requested, status confirmed|",
-    "  not_applied|unverified, evidence}), data (inline rows) or first/last (preview), error {code, message, fix};",
-    "  trimmed: cut to fit --max-chars in this order: data, preview, notes, units, per-target detail; projected: a selection.",
-    "  units: ratio (0.25 = 25%), multiple, shares, count, rank, money or per_share :quote (currency) | :financial",
-    "  (financial_currency) | :unconfirmed, date, datetime, text, unverified (do not compute with it).",
+    "stdout is one JSON receipt; the whole result is a file under data/results/<id>/, never overwritten.",
+    "  status ok|partial|empty|error, command, receipt_path (receipt.json, untrimmed), file {path,format,rows,columns}",
+    "  or null, units {column: unit; \"*\": the rest}, warnings [{code,text}] (change how values may be used), notes,",
+    "  results[]: target, status ok|empty|error|not_attempted, rows, warnings, observed_at, as_of (source times; last",
+    "  bar final|provisional|unknown), currency, financial_currency, coverage (what the rows cover; requested,",
+    "  received, next_offset), conditions ({requested, status confirmed|not_applied|unverified}), data or first/last,",
+    "  error {code,message,fix}; trimmed (cut in order: data, preview, notes, units, detail); projected.",
+    "  units: ratio (0.25 = 25%), multiple, shares, count, rank, money|per_share :quote|:financial|:unconfirmed,",
+    "  date, datetime, text, unverified (do not compute with it).",
 ]
 EXIT_LINE = "exit codes: " + " · ".join(f"{n} {name}" for name, (n, _) in receipts.EXIT_CODES.items())
 GLOBAL_LINE = "before COMMAND: --ttl-days N deletes saved results older than N days (default 14; 0 keeps all)."
@@ -242,13 +240,13 @@ def command_document(command):
 
 def root_document():
     width = max(len(usage(c)) for c in COMMANDS.values()) + 2
-    lines = [f"{lead()} COMMAND ...", "Investment research data from Yahoo Finance. stdout: one JSON receipt; the whole result is a file under data/.",
-             "`COMMAND --help` states that command's kinds, arguments, receipt, failures and exit codes.", "", "commands:"]
+    lines = [f"{lead()} COMMAND ...", "Yahoo Finance data. stdout: a JSON receipt; the whole result is a file under data/.",
+             "`COMMAND --help`: that command's kinds, arguments, receipt, failures and exit codes.", "", "commands:"]
     for command in COMMANDS.values():
         kinds = " | ".join(command.kinds) if command.kinds else command.purpose.split(":")[0].rstrip(".")
         lines.append(f"  {usage(command):<{width}}{kinds}")
-    lines += ["", "options:", "  --max-chars N  largest receipt to print, in characters (default 8000); also accepted after the command",
-              "  --ttl-days N   delete saved results older than N days (default 14; 0 keeps everything); before COMMAND only", "", EXIT_LINE]
+    lines += ["", "options:", "  --max-chars N  largest receipt, in characters (default 8000); also after the command",
+              "  --ttl-days N   delete saved results older than N days (default 14; 0 keeps all); before COMMAND", "", EXIT_LINE]
     return "\n".join(lines)
 
 
