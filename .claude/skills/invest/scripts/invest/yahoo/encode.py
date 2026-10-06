@@ -33,3 +33,25 @@ def encode(value):
     if isinstance(value, (str, int, float, bool)):
         return value
     raise TypeError(f"Unsupported output type: {type(value).__name__}")
+
+
+def label(column):
+    return " | ".join(map(str, column)) if isinstance(column, tuple) else str(column)
+
+
+def table(frame, index=True):
+    """(columns, rows, keys) of a DataFrame with its index levels as leading columns, named by the index's own names; `keys` are those leading columns.
+
+    A plain row-number index (an unnamed RangeIndex) carries nothing the rows do not, so it is left out; `index=False` leaves out any index.
+    """
+    if isinstance(frame, pd.Series):
+        frame = frame.to_frame(frame.name if frame.name is not None else "value")
+    names = list(frame.index.names)
+    keep = index and not (isinstance(frame.index, pd.RangeIndex) and names == [None])
+    leading = ([n if n is not None else ("index" if len(names) == 1 else f"index_{i}") for i, n in enumerate(names)] if keep else [])
+    columns = leading + [label(c) for c in frame.columns]
+    rows = []
+    for position, values in zip(frame.index, frame.itertuples(index=False, name=None)):
+        levels = (list(position) if isinstance(position, tuple) else [position]) if keep else []
+        rows.append([encode(v) for v in levels] + [encode(v) for v in values])
+    return columns, rows, leading

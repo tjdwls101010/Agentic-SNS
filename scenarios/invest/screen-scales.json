@@ -1,0 +1,886 @@
+{
+ "measured_at": "2026-10-06T05:36:55+00:00",
+ "yfinance": "1.7.0",
+ "scales": {
+  "annualreportgrossexpenseratio": "percent",
+  "annualreportnetexpenseratio": "percent",
+  "annualreturnnavy1": "percent",
+  "annualreturnnavy3": "percent",
+  "annualreturnnavy5": "percent",
+  "cashfromoperations1yrgrowth.lasttwelvemonths": "percent",
+  "dilutedeps1yrgrowth.lasttwelvemonths": "percent",
+  "dividendyield": "percent",
+  "ebitda1yrgrowth.lasttwelvemonths": "percent",
+  "ebitdamargin.lasttwelvemonths": "percent",
+  "epsgrowth.lasttwelvemonths": "percent",
+  "fiftytwowkpercentchange": "percent",
+  "forward_dividend_yield": "percent",
+  "grossprofitmargin.lasttwelvemonths": "percent",
+  "leveredfreecashflow1yrgrowth.lasttwelvemonths": "percent",
+  "ltdebtequity.lasttwelvemonths": "percent",
+  "netincome1yrgrowth.lasttwelvemonths": "percent",
+  "netincomemargin.lasttwelvemonths": "percent",
+  "pctheldinsider": "percent",
+  "pctheldinst": "percent",
+  "percentchange": "percent",
+  "quarterendtrailingreturnytd": "percent",
+  "quarterlyrevenuegrowth.quarterly": "percent",
+  "returnonassets.lasttwelvemonths": "percent",
+  "returnonequity.lasttwelvemonths": "percent",
+  "returnontotalcapital.lasttwelvemonths": "percent",
+  "short_interest_percentage_change.value": "percent",
+  "short_percentage_of_float.value": "percent",
+  "short_percentage_of_shares_outstanding.value": "percent",
+  "totaldebtequity.lasttwelvemonths": "percent",
+  "totalrevenues1yrgrowth.lasttwelvemonths": "percent",
+  "trailing_3m_return": "percent",
+  "trailing_ytd_return": "percent",
+  "turnoverratio": "percent"
+ },
+ "evidence": [
+  {
+   "field": "cashfromoperations1yrgrowth.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    20,
+    30
+   ],
+   "total_in_percent_band": 834,
+   "ratio_band": [
+    0.2,
+    0.3
+   ],
+   "total_in_ratio_band": 14,
+   "verdict": "percent"
+  },
+  {
+   "field": "dilutedeps1yrgrowth.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    20,
+    30
+   ],
+   "total_in_percent_band": 817,
+   "ratio_band": [
+    0.2,
+    0.3
+   ],
+   "total_in_ratio_band": 12,
+   "verdict": "percent"
+  },
+  {
+   "field": "dividendyield",
+   "type": "equity",
+   "percent_band": [
+    2,
+    4
+   ],
+   "total_in_percent_band": 2572,
+   "ratio_band": [
+    0.02,
+    0.04
+   ],
+   "total_in_ratio_band": 3,
+   "verdict": "percent"
+  },
+  {
+   "field": "ebitda1yrgrowth.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    20,
+    30
+   ],
+   "total_in_percent_band": 847,
+   "ratio_band": [
+    0.2,
+    0.3
+   ],
+   "total_in_ratio_band": 21,
+   "verdict": "percent"
+  },
+  {
+   "field": "ebitdamargin.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    20,
+    30
+   ],
+   "total_in_percent_band": 1480,
+   "ratio_band": [
+    0.2,
+    0.3
+   ],
+   "total_in_ratio_band": 8,
+   "counterpart": [
+    {
+     "symbol": "ZWS",
+     "ebitdaMargins": 0.261,
+     "inside": true
+    },
+    {
+     "symbol": "ZVRA",
+     "ebitdaMargins": 0.29803,
+     "inside": true
+    },
+    {
+     "symbol": "ZTSTF",
+     "ebitdaMargins": 0.21369,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "epsgrowth.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    20,
+    30
+   ],
+   "total_in_percent_band": 817,
+   "ratio_band": [
+    0.2,
+    0.3
+   ],
+   "total_in_ratio_band": 12,
+   "verdict": "percent"
+  },
+  {
+   "field": "fiftytwowkpercentchange",
+   "type": "equity",
+   "percent_band": [
+    1,
+    3
+   ],
+   "total_in_percent_band": 532,
+   "ratio_band": [
+    0.01,
+    0.03
+   ],
+   "total_in_ratio_band": 2,
+   "counterpart": [
+    {
+     "symbol": "ZTO",
+     "fiftyTwoWeekChangePercent": 1.2987018,
+     "inside": true
+    },
+    {
+     "symbol": "ZSHOF",
+     "fiftyTwoWeekChangePercent": 2.821076,
+     "inside": true
+    },
+    {
+     "symbol": "ZLIOF",
+     "fiftyTwoWeekChangePercent": 2.6666641,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "forward_dividend_yield",
+   "type": "equity",
+   "percent_band": [
+    2,
+    4
+   ],
+   "total_in_percent_band": 1856,
+   "ratio_band": [
+    0.02,
+    0.04
+   ],
+   "total_in_ratio_band": 2,
+   "counterpart": [
+    {
+     "symbol": "ZTS",
+     "dividendYield": 2.97,
+     "inside": true
+    },
+    {
+     "symbol": "ZTO",
+     "dividendYield": 3.5,
+     "inside": true
+    },
+    {
+     "symbol": "ZTCOF",
+     "dividendYield": 2.43,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "forward_dividend_yield",
+   "type": "equity",
+   "percent_band": [
+    2,
+    4
+   ],
+   "total_in_percent_band": 1856,
+   "ratio_band": [
+    0.02,
+    0.04
+   ],
+   "total_in_ratio_band": 2,
+   "counterpart": [
+    {
+     "symbol": "ZTS",
+     "dividendYield": 2.97,
+     "inside": true
+    },
+    {
+     "symbol": "ZTO",
+     "dividendYield": 3.5,
+     "inside": true
+    },
+    {
+     "symbol": "ZTCOF",
+     "dividendYield": 2.43,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "grossprofitmargin.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    20,
+    30
+   ],
+   "total_in_percent_band": 1843,
+   "ratio_band": [
+    0.2,
+    0.3
+   ],
+   "total_in_ratio_band": 5,
+   "counterpart": [
+    {
+     "symbol": "ZYBT",
+     "grossMargins": 0.20513001,
+     "inside": true
+    },
+    {
+     "symbol": "ZURVY",
+     "grossMargins": 0.24293,
+     "inside": true
+    },
+    {
+     "symbol": "ZTOEF",
+     "grossMargins": 0.25100002,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "leveredfreecashflow1yrgrowth.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    20,
+    30
+   ],
+   "total_in_percent_band": 469,
+   "ratio_band": [
+    0.2,
+    0.3
+   ],
+   "total_in_ratio_band": 8,
+   "verdict": "percent"
+  },
+  {
+   "field": "ltdebtequity.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    50,
+    100
+   ],
+   "total_in_percent_band": 2195,
+   "ratio_band": [
+    0.5,
+    1.0
+   ],
+   "total_in_ratio_band": 379,
+   "verdict": "percent"
+  },
+  {
+   "field": "netincome1yrgrowth.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    20,
+    30
+   ],
+   "total_in_percent_band": 892,
+   "ratio_band": [
+    0.2,
+    0.3
+   ],
+   "total_in_ratio_band": 9,
+   "verdict": "percent"
+  },
+  {
+   "field": "netincomemargin.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    20,
+    30
+   ],
+   "total_in_percent_band": 1138,
+   "ratio_band": [
+    0.2,
+    0.3
+   ],
+   "total_in_ratio_band": 32,
+   "counterpart": [
+    {
+     "symbol": "ZTS",
+     "profitMargins": 0.27685,
+     "inside": true
+    },
+    {
+     "symbol": "ZPHRF",
+     "profitMargins": 0.24254999,
+     "inside": true
+    },
+    {
+     "symbol": "ZNNGY",
+     "profitMargins": 0.27312002,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "pctheldinsider",
+   "type": "equity",
+   "percent_band": [
+    20,
+    40
+   ],
+   "total_in_percent_band": 2438,
+   "ratio_band": [
+    0.2,
+    0.4
+   ],
+   "total_in_ratio_band": 368,
+   "counterpart": [
+    {
+     "symbol": "ZZHGF",
+     "heldPercentInsiders": 0.28966,
+     "inside": true
+    },
+    {
+     "symbol": "ZUMZ",
+     "heldPercentInsiders": 0.25553,
+     "inside": true
+    },
+    {
+     "symbol": "ZTOEF",
+     "heldPercentInsiders": 0.23968,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "pctheldinst",
+   "type": "equity",
+   "percent_band": [
+    20,
+    40
+   ],
+   "total_in_percent_band": 2252,
+   "ratio_band": [
+    0.2,
+    0.4
+   ],
+   "total_in_ratio_band": 243,
+   "counterpart": [
+    {
+     "symbol": "ZTR",
+     "heldPercentInstitutions": 0.22928,
+     "inside": true
+    },
+    {
+     "symbol": "ZTCOF",
+     "heldPercentInstitutions": 0.28943002,
+     "inside": true
+    },
+    {
+     "symbol": "ZRSEF",
+     "heldPercentInstitutions": 0.22559,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "percentchange",
+   "type": "equity",
+   "percent_band": [
+    1,
+    3
+   ],
+   "total_in_percent_band": 1508,
+   "ratio_band": [
+    0.01,
+    0.03
+   ],
+   "total_in_ratio_band": 40,
+   "counterpart": [
+    {
+     "symbol": "ZUUZF",
+     "regularMarketChangePercent": 1.6710597,
+     "inside": true
+    },
+    {
+     "symbol": "ZTS",
+     "regularMarketChangePercent": 2.46807,
+     "inside": true
+    },
+    {
+     "symbol": "ZTO",
+     "regularMarketChangePercent": 1.02565,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "quarterlyrevenuegrowth.quarterly",
+   "type": "equity",
+   "percent_band": [
+    20,
+    30
+   ],
+   "total_in_percent_band": 1068,
+   "ratio_band": [
+    0.2,
+    0.3
+   ],
+   "total_in_ratio_band": 27,
+   "counterpart": [
+    {
+     "symbol": "ZTOEF",
+     "revenueGrowth": 0.23,
+     "inside": true
+    },
+    {
+     "symbol": "ZTO",
+     "revenueGrowth": 0.23,
+     "inside": true
+    },
+    {
+     "symbol": "ZTFMF",
+     "revenueGrowth": 0.23,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "returnonassets.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    10,
+    20
+   ],
+   "total_in_percent_band": 908,
+   "ratio_band": [
+    0.1,
+    0.2
+   ],
+   "total_in_ratio_band": 78,
+   "counterpart": [
+    {
+     "symbol": "ZTSTF",
+     "returnOnAssets": 0.124919996,
+     "inside": true
+    },
+    {
+     "symbol": "ZTS",
+     "returnOnAssets": 0.15352,
+     "inside": true
+    },
+    {
+     "symbol": "ZNZNF",
+     "returnOnAssets": 0.18624,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "returnonequity.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    10,
+    20
+   ],
+   "total_in_percent_band": 3319,
+   "ratio_band": [
+    0.1,
+    0.2
+   ],
+   "total_in_ratio_band": 25,
+   "counterpart": [
+    {
+     "symbol": "ZWS",
+     "returnOnEquity": 0.16919,
+     "inside": true
+    },
+    {
+     "symbol": "ZTOEF",
+     "returnOnEquity": 0.16277,
+     "inside": true
+    },
+    {
+     "symbol": "ZTO",
+     "returnOnEquity": 0.16277,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "returnontotalcapital.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    10,
+    20
+   ],
+   "total_in_percent_band": 1821,
+   "ratio_band": [
+    0.1,
+    0.2
+   ],
+   "total_in_ratio_band": 53,
+   "verdict": "percent"
+  },
+  {
+   "field": "short_interest_percentage_change.value",
+   "type": "equity",
+   "percent_band": [
+    2,
+    4
+   ],
+   "total_in_percent_band": 435,
+   "ratio_band": [
+    0.02,
+    0.04
+   ],
+   "total_in_ratio_band": 11,
+   "verdict": "percent"
+  },
+  {
+   "field": "short_percentage_of_float.value",
+   "type": "equity",
+   "percent_band": [
+    2,
+    4
+   ],
+   "total_in_percent_band": 992,
+   "ratio_band": [
+    0.02,
+    0.04
+   ],
+   "total_in_ratio_band": 123,
+   "counterpart": [
+    {
+     "symbol": "ZWS",
+     "shortPercentOfFloat": 0.0399,
+     "inside": true
+    },
+    {
+     "symbol": "ZVIA",
+     "shortPercentOfFloat": 0.0214,
+     "inside": true
+    },
+    {
+     "symbol": "ZTO",
+     "shortPercentOfFloat": 0.0247,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "short_percentage_of_shares_outstanding.value",
+   "type": "equity",
+   "percent_band": [
+    2,
+    4
+   ],
+   "total_in_percent_band": 1247,
+   "ratio_band": [
+    0.02,
+    0.04
+   ],
+   "total_in_ratio_band": 199,
+   "counterpart": [
+    {
+     "symbol": "ZWS",
+     "sharesPercentSharesOut": 0.0294,
+     "inside": true
+    },
+    {
+     "symbol": "ZS",
+     "sharesPercentSharesOut": 0.0399,
+     "inside": true
+    },
+    {
+     "symbol": "ZPTA",
+     "sharesPercentSharesOut": 0.024600001,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "totaldebtequity.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    50,
+    100
+   ],
+   "total_in_percent_band": 2432,
+   "ratio_band": [
+    0.5,
+    1.0
+   ],
+   "total_in_ratio_band": 321,
+   "counterpart": [
+    {
+     "symbol": "ZUMZ",
+     "debtToEquity": 81.431,
+     "inside": true
+    },
+    {
+     "symbol": "ZTCOF",
+     "debtToEquity": 89.105,
+     "inside": true
+    },
+    {
+     "symbol": "ZSHOF",
+     "debtToEquity": 91.263,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "totalrevenues1yrgrowth.lasttwelvemonths",
+   "type": "equity",
+   "percent_band": [
+    20,
+    30
+   ],
+   "total_in_percent_band": 965,
+   "ratio_band": [
+    0.2,
+    0.3
+   ],
+   "total_in_ratio_band": 30,
+   "verdict": "percent"
+  },
+  {
+   "field": "annualreportgrossexpenseratio",
+   "type": "etf",
+   "percent_band": [
+    0.3,
+    0.8
+   ],
+   "total_in_percent_band": 2801,
+   "ratio_band": [
+    0.003,
+    0.008
+   ],
+   "total_in_ratio_band": 0,
+   "verdict": "percent"
+  },
+  {
+   "field": "annualreportnetexpenseratio",
+   "type": "etf",
+   "percent_band": [
+    0.3,
+    0.8
+   ],
+   "total_in_percent_band": 2876,
+   "ratio_band": [
+    0.003,
+    0.008
+   ],
+   "total_in_ratio_band": 0,
+   "verdict": "percent"
+  },
+  {
+   "field": "annualreturnnavy1",
+   "type": "etf",
+   "percent_band": [
+    10,
+    20
+   ],
+   "total_in_percent_band": 415,
+   "ratio_band": [
+    0.1,
+    0.2
+   ],
+   "total_in_ratio_band": 0,
+   "verdict": "percent"
+  },
+  {
+   "field": "annualreturnnavy3",
+   "type": "etf",
+   "percent_band": [
+    10,
+    20
+   ],
+   "total_in_percent_band": 521,
+   "ratio_band": [
+    0.1,
+    0.2
+   ],
+   "total_in_ratio_band": 1,
+   "verdict": "percent"
+  },
+  {
+   "field": "annualreturnnavy5",
+   "type": "etf",
+   "percent_band": [
+    10,
+    20
+   ],
+   "total_in_percent_band": 290,
+   "ratio_band": [
+    0.1,
+    0.2
+   ],
+   "total_in_ratio_band": 6,
+   "verdict": "percent"
+  },
+  {
+   "field": "fiftytwowkpercentchange",
+   "type": "etf",
+   "percent_band": [
+    1,
+    3
+   ],
+   "total_in_percent_band": 206,
+   "ratio_band": [
+    0.01,
+    0.03
+   ],
+   "total_in_ratio_band": 3,
+   "counterpart": [
+    {
+     "symbol": "ZIG",
+     "fiftyTwoWeekChangePercent": 1.7005444,
+     "inside": true
+    },
+    {
+     "symbol": "XYLG",
+     "fiftyTwoWeekChangePercent": 2.3022532,
+     "inside": true
+    },
+    {
+     "symbol": "XVSP",
+     "fiftyTwoWeekChangePercent": 1.3764262,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "percentchange",
+   "type": "etf",
+   "percent_band": [
+    1,
+    3
+   ],
+   "total_in_percent_band": 893,
+   "ratio_band": [
+    0.01,
+    0.03
+   ],
+   "total_in_ratio_band": 134,
+   "counterpart": [
+    {
+     "symbol": "^UFO",
+     "regularMarketChangePercent": 1.0134133,
+     "inside": true
+    },
+    {
+     "symbol": "^UEVM",
+     "regularMarketChangePercent": 1.2284647,
+     "inside": true
+    },
+    {
+     "symbol": "^SKYY",
+     "regularMarketChangePercent": 1.0101877,
+     "inside": true
+    }
+   ],
+   "verdict": "percent"
+  },
+  {
+   "field": "quarterendtrailingreturnytd",
+   "type": "etf",
+   "percent_band": [
+    10,
+    20
+   ],
+   "total_in_percent_band": 439,
+   "ratio_band": [
+    0.1,
+    0.2
+   ],
+   "total_in_ratio_band": 6,
+   "verdict": "percent"
+  },
+  {
+   "field": "trailing_3m_return",
+   "type": "etf",
+   "percent_band": [
+    10,
+    20
+   ],
+   "total_in_percent_band": 89,
+   "ratio_band": [
+    0.1,
+    0.2
+   ],
+   "total_in_ratio_band": 8,
+   "verdict": "percent"
+  },
+  {
+   "field": "trailing_ytd_return",
+   "type": "etf",
+   "percent_band": [
+    10,
+    20
+   ],
+   "total_in_percent_band": 443,
+   "ratio_band": [
+    0.1,
+    0.2
+   ],
+   "total_in_ratio_band": 6,
+   "verdict": "percent"
+  },
+  {
+   "field": "turnoverratio",
+   "type": "etf",
+   "percent_band": [
+    20,
+    50
+   ],
+   "total_in_percent_band": 1113,
+   "ratio_band": [
+    0.2,
+    0.5
+   ],
+   "total_in_ratio_band": 2,
+   "verdict": "percent"
+  }
+ ]
+}

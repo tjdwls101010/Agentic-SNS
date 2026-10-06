@@ -1,0 +1,46 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:30:30+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "quote",
+   "XYZQQ"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v10/finance/quoteSummary/XYZQQ",
+   "params": {
+    "modules": "financialData,quoteType,defaultKeyStatistics,assetProfile,summaryDetail",
+    "symbol": "XYZQQ"
+   },
+   "status": 404,
+   "json": {
+    "quoteSummary": {
+     "result": null,
+     "error": {
+      "code": "Not Found",
+      "description": "Quote not found for symbol: XYZQQ"
+     }
+    }
+   }
+  },
+  {
+   "path": "/v10/finance/quoteSummary/XYZQQ",
+   "params": {
+    "modules": "financialData,quoteType,defaultKeyStatistics,assetProfile,summaryDetail",
+    "symbol": "XYZQQ"
+   },
+   "status": 404,
+   "json": {
+    "quoteSummary": {
+     "result": null,
+     "error": {
+      "code": "Not Found",
+      "description": "Quote not found for symbol: XYZQQ"
+     }
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,267 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:30:34+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "history",
+   "AAPL",
+   "--start",
+   "2026-09-28",
+   "--end",
+   "2026-10-03",
+   "--adjust",
+   "none"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v8/finance/chart/AAPL",
+   "params": {
+    "range": "1d",
+    "interval": "1d"
+   },
+   "status": 200,
+   "json": {
+    "chart": {
+     "result": [
+      {
+       "meta": {
+        "currency": "USD",
+        "symbol": "AAPL",
+        "exchangeName": "NMS",
+        "fullExchangeName": "NasdaqGS",
+        "instrumentType": "EQUITY",
+        "firstTradeDate": 345479400,
+        "regularMarketTime": 1791230402,
+        "hasPrePostMarketData": true,
+        "gmtoffset": -14400,
+        "timezone": "EDT",
+        "exchangeTimezoneName": "America/New_York",
+        "regularMarketPrice": 332.89,
+        "regularMarketChangePercent": -0.24,
+        "fulldayPrice": 332.89,
+        "fulldayChange": -0.61,
+        "fulldayChangePercent": -0.183,
+        "fiftyTwoWeekHigh": 345.34,
+        "fiftyTwoWeekLow": 243.42,
+        "regularMarketDayHigh": 336.19,
+        "regularMarketDayLow": 331.65,
+        "regularMarketVolume": 34328912,
+        "longName": "Apple Inc.",
+        "shortName": "Apple Inc.",
+        "chartPreviousClose": 333.69,
+        "priceHint": 2,
+        "currentTradingPeriod": {
+         "pre": {
+          "timezone": "EDT",
+          "start": 1791273600,
+          "end": 1791293400,
+          "gmtoffset": -14400
+         },
+         "regular": {
+          "timezone": "EDT",
+          "start": 1791293400,
+          "end": 1791316800,
+          "gmtoffset": -14400
+         },
+         "post": {
+          "timezone": "EDT",
+          "start": 1791316800,
+          "end": 1791331200,
+          "gmtoffset": -14400
+         }
+        },
+        "dataGranularity": "1d",
+        "range": "1d",
+        "validRanges": [
+         "1d",
+         "5d",
+         "1mo",
+         "3mo",
+         "6mo",
+         "1y",
+         "2y",
+         "5y",
+         "10y",
+         "ytd",
+         "max"
+        ]
+       },
+       "timestamp": [
+        1791207000
+       ],
+       "indicators": {
+        "quote": [
+         {
+          "low": [
+           331.6499938964844
+          ],
+          "open": [
+           332.82000732421875
+          ],
+          "close": [
+           332.8900146484375
+          ],
+          "high": [
+           336.2099914550781
+          ],
+          "volume": [
+           34350900
+          ]
+         }
+        ],
+        "adjclose": [
+         {
+          "adjclose": [
+           332.8900146484375
+          ]
+         }
+        ]
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/v8/finance/chart/AAPL",
+   "params": {
+    "interval": "1d",
+    "includePrePost": "False",
+    "events": "div,splits,capitalGains"
+   },
+   "status": 200,
+   "json": {
+    "chart": {
+     "result": [
+      {
+       "meta": {
+        "currency": "USD",
+        "symbol": "AAPL",
+        "exchangeName": "NMS",
+        "fullExchangeName": "NasdaqGS",
+        "instrumentType": "EQUITY",
+        "firstTradeDate": 345479400,
+        "regularMarketTime": 1791230402,
+        "hasPrePostMarketData": true,
+        "gmtoffset": -14400,
+        "timezone": "EDT",
+        "exchangeTimezoneName": "America/New_York",
+        "regularMarketPrice": 332.89,
+        "regularMarketChangePercent": -0.24,
+        "fulldayPrice": 332.89,
+        "fulldayChange": -0.61,
+        "fulldayChangePercent": -0.183,
+        "fiftyTwoWeekHigh": 345.34,
+        "fiftyTwoWeekLow": 243.42,
+        "regularMarketDayHigh": 336.19,
+        "regularMarketDayLow": 331.65,
+        "regularMarketVolume": 34328912,
+        "longName": "Apple Inc.",
+        "shortName": "Apple Inc.",
+        "chartPreviousClose": 341.07,
+        "priceHint": 2,
+        "currentTradingPeriod": {
+         "pre": {
+          "timezone": "EDT",
+          "end": 1791293400,
+          "start": 1791273600,
+          "gmtoffset": -14400
+         },
+         "regular": {
+          "timezone": "EDT",
+          "end": 1791316800,
+          "start": 1791293400,
+          "gmtoffset": -14400
+         },
+         "post": {
+          "timezone": "EDT",
+          "end": 1791331200,
+          "start": 1791316800,
+          "gmtoffset": -14400
+         }
+        },
+        "dataGranularity": "1d",
+        "range": "",
+        "validRanges": [
+         "1d",
+         "5d",
+         "1mo",
+         "3mo",
+         "6mo",
+         "1y",
+         "2y",
+         "5y",
+         "10y",
+         "ytd",
+         "max"
+        ]
+       },
+       "timestamp": [
+        1790602200,
+        1790688600,
+        1790775000,
+        1790861400,
+        1790947800
+       ],
+       "indicators": {
+        "quote": [
+         {
+          "high": [
+           342.989990234375,
+           337.0899963378906,
+           339.5,
+           332.4800109863281,
+           334.5400085449219
+          ],
+          "low": [
+           338.0400085449219,
+           328.70001220703125,
+           330.1400146484375,
+           325.80999755859375,
+           330.6099853515625
+          ],
+          "open": [
+           340.3699951171875,
+           336.9700012207031,
+           330.79998779296875,
+           330.0,
+           333.260009765625
+          ],
+          "volume": [
+           32820800,
+           38478000,
+           49988600,
+           36306300,
+           33278600
+          ],
+          "close": [
+           338.3999938964844,
+           329.3999938964844,
+           333.0199890136719,
+           330.32000732421875,
+           333.69000244140625
+          ]
+         }
+        ],
+        "adjclose": [
+         {
+          "adjclose": [
+           338.3999938964844,
+           329.3999938964844,
+           333.0199890136719,
+           330.32000732421875,
+           333.69000244140625
+          ]
+         }
+        ]
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  }
+ ]
+}

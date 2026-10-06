@@ -1,42 +1,59 @@
-"""Company profile, shares outstanding, news and filing links."""
-from invest.yahoo.datasets import SHARES, Dataset
-from invest.yahoo.info import CURRENCY_SPLIT, INFO_UNITS, info, info_time
+"""Company profile, shares outstanding, news entries and SEC filing entries."""
+import yfinance as yf
+
+from invest.yahoo.datasets import Dataset
+from invest.yahoo.info import ASSEMBLED, INFO_UNITS, PROFILE_FIELDS, RISK, SIBLING, info
+from invest.yahoo.units import DATETIME, EPOCH, SHARES, u
 
 
-def shares(ticker, args, context, warnings):
-    return ticker.get_shares_full(start=args.start, end=args.end)
+def shares(ticker, args, context):
+    series = ticker.get_shares_full(start=args.start, end=args.end)
+    if series is not None:
+        series = series.rename("shares")
+        series.index.name = "Date"
+    return series
 
 
-def news(ticker, args, context, warnings, rows):
-    context["requested"] = rows
-    return ticker.get_news(count=rows, tab=args.tab)
+def news(ticker, args, context):
+    """Yahoo search's news for the symbol. The ticker news feed yfinance 1.7.0 reads (/xhr/ncp) answers 404, which yfinance turns into an empty list."""
+    entries = yf.Search(ticker.ticker, max_results=0, news_count=args.limit, lists_count=0, include_nav_links=False, timeout=args.timeout).news
+    received = len(entries or [])
+    context.coverage.update(requested=args.limit)
+    if 0 < received < args.limit:
+        context.warn("shortfall", f"{received} of the {args.limit} entries asked for arrived on the first page, the only one read; a short list does not mean there is no more news.")
+    return entries
 
 
-def filings(ticker, args, context, warnings):
+NEWS_UNITS = {"providerPublishTime": u(DATETIME, EPOCH)}
+
+
+def filings(ticker, args, context):
     return ticker.get_sec_filings()
+
+
+def filing_preview(entry):
+    """What a trimmed receipt shows of one filing: its date, form type and how many documents it has."""
+    if not isinstance(entry, dict):
+        return entry
+    return {"date": entry.get("date"), "type": entry.get("type"), "exhibits": len(entry.get("exhibits") or {})}
 
 
 DATASETS = {
     "company.profile": Dataset(
-        info, ticker=True, shares_info=True, source_time=info_time, units=INFO_UNITS,
-        interpretation={"sibling": "prices quote selects the price side of this same assembled response.",
-                        "currency": CURRENCY_SPLIT,
-                        "governance": "The risk fields are ISS governance deciles, 1-10 relative to the company's index and region, where 1 is the lowest relative risk; they are ranks, not scores out of ten."},
-        gotchas=["companyOfficers and executiveTeam are omitted from the default projection because they are large; ask for them by name."]),
+        info, form="records", units=INFO_UNITS, fields=PROFILE_FIELDS,
+        coverage="Yahoo's info response for the symbol: every field it carries is in result.json",
+        notes=(SIBLING, ASSEMBLED, RISK), possible=("cross_currency_fields",)),
     "company.shares": Dataset(
-        shares, ticker=True, recent=True, units={"value": SHARES},
-        interpretation={"dates": "Each row is a share count dated to the day Yahoo reports it; dates come dozens a year and can repeat within a day, so they do not follow a quarterly filing calendar."}),
+        shares, units={"shares": u(SHARES), "Date": u(DATETIME)},
+        coverage="share counts as Yahoo reports them over the range, dated when Yahoo reports them; the dates do not follow a filing calendar"),
     "company.news": Dataset(
-        news, ticker=True, counted=True,
-        shortfall=("{received} usable entries arrived of the {requested} asked for. yfinance drops sponsored entries from what the feed sent, "
-                   "so a short page does not show that the feed ended, and these are not every article about the company."),
-        interpretation={"payload": "Each entry nests its article under content, so a field path is dotted: content.title, content.provider.displayName.",
-                        "not_the_article": "Entries locate sources; the text here is a summary, not the article. Read the article itself with a web reader."},
-        gotchas=["The default projection leaves out content.thumbnail and content.storyline, which are large; name those paths to get them.",
-                 "Entries are not strictly ordered by pubDate, so the first entry is not reliably the most recent."]),
+        news, form="records", counted=True, units=NEWS_UNITS,
+        coverage="the first page of Yahoo search's news for the symbol, not every article",
+        notes=("Each entry is a headline with its publisher, link, providerPublishTime and relatedTickers; it is not the article.",
+               "Entries are not strictly ordered by time."),
+        possible=("shortfall",)),
     "company.filings": Dataset(
-        filings, ticker=True,
-        interpretation={"dates": "date is the filing date. Entries arrive newest first.",
-                        "not_the_filing": "These are links and metadata. Read the original filing with the sec skill."},
-        gotchas=["exhibits holds a link map per filing and is most of this payload; it is outside the default projection, so name it to get it."]),
+        filings, form="records", preview=filing_preview,
+        coverage="the SEC filings Yahoo currently lists for the symbol, newest first; Form 4 and older filings may be absent",
+        notes=("date is the filing date; exhibits map each document type to Yahoo's copy of the SEC document.",)),
 }

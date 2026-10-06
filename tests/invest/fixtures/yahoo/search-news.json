@@ -1,0 +1,328 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:32:29+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "search",
+   "apple",
+   "--dataset",
+   "news"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v1/finance/search",
+   "params": {
+    "q": "apple",
+    "quotesCount": "0",
+    "enableFuzzyQuery": "False",
+    "newsCount": "10",
+    "quotesQueryId": "tss_match_phrase_query",
+    "newsQueryId": "news_cie_vespa",
+    "listsCount": "0",
+    "enableCb": "True",
+    "enableNavLinks": "False",
+    "enableResearchReports": "False",
+    "enableCulturalAssets": "False",
+    "recommendedCount": "8"
+   },
+   "status": 200,
+   "json": {
+    "explains": [],
+    "count": 11,
+    "quotes": [
+     {
+      "index": "7e90b00eb9cb3e1feb91ca39b64bebb9",
+      "name": "ApplePie Capital",
+      "permalink": "applepie-capital",
+      "isYahooFinance": false
+     },
+     {
+      "index": "d8c1b54896db4e148d5bff7bdd4778d0",
+      "name": "Apple Tree Partners",
+      "permalink": "apple-tree-partners",
+      "isYahooFinance": false
+     }
+    ],
+    "news": [
+     {
+      "uuid": "3654441b-c2b4-3951-87d6-2af7a74fac24",
+      "title": "Here's How Many Shares of Apple You'd Need for $10,000 in Yearly Dividends",
+      "publisher": "Motley Fool",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/heres-many-shares-apple-youd-030655372.html",
+      "providerPublishTime": 1791256015,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/motleyfool.com/4cdee7f7117101b2984f155680950a15.png",
+         "width": 1200,
+         "height": 800,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/29B264F480F878C9244207BC3D5D92CEF2017DAED680D5DEBEE2B10454896531/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmotleyfool.com%2F4cdee7f7117101b2984f155680950a15.png",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL",
+       "NVDA"
+      ]
+     },
+     {
+      "uuid": "761e1dc6-7d9f-3d24-8e89-b7c124ab7695",
+      "title": "Apple Changes Mac OS to Warn Users About Aggressive AI Agents",
+      "publisher": "TIKR",
+      "link": "https://finance.yahoo.com/technology/ai/articles/apple-changes-mac-os-warn-151610165.html",
+      "providerPublishTime": 1791213370,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/tikr_258/7ecb5661219d0ec9e7b6278f515c8fa9",
+         "width": 1280,
+         "height": 720,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/763734F4919C53C74948808DD93849C61100D295E2DA18A4F2C32F1C57E6B829/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Ftikr_258%2F7ecb5661219d0ec9e7b6278f515c8fa9",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "b0d42f45-0b75-37ce-81e3-84fc5a5a9ca8",
+      "title": "Prediction: By the End of 2027, Microsoft Will Be More Valuable Than Apple",
+      "publisher": "Motley Fool",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/prediction-end-2027-microsoft-more-145002512.html",
+      "providerPublishTime": 1791211802,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/motleyfool.com/4fc6648a825076d22dca8ac146c408fd.jpg",
+         "width": 1400,
+         "height": 933,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/8600A7C393D71BFC763E3EE9A88F96E80AB830A0F5F01EE2F57BFE7F24B10716/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmotleyfool.com%2F4fc6648a825076d22dca8ac146c408fd.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "MSFT",
+       "AAPL",
+       "NVDA"
+      ]
+     },
+     {
+      "uuid": "59cf3d09-0980-3420-800d-b5493b1d1b70",
+      "title": "Visual Computing Market Report 2026: Global Size, Share, Trends and Growth Forecast to 2030 | Capitalize on AI, Real-Time 3D and AR/VR with NVIDIA, Apple, Microsoft and AMD",
+      "publisher": "GlobeNewswire",
+      "link": "https://finance.yahoo.com/technology/articles/visual-computing-market-report-2026-133700784.html",
+      "providerPublishTime": 1791207420,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/globenewswire.com/93d5b27580f67db722dd7c112e43e8bc.jpg",
+         "width": 480,
+         "height": 58,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/BB9B58157D9D52FE5136EB09C714B2275F8906CDA5F9FF04CECC4362D75E9038/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fglobenewswire.com%2F93d5b27580f67db722dd7c112e43e8bc.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL",
+       "MSFT",
+       "NVDA",
+       "AMD"
+      ]
+     },
+     {
+      "uuid": "43eb02d5-f481-3192-b971-39e48e5ac068",
+      "title": "Global Context-Aware Computing Market Report 2026: Size, Share, Trends and Forecast to 2030 | Capitalize on AI and Edge Growth with Amazon, Apple, Alphabet, Microsoft, and Oracle",
+      "publisher": "GlobeNewswire",
+      "link": "https://finance.yahoo.com/technology/articles/global-context-aware-computing-market-132400336.html",
+      "providerPublishTime": 1791206640,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/globenewswire.com/93d5b27580f67db722dd7c112e43e8bc.jpg",
+         "width": 480,
+         "height": 58,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/BB9B58157D9D52FE5136EB09C714B2275F8906CDA5F9FF04CECC4362D75E9038/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fglobenewswire.com%2F93d5b27580f67db722dd7c112e43e8bc.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL",
+       "GOOG",
+       "AMZN",
+       "MSFT",
+       "ORCL"
+      ]
+     },
+     {
+      "uuid": "9e7a5925-923e-3cd8-9995-74da9578650a",
+      "title": "Human-Computer Interaction Market Report 2026: Global Forecast to 2030 | Capitalize on AI, IoT and Multimodal Interfaces as Apple, Google, Microsoft and Meta Scale a $1.97T Market",
+      "publisher": "GlobeNewswire",
+      "link": "https://finance.yahoo.com/technology/articles/human-computer-interaction-market-report-132300346.html",
+      "providerPublishTime": 1791206580,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/globenewswire.com/93d5b27580f67db722dd7c112e43e8bc.jpg",
+         "width": 480,
+         "height": 58,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/BB9B58157D9D52FE5136EB09C714B2275F8906CDA5F9FF04CECC4362D75E9038/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fglobenewswire.com%2F93d5b27580f67db722dd7c112e43e8bc.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL",
+       "GOOG",
+       "MSFT",
+       "META",
+       "AMZN"
+      ]
+     },
+     {
+      "uuid": "1deff1e2-6ab4-3516-a066-9421b60e882f",
+      "title": "Will Siri Overhaul Help Apple (AAPL) Restore Its AI Credibility?",
+      "publisher": "Insider Monkey",
+      "link": "https://finance.yahoo.com/technology/ai/articles/siri-overhaul-help-apple-aapl-124652463.html",
+      "providerPublishTime": 1791204412,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/insidermonkey.com/62cb46e6eeef5e0adeaa5b81e9188f72.jpg",
+         "width": 800,
+         "height": 1200,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/74A60C75BF24564A8E3C833079290EA6F0FDE7830F954735FD9114A76CECD89A/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Finsidermonkey.com%2F62cb46e6eeef5e0adeaa5b81e9188f72.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "d7a21629-7467-3dec-85e0-27a5cf7c8bc2",
+      "title": "Who’s Worse At AI Monetization, Tesla or Apple?",
+      "publisher": "24/7 Wall St.",
+      "link": "https://finance.yahoo.com/technology/ai/articles/worse-ai-monetization-tesla-apple-124556466.html",
+      "providerPublishTime": 1791204356,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/24_7_wall_st__718/43f0fb5b8e47fa798d331c7447ec736e",
+         "width": 1376,
+         "height": 768,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/083B11897BA28B4DAA0C2FD696D3C84C4C00AA97D67816839334E45A7BD63FE0/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2F24_7_wall_st__718%2F43f0fb5b8e47fa798d331c7447ec736e",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "TSLA",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "d7b0e3f8-c80f-3b32-a310-691823b4cfe2",
+      "title": "Nvidia Gets Another AI Demand Signal As Foxconn Sales Hit Record High – Apple Faces Holiday Test",
+      "publisher": "Stocktwits",
+      "link": "https://finance.yahoo.com/technology/ai/articles/nvidia-gets-another-ai-demand-121803306.html",
+      "providerPublishTime": 1791202683,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/stocktwits_383/546e99e2995bdcbf0105b6203c32dffe",
+         "width": 1000,
+         "height": 750,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/C58BEA3D81CC6E277986404E84FAA2D9C222C7425189BDF532351C4F554A38C5/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fstocktwits_383%2F546e99e2995bdcbf0105b6203c32dffe",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "2317.TW",
+       "NVDA",
+       "AAPL"
+      ]
+     }
+    ],
+    "nav": [],
+    "lists": [],
+    "researchReports": [],
+    "screenerFieldResults": [],
+    "totalTime": 131,
+    "timeTakenForQuotes": 407,
+    "timeTakenForNews": 600,
+    "timeTakenForAlgowatchlist": 400,
+    "timeTakenForPredefinedScreener": 400,
+    "timeTakenForCrunchbase": 400,
+    "timeTakenForNav": 0,
+    "timeTakenForResearchReports": 0,
+    "timeTakenForQuestions": 0,
+    "timeTakenForScreenerField": 0,
+    "timeTakenForCulturalAssets": 0,
+    "timeTakenForSearchLists": 0
+   }
+  }
+ ]
+}

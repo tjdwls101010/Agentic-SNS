@@ -1,92 +1,124 @@
-"""Quotes, and bars and corporate actions with explicit adjustment and date semantics."""
+"""The quote, and price bars with their adjustment, dates and whether the last bar is final."""
+from zoneinfo import ZoneInfo
+
 import pandas as pd
 
+from invest.yahoo import timing
 from invest.yahoo.conditions import within_dates
 from invest.yahoo.datasets import Dataset
-from invest.yahoo.info import CURRENCY_SPLIT, INFO_UNITS, QUOTE_TIME, info, info_time
+from invest.yahoo.encode import encode
+from invest.yahoo.info import ASSEMBLED, INFO_UNITS, QUOTE_FIELDS, SIBLING, info
 from invest.yahoo.refusals import is_rate_limited
+from invest.yahoo.units import DATETIME, MULTIPLE, PER_SHARE_QUOTE, SHARES, TEXT, u
+
+PRICE = u(PER_SHARE_QUOTE)
+BAR_UNITS = {"Open": PRICE, "High": PRICE, "Low": PRICE, "Close": PRICE, "Adj Close": PRICE, "Volume": u(SHARES),
+             "Dividends": PRICE, "Stock Splits": u(MULTIPLE), "Capital Gains": PRICE, "Repaired?": u(TEXT), "Date": u(DATETIME), "Datetime": u(DATETIME)}
+# 성진: 원천 정밀도가 실측된 열만 인라인에서 7자리로 보인다(Yahoo는 가격을 float32로 준다). 파일은 언제나 받은 자릿수 전부다.
+PRICE_COLUMNS = ("Open", "High", "Low", "Close", "Adj Close")
+ACTIONS = ("Dividends", "Stock Splits", "Capital Gains")
+ADJUSTMENT = {
+    "auto": "Prices are adjusted for splits and dividends (--adjust auto), so a return from Close already includes dividends.",
+    "back": "Close is as traded while Open, High and Low are scaled by the adjustment ratio (--adjust back).",
+    "none": "Prices are as traded, adjusted only for splits as Yahoo serves them; Adj Close adds the dividend adjustment (--adjust none).",
+}
 
 
-def dates_applied(encoded, args, context):
-    """Judge --start/--end from the rows themselves rather than from the arguments that were sent."""
+def session(metadata):
+    """The (start, end) of the regular session Yahoo reports as current, and the exchange's time zone; None for what it did not report."""
+    period = (metadata or {}).get("currentTradingPeriod") or {}
+    regular = period.get("regular") if isinstance(period, dict) else None
+    name = (metadata or {}).get("exchangeTimezoneName")
+    zone = None
+    if name:
+        try:
+            zone = ZoneInfo(name)
+        except (KeyError, ValueError):
+            zone = None
+    if isinstance(regular, dict) and regular.get("start") is not None and regular.get("end") is not None:
+        return (regular["start"], regular["end"]), zone
+    return None, zone
+
+
+def bars(ticker, args, context):
+    frame = ticker.history(period=args.period, start=args.start, end=args.end, interval=args.interval, auto_adjust=args.adjust == "auto",
+                           back_adjust=args.adjust == "back", repair=args.repair, actions=True, keepna=True, prepost=args.prepost, timeout=args.timeout)
+    context.observed_at = timing.now()
+    if not frame.empty:
+        zone = getattr(frame.index, "tz", None)
+        if args.start:
+            frame = frame.loc[frame.index >= pd.Timestamp(args.start, tz=zone)]
+        if args.end:
+            frame = frame.loc[frame.index < pd.Timestamp(args.end, tz=zone)]
+    metadata = {}
+    try:
+        metadata = ticker.get_history_metadata() or {}
+    except Exception as exc:  # the bars are still the answer; what could not be read is when the session ends
+        if is_rate_limited(exc):
+            context.rate_limited = True
+            context.warn("secondary_rate_limited", "Yahoo rate-limited the session lookup after the bars arrived; the bars are kept and the remaining targets were not attempted.")
+        context.receipt["metadata_error"] = str(exc)
+    context.currency = metadata.get("currency")
+    zone_name = metadata.get("exchangeTimezoneName") or (str(frame.index.tz) if getattr(frame.index, "tz", None) else None)
+    context.as_of["timezone"] = zone_name
+    if not frame.empty:
+        judge_last_bar(frame, args, metadata, context)
+    context.conditions.update(dates_applied(frame, args))
+    context.note(ADJUSTMENT[args.adjust])
+    context.note("A bar's date is in the exchange's time zone (as_of.timezone).")
+    if args.interval not in ("1d", "5d", "1wk", "1mo", "3mo") and args.period == "max":
+        context.note("With an intraday --interval, --period max is the longest span Yahoo serves for that interval, not the whole history.")
+    return frame
+
+
+def judge_last_bar(frame, args, metadata, context):
+    observed = context.observed_at
+    span, zone = session(metadata)
+    last = frame.index[-1]
+    status, reason = timing.last_bar(last, args.interval, observed, span, zone)
+    context.as_of.update(last_bar=encode(last), last_bar_status=status, reason=reason)
+    if span:
+        context.as_of["session"] = {"start": encode(timing.stamp(span[0])), "end": encode(timing.stamp(span[1]))}
+    if metadata.get("regularMarketTime") is not None:
+        context.as_of["regularMarketTime"] = encode(timing.stamp(metadata["regularMarketTime"]))
+    if status == "provisional":
+        context.warn("last_bar_provisional", f"The last bar ({encode(last)[:10]}) is still forming: {reason}. It is not a close.")
+    elif status == "unknown":
+        context.warn("last_bar_unknown", f"Whether the last bar is final is unknown: {reason}. Do not call it a close.")
+
+
+def dates_applied(frame, args):
+    """--start and --end judged from the rows themselves; --end is exclusive, so the last row it allows is the day before."""
     if not (args.start or args.end):
         return {}
-    end = args.end
-    if end:
-        end = (pd.Timestamp(end) - pd.Timedelta(days=1)).date().isoformat()  # end is exclusive here, so the last row it can contain is the day before
-    found = within_dates(encoded, "index", args.start, end)
+    end = (pd.Timestamp(args.end) - pd.Timedelta(days=1)).date().isoformat() if args.end else None
+    found = within_dates([encode(i) for i in frame.index], frame.index.name or "Date", args.start, end)
     return {"dates": found} if found else {}
 
 
-# 성진: 원천 정밀도가 실측된 열만 7자리로 표기한다 — 비조정 OHLC 6,270값 전부 float32 정확값(2026-09-24 AAPL 5y).
-# 옵션 체인은 52%만 float32라 선언하지 않는다; 새 열을 여기 넣으려면 같은 측정이 먼저다.
-PRICE_COLUMNS = ("Open", "High", "Low", "Close", "Adj Close")
-PRECISION = "Prices print to 7 significant digits, the precision Yahoo serves; the saved observation and --out keep every digit."
-
-
-def bars(ticker, args, context, warnings):
-    frame = ticker.history(period=args.period, start=args.start, end=args.end, interval=args.interval, auto_adjust=args.adjust == "auto", back_adjust=args.adjust == "back", repair=args.repair, actions=True, keepna=True, prepost=args.prepost, timeout=args.timeout)
-    if not frame.empty:
-        timezone = getattr(frame.index, "tz", None)
-        if args.start:
-            frame = frame.loc[frame.index >= pd.Timestamp(args.start, tz=timezone)]
-        if args.end:
-            frame = frame.loc[frame.index < pd.Timestamp(args.end, tz=timezone)]
-    context.update(adjustment=args.adjust, repair=args.repair, currency=None, timezone=str(frame.index.tz) if hasattr(frame.index, "tz") else None)
-    try:
-        metadata = ticker.get_history_metadata()
-        context.update(currency=metadata.get("currency"), timezone=metadata.get("exchangeTimezoneName") or context["timezone"])
-    except Exception as exc:
-        warnings.append(f"History metadata unavailable; price data retained: {exc}")
-        if is_rate_limited(exc):
-            context["rate_limited"] = True
-    if context["currency"] is None:
-        warnings.append("Source currency is unconfirmed.")
-    return frame
-
-
-def history(ticker, args, context, warnings):
-    return bars(ticker, args, context, warnings)
-
-
-BAR_NAMES = {"1d": "daily", "5d": "five-day", "1wk": "weekly", "1mo": "monthly", "3mo": "quarterly"}
-COARSER = {"1d": "1wk", "5d": "1wk", "1wk": "1mo", "1mo": "3mo"}
-
-
-def coarser(interval):
-    """The next interval up, for a window too long to read row by row; intraday bars step up to daily."""
-    step = COARSER.get(interval) or (None if interval == "3mo" else "1d")
-    if step is None:
-        return None
-    return step, BAR_NAMES[step], BAR_NAMES.get(interval, interval)
-
-
-def actions(ticker, args, context, warnings):
-    frame = bars(ticker, args, context, warnings)
-    if not frame.empty:
-        columns = [c for c in ("Dividends", "Stock Splits", "Capital Gains") if c in frame.columns]
+def history(ticker, args, context):
+    frame = bars(ticker, args, context)
+    if args.actions and not frame.empty:
+        columns = [c for c in ACTIONS if c in frame.columns]
         frame = frame.loc[(frame[columns].fillna(0) != 0).any(axis=1), columns]
+        context.note("Only dates carrying a dividend, split or capital gain are rows (--actions); a window without one is empty, which does not mean the instrument pays nothing.")
     return frame
+
+
+def quote(ticker, args, context):
+    data = info(ticker, args, context)
+    context.observed_at = timing.now()
+    return data
 
 
 DATASETS = {
-    "prices.quote": Dataset(
-        info, ticker=True, shares_info=True, source_time=info_time, units=INFO_UNITS,
-        interpretation={"sibling": "company profile selects the business side of this same assembled response.",
-                        "timing": QUOTE_TIME, "currency": CURRENCY_SPLIT,
-                        "assembly": "yfinance assembles this response from several endpoints, so its fields do not all share one timestamp; where a field has its own time field, that one governs."},
-        gotchas=["An instrument that did not trade in the current session still returns regularMarket fields from the last session it did."]),
-    "prices.history": Dataset(
-        history, ticker=True, conditions=dates_applied, precise=PRICE_COLUMNS, recent=True, coarser=coarser,
-        interpretation={"dates": "A date is read in the exchange's timezone.",
-                        "adjustment": "--adjust decides what Close means; adding dividends to an already adjusted return counts them twice.",
-                        "repair": "--repair is a transformation with its own limits, not proof that a value equals the original trade.",
-                        "precision": PRECISION},
-        limits={"period_max": "With an intraday interval --period max is not the whole history: yfinance 1.7.0 asks for the last 8 days of 1m, 60 days of 2m/5m/15m/30m/90m and 730 days of 60m/1h bars.",
-                "intraday_range": "Yahoo limits the days one intraday request spans and how far back intraday bars go. When its refusal states the limit, the fix gives --period or --start with that number; otherwise the general fix."},
-        gotchas=["A 30m request is resampled from 15m, so Yahoo's refusal for it names 15m, not the interval asked for."]),
-    "prices.actions": Dataset(
-        actions, ticker=True, conditions=dates_applied, recent=True,
-        interpretation={"dates": "Rows appear only on dates carrying an action.",
-                        "empty": "The default month often holds no action for a quarterly payer; an empty result is not evidence that it pays nothing."}),
+    "quote": Dataset(
+        quote, form="records", units=INFO_UNITS, fields=QUOTE_FIELDS,
+        coverage="Yahoo's info response for the symbol: every field it carries is in result.json",
+        notes=(ASSEMBLED, SIBLING, "An instrument that did not trade this session still carries regularMarket fields from the last session it did."),
+        possible=("cross_currency_fields",)),
+    "history": Dataset(
+        history, units=BAR_UNITS, precise=PRICE_COLUMNS,
+        coverage="the bars Yahoo serves for this range and interval",
+        possible=("last_bar_provisional", "last_bar_unknown", "inverse_of_zero")),
 }

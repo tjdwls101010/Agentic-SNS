@@ -1,0 +1,161 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:30:36+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "history",
+   "ARM",
+   "--start",
+   "2021-01-01",
+   "--end",
+   "2022-01-01"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v8/finance/chart/ARM",
+   "params": {
+    "range": "1d",
+    "interval": "1d"
+   },
+   "status": 200,
+   "json": {
+    "chart": {
+     "result": [
+      {
+       "meta": {
+        "currency": "USD",
+        "symbol": "ARM",
+        "exchangeName": "NMS",
+        "fullExchangeName": "NasdaqGS",
+        "instrumentType": "EQUITY",
+        "firstTradeDate": 1694698200,
+        "regularMarketTime": 1791230401,
+        "hasPrePostMarketData": true,
+        "gmtoffset": -14400,
+        "timezone": "EDT",
+        "exchangeTimezoneName": "America/New_York",
+        "regularMarketPrice": 302.9,
+        "regularMarketChangePercent": -1.493,
+        "fulldayPrice": 302.9,
+        "fulldayChange": -5.23,
+        "fulldayChangePercent": -1.701,
+        "fiftyTwoWeekHigh": 452.7,
+        "fiftyTwoWeekLow": 100.02,
+        "regularMarketDayHigh": 311.0,
+        "regularMarketDayLow": 299.8,
+        "regularMarketVolume": 2891460,
+        "longName": "Arm Holdings plc",
+        "shortName": "Arm Holdings plc",
+        "chartPreviousClose": 307.49,
+        "priceHint": 2,
+        "currentTradingPeriod": {
+         "pre": {
+          "timezone": "EDT",
+          "end": 1791293400,
+          "start": 1791273600,
+          "gmtoffset": -14400
+         },
+         "regular": {
+          "timezone": "EDT",
+          "end": 1791316800,
+          "start": 1791293400,
+          "gmtoffset": -14400
+         },
+         "post": {
+          "timezone": "EDT",
+          "end": 1791331200,
+          "start": 1791316800,
+          "gmtoffset": -14400
+         }
+        },
+        "dataGranularity": "1d",
+        "range": "1d",
+        "validRanges": [
+         "1d",
+         "5d",
+         "1mo",
+         "3mo",
+         "6mo",
+         "1y",
+         "2y",
+         "5y",
+         "ytd",
+         "max"
+        ]
+       },
+       "timestamp": [
+        1791207000
+       ],
+       "indicators": {
+        "quote": [
+         {
+          "close": [
+           302.8999938964844
+          ],
+          "volume": [
+           2893900
+          ],
+          "high": [
+           311.0
+          ],
+          "open": [
+           308.0299987792969
+          ],
+          "low": [
+           299.79998779296875
+          ]
+         }
+        ],
+        "adjclose": [
+         {
+          "adjclose": [
+           302.8999938964844
+          ]
+         }
+        ]
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/v8/finance/chart/ARM",
+   "params": {
+    "interval": "1d",
+    "includePrePost": "False",
+    "events": "div,splits,capitalGains"
+   },
+   "status": 400,
+   "json": {
+    "chart": {
+     "result": null,
+     "error": {
+      "code": "Bad Request",
+      "description": "Data doesn't exist for startDate = 1609477200, endDate = 1641013200"
+     }
+    }
+   }
+  },
+  {
+   "path": "/v8/finance/chart/ARM",
+   "params": {
+    "interval": "1d",
+    "includePrePost": "False",
+    "events": "div,splits,capitalGains"
+   },
+   "status": 400,
+   "json": {
+    "chart": {
+     "result": null,
+     "error": {
+      "code": "Bad Request",
+      "description": "Data doesn't exist for startDate = 1609477200, endDate = 1641013200"
+     }
+    }
+   }
+  }
+ ]
+}

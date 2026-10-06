@@ -1,38 +1,47 @@
-"""Every dataset this skill reads, by the key a command names, and the call that fetches one."""
+"""Every dataset by the key a command names ("history", "company.profile"), the kinds each command offers, and the call that fetches one target."""
 import yfinance as yf
 
-from invest.receipts import Invalid
+from invest.receipts import Failure
 from invest.yahoo import analysts, calendar, company, financials, fund, holders, market, options, prices, screen, search
-from invest.yahoo.encode import encode
 from invest.yahoo.refusals import refusal
 
-DATASETS = {**search.DATASETS, **prices.DATASETS, **company.DATASETS, **financials.DATASETS, **analysts.DATASETS,
-            **holders.DATASETS, **fund.DATASETS, **options.DATASETS, **screen.DATASETS, **market.DATASETS,
-            **calendar.DATASETS}
+DATASETS = {**search.DATASETS, **prices.DATASETS, **company.DATASETS, **financials.DATASETS, **analysts.DATASETS, **holders.DATASETS,
+            **fund.DATASETS, **options.DATASETS, **screen.DATASETS, **market.DATASETS, **calendar.DATASETS}
 
 
 def kinds():
-    raise NotImplementedError
+    """{command: [kind, ...]}; a command without kinds maps to []."""
+    found = {}
+    for key in DATASETS:
+        command, _, kind = key.partition(".")
+        found.setdefault(command, [])
+        if kind:
+            found[command].append(kind)
+    return found
 
 
 def dataset(key):
-    """The dataset a command names. A key with no dataset fails here, on the command's first use."""
     if key not in DATASETS:
         raise LookupError(f"invest.yahoo defines no dataset {key!r}")
     return DATASETS[key]
 
 
-def fetch(key, target, args, context, warnings, rows=None):
-    """One target's response, encoded before anything is selected from it.
+def check(key, args):
+    """Refuse an argument before any request is made or anything is saved (a malformed screen query, an unknown sort field)."""
+    dataset(key).check(args)
 
-    `rows` is the row count in force, which a dataset that sends the source a count (`counted`) asks for. A failure the library or the source reports arrives as a SourceFailure; Invalid, and anything that is not an Exception (the CLI's deadline), pass through unchanged.
-    """
+
+def warning_codes(key):
+    return dataset(key).warning_codes()
+
+
+def fetch(key, target, args):
+    """One target's Observation. A failure the library or Yahoo reports arrives as a receipts.Failure with its code; anything that is not an Exception (the caller's deadline) passes through."""
     found = dataset(key)
     yf.config.debug.hide_exceptions = False
     try:
-        subject = yf.Ticker(target) if found.ticker else target
-        return encode(found.fetch(subject, args, context, warnings, **({"rows": rows} if found.counted else {})))
-    except Invalid:
+        return found.observe(target, args)
+    except Failure:
         raise
     except Exception as exc:
-        raise refusal(exc) from exc
+        raise refusal(exc, args) from exc

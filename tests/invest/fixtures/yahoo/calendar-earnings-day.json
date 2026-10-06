@@ -1,0 +1,352 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:32:16+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "calendar",
+   "earnings",
+   "--start",
+   "2026-10-01",
+   "--end",
+   "2026-10-01"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v1/finance/visualization",
+   "params": {},
+   "status": 200,
+   "body": {
+    "sortType": "DESC",
+    "entityIdType": "sp_earnings",
+    "sortField": "intradaymarketcap",
+    "includeFields": [
+     "ticker",
+     "companyshortname",
+     "intradaymarketcap",
+     "eventname",
+     "startdatetime",
+     "startdatetimetype",
+     "epsestimate",
+     "epsactual",
+     "epssurprisepct"
+    ],
+    "size": 100,
+    "offset": 0,
+    "query": {
+     "operator": "AND",
+     "operands": [
+      {
+       "operator": "EQ",
+       "operands": [
+        "region",
+        "us"
+       ]
+      },
+      {
+       "operator": "OR",
+       "operands": [
+        {
+         "operator": "EQ",
+         "operands": [
+          "eventtype",
+          "EAD"
+         ]
+        },
+        {
+         "operator": "EQ",
+         "operands": [
+          "eventtype",
+          "ERA"
+         ]
+        }
+       ]
+      },
+      {
+       "operator": "GTE",
+       "operands": [
+        "startdatetime",
+        "2026-10-01"
+       ]
+      },
+      {
+       "operator": "LTE",
+       "operands": [
+        "startdatetime",
+        "2026-10-02"
+       ]
+      }
+     ]
+    }
+   },
+   "json": {
+    "finance": {
+     "result": [
+      {
+       "criteriaMeta": {
+        "size": 100,
+        "offset": 0,
+        "sortField": "intradaymarketcap",
+        "sortType": "DESC",
+        "entityIdType": "SP_EARNINGS",
+        "criteria": [
+         {
+          "field": "region",
+          "subField": null,
+          "operators": [
+           "EQ"
+          ],
+          "values": [],
+          "labelsSelected": [
+           53
+          ],
+          "dependentValues": []
+         },
+         {
+          "field": "eventtype",
+          "subField": null,
+          "operators": [
+           "EQ",
+           "EQ"
+          ],
+          "values": [
+           "EAD",
+           "ERA"
+          ],
+          "labelsSelected": [],
+          "dependentValues": []
+         },
+         {
+          "field": "startdatetime",
+          "subField": null,
+          "operators": [
+           "GTE"
+          ],
+          "values": [
+           "2026-10-01T00:00:00.000-04:00"
+          ],
+          "labelsSelected": [],
+          "dependentValues": []
+         },
+         {
+          "field": "startdatetime",
+          "subField": null,
+          "operators": [
+           "LTE"
+          ],
+          "values": [
+           "2026-10-02T00:00:00.000-04:00"
+          ],
+          "labelsSelected": [],
+          "dependentValues": []
+         }
+        ],
+        "topOperator": "AND"
+       },
+       "rawCriteria": "{\"sortType\":\"DESC\",\"entityIdType\":\"sp_earnings\",\"sortField\":\"intradaymarketcap\",\"includeFields\":[\"ticker\",\"companyshortname\",\"intradaymarketcap\",\"eventname\",\"startdatetime\",\"startdatetimetype\",\"epsestimate\",\"epsactual\",\"epssurprisepct\"],\"size\":100,\"offset\":0,\"query\":{\"operator\":\"AND\",\"operands\":[{\"operator\":\"EQ\",\"operands\":[\"region\",\"us\"]},{\"operator\":\"OR\",\"operands\":[{\"operator\":\"EQ\",\"operands\":[\"eventtype\",\"EAD\"]},{\"operator\":\"EQ\",\"operands\":[\"eventtype\",\"ERA\"]}]},{\"operator\":\"GTE\",\"operands\":[\"startdatetime\",\"2026-10-01\"]},{\"operator\":\"LTE\",\"operands\":[\"startdatetime\",\"2026-10-02\"]}]}}",
+       "total": 13,
+       "documents": [
+        {
+         "entityIdType": "SP_EARNINGS",
+         "columns": [
+          {
+           "id": "ticker",
+           "label": "Symbol",
+           "type": "STRING"
+          },
+          {
+           "id": "companyshortname",
+           "label": "Company Name",
+           "type": "STRING"
+          },
+          {
+           "id": "intradaymarketcap",
+           "label": "Market Cap (Intraday)",
+           "type": "NUMBER"
+          },
+          {
+           "id": "eventname",
+           "label": "Event Name",
+           "type": "STRING"
+          },
+          {
+           "id": "startdatetime",
+           "label": "Event Start Date",
+           "type": "DATE"
+          },
+          {
+           "id": "startdatetimetype",
+           "label": "Event Start Date",
+           "type": "STRING"
+          },
+          {
+           "id": "epsestimate",
+           "label": "EPS Estimate",
+           "type": "NUMBER"
+          },
+          {
+           "id": "epsactual",
+           "label": "Reported EPS",
+           "type": "NUMBER"
+          },
+          {
+           "id": "epssurprisepct",
+           "label": "Surprise (%)",
+           "type": "NUMBER"
+          }
+         ],
+         "rows": [
+          [
+           "ACN",
+           "Accenture plc",
+           119359310227.94911,
+           null,
+           "2026-10-01T10:42:03.000Z",
+           "TAS",
+           3.18,
+           3.29,
+           3.36
+          ],
+          [
+           "NKE",
+           "NIKE, Inc.",
+           50290922284.88743,
+           null,
+           "2026-10-01T20:15:15.000Z",
+           "TAS",
+           0.44,
+           0.48,
+           9.87
+          ],
+          [
+           "MKC",
+           "McCormick & Company, Incorporated",
+           12253196619.995888,
+           null,
+           "2026-10-01T10:30:00.000Z",
+           "TAS",
+           0.76,
+           0.86,
+           13.78
+          ],
+          [
+           "AYI",
+           "Acuity Inc.",
+           9125552037.852753,
+           null,
+           "2026-10-01T10:00:00.000Z",
+           "TAS",
+           5.56,
+           5.77,
+           3.78
+          ],
+          [
+           "GNS",
+           "Genius Group Limited",
+           31345026.65144974,
+           "Q3 2026 Earnings Announcement",
+           "2026-10-01T12:30:00.000Z",
+           "BMO",
+           null,
+           null,
+           null
+          ],
+          [
+           "DKLRF",
+           "Decklar Resources Inc.",
+           125956.72801749036,
+           "Q4 2023 Earnings Announcement",
+           "2026-10-01T20:00:00.000Z",
+           "TNS",
+           null,
+           null,
+           null
+          ],
+          [
+           "TTMZF",
+           "Datable Technology Corporation",
+           42426.90201516962,
+           "Q4 2023 Earnings Announcement",
+           "2026-10-01T20:00:00.000Z",
+           "TNS",
+           null,
+           null,
+           null
+          ],
+          [
+           "XTXXF",
+           "Adastra Holdings Ltd.",
+           39179.35120933689,
+           "Q4 2023 Earnings Announcement",
+           "2026-10-01T20:00:00.000Z",
+           "AMC",
+           null,
+           null,
+           null
+          ],
+          [
+           "FBSGF",
+           "Fabled Silver Gold Corp.",
+           430.89328911471966,
+           "Q4 2023 Earnings Announcement",
+           "2026-10-01T20:00:00.000Z",
+           "TNS",
+           null,
+           null,
+           null
+          ],
+          [
+           "GDSKF",
+           "Nevada Zinc Corporation",
+           null,
+           "Q4 2023 Earnings Announcement",
+           "2026-10-01T20:00:00.000Z",
+           "TNS",
+           null,
+           null,
+           null
+          ],
+          [
+           "NRXCF",
+           "NeutriSci International Inc.",
+           null,
+           "Q4 2023 Earnings Announcement",
+           "2026-10-01T20:00:00.000Z",
+           "TNS",
+           null,
+           null,
+           null
+          ],
+          [
+           "OOOOF",
+           "OOOOO Entertainment Commerce Limited",
+           null,
+           "Q4 2023 Earnings Announcement",
+           "2026-10-01T20:00:00.000Z",
+           "TNS",
+           null,
+           null,
+           null
+          ],
+          [
+           "RCHTF",
+           "Richco Investors Inc.",
+           null,
+           "Q4 2023 Earnings Announcement",
+           "2026-10-01T20:00:00.000Z",
+           "TNS",
+           null,
+           null,
+           null
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "error": null
+    }
+   }
+  }
+ ]
+}

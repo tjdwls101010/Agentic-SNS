@@ -1,61 +1,61 @@
-"""Statements and valuation measures by period."""
-from invest.yahoo.datasets import CURRENCY, MULTIPLE, PER_SHARE, RATE, SHARES, Dataset
+"""Financial statements and valuation measures by period, in the currency each is reported in."""
+from invest.yahoo.datasets import Dataset
 from invest.yahoo.refusals import is_rate_limited
+from invest.yahoo.units import DATETIME, MONEY_FINANCIAL, MONEY_QUOTE, MULTIPLE, PER_SHARE_FINANCIAL, RATIO, SHARES, TEXT, u
 
-STATEMENT_DATES = "Row labels (the index) are fiscal period end dates, not announcement dates."
-STATEMENT_INTERPRETATION = {
-    "dates": STATEMENT_DATES,
-    "currency": "The reported currency is in context.currency, read from the same company's financialCurrency. It can differ from the currency the share price is quoted in.",
-    "orientation": "Rows are periods and columns are native line items, so --fields selects line items.",
-    "scale": "One row mixes measurements, such as TaxRateForCalcs (a rate) beside NormalizedEBITDA (an amount); read a line item's name and units before comparing magnitudes.",
-}
-STATEMENT_UNITS = {"TaxRateForCalcs": RATE, "TaxEffectOfUnusualItems": CURRENCY, "BasicEPS": PER_SHARE, "DilutedEPS": PER_SHARE,
-                   "BasicAverageShares": SHARES, "DilutedAverageShares": SHARES, "ShareIssued": SHARES, "OrdinarySharesNumber": SHARES, "TreasurySharesNumber": SHARES}
 STATEMENTS = {"income": "get_income_stmt", "balance": "get_balance_sheet", "cashflow": "get_cash_flow"}
+# Every line item is an amount in the reporting currency except these, which name a per-share amount, a share count or a rate.
+STATEMENT_UNITS = {"*": u(MONEY_FINANCIAL), "Date": u(DATETIME),
+                   "TaxRateForCalcs": u(RATIO), "BasicEPS": u(PER_SHARE_FINANCIAL), "DilutedEPS": u(PER_SHARE_FINANCIAL),
+                   "BasicAverageShares": u(SHARES), "DilutedAverageShares": u(SHARES), "ShareIssued": u(SHARES),
+                   "OrdinarySharesNumber": u(SHARES), "TreasurySharesNumber": u(SHARES), "PreferredSharesNumber": u(SHARES)}
+VALUATION_UNITS = {"Date": u(TEXT), "Market Cap": u(MONEY_QUOTE), "Enterprise Value": u(MONEY_QUOTE), "Trailing P/E": u(MULTIPLE),
+                   "Forward P/E": u(MULTIPLE), "PEG Ratio (5yr expected)": u(MULTIPLE), "Price/Sales": u(MULTIPLE), "Price/Book": u(MULTIPLE),
+                   "Enterprise Value/Revenue": u(MULTIPLE), "Enterprise Value/EBITDA": u(MULTIPLE)}
 
 
-def statement_currency(ticker, context, warnings):
-    """Report the currency the statements are reported in, which is not the currency the share price is quoted in.
-
-    Reading a price in one currency against a profit in another is wrong by the exchange rate — measured, about 150x
-    for a JPY reporter quoted in USD — and the value is one lookup away, so declining to report it was not caution.
-    """
+def currencies(ticker, context):
+    """The reporting and quote currencies, a second request: a rate limit here keeps the statement and stops the remaining targets."""
     try:
-        info = ticker.get_info()
-    except Exception as exc:  # the statement is still the answer; the currency is what could not be confirmed
-        warnings.append(f"Statement currency could not be read, so the reported figures carry no confirmed currency: {exc}")
-        context["currency"] = None
+        info = ticker.get_info() or {}
+    except Exception as exc:
         if is_rate_limited(exc):
-            context["rate_limited"] = True  # a refused second request is still a rate limit: the next target must not spend another
+            context.rate_limited = True
+            context.warn("secondary_rate_limited", "Yahoo rate-limited the currency lookup after the statement arrived; the statement is kept and the remaining targets were not attempted.")
+        context.receipt["currency_error"] = str(exc)
         return
-    context["currency"] = info.get("financialCurrency")
-    context["quote_currency"] = info.get("currency")
-    if context["currency"] is None:
-        warnings.append("The source reported no financialCurrency for this company, so the statement's currency is unconfirmed.")
+    context.financial_currency, context.currency = info.get("financialCurrency"), info.get("currency")
 
 
 def statement(method):
-    def fetch(ticker, args, context, warnings):
+    def fetch(ticker, args, context):
         frame = getattr(ticker, method)(freq=args.frequency, pretty=False)
-        context.update(periods_available=len(frame.columns))
-        statement_currency(ticker, context, warnings)
-        return frame.iloc[:, :args.periods].T
+        currencies(ticker, context)
+        if frame is None or frame.empty:
+            return frame
+        frame = frame.T.sort_index(ascending=False)
+        frame.index.name = "Date"
+        return frame
     return fetch
 
 
-def valuation(ticker, args, context, warnings):
-    return ticker.get_valuation_measures(freq=args.frequency, periods=args.periods).T
+def valuation(ticker, args, context):
+    frame = ticker.get_valuation_measures(freq=args.frequency, periods=args.periods)
+    currencies(ticker, context)
+    if frame is None or frame.empty:
+        return frame
+    frame = frame.T
+    frame.index.name = "Date"
+    return frame
 
 
+DATED = "Date is the fiscal period end, not the day the figures were announced."
 DATASETS = {
-    f"financials.{name}": Dataset(
-        statement(method), ticker=True, units=STATEMENT_UNITS, interpretation=STATEMENT_INTERPRETATION)
+    f"financials.{name}": Dataset(statement(method), units=STATEMENT_UNITS, coverage="every period Yahoo lists for this frequency, newest first",
+                                  notes=(DATED, "trailing rows are a rolling twelve months, not a completed fiscal year."))
     for name, method in STATEMENTS.items()
 } | {
     "financials.valuation": Dataset(
-        valuation, ticker=True,
-        units={"Market Cap": CURRENCY, "Enterprise Value": CURRENCY, "Trailing P/E": MULTIPLE, "Forward P/E": MULTIPLE,
-               "PEG Ratio (5yr expected)": MULTIPLE, "Price/Sales": MULTIPLE, "Price/Book": MULTIPLE,
-               "Enterprise Value/Revenue": MULTIPLE, "Enterprise Value/EBITDA": MULTIPLE},
-        interpretation={"dates": "Labels other than Current are native period dates; Current is the latest trailing snapshot, not a completed fiscal period."}),
+        valuation, units=VALUATION_UNITS, coverage="the periods asked for with --periods, plus Current",
+        notes=("Current is the latest trailing snapshot, not a completed period; the other rows are period dates.",)),
 }

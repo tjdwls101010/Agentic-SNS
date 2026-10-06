@@ -1,4 +1,9 @@
-"""Test-process-only transport fixtures and a separate cache for every invocation."""
+"""Test-process-only transport: every Yahoo request is answered from $YF_HTTP_FIXTURE, and anything it does not hold exits 97.
+
+Routes match on path and on the parameters and body fields they name, first match wins, so a fixture recorded by scenarios/invest/record_yahoo.py replays without its volatile parameters. Each request is appended to $YF_HTTP_LOG when set, so a test can count what the CLI actually asked for. $YF_FIXTURE_NOW fixes the skill's clock (invest.yahoo.timing.now), the one time source its timing verdicts read, so a test can move the observation time while the session data stays the same.
+"""
+import datetime as dt
+import importlib.machinery
 import json
 import os
 import sys
@@ -10,6 +15,7 @@ from curl_cffi import requests
 
 routes = json.loads(open(os.environ["YF_HTTP_FIXTURE"]).read())
 yf.set_tz_cache_location(os.environ["YF_TEST_CACHE"])
+LOG = os.environ.get("YF_HTTP_LOG")
 
 
 def request(self, method, url, **kwargs):
@@ -25,7 +31,11 @@ def request(self, method, url, **kwargs):
         params = {key: values[-1] for key, values in parse_qs(parsed.query).items()}
         params.update(kwargs.get("params") or {})
         body = kwargs.get("json") or (json.loads(kwargs["data"]) if isinstance(kwargs.get("data"), str) else {})
-        payload = next((r for r in routes if r["path"] in parsed.path and all(str(params.get(k)) == str(v) for k, v in r.get("params", {}).items()) and all(body.get(k) == v for k, v in r.get("body", {}).items())), None)
+        if LOG:
+            with open(LOG, "a") as handle:
+                handle.write(json.dumps({"method": method, "path": parsed.path, "params": {k: str(v) for k, v in params.items()}, "body": body or None}) + "\n")
+        payload = next((r for r in routes if r["path"] in parsed.path and all(str(params.get(k)) == str(v) for k, v in r.get("params", {}).items())
+                        and all(body.get(k) == v for k, v in (r.get("body") or {}).items())), None)
         if payload is None:
             sys.stderr.write(f"UNEXPECTED NETWORK {method} {url} params={params} body={kwargs.get('json')}\n")
             raise SystemExit(97)
@@ -36,6 +46,8 @@ def request(self, method, url, **kwargs):
             handle.write("arrived first\n")
     response = requests.Response()
     response.status_code = payload.get("status", 200)
+    response.ok = 200 <= response.status_code < 400  # a real Response sets these; raise_for_status reads ok
+    response.reason = "OK" if response.ok else "Error"
     response.url = url
     response.headers = {"content-type": "text/html" if "text" in payload else "application/json"}
     response.content = payload.get("text", json.dumps(payload.get("json", {}))).encode()
@@ -43,3 +55,26 @@ def request(self, method, url, **kwargs):
 
 
 requests.Session.request = request
+
+FROZEN = os.environ.get("YF_FIXTURE_NOW")
+
+
+class FrozenClock:
+    """Replace invest.yahoo.timing.now once that module loads; the skill's own code is otherwise untouched."""
+
+    def find_spec(self, name, path, target=None):
+        if name != "invest.yahoo.timing":
+            return None
+        spec = importlib.machinery.PathFinder.find_spec(name, path)
+        load = spec.loader.exec_module
+
+        def exec_module(module):
+            load(module)
+            module.now = lambda: dt.datetime.fromisoformat(FROZEN)
+
+        spec.loader.exec_module = exec_module
+        return spec
+
+
+if FROZEN:
+    sys.meta_path.insert(0, FrozenClock())

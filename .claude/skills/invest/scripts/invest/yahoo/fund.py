@@ -1,42 +1,70 @@
-"""ETF and mutual fund composition, weights and operations."""
-from invest.yahoo.datasets import CURRENCY, MULTIPLE, PERCENT, RATE, WEIGHT, Dataset
+"""ETF and mutual fund overview, objective, holdings, allocations and the fund's reported equity statistics and operations."""
+from invest.yahoo.datasets import Dataset
+from invest.yahoo.refusals import not_applicable
+from invest.yahoo.units import INVERSE, MONEY_QUOTE, MULTIPLE, PERCENT, RATIO, TEXT, UNVERIFIED, u
+
+FUNDS = ("ETF", "MUTUALFUND")
 
 
-def fund(attribute, **spec):
-    def fetch(ticker, args, context, warnings):
-        return getattr(ticker.get_funds_data(), attribute)
-    return Dataset(fetch, ticker=True, **spec)
+def fund(attribute, what):
+    """One part of Yahoo's fund data. A stock has none: yfinance raises KeyError 'topHoldings' after reading the quoteType, which says why."""
+    def fetch(ticker, args, context):
+        data = ticker.get_funds_data()
+        try:
+            found = getattr(data, attribute)
+        except KeyError:
+            raise not_applicable(confirmed_type(data), FUNDS, what) from None
+        context.quote_type = data.quote_type()
+        return found
+    return fetch
+
+
+def confirmed_type(data):
+    """The quoteType yfinance read before the missing part raised, or None when the response did not carry one either."""
+    try:
+        return data.quote_type()
+    except Exception:
+        return None
+
+
+MULTIPLE_ROWS = ("Price/Earnings", "Price/Book", "Price/Sales", "Price/Cashflow")
+
+
+def equity_unit(metric, column):
+    """The four price multiples arrive as reciprocals (an earnings yield), in the fund's column and the Category Average alike."""
+    if metric in MULTIPLE_ROWS:
+        return u(MULTIPLE, INVERSE)
+    if metric == "Median Market Cap":
+        return u(MONEY_QUOTE)
+    if metric == "3 Year Earnings Growth":
+        return u(RATIO, PERCENT)
+    return u(UNVERIFIED)
+
+
+def operations_unit(metric, column):
+    if metric in ("Annual Report Expense Ratio", "Annual Holdings Turnover"):
+        return u(RATIO)
+    return u(UNVERIFIED)
 
 
 DATASETS = {
-    "fund.overview": fund("fund_overview"),
-    # 성진: 반환값이 문자열 하나라 --fields도 --limit도 줄이지 못한다. 줄일 수 없는 리프는 줄이는 법을 선언하지 않는다 —
-    # 선언하면 fix가 그 인자를 권하고, 따라간 결과가 같은 크기로 다시 실패한다.
-    "fund.description": fund(
-        "description", sliceable=False,
-        interpretation={"shape": "One text value that neither --fields nor --limit narrows; a larger --max-chars on read ID returns it without a new request."}),
-    "fund.holdings": fund(
-        "top_holdings", units={"Holding Percent": WEIGHT},
-        interpretation={"coverage": "These are the top reported holdings, not guaranteed to cover the whole portfolio."}),
-    "fund.asset-classes": fund(
-        "asset_classes",
-        units={"cashPosition": WEIGHT, "stockPosition": WEIGHT, "bondPosition": WEIGHT, "preferredPosition": WEIGHT,
-               "convertiblePosition": WEIGHT, "otherPosition": WEIGHT}),
-    "fund.sector-weights": fund(
-        "sector_weightings", units={"*": WEIGHT},
-        interpretation={"keys": "Sector keys here use underscores (consumer_cyclical); market sector takes hyphenated keys (consumer-cyclical)."}),
-    "fund.equity": fund(
-        "equity_holdings",
-        units={"Price/Earnings": dict(MULTIPLE, inverted=True), "Price/Book": dict(MULTIPLE, inverted=True),
-               "Price/Sales": dict(MULTIPLE, inverted=True), "Price/Cashflow": dict(MULTIPLE, inverted=True),
-               "Median Market Cap": CURRENCY, "3 Year Earnings Growth": PERCENT},
-        interpretation={"inverted": "All four price multiples arrive as their reciprocals: the Price/Earnings row holds an earnings yield, so the P/E is 1 divided by the value."},
-        gotchas=["The Category Average column is often empty, so a missing peer figure is the usual case rather than a failed call."]),
-    "fund.operations": fund(
-        "fund_operations",
-        units={"Annual Report Expense Ratio": RATE, "Annual Holdings Turnover": RATE,
-               "Total Net Assets": {"kind": "currency", "scale": "unverified"}},
-        interpretation={"expense": "The expense ratio is a ratio, not a percent: 0.000945 is 0.0945%."},
-        gotchas=["Total Net Assets has no declared unit and does not reconcile with the fund's totalAssets as either the raw amount or millions. Cite it only with the fund's own reporting.",
-                 "The Category Average column can hold an exact copy of the fund's own value, so a difference of zero there is not evidence of being at the peer average."]),
+    "fund.overview": Dataset(fund("fund_overview", "fund overviews"), form="row", units={"*": u(TEXT)}, coverage="Yahoo's fund profile"),
+    "fund.description": Dataset(fund("description", "fund descriptions"), form="records", coverage="the fund's own objective text"),
+    "fund.holdings": Dataset(
+        fund("top_holdings", "fund holdings"), units={"Symbol": u(TEXT), "Name": u(TEXT), "Holding Percent": u(RATIO)},
+        coverage="the top holdings Yahoo lists, which need not cover the whole portfolio"),
+    "fund.asset-classes": Dataset(fund("asset_classes", "asset allocations"), form="row", units={"*": u(RATIO)}, coverage="the fund's allocation across asset classes"),
+    "fund.sectors": Dataset(
+        fund("sector_weightings", "sector weights"), form="row", units={"*": u(RATIO)}, coverage="the fund's weight in each sector",
+        notes=("Sector keys use underscores here (consumer_cyclical); market sector takes hyphens (consumer-cyclical).",)),
+    "fund.equity": Dataset(
+        fund("equity_holdings", "equity statistics"), form="mixed", mixed=equity_unit,
+        coverage="the valuation and growth statistics the fund reports for its equity holdings",
+        notes=("The four price multiples are the fund-reported figures for its holdings, converted from the reciprocal Yahoo serves; the Category Average column is often empty.",),
+        possible=("inverse_of_zero",)),
+    "fund.operations": Dataset(
+        fund("fund_operations", "fund operations"), form="mixed", mixed=operations_unit,
+        coverage="the fund's expense ratio, turnover and reported net assets",
+        notes=("Total Net Assets is unverified: it does not reconcile with the quote's totalAssets as an amount or in millions, so do not compute with it.",
+               "The Category Average column can repeat the fund's own value, so a zero difference is not evidence of being at the average.")),
 }

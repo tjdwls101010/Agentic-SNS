@@ -1,8 +1,6 @@
 """The Yahoo boundary, read from the source: only invest/yahoo/ imports yfinance, pandas or numpy.
 
-Everything outside it works on the skill's own encoded representation, which is what lets `read` reuse the selection
-that printed an observation. An import of the library elsewhere, even inside a function, is where a pandas object
-would start leaking past the adapter, so this reads every module's syntax tree rather than running anything.
+Everything outside it works on the skill's own values, so a pandas object cannot leak past the system that owns the library. An import elsewhere, even inside a function, is where that leak starts, so this reads every module's syntax tree rather than running anything.
 """
 import ast
 from pathlib import Path
@@ -29,3 +27,9 @@ def test_only_the_yahoo_package_imports_the_data_libraries():
         if found:
             outside[str(path.relative_to(SCRIPTS))] = sorted(found)
     assert outside == {}
+
+
+def test_result_files_are_written_with_the_standard_library():
+    """results.py writes csv and json itself, so the file format does not depend on pandas' writers."""
+    tree = ast.parse((SCRIPTS / "invest" / "results.py").read_text(encoding="utf-8"))
+    assert {"csv", "json"} <= set(imported_roots(tree))

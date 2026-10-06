@@ -1,126 +1,69 @@
+"""Price bars: the file keeps every value as received (a zero, a missing value, an integer past 2**53, the exchange's time zone), --adjust decides what Close means, and only the inline copy rounds prices to the 7 digits Yahoo serves.
+
+The chart is synthetic; its literals are the expectation.
+"""
 import pytest
 
-CHART = {"chart": {"error": None, "result": [{"meta": {"currency": "USD", "symbol": "AAPL", "exchangeName": "NMS", "instrumentType": "EQUITY", "firstTradeDate": 345479400, "regularMarketTime": 1704387600, "gmtoffset": -18000, "timezone": "EST", "exchangeTimezoneName": "America/New_York", "regularMarketPrice": 110, "chartPreviousClose": 100, "priceHint": 2, "dataGranularity": "1d", "validRanges": ["1d", "5d", "1mo", "max"]}, "timestamp": [1704205800, 1704292200, 1704378600], "indicators": {"quote": [{"open": [100, 0, 110], "high": [105, 0, 115], "low": [95, 0, 105], "close": [100, 0, 110], "volume": [9007199254740993, 0, 1200]}], "adjclose": [{"adjclose": [50, 0, 55]}]}, "events": {"dividends": {"1704205800": {"amount": 0.5, "date": 1704205800}}}}]}}
+CHART = {"chart": {"error": None, "result": [{"meta": {"currency": "USD", "symbol": "AAPL", "exchangeName": "NMS", "instrumentType": "EQUITY", "firstTradeDate": 345479400,
+                                                       "regularMarketTime": 1704387600, "gmtoffset": -18000, "timezone": "EST", "exchangeTimezoneName": "America/New_York",
+                                                       "regularMarketPrice": 110, "chartPreviousClose": 100, "priceHint": 2, "dataGranularity": "1d",
+                                                       "validRanges": ["1d", "5d", "1mo", "max"]},
+                                              "timestamp": [1704205800, 1704292200, 1704378600],
+                                              "indicators": {"quote": [{"open": [100, 0, 110], "high": [105, 0, 115], "low": [95, 0, 105], "close": [100, 0, 110],
+                                                                        "volume": [9007199254740993, 0, 1200]}], "adjclose": [{"adjclose": [50, 0, 55]}]},
+                                              "events": {"dividends": {"1704205800": {"amount": 0.5, "date": 1704205800}}}}]}}
 
 
-def chart_routes():
-    return [{"path": "/v8/finance/chart/AAPL", "json": CHART}]
+def chart_routes(symbol="AAPL", body=CHART):
+    return [{"path": f"/v8/finance/chart/{symbol}", "json": body}]
 
 
-def test_history_preserves_axis_timezone_zero_and_large_integer(cli):
-    proc, doc = cli("prices", "history", "AAPL", "--start", "2024-01-02", "--end", "2024-01-04", "--adjust", "none", "--fields", "Close,Volume", routes=chart_routes())
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    r = doc["results"][0]
-    assert r["data"]["columns"] == ["Close", "Volume"]
-    assert r["data"]["data"] == [[100.0, 9007199254740993], [0.0, 0]]
-    assert r["data"]["index"] == ["2024-01-02", "2024-01-03"]
-    assert r["context"]["timezone"] == "America/New_York", "a date-only axis is only lossless with its zone beside it"
-    assert r["data"]["index_names"] == ["Date"]
-    assert r["context"]["currency"] == "USD"
-    assert "period" not in doc["request"] and "repair" not in doc["request"], "defaults left as they were are not echoed"
+def test_the_file_keeps_zero_large_integers_and_the_exchange_time_zone(cli):
+    run = cli("history", "AAPL", "--start", "2024-01-02", "--end", "2024-01-04", "--adjust", "none", routes=chart_routes())
+    assert run.code == 0, run
+    rows = run.rows
+    assert [r["Date"] for r in rows] == ["2024-01-02T00:00:00-05:00", "2024-01-03T00:00:00-05:00"]
+    assert [r["Close"] for r in rows] == ["100.0", "0.0"], "a zero close is kept as a zero, not dropped or blanked"
+    assert [r["Volume"] for r in rows] == ["9007199254740993", "0"], "an integer past 2**53 keeps every digit"
+    assert run.result()["as_of"]["timezone"] == "America/New_York" and run.result()["currency"] == "USD"
+    inline = run.result()["data"]
+    assert inline[0]["Date"] == "2024-01-02" and inline[0]["Volume"] == 9007199254740993
 
 
-def test_batch_retains_success_and_stops_remaining_targets_on_rate_limit(cli):
-    routes = chart_routes() + [{"path": "/v1/test/getcrumb", "status": 429, "text": "Too Many Requests"}, {"path": "/v8/finance/chart/RATE", "status": 429, "text": "Too Many Requests"}, {"path": "/consent", "text": ""}]
-    proc, doc = cli("prices", "history", "AAPL", "RATE", "NEVER", "--period", "1mo", "--adjust", "none", routes=routes)
-    assert proc.returncode == 8, proc.stdout + proc.stderr
-    assert doc["status"] == "partial"
-    assert [r["status"] for r in doc["results"]] == ["ok", "error", "not_attempted"]
-    assert doc["results"][1]["error"]["code"] == "rate_limited"
+@pytest.mark.parametrize("adjust,open_,close", [("auto", 50, 50), ("back", 50, 100), ("none", 100, 100)])
+def test_each_adjustment_keeps_its_own_meaning(cli, adjust, open_, close):
+    run = cli("history", "AAPL", "--start", "2024-01-02", "--end", "2024-01-03", "--adjust", adjust, routes=chart_routes())
+    assert run.code == 0, run
+    assert (float(run.rows[0]["Open"]), float(run.rows[0]["Close"])) == (open_, close)
+    assert any(f"--adjust {adjust}" in n for n in run.doc["notes"])
 
 
-
-@pytest.mark.parametrize("adjust,expected_open,expected_close", [("auto", 50, 50), ("back", 50, 100), ("none", 100, 100)])
-def test_adjustment_modes_keep_their_distinct_price_meaning(cli, adjust, expected_open, expected_close):
-    proc, doc = cli("prices", "history", "AAPL", "--start", "2024-01-02", "--end", "2024-01-03", "--adjust", adjust, "--fields", "Open,Close", routes=chart_routes())
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"]["data"] == [[expected_open, expected_close]]
-    assert doc["request"].get("adjust", "auto") == adjust
+def test_actions_keep_only_dates_with_an_action_and_the_native_amount(cli):
+    run = cli("history", "AAPL", "--period", "1mo", "--actions", routes=chart_routes())
+    assert run.code == 0, run
+    assert [(r["Date"][:10], float(r["Dividends"])) for r in run.rows] == [("2024-01-02", 0.5)]
+    assert "Open" not in run.rows[0]
 
 
-def test_actions_keep_native_dividend_amount(cli):
-    proc, doc = cli("prices", "actions", "AAPL", "--period", "1mo", "--fields", "Dividends", routes=chart_routes())
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"]["data"] == [[0.5]]
+def test_the_inline_copy_rounds_prices_to_seven_digits_and_the_file_keeps_them_all(cli):
+    body = {"chart": {**CHART["chart"], "result": [{**CHART["chart"]["result"][0],
+                                                     "indicators": {"quote": [{"open": [123.456789123], "high": [124.0], "low": [120.0], "close": [123.456789123], "volume": [5]}],
+                                                                    "adjclose": [{"adjclose": [123.456789123]}]}, "timestamp": [1704205800], "events": {}}]}}
+    run = cli("history", "AAPL", "--start", "2024-01-02", "--end", "2024-01-03", "--adjust", "none", routes=chart_routes(body=body))
+    assert run.code == 0, run
+    assert run.result()["data"][0]["Close"] == 123.4568
+    assert run.rows[0]["Close"] == "123.456789123"
 
 
-def test_bad_target_does_not_erase_a_good_target(cli):
-    routes = chart_routes() + [{"path": "/v8/finance/chart/BAD", "json": {"chart": {"result": None, "error": {"code": "Not Found", "description": "No such symbol"}}}}]
-    routes += [{"path": "/quoteSummary/BAD", "json": {"quoteSummary": {"result": []}}}, {"path": "/v7/finance/quote", "params": {"symbols": "BAD"}, "json": {"quoteResponse": {"result": []}}}, {"path": "/timeseries/BAD", "json": {"timeseries": {"result": []}}}]
-    proc, doc = cli("prices", "history", "BAD", "AAPL", "--period", "1mo", routes=routes)
-    assert proc.returncode == 8, proc.stdout + proc.stderr
-    assert [r["status"] for r in doc["results"]] == ["error", "ok"]
-    assert doc["results"][1]["data"]["index"]
+def test_the_default_range_is_one_month(cli):
+    run = cli("history", "AAPL", routes=chart_routes())
+    assert run.code == 0, run
+    assert run.receipt["request"]["period"] == "1mo"
 
 
-def test_oversize_returns_no_table_presented_as_complete(cli):
-    """A refusal carries no rows at all; a budget-narrowed answer carries rows and the coverage saying what was left
-    out. What must never appear is rows with nothing marking them as a fragment."""
-    proc, doc = cli("prices", "history", "AAPL", "AAPL", "--period", "1mo", "--max-chars", "1000", routes=chart_routes())
-    assert proc.returncode in (8, 9), proc.stdout + proc.stderr
-    for index, r in enumerate(doc["results"]):
-        if r["status"] == "error":
-            assert r.get("data") is None
-            # one full recovery sentence for the call; the others stay addressable by their own saved id
-            assert ("--max-chars" in r["error"]["fix"]) if index == 0 else r.get("id")
-        else:
-            assert r["coverage"]["truncated_by"] == "budget"
-            assert r["coverage"]["shown"] < r["coverage"]["received"]
-
-
-def test_rate_limit_without_success_uses_rate_exit_code(cli):
-    proc, doc = cli("prices", "history", "RATE", "NEVER", routes=[{"path": "/v8/finance/chart/RATE", "status": 429, "text": "Too Many Requests"}, {"path": "/consent", "text": ""}])
-    assert proc.returncode == 5, proc.stdout + proc.stderr
-    assert doc["status"] == "error"
-    assert [r["status"] for r in doc["results"]] == ["error", "not_attempted"]
-
-
-def many_symbol_routes(count):
-    return [{"path": f"/v8/finance/chart/S{i:02d}", "json": CHART} for i in range(count)]
-
-
-def test_thirty_targets_one_value_each_fit_the_default_budget(cli):
-    symbols = [f"S{i:02d}" for i in range(30)]
-    proc, doc = cli("prices", "history", *symbols, "--period", "5d", "--fields", "Close", "--limit", "1", routes=many_symbol_routes(30))
-    assert proc.returncode == 0, proc.stdout[:300] + proc.stderr
-    assert doc["status"] == "ok"
-    assert [r["target"] for r in doc["results"]] == symbols
-    assert doc["request"]["fields"] == ["Close"]
-    assert "request" not in doc["results"][0]
-
-
-
-
-def test_a_multi_target_oversize_names_every_target_and_a_budget_that_fits(cli):
-    """Supersedes an assertion that the sentence began with "Narrow": its shape was never the point, and checking it
-    passed while the advice itself did not work. tests/yfinance/test_budget.py executes these recoveries."""
-    import re as _re
-    symbols = [f"S{i:02d}" for i in range(30)]
-    args = ("prices", "history", *symbols, "--period", "5d", "--fields", "Close", "--limit", "1")
-    proc, doc = cli(*args, "--max-chars", "5000", routes=many_symbol_routes(30))
-    assert proc.returncode == 9, proc.stdout[:300] + proc.stderr
-    fix = doc["results"][0]["error"]["fix"]
-    assert len(_re.findall(r"[0-9a-f]{16}", fix)) == 30, "a recovery naming one target turns a comparison into a single-symbol question"
-    advised = _re.search(r"--max-chars ([0-9]+)", fix)[1]
-    proc, doc = cli(*args, "--max-chars", advised, routes=many_symbol_routes(30))
-    assert proc.returncode == 0, proc.stdout[:300] + proc.stderr
-    assert len(proc.stdout.strip()) <= int(advised)
-
-
-
-def test_field_discovery_oversize_recovery_names_filter_not_selection(cli):
-    symbols = [f"S{i:02d}" for i in range(30)]
-    proc, doc = cli("prices", "history", *symbols, "--period", "5d", "--list-fields", "--max-chars", "1000", routes=many_symbol_routes(30))
-    assert proc.returncode == 9, proc.stdout[:300] + proc.stderr
-    fix = doc["results"][0]["error"]["fix"]
-    assert "--filter" in fix
-    assert "--fields" not in fix and "--limit" not in fix
-
-
-@pytest.mark.parametrize("leaf", ["history", "actions"])
-def test_repair_with_five_day_bars_is_refused_before_any_request(cli, leaf):
-    """yfinance raises for repair with the 5d interval whatever the symbol, so the call is refused here rather than reported as the source's failure."""
-    proc, doc = cli("prices", leaf, "AAPL", "--repair", "--interval", "5d", routes=[])
-    assert proc.returncode == 2, proc.stdout[:400]
-    error = doc["results"][0]["error"]
-    assert error["code"] == "invalid" and "--repair" in error["fix"] and "--interval" in error["fix"], error
+def test_five_day_bars_cannot_be_repaired_and_are_refused_before_any_request(cli):
+    run = cli("history", "AAPL", "--repair", "--interval", "5d", routes=[])
+    assert run.code == 2, run
+    error = run.result()["error"]
+    assert error["code"] == "invalid" and "--repair" in error["fix"] and "--interval" in error["fix"]
+    assert run.requests == []

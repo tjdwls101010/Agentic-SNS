@@ -1,0 +1,566 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:30:23+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "quote",
+   "KO"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v10/finance/quoteSummary/KO",
+   "params": {
+    "modules": "financialData,quoteType,defaultKeyStatistics,assetProfile,summaryDetail",
+    "symbol": "KO"
+   },
+   "status": 200,
+   "json": {
+    "quoteSummary": {
+     "result": [
+      {
+       "assetProfile": {
+        "address1": "One Coca-Cola Plaza",
+        "city": "Atlanta",
+        "state": "GA",
+        "zip": "30313",
+        "country": "United States",
+        "phone": "404 676 2121",
+        "website": "https://www.coca-colacompany.com",
+        "industry": "Beverages - Non-Alcoholic",
+        "industryKey": "beverages-non-alcoholic",
+        "industryDisp": "Beverages - Non - Alcoholic",
+        "sector": "Consumer Defensive",
+        "sectorKey": "consumer-defensive",
+        "sectorDisp": "Consumer Defensive",
+        "longBusinessSummary": "The Coca-Cola Company, a beverage company, manufactures and sells various nonalcoholic beverages in the United States and internationally. The company provides Trademark Coca-Cola, sparkling soft drinks and flavors; water, sports, coffee, and tea; juice, value-added dairy, and plant-based beverages; and emerging beverages. It also offers beverage concentrates and syrups, as well as fountain syrups to fountain retailers comprising restaurants and convenience stores. The company sells its products under the Coca-Cola, Diet Coke/Coca-Cola Light, Coca-Cola Zero Sugar, caffeine free Diet Coke, Cherry Coke, Fanta, Sprite, Simply, Fanta Orange, Fanta Zero Orange, Fanta Zero Sugar, Fanta Apple, Sprite Zero Sugar, Simply Orange, Simply Apple, Simply Grapefruit, Fresca, Schweppes, Thums Up, Aquarius, Ayataka, BODYARMOR, Ciel, Costa, Crystal, Dasani, Fuze Tea, Georgia, glacéau smartwater, glacéau vitaminwater, Gold Peak, I LOHAS, Powerade, Topo Chico, Core Power, Del Valle, fairlife, innocent, Maaza, Minute Maid, Minute Maid Pulpy, Santa Clara, and dogadan brands. It operates through a network of independent bottling partners, distributors, wholesalers, and retailers, as well as through bottling and distribution operators. The Coca-Cola Company was founded in 1886 and is headquartered in Atlanta, Georgia.",
+        "fullTimeEmployees": 65900,
+        "companyOfficers": [
+         {
+          "maxAge": 1,
+          "name": "Mr. James Robert B. Quincey",
+          "age": 60,
+          "title": "Executive Chairman",
+          "yearBorn": 1965,
+          "fiscalYear": 2025,
+          "totalPay": {
+           "raw": 7231315,
+           "fmt": "7.23M",
+           "longFmt": "7,231,315"
+          },
+          "exercisedValue": {
+           "raw": 7605114,
+           "fmt": "7.61M",
+           "longFmt": "7,605,114"
+          },
+          "unexercisedValue": {
+           "raw": 59902496,
+           "fmt": "59.9M",
+           "longFmt": "59,902,496"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Henrique  Braun",
+          "age": 56,
+          "title": "CEO & Director",
+          "yearBorn": 1969,
+          "fiscalYear": 2025,
+          "totalPay": {
+           "raw": 4249503,
+           "fmt": "4.25M",
+           "longFmt": "4,249,503"
+          },
+          "exercisedValue": {
+           "raw": 1385757,
+           "fmt": "1.39M",
+           "longFmt": "1,385,757"
+          },
+          "unexercisedValue": {
+           "raw": 6500164,
+           "fmt": "6.5M",
+           "longFmt": "6,500,164"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. John  Murphy",
+          "age": 63,
+          "title": "President & CFO",
+          "yearBorn": 1962,
+          "fiscalYear": 2025,
+          "totalPay": {
+           "raw": 3988074,
+           "fmt": "3.99M",
+           "longFmt": "3,988,074"
+          },
+          "exercisedValue": {
+           "raw": 1107465,
+           "fmt": "1.11M",
+           "longFmt": "1,107,465"
+          },
+          "unexercisedValue": {
+           "raw": 20311522,
+           "fmt": "20.31M",
+           "longFmt": "20,311,522"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Manuel Arroyo Prieto",
+          "age": 58,
+          "title": "EVP, Chief Marketing & Customer Commercial Officer",
+          "yearBorn": 1967,
+          "fiscalYear": 2025,
+          "totalPay": {
+           "raw": 2532132,
+           "fmt": "2.53M",
+           "longFmt": "2,532,132"
+          },
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 10408435,
+           "fmt": "10.41M",
+           "longFmt": "10,408,435"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Ms. Jennifer Kay Mann J.D.",
+          "age": 53,
+          "title": "Senior Advisor",
+          "yearBorn": 1972,
+          "fiscalYear": 2025,
+          "totalPay": {
+           "raw": 2343780,
+           "fmt": "2.34M",
+           "longFmt": "2,343,780"
+          },
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 5160516,
+           "fmt": "5.16M",
+           "longFmt": "5,160,516"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Ms. Erin L. May",
+          "age": 45,
+          "title": "Senior VP, Chief Accounting Officer & Controller",
+          "yearBorn": 1980,
+          "fiscalYear": 2025,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Ms. Nancy W. Quan",
+          "age": 59,
+          "title": "Executive VP and Global Chief Technical & Innovation Officer",
+          "yearBorn": 1966,
+          "fiscalYear": 2025,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Todd  Beiger",
+          "title": "VP & Head of Investor Relations",
+          "fiscalYear": 2025,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Ms. Monica Howard Douglas",
+          "age": 52,
+          "title": "Executive VP & Global General Counsel",
+          "yearBorn": 1973,
+          "fiscalYear": 2025,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Ms. Beatriz R. Perez",
+          "age": 55,
+          "title": "Executive VP & Global Chief of Communications, Sustainability and Strategic Partnerships Officer",
+          "yearBorn": 1970,
+          "fiscalYear": 2025,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         }
+        ],
+        "auditRisk": 4,
+        "boardRisk": 9,
+        "compensationRisk": 1,
+        "shareHolderRightsRisk": 4,
+        "overallRisk": 4,
+        "governanceEpochDate": 1790812800,
+        "compensationAsOfEpochDate": 1767139200,
+        "irWebsite": "http://www.coca-colacompany.com/investors/",
+        "executiveTeam": [],
+        "maxAge": 86400
+       },
+       "summaryDetail": {
+        "maxAge": 1,
+        "priceHint": 2,
+        "previousClose": 85.65,
+        "open": 85.87,
+        "dayLow": 85.13,
+        "dayHigh": 86.57,
+        "regularMarketPreviousClose": 85.65,
+        "regularMarketOpen": 85.87,
+        "regularMarketDayLow": 85.13,
+        "regularMarketDayHigh": 86.57,
+        "dividendRate": 2.12,
+        "dividendYield": 0.024500001,
+        "exDividendDate": 1789430400,
+        "payoutRatio": 0.6246,
+        "fiveYearAvgDividendYield": 2.84,
+        "beta": 0.318,
+        "trailingPE": 25.978981,
+        "forwardPE": 24.540869,
+        "volume": 20444719,
+        "regularMarketVolume": 20444719,
+        "averageVolume": 15814095,
+        "averageVolume10days": 15671030,
+        "averageDailyVolume10Day": 15671030,
+        "bid": 0.0,
+        "ask": 0.0,
+        "bidSize": 50000,
+        "askSize": 50000,
+        "marketCap": 372213514240,
+        "nonDilutedMarketCap": 379011562815,
+        "fiftyTwoWeekLow": 65.87,
+        "fiftyTwoWeekHigh": 92.49,
+        "allTimeHigh": 92.49,
+        "allTimeLow": 0.182292,
+        "fulldayPrice": 86.51,
+        "fulldayChange": 0.87999725,
+        "fulldayChangePercent": 0.0102743395,
+        "priceToSalesTrailing12Months": 7.4251137,
+        "fiftyDayAverage": 87.9382,
+        "twoHundredDayAverage": 80.01175,
+        "trailingAnnualDividendRate": 2.08,
+        "trailingAnnualDividendYield": 0.024284879,
+        "currency": "USD",
+        "fromCurrency": null,
+        "toCurrency": null,
+        "lastMarket": null,
+        "coinMarketCapLink": null,
+        "algorithm": null,
+        "tradeable": false
+       },
+       "defaultKeyStatistics": {
+        "maxAge": 1,
+        "priceHint": 2,
+        "enterpriseValue": 402268520448,
+        "forwardPE": 24.540869,
+        "profitMargins": 0.28558,
+        "floatShares": 3874015338,
+        "sharesOutstanding": 4302549243,
+        "sharesShort": 40584069,
+        "sharesShortPriorMonth": 39226153,
+        "sharesShortPreviousMonthDate": 1786665600,
+        "dateShortInterest": 1789430400,
+        "sharesPercentSharesOut": 0.0094,
+        "heldPercentInsiders": 0.098950006,
+        "heldPercentInstitutions": 0.68202,
+        "shortRatio": 2.77,
+        "shortPercentOfFloat": 0.0095,
+        "beta": 0.318,
+        "impliedSharesOutstanding": 4302549243,
+        "category": null,
+        "bookValue": 8.401,
+        "priceToBook": 10.297584,
+        "fundFamily": null,
+        "legalType": null,
+        "lastFiscalYearEnd": 1767139200,
+        "nextFiscalYearEnd": 1798675200,
+        "mostRecentQuarter": 1783036800,
+        "earningsQuarterlyGrowth": 0.161,
+        "netIncomeToCommon": 14316000256,
+        "trailingEps": 3.33,
+        "forwardEps": 3.52514,
+        "pegRatio": 3.89,
+        "lastSplitFactor": "2:1",
+        "lastSplitDate": 1344816000,
+        "enterpriseToRevenue": 8.025,
+        "enterpriseToEbitda": 23.666,
+        "52WeekChange": 0.2823776,
+        "SandP52WeekChange": 0.1457566,
+        "lastDividendValue": 0.53,
+        "lastDividendDate": 1789430400,
+        "latestShareClass": null,
+        "leadInvestor": null
+       },
+       "quoteType": {
+        "exchange": "NYQ",
+        "quoteType": "EQUITY",
+        "symbol": "KO",
+        "underlyingSymbol": "KO",
+        "shortName": "Coca-Cola Company (The)",
+        "longName": "The Coca-Cola Company",
+        "firstTradeDateEpochUtc": -252322200,
+        "timeZoneFullName": "America/New_York",
+        "timeZoneShortName": "EDT",
+        "uuid": "5fed318f-9c85-3ad1-b311-20392472c25a",
+        "messageBoardId": "finmb_26642",
+        "gmtOffSetMilliseconds": -14400000,
+        "maxAge": 1
+       },
+       "financialData": {
+        "maxAge": 86400,
+        "currentPrice": 86.51,
+        "targetHighPrice": 104.0,
+        "targetLowPrice": 75.0,
+        "targetMeanPrice": 94.65217,
+        "targetMedianPrice": 95.0,
+        "recommendationMean": 1.75,
+        "recommendationKey": "buy",
+        "numberOfAnalystOpinions": 23,
+        "totalCash": 16371000320,
+        "totalCashPerShare": 3.805,
+        "ebitda": 16997999616,
+        "totalDebt": 44260999168,
+        "quickRatio": 0.798,
+        "currentRatio": 1.305,
+        "totalRevenue": 50128998400,
+        "debtToEquity": 115.519,
+        "revenuePerShare": 11.651,
+        "returnOnAssets": 0.09401,
+        "returnOnEquity": 0.42054,
+        "grossProfits": 31024001024,
+        "freeCashflow": 5218749952,
+        "operatingCashflow": 16341999616,
+        "earningsGrowth": 0.169,
+        "revenueGrowth": 0.067,
+        "grossMargins": 0.61888003,
+        "ebitdaMargins": 0.33909,
+        "operatingMargins": 0.34873,
+        "profitMargins": 0.28558,
+        "financialCurrency": "USD"
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/v7/finance/quote",
+   "params": {
+    "symbols": "KO"
+   },
+   "status": 200,
+   "json": {
+    "quoteResponse": {
+     "result": [
+      {
+       "language": "en-US",
+       "region": "US",
+       "quoteType": "EQUITY",
+       "typeDisp": "Equity",
+       "quoteSourceName": "Delayed Quote",
+       "triggerable": true,
+       "customPriceAlertConfidence": "HIGH",
+       "currency": "USD",
+       "shortName": "Coca-Cola Company (The)",
+       "longName": "The Coca-Cola Company",
+       "corporateActions": [],
+       "postMarketTime": 1791244672,
+       "regularMarketTime": 1791230402,
+       "hasPrePostMarketData": true,
+       "firstTradeDateMilliseconds": -252322200000,
+       "priceHint": 2,
+       "postMarketChangePercent": -0.011561827,
+       "postMarketPrice": 86.5,
+       "postMarketChange": -0.010002136,
+       "regularMarketChange": 0.860001,
+       "regularMarketChangePercent": 1.00409,
+       "fulldayChange": 0.87999725,
+       "fulldayChangePercent": 1.027434,
+       "fulldayPrice": 86.51,
+       "regularMarketPrice": 86.51,
+       "regularMarketDayHigh": 86.57,
+       "regularMarketDayRange": "85.13 - 86.57",
+       "regularMarketDayLow": 85.13,
+       "regularMarketVolume": 20444719,
+       "regularMarketPreviousClose": 85.65,
+       "bid": 0.0,
+       "ask": 0.0,
+       "bidSize": 500,
+       "askSize": 500,
+       "fullExchangeName": "NYSE",
+       "financialCurrency": "USD",
+       "regularMarketOpen": 85.87,
+       "averageDailyVolume3Month": 15814095,
+       "averageDailyVolume10Day": 15671030,
+       "fiftyTwoWeekLowChange": 20.64,
+       "fiftyTwoWeekLowChangePercent": 0.31334445,
+       "fiftyTwoWeekRange": "65.87 - 92.49",
+       "fiftyTwoWeekHighChange": -5.9799957,
+       "fiftyTwoWeekHighChangePercent": -0.064655595,
+       "fiftyTwoWeekLow": 65.87,
+       "fiftyTwoWeekHigh": 92.49,
+       "fiftyTwoWeekChangePercent": 28.23776,
+       "dividendDate": 1790812800,
+       "earningsTimestamp": 1793104200,
+       "earningsTimestampStart": 1793104200,
+       "earningsTimestampEnd": 1793104200,
+       "earningsCallTimestampStart": 1793131200,
+       "earningsCallTimestampEnd": 1793131200,
+       "isEarningsDateEstimate": false,
+       "trailingAnnualDividendRate": 2.08,
+       "trailingPE": 25.978981,
+       "dividendRate": 2.12,
+       "trailingAnnualDividendYield": 0.024284879,
+       "dividendYield": 2.45,
+       "epsTrailingTwelveMonths": 3.33,
+       "epsForward": 3.52514,
+       "epsCurrentYear": 3.30149,
+       "priceEpsCurrentYear": 26.20332,
+       "sharesOutstanding": 4302549243,
+       "impliedSharesOutstanding": 4302549243,
+       "bookValue": 8.401,
+       "fiftyDayAverage": 87.9382,
+       "fiftyDayAverageChange": -1.4281998,
+       "fiftyDayAverageChangePercent": -0.016240949,
+       "twoHundredDayAverage": 80.01175,
+       "twoHundredDayAverageChange": 6.498253,
+       "twoHundredDayAverageChangePercent": 0.08121623,
+       "marketCap": 372213514240,
+       "forwardPE": 24.540869,
+       "priceToBook": 10.297584,
+       "sourceInterval": 15,
+       "exchangeDataDelayedBy": 0,
+       "averageAnalystRating": "1.8 - Buy",
+       "tradeable": false,
+       "cryptoTradeable": false,
+       "marketState": "PREPRE",
+       "exchange": "NYQ",
+       "messageBoardId": "finmb_26642",
+       "exchangeTimezoneName": "America/New_York",
+       "exchangeTimezoneShortName": "EDT",
+       "gmtOffSetMilliseconds": -14400000,
+       "market": "us_market",
+       "esgPopulated": false,
+       "displayName": "Coca-Cola",
+       "symbol": "KO"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/ws/fundamentals-timeseries/v1/finance/timeseries/KO",
+   "params": {
+    "symbol": "KO",
+    "type": "trailingPegRatio"
+   },
+   "status": 200,
+   "json": {
+    "timeseries": {
+     "result": [
+      {
+       "meta": {
+        "symbol": [
+         "KO"
+        ],
+        "type": [
+         "trailingPegRatio"
+        ]
+       },
+       "timestamp": [
+        1785456000,
+        1789603200,
+        1790035200
+       ],
+       "trailingPegRatio": [
+        {
+         "dataId": 14021,
+         "asOfDate": "2026-07-31",
+         "periodType": "TTM",
+         "reportedValue": {
+          "raw": 4.2198,
+          "fmt": "4.22"
+         }
+        },
+        {
+         "dataId": 14021,
+         "asOfDate": "2026-09-17",
+         "periodType": "TTM",
+         "reportedValue": {
+          "raw": 4.0,
+          "fmt": "4.00"
+         }
+        },
+        {
+         "dataId": 14021,
+         "asOfDate": "2026-09-22",
+         "periodType": "TTM",
+         "reportedValue": {
+          "raw": 4.025,
+          "fmt": "4.03"
+         }
+        }
+       ]
+      }
+     ],
+     "error": null
+    }
+   }
+  }
+ ]
+}

@@ -1,0 +1,194 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:30:27+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "quote",
+   "^GSPC"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v10/finance/quoteSummary/^GSPC",
+   "params": {
+    "modules": "financialData,quoteType,defaultKeyStatistics,assetProfile,summaryDetail",
+    "symbol": "^GSPC"
+   },
+   "status": 200,
+   "json": {
+    "quoteSummary": {
+     "result": [
+      {
+       "summaryDetail": {
+        "maxAge": 1,
+        "priceHint": 2,
+        "previousClose": 7722.72,
+        "open": 7730.86,
+        "dayLow": 7727.59,
+        "dayHigh": 7794.35,
+        "regularMarketPreviousClose": 7722.72,
+        "regularMarketOpen": 7730.86,
+        "regularMarketDayLow": 7727.59,
+        "regularMarketDayHigh": 7794.35,
+        "volume": 3473000000,
+        "regularMarketVolume": 3473000000,
+        "averageVolume": 5006410000,
+        "averageVolume10days": 5053188000,
+        "averageDailyVolume10Day": 5053188000,
+        "bid": 7683.78,
+        "ask": 7759.63,
+        "bidSize": 0,
+        "askSize": 0,
+        "fiftyTwoWeekLow": 6316.91,
+        "fiftyTwoWeekHigh": 7816.7,
+        "allTimeHigh": 7816.7,
+        "allTimeLow": 4.4,
+        "fulldayPrice": 7773.95,
+        "fulldayChange": 51.22998,
+        "fulldayChangePercent": 0.0066336705,
+        "fiftyDayAverage": 7657.642,
+        "twoHundredDayAverage": 7225.8184,
+        "currency": "USD",
+        "fromCurrency": null,
+        "toCurrency": null,
+        "lastMarket": null,
+        "coinMarketCapLink": null,
+        "algorithm": null,
+        "tradeable": false
+       },
+       "defaultKeyStatistics": {
+        "maxAge": 1,
+        "priceHint": 2,
+        "category": null,
+        "fundFamily": null,
+        "legalType": null,
+        "lastSplitFactor": null,
+        "52WeekChange": 14.575661,
+        "latestShareClass": null,
+        "leadInvestor": null
+       },
+       "quoteType": {
+        "exchange": "SNP",
+        "quoteType": "INDEX",
+        "symbol": "^GSPC",
+        "underlyingSymbol": "^GSPC",
+        "shortName": "S&P 500",
+        "longName": "S&P 500",
+        "firstTradeDateEpochUtc": -1325583000,
+        "timeZoneFullName": "America/New_York",
+        "timeZoneShortName": "EDT",
+        "uuid": "8ffd55d1-3d1d-3733-a480-56768bc708e6",
+        "messageBoardId": "finmb_INDEXGSPC",
+        "gmtOffSetMilliseconds": -14400000,
+        "maxAge": 1
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/v7/finance/quote",
+   "params": {
+    "symbols": "^GSPC"
+   },
+   "status": 200,
+   "json": {
+    "quoteResponse": {
+     "result": [
+      {
+       "language": "en-US",
+       "region": "US",
+       "quoteType": "INDEX",
+       "typeDisp": "Index",
+       "quoteSourceName": "Delayed Quote",
+       "triggerable": true,
+       "customPriceAlertConfidence": "HIGH",
+       "currency": "USD",
+       "corporateActions": [],
+       "marketState": "PREPRE",
+       "hasPrePostMarketData": false,
+       "firstTradeDateMilliseconds": -1325583000000,
+       "priceHint": 2,
+       "regularMarketChange": 51.22998,
+       "regularMarketChangePercent": 0.66336703,
+       "fulldayChange": 51.22998,
+       "fulldayChangePercent": 0.66336703,
+       "fulldayPrice": 7773.95,
+       "regularMarketPrice": 7773.95,
+       "regularMarketDayHigh": 7794.35,
+       "regularMarketDayRange": "7727.59 - 7794.35",
+       "regularMarketDayLow": 7727.59,
+       "regularMarketVolume": 3473000000,
+       "regularMarketPreviousClose": 7722.72,
+       "bid": 7683.78,
+       "ask": 7759.63,
+       "bidSize": 0,
+       "askSize": 0,
+       "fullExchangeName": "SNP",
+       "regularMarketOpen": 7730.86,
+       "averageDailyVolume3Month": 5006410000,
+       "averageDailyVolume10Day": 5053188000,
+       "fiftyTwoWeekLowChange": 1457.04,
+       "fiftyTwoWeekLowChangePercent": 0.23065707,
+       "fiftyTwoWeekRange": "6316.91 - 7816.7",
+       "fiftyTwoWeekHighChange": -42.75,
+       "fiftyTwoWeekHighChangePercent": -0.0054690596,
+       "fiftyTwoWeekLow": 6316.91,
+       "fiftyTwoWeekHigh": 7816.7,
+       "fiftyTwoWeekChangePercent": 14.575661,
+       "fiftyDayAverage": 7657.642,
+       "fiftyDayAverageChange": 116.308105,
+       "fiftyDayAverageChangePercent": 0.015188501,
+       "twoHundredDayAverage": 7225.8184,
+       "twoHundredDayAverageChange": 548.13184,
+       "twoHundredDayAverageChangePercent": 0.07585741,
+       "sourceInterval": 15,
+       "exchangeDataDelayedBy": 0,
+       "tradeable": false,
+       "cryptoTradeable": false,
+       "regularMarketTime": 1791233310,
+       "exchange": "SNP",
+       "messageBoardId": "finmb_INDEXGSPC",
+       "exchangeTimezoneName": "America/New_York",
+       "exchangeTimezoneShortName": "EDT",
+       "gmtOffSetMilliseconds": -14400000,
+       "market": "us_market",
+       "esgPopulated": false,
+       "shortName": "S&P 500",
+       "longName": "S&P 500",
+       "symbol": "^GSPC"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/ws/fundamentals-timeseries/v1/finance/timeseries/^GSPC",
+   "params": {
+    "symbol": "^GSPC",
+    "type": "trailingPegRatio"
+   },
+   "status": 200,
+   "json": {
+    "timeseries": {
+     "result": [
+      {
+       "meta": {
+        "symbol": [
+         "^GSPC"
+        ],
+        "type": [
+         "trailingPegRatio"
+        ]
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  }
+ ]
+}

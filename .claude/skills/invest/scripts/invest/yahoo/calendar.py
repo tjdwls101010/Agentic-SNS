@@ -1,97 +1,98 @@
-"""Earnings, economic, IPO and split events by date."""
+"""Earnings, economic, IPO and split events by date, and one company's earnings dates."""
 from datetime import date, timedelta
 
 import yfinance as yf
 
+from invest.receipts import Failure
 from invest.yahoo.conditions import condition, within_dates
-from invest.yahoo.datasets import CURRENCY, PER_SHARE, PERCENT, Dataset
+from invest.yahoo.datasets import Dataset
+from invest.yahoo.encode import encode
+from invest.yahoo.units import (COUNT, DATETIME, MONEY_UNCONFIRMED, PER_SHARE_UNCONFIRMED, PERCENT, RATIO, SHARES, TEXT, UNVERIFIED, u)
 
 CALENDARS = {"earnings": "get_earnings_calendar", "economic": "get_economic_events_calendar", "ipo": "get_ipo_info_calendar", "splits": "get_splits_calendar"}
 DATE_FIELDS = {"earnings": "Event Start Date", "economic": "Event Time", "ipo": "Date", "splits": "Payable On"}
-CALENDAR_DATES = "conditions.dates reports whether the rows returned fall inside the range asked for."
+PAGING = "A page is read at the moment it is asked for; rows can move between pages, and total is Yahoo's own claim."
 
 
-def dates_applied(encoded, args, context):
-    if getattr(args, "symbol", None):
-        return {}
-    if args.leaf == "ipo":
+def dates_applied(frame, args, kind):
+    if kind == "ipo":
         return {"dates": condition({"start": args.start, "end": args.end}, "unverified",
-                                   {"reason": "a row matches on any of three date fields, so a returned row's Date can lie outside the requested range"})}
-    found = within_dates(encoded, DATE_FIELDS[args.leaf], args.start, args.end)
+                                   {"reason": "a row matches on any of its Date, Filing Date or Amended Date, so its Date can lie outside the range"})}
+    field = DATE_FIELDS[kind]
+    values = [encode(v) for v in frame[field]] if frame is not None and field in getattr(frame, "columns", []) else []
+    found = within_dates(values, field, args.start, args.end)
     return {"dates": found} if found else {}
 
 
-def market_wide(args, context, warnings, rows):
-    """--start and --end are inclusive here.
-
-    Yahoo's own range excludes the end date, so a caller asking for one day received nothing while the CLI declared
-    the boundary inclusive and the validator explicitly allowed start == end. Sending the following day makes the
-    declaration true; the conditions field then checks it against the rows that came back.
-    """
-    native_end = (date.fromisoformat(args.end) + timedelta(days=1)).isoformat()
-    native = yf.Calendars(start=args.start, end=native_end)
-    requested = rows
-    context["requested"] = requested
-    kwargs = {"limit": requested, "offset": args.offset}
-    if args.leaf == "earnings":
-        kwargs["filter_most_active"] = args.most_active
-    data = getattr(native, CALENDARS[args.leaf])(**kwargs)
-    context.update(scope="US" if args.leaf == "earnings" else "native calendar universe; each row names its own region or exchange")
-    if args.leaf != "splits":
-        warnings.append("yfinance converts zero to null in the numeric estimate, actual, surprise and price columns; the zero/missing distinction is already lost upstream of this CLI.")
-    displayed = min(len(data), requested)
-    if displayed and len(data) >= requested:
-        context["next_offset"] = args.offset + displayed
-    return data
+def market_wide(kind):
+    """--start and --end are inclusive: Yahoo's own range excludes its end, so the day after --end is sent."""
+    def fetch(target, args, context):
+        native = yf.Calendars(start=args.start, end=(date.fromisoformat(args.end) + timedelta(days=1)).isoformat())
+        options = {"limit": args.limit, "offset": args.offset}
+        if kind == "earnings":
+            options["filter_most_active"] = args.most_active
+        frame = getattr(native, CALENDARS[kind])(**options)
+        received = 0 if frame is None else len(frame)
+        context.coverage.update(requested=args.limit, offset=args.offset)
+        if received >= args.limit:
+            context.coverage["next_offset"] = args.offset + received
+            context.warn("pages_move", PAGING)
+        if kind != "splits" and received:
+            context.warn("zero_as_null", "yfinance turns zero into null in this calendar's numeric columns, so a null can be a real zero.")
+        context.conditions.update(dates_applied(frame, args, kind))
+        if frame is not None and not frame.empty and frame.index.name is None:
+            frame = frame.reset_index(drop=True)
+        return frame
+    return fetch
 
 
-def one_company(args, context, rows):
-    requested = rows
-    batch = 25 if requested <= 25 else 50 if requested <= 50 else 100
-    context.update(native_batch_size=batch, scope="single_symbol")
-    context["requested"] = requested
-    data = yf.Ticker(args.symbol).get_earnings_dates(limit=requested, offset=args.offset)
-    if data is not None and data.index.hasnans:
-        raise ValueError("Upstream earnings date/value alignment is unreliable after missing dates were parsed; use market earnings with a bounded date window instead.")
-    displayed = min(0 if data is None else len(data), requested)
-    if displayed:
-        context["next_offset"] = args.offset + displayed
-    return data
+def company_earnings(ticker, args, context):
+    frame = ticker.get_earnings_dates(limit=args.limit, offset=args.offset)
+    if frame is not None and frame.index.hasnans:
+        raise Failure("Yahoo returned an earnings row without a date, after which yfinance cannot keep dates and values aligned.",
+                      "Use market-wide calendar earnings with a bounded --start/--end instead.", code="upstream")
+    received = 0 if frame is None else len(frame)
+    context.coverage.update(requested=args.limit, offset=args.offset)
+    if received >= args.limit:
+        context.coverage["next_offset"] = args.offset + received
+    return frame
 
 
-def earnings(target, args, context, warnings, rows):
-    return one_company(args, context, rows) if args.symbol else market_wide(args, context, warnings, rows)
+class Calendar(Dataset):
+    """calendar earnings reads one company's dates when a SYMBOL is given, and the market-wide calendar otherwise."""
+
+    def __init__(self, kind, **spec):
+        super().__init__(market_wide(kind), ticker=False, counted=True, **spec)
+        self.kind = kind
+
+    def reader(self, args, target):
+        if self.kind == "earnings" and getattr(args, "symbol", None):
+            return company_earnings, yf.Ticker(args.symbol)
+        return self.fetch, target
 
 
-def events(target, args, context, warnings, rows):
-    return market_wide(args, context, warnings, rows)
-
-
-ZERO_LOSS = "yfinance converts zero to null in the numeric columns, so a null actual or expected can be a real zero."
-
-
-def calendar(fetch, **spec):
-    return Dataset(fetch, counted=True, conditions=dates_applied, **spec)
-
-
+EARNINGS_UNITS = {"Event Start Date": u(DATETIME), "Earnings Date": u(DATETIME), "Symbol": u(TEXT), "Company": u(TEXT),
+                  "Marketcap": u(MONEY_UNCONFIRMED), "EPS Estimate": u(PER_SHARE_UNCONFIRMED), "Reported EPS": u(PER_SHARE_UNCONFIRMED),
+                  "Surprise(%)": u(RATIO, PERCENT, evidence="Surprise(%) = surprisePercent x 100 for the same quarter (AAPL)")}
+OWN_CURRENCY = "Amounts are in each company's own currency, which the calendar does not state."
 DATASETS = {
-    "calendar.earnings": calendar(
-        earnings,
-        units={"Surprise(%)": PERCENT, "Marketcap": CURRENCY, "EPS Estimate": PER_SHARE, "Reported EPS": PER_SHARE},
-        interpretation={"dates": CALENDAR_DATES,
-                        "two_modes": "With a SYMBOL the rows are that company's own history and upcoming dates, newest first; without one, market-wide US earnings in the date range.",
-                        "surprise": "Surprise(%) is in percent (33.33 is 33.33%); analysts history reports the same measurement as surprisePercent, a ratio, 100x apart.",
-                        "zero_loss": "Market-wide, yfinance turns zero into null in the estimate, actual and surprise columns, so a null can be a real zero; a single symbol's history keeps its zeros."}),
-    "calendar.economic": calendar(
-        events,
-        interpretation={"dates": CALENDAR_DATES,
-                        "scope": "The universe is not US-only; the Region column says which economy each row belongs to.",
-                        "zero_loss": ZERO_LOSS}),
-    "calendar.ipo": calendar(
-        events,
-        interpretation={"dates": "A row matches when any of its listing Date, Filing Date or Amended Date falls in the range, so a returned row's Date can sit outside it and conditions reports the range as unverified.",
-                        "zero_loss": "yfinance converts zero to null in the price and share columns."}),
-    "calendar.splits": calendar(
-        events,
-        interpretation={"dates": CALENDAR_DATES + " The date matched is the payable date, not the announcement or ex-date."}),
+    "calendar.earnings": Calendar(
+        "earnings", units=EARNINGS_UNITS, coverage="Yahoo's US earnings calendar for the range, or one company's earnings dates newest first",
+        notes=(OWN_CURRENCY, "With a SYMBOL the rows are that company's own past and upcoming dates; without one, market-wide US earnings in the range."),
+        possible=("zero_as_null", "pages_move")),
+    "calendar.economic": Calendar(
+        "economic", units={"Event Time": u(DATETIME), "Actual": u(UNVERIFIED), "Expected": u(UNVERIFIED), "Last": u(UNVERIFIED), "Revised": u(UNVERIFIED)},
+        coverage="Yahoo's economic release calendar for the range, every region",
+        notes=("The calendar is not US-only; the Region column names each row's economy.",
+               "Actual, Expected, Last and Revised carry each release's own unit, which the calendar does not state."),
+        possible=("zero_as_null", "pages_move")),
+    "calendar.ipo": Calendar(
+        "ipo", units={"Date": u(DATETIME), "Filing Date": u(DATETIME), "Amended Date": u(DATETIME), "Price From": u(MONEY_UNCONFIRMED),
+                      "Price To": u(MONEY_UNCONFIRMED), "Price": u(MONEY_UNCONFIRMED), "Shares": u(SHARES)},
+        coverage="Yahoo's IPO calendar: rows whose listing, filing or amendment date falls in the range",
+        notes=(OWN_CURRENCY,), possible=("zero_as_null", "pages_move")),
+    "calendar.splits": Calendar(
+        "splits", units={"Payable On": u(DATETIME), "Old Share Worth": u(COUNT), "Share Worth": u(COUNT)},
+        coverage="Yahoo's split calendar for the range, matched on the payable date",
+        notes=("Old Share Worth becomes Share Worth: 1 and 4 is a four-for-one split.",), possible=("pages_move",)),
 }

@@ -1,231 +1,183 @@
+"""Company, financials, analysts, holders, fund and options datasets read through yfinance into the long file: native field names kept, missing values kept missing, zeros kept zero, and the source's order kept.
+
+Routes here are synthetic examples of each Yahoo module's shape; their literals are the expectation.
+"""
 import pytest
 
-
-def test_financial_periods_and_native_line_items_keep_missing_values(cli):
-    payload = {"timeseries": {"result": [{"meta": {"type": ["annualTotalRevenue"]}, "timestamp": [1703980800, 1735603200], "annualTotalRevenue": [{"asOfDate": "2023-12-31", "reportedValue": {"raw": 0}}, {"asOfDate": "2024-12-31", "reportedValue": {"raw": 120}}]}, {"meta": {"type": ["annualNetIncome"]}, "timestamp": [1735603200], "annualNetIncome": [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 30}}]}], "error": None}}
-    proc, doc = cli("financials", "income", "AAPL", "--fields", "TotalRevenue,NetIncome", "--periods", "2", routes=[{"path": "/timeseries/AAPL", "json": payload}] + [r for r in info_routes() if "timeseries" not in r["path"]])
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    r = doc["results"][0]
-    assert r["data"]["columns"] == ["TotalRevenue", "NetIncome"]
-    assert r["data"]["index"] == ["2024-12-31", "2023-12-31"]
-    assert r["data"]["data"] == [[120, 30], [0, None]]
-    assert r["context"]["currency"] == "USD", "the statement currency is looked up rather than declined"
-    assert r["context"]["quote_currency"] == "USD"
+from conftest import recorded
 
 
-def info_routes():
-    return [{"path": "/quoteSummary/AAPL", "json": {"quoteSummary": {"result": [{"assetProfile": {"sector": "Technology", "fullTimeEmployees": 10}, "financialData": {"financialCurrency": "USD"}}], "error": None}}}, {"path": "/v7/finance/quote", "json": {"quoteResponse": {"result": [{"symbol": "AAPL", "currency": "USD", "regularMarketPrice": 100, "marketCap": 9007199254740993}], "error": None}}}, {"path": "/timeseries/AAPL", "json": {"timeseries": {"result": [], "error": None}}}]
+def summary(symbol, module, payload, params=None):
+    route = {"path": f"/quoteSummary/{symbol}", "json": {"quoteSummary": {"result": [{module: payload}], "error": None}}}
+    if params:
+        route["params"] = params
+    return route
 
 
-@pytest.mark.parametrize("group,leaf,fields,expected", [("company", "profile", "sector,fullTimeEmployees", {"sector": "Technology", "fullTimeEmployees": 10}), ("prices", "quote", "regularMarketPrice,marketCap", {"regularMarketPrice": 100, "marketCap": 9007199254740993})])
-def test_profile_and_quote_query_real_info_and_select_fields(cli, group, leaf, fields, expected):
-    proc, doc = cli(group, leaf, "AAPL", "--fields", fields, routes=info_routes())
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"] == expected
-    assert doc["results"][0]["context"]["currency"] == "USD"
+INFO = [summary("AAPL", "financialData", {"financialCurrency": "USD"}),
+        {"path": "/v7/finance/quote", "json": {"quoteResponse": {"result": [{"symbol": "AAPL", "currency": "USD", "regularMarketPrice": 100, "marketCap": 9007199254740993}], "error": None}}},
+        {"path": "/timeseries/AAPL", "params": {"type": "trailingPegRatio"}, "json": {"timeseries": {"result": [], "error": None}}}]
 
 
-@pytest.mark.parametrize("leaf,module,payload,index,column,value", [
-    ("recommendations", "recommendationTrend", {"trend": [{"period": "0m", "strongBuy": 7}]}, 0, "strongBuy", 7),
-    ("upgrades", "upgradeDowngradeHistory", {"history": [{"epochGradeDate": 1704067200, "firm": "Example", "toGrade": "Buy", "fromGrade": "Hold", "action": "up"}]}, "2024-01-01", "ToGrade", "Buy"),
-    ("earnings-estimate", "earningsTrend", {"trend": [{"period": "0q", "earningsEstimate": {"avg": {"raw": 2.5}, "earningsCurrency": "USD"}}]}, "0q", "avg", 2.5),
-    ("revenue-estimate", "earningsTrend", {"trend": [{"period": "0q", "revenueEstimate": {"avg": {"raw": 200}, "revenueCurrency": "USD"}}]}, "0q", "avg", 200),
-    ("trend", "earningsTrend", {"trend": [{"period": "0q", "epsTrend": {"current": {"raw": 2.5}}}]}, "0q", "current", 2.5),
-    ("revisions", "earningsTrend", {"trend": [{"period": "0q", "epsRevisions": {"upLast7days": {"raw": 0}}}]}, "0q", "upLast7days", 0),
-    ("history", "earningsHistory", {"history": [{"quarter": {"fmt": "2024-03-31"}, "epsActual": {"raw": 3}}]}, "2024-03-31", "epsActual", 3),
+def test_statement_periods_keep_zero_and_missing_line_items(cli):
+    payload = {"timeseries": {"result": [{"meta": {"type": ["annualTotalRevenue"]}, "timestamp": [1703980800, 1735603200],
+                                          "annualTotalRevenue": [{"asOfDate": "2023-12-31", "reportedValue": {"raw": 0}}, {"asOfDate": "2024-12-31", "reportedValue": {"raw": 120}}]},
+                                         {"meta": {"type": ["annualNetIncome"]}, "timestamp": [1735603200],
+                                          "annualNetIncome": [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 30}}]}], "error": None}}
+    run = cli("financials", "income", "AAPL", routes=[{"path": "/timeseries/AAPL", "json": payload}] + INFO)
+    assert run.code == 0, run
+    rows = [(r["Date"][:10], r["TotalRevenue"], r["NetIncome"]) for r in run.rows]
+    assert rows == [("2024-12-31", "120.0", "30.0"), ("2023-12-31", "0.0", "")], "newest first; zero kept, a missing item left empty"
+    assert run.result()["financial_currency"] == "USD"
+
+
+@pytest.mark.parametrize("kind,item,frequency,prefix", [("balance", "TotalAssets", "quarterly", "quarterly"), ("cashflow", "OperatingCashFlow", "trailing", "trailing"),
+                                                        ("income", "TotalRevenue", "quarterly", "quarterly")])
+def test_the_statement_and_frequency_asked_for_are_the_ones_read(cli, kind, item, frequency, prefix):
+    payload = {"timeseries": {"result": [{"timestamp": [1735603200], prefix + item: [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 99}}]}]}}
+    run = cli("financials", kind, "AAPL", "--frequency", frequency, routes=[{"path": "/timeseries/AAPL", "json": payload}] + INFO)
+    assert run.code == 0, run
+    assert float(run.rows[0][item]) == 99
+
+
+def test_a_balance_sheet_has_no_trailing_form(cli):
+    run = cli("financials", "balance", "AAPL", "--frequency", "trailing", routes=[])
+    assert run.code == 2 and "yearly, quarterly" in run.result()["error"]["message"], run
+
+
+def test_valuation_keeps_current_apart_from_the_periods(cli):
+    payload = {"timeseries": {"result": [{"meta": {"type": ["trailingPeRatio"]}, "trailingPeRatio": [{"asOfDate": "2025-01-01", "reportedValue": {"raw": 30}}]},
+                                         {"meta": {"type": ["quarterlyPeRatio"]}, "quarterlyPeRatio": [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 25}}]}]}}
+    run = cli("financials", "valuation", "AAPL", "--periods", "1", routes=[{"path": "/timeseries/AAPL", "json": payload}] + INFO)
+    assert run.code == 0, run
+    assert [(r["Date"], r["Trailing P/E"]) for r in run.rows] == [("Current", "30.0"), ("12/31/2024", "25.0")]
+
+
+def test_quote_and_profile_read_one_response_and_each_saves_all_of_it(cli):
+    quote = cli("quote", "AAPL", routes=INFO)
+    profile = cli("company", "profile", "AAPL", routes=INFO)
+    assert quote.code == 0 and profile.code == 0, (quote, profile)
+    assert quote.records[0]["data"]["marketCap"] == 9007199254740993
+    assert profile.records[0]["data"]["marketCap"] == 9007199254740993, "the profile's file holds the quote's fields too"
+    assert any("same response" in n for n in quote.doc["notes"])
+
+
+@pytest.mark.parametrize("kind,module,payload,column,value", [
+    ("recommendations", "recommendationTrend", {"trend": [{"period": "0m", "strongBuy": 7}]}, "strongBuy", "7"),
+    ("eps-estimate", "earningsTrend", {"trend": [{"period": "0q", "earningsEstimate": {"avg": {"raw": 2.5}, "earningsCurrency": "USD"}}]}, "avg", "2.5"),
+    ("revenue-estimate", "earningsTrend", {"trend": [{"period": "0q", "revenueEstimate": {"avg": {"raw": 200}, "revenueCurrency": "USD"}}]}, "avg", "200"),
+    ("trend", "earningsTrend", {"trend": [{"period": "0q", "epsTrend": {"current": {"raw": 2.5}}}]}, "current", "2.5"),
+    ("revisions", "earningsTrend", {"trend": [{"period": "0q", "epsRevisions": {"upLast7days": {"raw": 0}}}]}, "upLast7days", "0"),
+    ("eps-history", "earningsHistory", {"history": [{"quarter": {"fmt": "2024-03-31"}, "epsActual": {"raw": 3}}]}, "epsActual", "3"),
 ])
-def test_analyst_datasets_parse_yahoo_modules(cli, leaf, module, payload, index, column, value):
-    proc, doc = cli("analysts", leaf, "AAPL", "--fields", column, routes=[{"path": "/quoteSummary/AAPL", "params": {"modules": module}, "json": {"quoteSummary": {"result": [{module: payload}]}}}])
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"]["index"] == [index]
-    assert doc["results"][0]["data"]["data"] == [[value]]
+def test_analyst_modules_keep_their_native_columns_and_zeros(cli, kind, module, payload, column, value):
+    run = cli("analysts", kind, "AAPL", routes=[summary("AAPL", module, payload, {"modules": module})])
+    assert run.code == 0, run
+    assert run.rows[0][column].removesuffix(".0") == value
 
 
-def test_holder_breakdown_preserves_both_axis_names(cli):
-    proc, doc = cli("holders", "major", "AAPL", routes=[{"path": "/quoteSummary/AAPL", "json": {"quoteSummary": {"result": [{"majorHoldersBreakdown": {"maxAge": 1, "insidersPercentHeld": 0.025, "institutionsPercentHeld": 0.75}}]}}}])
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    table = doc["results"][0]["data"]
-    assert table["index"] == ["insidersPercentHeld", "institutionsPercentHeld"]
-    assert table["column_names"] == ["Breakdown"]
-    assert table["data"] == [[0.025], [0.75]]
+def test_analyst_targets_are_one_row_in_the_quote_currency(cli):
+    routes = [summary("AAPL", "financialData", {"targetMeanPrice": 120, "currentPrice": 100}, {"modules": "financialData"}),
+              {"path": "/v8/finance/chart/AAPL", "json": {"chart": {"result": [{"meta": {"currency": "USD", "exchangeTimezoneName": "America/New_York"}}], "error": None}}}]
+    run = cli("analysts", "targets", "AAPL", routes=routes)
+    assert run.code == 0, run
+    assert (float(run.rows[0]["mean"]), float(run.rows[0]["current"])) == (120, 100)
+    assert run.result()["currency"] == "USD" and run.receipt["units"]["mean"] == "per_share:quote"
+
+
+def test_holder_breakdown_becomes_metric_rows_with_their_own_units(cli):
+    routes = [summary("AAPL", "majorHoldersBreakdown", {"maxAge": 1, "insidersPercentHeld": 0.025, "institutionsPercentHeld": 0.75, "institutionsCount": 6000})]
+    run = cli("holders", "major", "AAPL", routes=routes)
+    assert run.code == 0, run
+    rows = {r["metric"]: (float(r["value"]), r["unit"]) for r in run.rows}
+    assert rows["insidersPercentHeld"] == (0.025, "ratio") and rows["institutionsCount"] == (6000, "count")
+
+
+def test_insider_purchases_keep_a_zero_count_and_tell_percent_rows_from_share_rows(cli):
+    routes = [summary("AAPL", "netSharePurchaseActivity", {"period": "6m", "buyInfoShares": 0, "buyInfoCount": 0, "buyPercentInsiderShares": 0.01})]
+    run = cli("holders", "insider-purchases", "AAPL", routes=routes)
+    assert run.code == 0, run
+    purchases = {(r["metric"], r["source_column"]): (r["value"], r["unit"]) for r in run.rows}
+    assert purchases["Purchases", "Shares"][1] == "shares" and float(purchases["Purchases", "Shares"][0]) == 0, "a zero count stays zero, not missing"
+    assert purchases["Purchases", "Trans"][1] == "count" and float(purchases["Purchases", "Trans"][0]) == 0
+    assert purchases["% Buy Shares", "Shares"][1] == "ratio"
 
 
 def fund_routes():
-    return [{"path": "/quoteSummary/SPY", "json": {"quoteSummary": {"result": [{"quoteType": {"quoteType": "ETF"}, "summaryProfile": {"longBusinessSummary": "Tracks an index."}, "topHoldings": {"holdings": [{"symbol": "AAPL", "holdingName": "Apple", "holdingPercent": 0.071}], "stockPosition": {"raw": 0.99}, "sectorWeightings": [{"technology": 0.3}], "bondRatings": [{"aaa": 0.1}]}, "fundProfile": {"categoryName": "Large Blend", "family": "Example", "legalType": "Exchange Traded Fund"}}]}}}]
+    return [summary("SPY", "topHoldings", None) | {"json": {"quoteSummary": {"result": [{
+        "quoteType": {"quoteType": "ETF"}, "summaryProfile": {"longBusinessSummary": "Tracks an index."},
+        "topHoldings": {"holdings": [{"symbol": "AAPL", "holdingName": "Apple", "holdingPercent": 0.071}], "stockPosition": {"raw": 0.99},
+                        "sectorWeightings": [{"technology": 0.3}], "bondRatings": [{"aaa": 0.1}]},
+        "fundProfile": {"categoryName": "Large Blend", "family": "Example", "legalType": "Exchange Traded Fund"}}]}}}]
 
 
-def test_fund_holdings_preserve_reported_fraction_and_ticker(cli):
-    proc, doc = cli("fund", "holdings", "SPY", routes=fund_routes())
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"]["index"] == ["AAPL"]
-    assert doc["results"][0]["data"]["data"] == [["Apple", 0.071]]
+def test_fund_holdings_keep_the_reported_weight_and_symbol(cli):
+    run = cli("fund", "holdings", "SPY", routes=fund_routes())
+    assert run.code == 0, run
+    assert [(r["Symbol"], r["Name"], float(r["Holding Percent"])) for r in run.rows] == [("AAPL", "Apple", 0.071)]
 
 
-def option_routes():
-    contract = {"contractSymbol": "AAPL240119C00100000", "lastTradeDate": 1704205800, "strike": 100, "lastPrice": 2, "bid": 0, "ask": 2.1, "volume": 0, "openInterest": 20, "impliedVolatility": 0.2, "inTheMoney": True, "contractSize": "REGULAR", "currency": "USD"}
-    return [{"path": "/v7/finance/options/AAPL", "json": {"optionChain": {"result": [{"expirationDates": [1705622400], "quote": {"symbol": "AAPL", "regularMarketPrice": 100}, "options": [{"calls": [contract], "puts": []}]}], "error": None}}}]
+@pytest.mark.parametrize("kind,column,value", [("overview", "categoryName", "Large Blend"), ("sectors", "technology", "0.3"), ("asset-classes", "stockPosition", "0.99")])
+def test_a_fund_mapping_becomes_one_row(cli, kind, column, value):
+    run = cli("fund", kind, "SPY", routes=fund_routes())
+    assert run.code == 0, run
+    assert run.rows[0][column] == value
 
 
-def test_options_expiration_then_selected_side_and_fields(cli):
-    proc, doc = cli("options", "expirations", "AAPL", routes=option_routes())
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    expiration = doc["results"][0]["data"][0]
-    assert expiration == "2024-01-19"
-    proc, doc = cli("options", "chain", "AAPL", "--date", expiration, "--side", "calls", "--fields", "contractSymbol,lastTradeDate,bid", routes=option_routes())
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"]["calls"]["data"] == [["AAPL240119C00100000", "2024-01-02T14:30:00+00:00", 0]]
-    assert "puts" not in doc["results"][0]["data"]
+def test_a_fund_description_is_a_record(cli):
+    run = cli("fund", "description", "SPY", routes=fund_routes())
+    assert run.code == 0, run
+    assert run.records[0]["data"] == "Tracks an index."
 
 
-@pytest.mark.parametrize("leaf,payload,fields,expected", [
-    ("news", {"data": {"tickerStream": {"stream": [{"id": "story-1", "content": {"title": "Quarterly result"}}, {"ad": ["sponsored"]}]}}}, "id", [{"id": "story-1"}]),
-    ("filings", {"quoteSummary": {"result": [{"secFilings": {"filings": [{"date": "2024-01-01", "epochDate": 1704067200, "type": "10-K", "title": "Annual", "edgarUrl": "https://www.sec.gov/example", "exhibits": []}]}}]}}, "type", [{"type": "10-K"}]),
-])
-def test_company_news_and_filing_links(cli, leaf, payload, fields, expected):
-    path = "/xhr/ncp" if leaf == "news" else "/quoteSummary/AAPL"
-    proc, doc = cli("company", leaf, "AAPL", "--fields", fields, routes=[{"path": path, "json": payload}])
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"] == expected
+def test_a_fund_statistic_table_of_nulls_is_empty(cli):
+    run = cli("fund", "equity", "SPY", routes=fund_routes())
+    assert run.code == 7 and run.result()["status"] == "empty", run
 
 
-def test_shares_full_preserves_integer_series(cli):
-    routes = [{"path": "/v8/finance/chart/AAPL", "json": {"chart": {"result": [{"meta": {"exchangeTimezoneName": "America/New_York"}}], "error": None}}}, {"path": "/timeseries/AAPL", "json": {"timeseries": {"result": [{"timestamp": [1704067200], "shares_out": [9007199254740993]}]}}}]
-    proc, doc = cli("company", "shares", "AAPL", "--start", "2024-01-01", "--end", "2024-02-01", routes=routes)
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"]["data"] == [[9007199254740993]]
-    assert doc["results"][0]["data"]["index"] == ["2024-01-01T00:00:00-05:00"]
+def option_routes(calls):
+    return [{"path": "/v7/finance/options/AAPL", "json": {"optionChain": {"result": [{"expirationDates": [1705622400], "quote": {"symbol": "AAPL", "regularMarketPrice": 100, "currency": "USD"},
+                                                                                       "options": [{"calls": calls, "puts": []}]}], "error": None}}}]
 
 
+def test_expirations_then_one_side_of_the_chain(cli):
+    contract = {"contractSymbol": "AAPL240119C00100000", "lastTradeDate": 1704205800, "strike": 100, "lastPrice": 2, "bid": 0, "ask": 2.1, "volume": 0, "openInterest": 20,
+                "impliedVolatility": 0.2, "inTheMoney": True, "contractSize": "REGULAR", "currency": "USD"}
+    expirations = cli("options", "expirations", "AAPL", routes=option_routes([contract]))
+    assert expirations.code == 0, expirations
+    assert [r["expiration"] for r in expirations.rows] == ["2024-01-19"]
+    chain = cli("options", "chain", "AAPL", "--date", "2024-01-19", "--side", "calls", routes=option_routes([contract]))
+    assert chain.code == 0, chain
+    row = chain.rows[0]
+    assert (row["side"], row["contractSymbol"], row["lastTradeDate"], float(row["bid"])) == ("call", "AAPL240119C00100000", "2024-01-02T14:30:00+00:00", 0.0)
+    assert chain.result()["conditions"]["date"]["status"] == "confirmed" and chain.result()["as_of"]["expiration"] == "2024-01-19"
 
 
-
-def test_valuation_distinguishes_current_and_periods(cli):
-    payload = {"timeseries": {"result": [{"meta": {"type": ["trailingPeRatio"]}, "trailingPeRatio": [{"asOfDate": "2025-01-01", "reportedValue": {"raw": 30}}]}, {"meta": {"type": ["quarterlyPeRatio"]}, "quarterlyPeRatio": [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 25}}]}]}}
-    proc, doc = cli("financials", "valuation", "AAPL", "--periods", "1", "--fields", "Trailing P/E", routes=[{"path": "/timeseries/AAPL", "json": payload}])
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"]["index"] == ["Current", "12/31/2024"]
-    assert doc["results"][0]["data"]["data"] == [[30], [25]]
+def test_an_empty_chain_is_empty_not_success(cli):
+    run = cli("options", "chain", "AAPL", routes=option_routes([]))
+    assert run.code == 7 and run.doc["status"] == "empty", run
 
 
-def test_empty_option_sides_are_empty_not_success(cli):
-    routes = [{"path": "/v7/finance/options/AAPL", "json": {"optionChain": {"result": [{"expirationDates": [1705622400], "quote": {}, "options": [{"calls": [], "puts": []}]}]}}}]
-    proc, doc = cli("options", "chain", "AAPL", routes=routes)
-    assert proc.returncode == 7, proc.stdout + proc.stderr
-    assert doc["status"] == "empty"
-    assert doc["results"][0]["warnings"]
+def test_shares_keep_an_integer_past_two_to_the_53(cli):
+    routes = [{"path": "/v8/finance/chart/AAPL", "json": {"chart": {"result": [{"meta": {"exchangeTimezoneName": "America/New_York"}}], "error": None}}},
+              {"path": "/timeseries/AAPL", "json": {"timeseries": {"result": [{"timestamp": [1704067200], "shares_out": [9007199254740993]}]}}}]
+    run = cli("company", "shares", "AAPL", "--start", "2024-01-01", "--end", "2024-02-01", routes=routes)
+    assert run.code == 0, run
+    assert [(r["Date"], r["shares"]) for r in run.rows] == [("2024-01-01T00:00:00-05:00", "9007199254740993")]
 
 
-@pytest.mark.parametrize("leaf,expected", [("overview", {"categoryName": "Large Blend", "family": "Example", "legalType": "Exchange Traded Fund"}), ("description", "Tracks an index."), ("sector-weights", {"technology": 0.3})])
-def test_remaining_fund_dict_datasets(cli, leaf, expected):
-    proc, doc = cli("fund", leaf, "SPY", routes=fund_routes())
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"] == expected
+def test_filings_are_records_with_their_document_map(cli):
+    run = cli("company", "filings", "AAPL", routes=recorded("company-filings-aapl"))
+    assert run.code == 0, run
+    first = run.records[0]["data"][0]
+    assert {"date", "type", "title", "exhibits"} <= set(first)
+    assert all(url.startswith("https://cdn.yahoofinance.com/prod/sec-filings/") for url in first["exhibits"].values() if url.endswith(".htm"))
+    shown = run.result().get("data") or run.result().get("first")
+    assert shown, run
 
 
-@pytest.mark.parametrize("leaf,field", [("equity", "SPY"), ("operations", "SPY"), ("asset-classes", "stockPosition")])
-def test_fund_numeric_datasets_keep_native_missing_or_fraction(cli, leaf, field):
-    proc, doc = cli("fund", leaf, "SPY", "--fields", field, routes=fund_routes())
-    assert proc.returncode == (0 if leaf == "asset-classes" else 7), proc.stdout + proc.stderr
-    if leaf != "asset-classes":
-        assert doc["status"] == "empty"
-        assert doc["results"][0]["warnings"]
-    data = doc["results"][0]["data"]
-    if leaf == "asset-classes":
-        assert data == {"stockPosition": 0.99}
-    else:
-        assert data["data"] and all(row == [None] for row in data["data"])
-
-
-@pytest.mark.parametrize("leaf,item,frequency,prefix", [("balance", "TotalAssets", "quarterly", "quarterly"), ("cashflow", "OperatingCashFlow", "trailing", "trailing"), ("income", "TotalRevenue", "quarterly", "quarterly")])
-def test_statement_purpose_and_frequency_are_applied(cli, leaf, item, frequency, prefix):
-    payload = {"timeseries": {"result": [{"timestamp": [1735603200], prefix + item: [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 99}}]}]}}
-    routes = [{"path": "/timeseries/AAPL", "json": payload}] + [r for r in info_routes() if "timeseries" not in r["path"]]
-    proc, doc = cli("financials", leaf, "AAPL", "--frequency", frequency, "--fields", item, routes=routes)
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"]["columns"] == [item]
-    assert doc["results"][0]["data"]["data"] == [[99]]
-
-
-@pytest.mark.parametrize("leaf,module,field", [("institutional", "institutionOwnership", "Holder"), ("fund", "fundOwnership", "Holder"), ("insider-transactions", "insiderTransactions", "Insider"), ("insider-roster", "insiderHolders", "Name")])
-def test_holder_list_datasets_have_reusable_fields(cli, leaf, module, field):
-    payloads = {"institutionOwnership": {"ownershipList": [{"maxAge": 1, "reportDate": 1704067200, "organization": "Example", "position": 123, "value": 246}]}, "fundOwnership": {"ownershipList": [{"maxAge": 1, "reportDate": 1704067200, "organization": "Example", "position": 123, "value": 246}]}, "insiderTransactions": {"transactions": [{"maxAge": 1, "startDate": 1704067200, "filerName": "Example", "shares": 123}]}, "insiderHolders": {"holders": [{"maxAge": 1, "name": "Example", "relation": "Officer", "url": "https://example.com", "transactionDescription": "Purchase"}]}}
-    proc, doc = cli("holders", leaf, "AAPL", "--fields", field, routes=[{"path": "/quoteSummary/AAPL", "json": {"quoteSummary": {"result": [{module: payloads[module]}]}}}])
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"]["data"] == [["Example"]]
-
-
-def test_insider_purchases_preserves_nullable_count(cli):
-    proc, doc = cli("holders", "insider-purchases", "AAPL", "--fields", "Shares,Trans", "--limit", "1", routes=[{"path": "/quoteSummary/AAPL", "json": {"quoteSummary": {"result": [{"netSharePurchaseActivity": {"period": "6m", "buyInfoShares": 0, "buyInfoCount": 0}}]}}}])
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"]["data"] == [[0, 0]]
-
-
-def test_analyst_targets_and_growth(cli):
-    routes = [{"path": "/quoteSummary/AAPL", "params": {"modules": "financialData"}, "json": {"quoteSummary": {"result": [{"financialData": {"targetMeanPrice": 120, "currentPrice": 100}}]}}}]
-    proc, doc = cli("analysts", "targets", "AAPL", routes=routes)
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"] == {"mean": 120, "current": 100}
-    routes = [{"path": "/quoteSummary/AAPL", "params": {"modules": "earningsTrend"}, "json": {"quoteSummary": {"result": [{"earningsTrend": {"trend": [{"period": "0q", "growth": {"raw": 0.2}}]}}]}}}, {"path": "/quoteSummary/AAPL", "params": {"modules": "industryTrend,sectorTrend,indexTrend"}, "json": {"quoteSummary": {"result": [{"industryTrend": {"estimates": [{"period": "0q", "growth": 0.1}]}}]}}}]
-    proc, doc = cli("analysts", "growth", "AAPL", "--fields", "stockTrend,industryTrend", routes=routes)
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert doc["results"][0]["data"]["data"] == [[0.2, 0.1]]
-
-
-def test_a_rate_limit_met_while_reading_the_statement_currency_stops_the_remaining_targets(cli):
-    """The currency lookup is a second request; a 429 there is still a rate limit, and going on to the next symbol
-    spends requests the source just refused."""
-    payload = {"timeseries": {"result": [{"meta": {"type": ["annualTotalRevenue"]}, "timestamp": [1735603200], "annualTotalRevenue": [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 120}}]}], "error": None}}
-    routes = [{"path": "/timeseries/AAPL", "json": payload},
-              {"path": "/quoteSummary/AAPL", "status": 429, "text": "Too Many Requests"},
-              {"path": "/v7/finance/quote", "status": 429, "text": "Too Many Requests"}]
-    proc, doc = cli("financials", "income", "AAPL", "MSFT", "--fields", "TotalRevenue", routes=routes)  # no MSFT route: any MSFT request fails the fixture
-    assert proc.returncode == 8, proc.stdout[:400]
-    first, second = doc["results"]
-    assert first["status"] == "ok" and first["data"]["data"] == [[120]]
-    assert any("currency" in w for w in first["warnings"])
-    assert second["status"] == "not_attempted"
-
-
-# ---- how many were asked for, next to how many arrived --------------------------------------------------------------
-
-
-def news_with_an_ad(count):
-    """`count` articles and one sponsored entry, which yfinance drops before the CLI sees it."""
-    stream = [{"id": f"n{i}", "content": {"title": f"Headline {i}"}} for i in range(count)] + [{"ad": ["sponsored"]}]
-    return [{"path": "/xhr/ncp", "json": {"data": {"tickerStream": {"stream": stream}}}}]
-
-
-def test_a_news_page_shorter_than_asked_says_both_numbers_and_claims_no_end(cli, tmp_path):
-    """--limit 300 answered with 196 articles was reported as the whole feed. The count asked for is the one number
-    that makes the shortfall visible; the source's own filtering is why the shortfall is not proof the feed ended."""
-    store = tmp_path / "s"
-    proc, doc = cli("company", "news", "AAPL", "--limit", "300", "--fields", "content.title", routes=news_with_an_ad(196), store=store)
-    assert proc.returncode == 0, proc.stdout[:400]
-    r = doc["results"][0]
-    assert r["coverage"]["requested"] == 300 and r["coverage"]["received"] == 196
-    assert "exhaustive" not in r["coverage"]
-    assert any("196" in w and "300" in w for w in r["warnings"]), r["warnings"]
-
-    proc, cut = cli("company", "news", "AAPL", "--limit", "300", "--max-chars", "3000", routes=news_with_an_ad(196), store=store)
-    assert proc.returncode == 8, proc.stdout[:300]
-    assert cut["results"][0]["coverage"]["requested"] == 300, "a narrowing re-selects; it does not forget what was asked"
-
-    proc, filed = cli("company", "news", "AAPL", "--limit", "300", "--out", str(tmp_path / "news.csv"), routes=news_with_an_ad(196), store=store)
-    assert proc.returncode == 0, proc.stdout[:300]
-    assert filed["results"][0]["coverage"]["requested"] == 300
-
-    proc, back = cli("read", r["id"], "--limit", "5", routes=[], store=store)
-    assert proc.returncode == 0, proc.stdout[:300]
-    assert back["results"][0]["coverage"]["requested"] == 300, "a slice of the observation does not change what was asked of the source"
-    assert any("196" in w for w in back["results"][0]["warnings"])
-    assert "exhaustive" not in proc.stdout
-
-
-def test_a_rate_limit_is_kept_when_the_same_target_then_fails_locally(cli):
-    """The rate limit was met while observing AAPL; a selection error on AAPL afterwards does not make MSFT safe to ask."""
-    payload = {"timeseries": {"result": [{"meta": {"type": ["annualTotalRevenue"]}, "timestamp": [1735603200], "annualTotalRevenue": [{"asOfDate": "2024-12-31", "reportedValue": {"raw": 120}}]}], "error": None}}
-    routes = [{"path": "/timeseries/AAPL", "json": payload},
-              {"path": "/quoteSummary/AAPL", "status": 429, "text": "Too Many Requests"},
-              {"path": "/v7/finance/quote", "status": 429, "text": "Too Many Requests"}]
-    proc, doc = cli("financials", "income", "AAPL", "MSFT", "--fields", "NoSuchLineItem", routes=routes)
-    assert [r["status"] for r in doc["results"]] == ["error", "not_attempted"], proc.stdout[:400]
+def test_holder_lists_keep_their_columns(cli):
+    run = cli("holders", "institutional", "AAPL", routes=recorded("holders-institutional-aapl"))
+    assert run.code == 0, run
+    assert {"Date Reported", "Holder", "pctHeld", "Shares", "Value", "pctChange"} <= set(run.rows[0])
+    assert run.result()["as_of"]["date_reported"] == max(r["Date Reported"][:10] for r in run.rows)

@@ -16,9 +16,9 @@ def condition(requested, status="unverified", evidence=None):
     return {"requested": requested, "status": status, "evidence": evidence}
 
 
-def within_dates(data, field, start, end):
-    """Confirm a date range from the rows themselves: every row inside it confirms, any row outside contradicts."""
-    values = [str(v)[:10] for v in column(data, field) if v is not None]
+def within_dates(values, field, start, end):
+    """Confirm a date range from the rows' own dates (`values`, from the column `field`): every row inside it confirms, any row outside contradicts."""
+    values = [str(v)[:10] for v in values if v is not None]
     if not values:
         return None
     outside = [v for v in values if (start and v < start) or (end and v > end)]
