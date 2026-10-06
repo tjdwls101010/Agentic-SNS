@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.12,<3.14"
-# dependencies = ["yfinance[repair]==1.7.0", "pandas", "numpy"]
+# dependencies = ["yfinance[repair]==1.7.0", "pandas", "numpy", "lxml>=5,<7", "beautifulsoup4>=4.13,<5", "requests>=2.32,<3"]
 #
 # [tool.uv]
 # exclude-newer = "2026-09-13T13:10:00Z"

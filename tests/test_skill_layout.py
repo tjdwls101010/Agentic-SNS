@@ -39,6 +39,7 @@ SKILLS = {
     'invest': ('invest', {
         'receipts': 'common',
         'yahoo': 'system',
+        'sec': 'system',
         'results': 'store',
         'load': 'feature',
     }),
