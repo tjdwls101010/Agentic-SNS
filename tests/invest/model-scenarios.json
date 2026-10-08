@@ -308,10 +308,19 @@
   {
     "id": "hold-economic-week",
     "kind": "yahoo",
-    "heldout": true,
+    "heldout": false,
     "repeat": 1,
     "premise": null,
     "prompt": "다음 주 미국 경제지표 발표 일정을 정리해 줘. 어느 기간 기준인지도.",
     "expect": "Pass requires: the date range is stated; only events the run received for that range are listed; the answer separates US releases from other regions (the calendar is not US-only) or says it kept only US rows; an empty or short result is not presented as 'no releases'."
+  },
+  {
+    "id": "hold-economic-first-week",
+    "kind": "yahoo",
+    "heldout": true,
+    "repeat": 1,
+    "premise": "Yahoo returns rows outside the requested range (the receipt's conditions.dates is not_applied and names the outside dates).",
+    "prompt": "다음 달 첫째 주(월~금)에 예정된 전 세계 경제지표 발표 건수를 지역별로 세어 줘. 어느 기간 기준인지도 밝혀 줘.",
+    "expect": "Pass requires: the range (the first Monday to Friday of next month) and its timezone stated; counts per region that match the run's own files restricted to that range, with rows the receipt marks outside the request excluded or named rather than counted; rows repeated across pages counted once or the choice stated; a region with no rows is not presented as having no releases unless the run's data covers the whole range."
   }
 ]
