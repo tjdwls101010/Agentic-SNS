@@ -70,6 +70,8 @@ A folder is published whole or not at all and never overwritten, so a receipt al
 
 Values arrive on one scale: a rate is a ratio (0.0245 is 2.45%) and a multiple is a multiple, whatever scale Yahoo used for that field, and `units` says which applies; money carries the currency of its role (`currency` for quote values, `financial_currency` for statements). A screen query's rates are written as ratios too and translated to Yahoo's scale; `screen fields` gives each field's input unit. Provider restrictions, incomplete datasets and upstream failures are reported per target with their own codes, and the time a value was true is reported apart from the time it was observed.
 
+For what a company says in its own filings, `company filings SYMBOL` lists the filings Yahoo has, each with a map of its documents to Yahoo's copies of the SEC originals, and `filing URL…` turns one or more of those documents into a text file (one paragraph or table row per line) and a map of its own linked contents, set-apart headings, tables, images and links, saved under `data/filings`. Ask, for example: “How does NVIDIA's management read its latest quarter, and what does it expect next?” The agent picks the earnings release, reads the map and then the lines it needs, and cites the original document; `filing --help` describes the file and the map, and no SEC identity is required.
+
 ## CLI reference
 
 Run these from the clone's root. Every CLI provides `--help`, command-specific help, and `schema`; `--help` and `schema` do not read your browser.
