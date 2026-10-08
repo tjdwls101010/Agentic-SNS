@@ -977,3 +977,106 @@ python3 scenarios/invest/run.py --phase eval --cond invest --scenario <공시 7 
 - 분석 명령(상관·수익률 계산 등)과 분석용 Python 사전 승인(C10).
 - yfinance 버전 업그레이드(C9), 라이브러리 캐시 이동(결정 17), 다른 스킬의 이행, twitter `tests/twitter/model/` 이동.
 - 공시 이미지 내려받기·OCR, PDF·XLSX 변환(C5).
+
+
+# 구현 기록
+
+세 PR로 구현했다: PR ① #37 `refactor: yfinance를 invest로 바꾸고 Yahoo CLI를 다시 설계한다`, PR ② #38 `feat: invest에 공시 읽기 파일과 지도를 더한다`, PR ③ #39 `chore: sec 스킬을 은퇴시킨다`. 단계별 근거는 각 커밋 본문에 있다.
+
+## 계획과 달라진 곳과 이유
+
+- **단계 3–5의 순서.** Yahoo 테스트 seam이 CLI 하위 프로세스라 `yahoo/`만으로는 green이 될 수 없었다. 그래서 receipts·results·load·cli의 파이프를 먼저 세우고, 그 위에 yahoo 의미를 테스트로 얹었다.
+- **company news.** yfinance 1.7.0의 `Ticker.get_news`(`/xhr/ncp`)가 2026-10-06 Yahoo에서 404를 받는데, 라이브러리는 빈 목록을 돌려준다(조용한 실패). `yf.Search(symbol).news`로 바꾸고, 그 엔드포인트에만 있던 `--tab`을 없앴다.
+- **스크린 미측정 비율 필드 거절(C23).** 비율 성격 필드 34개가 전부 Yahoo 퍼센트 포인트로 측정돼, 현 카탈로그로는 거절 경로에 도달하지 않는다. 거절 코드는 방어로 두고, "카탈로그의 모든 비율 필드가 measured"를 테스트로 고정했다.
+- **not_found 신호(C24).** TWTR(상장폐지)의 chart 404는 없는 심볼과 같다. 그래서 신호는 quoteSummary 404 "Quote not found for symbol"로 정했고, quoteType NONE은 no_data다.
+- **사전 검사 범위(C22).** 공용 경고 코드 전부로 최소 영수증을 재면 30종목 기본 호출이 8,635자로 거절됐다. 그래서 데이터셋이 실제로 낼 수 있는 코드만 센다.
+- **실행기 계측.** 출력 문자열로 CLI 실행을 세면 리다이렉션과 재출력에서 틀렸다. 복사한 `cli.py`에 `INVEST_CALL_LOG`로만 켜지는 한 줄 계측을 넣었다. 옛 계측으로 돈 짝 A·큰 결과 묶음은 명령 기록에서 누락·오집계 0건임을 확인했다.
+- **allowed-tools 확인(7e).** 계획의 `--setting-sources project` 조합에서는 스킬 allowed-tools가 적용되지 않았다(twitter도 같음). `--setting-sources` 없이 `--permission-mode default --allowedTools Skill`로 확인했고, 거부는 0이었다.
+- **구조 검사 등록.** `sec`·`filing`·`documents` 등록을 단계 11에서 9·10으로 당겨 커밋마다 green을 지켰다.
+- **인코딩(P1).** 선언 없는 짧은 UTF-8을 bs4 추측기가 windows-1252로 읽어 U+200B가 깨졌다. 그래서 선언이 없으면 엄격한 UTF-8을 먼저 시도한다. 선언과 UTF-8이 모두 맞지 않으면, 추측(café→cafť) 대신 선언 인코딩으로 읽고 `encoding_loss`를 남긴다.
+- **표 레이아웃 실패.** 겹친 span·범위 밖 span·너무 큰 표는 옛 `parse_failed` 대신 `unsupported`다(실패 코드 표에 parse_failed가 없다).
+- **렌더 결정(P3).**
+  - 문단 끝에 놓인 앵커는 다음 줄로 착지한다(NBIS "NEBIUS GROUP N.V.<a name>").
+  - 표 셀 이미지는 그 필드 안에 쓴다.
+  - caption은 자기 줄 좌표를 갖는다.
+  - 받은 시각은 `document.txt`가 아니라 `source.json`과 영수증에 둔다. 그래서 같은 키는 같은 파일 내용이다.
+  - 출력이 바뀌면 텍스트 VERSION을 올리게 하는 감지 테스트를 두었다(현재 3).
+- **받기 마감(P5).** socket timeout은 침묵만 막아, 한 바이트씩 흘러드는 본문은 `--timeout`을 넘겼다. interval timer(SIGALRM)로 시도 전체를 덮는다. 이미 켜진 타이머가 있으면 덮지 않고 거부한다.
+- **exit 7(C24).** `empty_document`도 `unsupported`처럼 "쓸 것 없음"이라 7이다. 영수증 저장 실패(`local_io` 4)가 이보다 먼저다.
+- **C20.** 읽기 전략 문장을 지웠다. 문장이 없는 조건이 합격 9/14로 있는 조건(8/14) 이상이었고, 읽은 글자 중앙값 차이는 1%였다. 규칙의 "같다"를 글자 그대로 충족하지는 않아 성진이 정했다.
+- **SKILL.md 조정.**
+  - 공시 인용 지침: 인용은 파일 그대로, 출처는 영수증의 `source`, 신규 판단은 이전 문서의 같은 절도 읽은 뒤에.
+  - 조건 항목을 스크린에서 날짜 범위로 일반화했다.
+  - 잠정 봉은 남기고 표시한다.
+  - 뒤의 두 가지는 홀드아웃 hold-economic-week 실패(영수증이 `not_applied`와 범위 밖 날짜를 알렸는데도 셈)에서 왔다. 그 사례는 평가 세트로 옮기고, 같은 성질의 새 홀드아웃으로 다시 확인했다.
+- **docs/usage.md.** 단계 6에서 Yahoo 절의 세 문단이 옛 CLI를 설명한 채 남아 있었다. PR ①에서 고쳤다.
+
+## 시나리오 전후 표
+
+| 묶음 | 조건 | 결과 | 비고 |
+|---|---|---|---|
+| 실험 3·4 (계획 단계) | none / 옛 cli / L | 14/17 · 16/17 · 17/17 | 옛 cli help 285K, 비용 $3.13 |
+| Yahoo 17, 짝 A (장 시작 전) | invest / L | 16/17 · 17/17 | invest help 80.7K, CLI 실행 중앙값 4, $2.34 / $2.32 |
+| Yahoo 17, 짝 B (정규장) | invest / L | 14/17 · 13/17 | invest만 불합격 0, help 74.2K |
+| Yahoo 18, 짝 C (정규장, 조정 후) | invest / L | 17/18 · 14/18 | invest만 불합격 1(growth-screen), 잠정 봉 유지로 mdd·correlation·date-close 합격(L은 불합격), help 81.1K |
+| 큰 결과 9·조용한 실패 3·희귀 단위 2 | invest | 13/14 | 2025 대량 두 건 독립 기대값 일치 |
+| 희귀 단위 재실행 | invest | 2/2 | KO는 전제 불성립(모델이 debtToEquity를 쓰지 않음) |
+| 일관성 5×3 | invest / L | 런 15/15 · 15/15, 묶음 1/5 · 1/5 | 묶음은 추가 범위 선택에서 흔들림, 단위 오류 0 |
+| Yahoo 홀드아웃 3 | invest | 2/3 | economic-week 실패 → 수정 후 평가 세트로 |
+| 새 Yahoo 홀드아웃 1 | invest | 0/1 | 시간대 미표기(중대 아님), 범위 밖 행 전제 불성립 |
+| 공시 7×2 (C20 짝) | invest / noread | 8/14 · 9/14 | 읽은 글자 중앙값 78.3K · 79.0K |
+| 공시 7×2 (인용 지침 조정 후) | invest | 10/14 | 실패는 덧붙인 주장의 오독 |
+| 경계 2 | invest | 2/2 | NVDA 부문은 공시, MSFT 마진은 Yahoo |
+| 공시 홀드아웃 2 | invest | 1/2 | BA: "briefly slowed"를 생산 중단으로 과장 |
+| Yahoo 17 회귀 (PR ② 코드) | invest | 17/17 | 새 유형 의미 오류 9(덧붙인 설명, 코드 무관) |
+
+## codex 의견의 수용·기각
+
+- PR ① 코드 리뷰 3차.
+  - 1차: blocking 2·major 10·minor 2. 모두 재현 후 수용했다.
+  - 2차: 기존 14건 중 resolved 11, 새 major 3·minor 1을 수용했다.
+  - 3차: 실행기 계측 major 4를 수용했다.
+- PR ② 코드 리뷰 3차. 1차 major 6·minor 6, 2차 새 major 3·minor 2, 3차 minor 2를 모두 수용했다. 기각은 없다.
+- 리뷰가 바꾼 테스트.
+  - 선언 완전성: 구현의 `units`가 아니라 파일의 숫자 열을 독립 열거한다. 이것으로 filings `epochDate`·`maxAge` 미선언을 실제로 찾았다.
+  - 관계 테스트: 두 원천(캘린더 HTML, quoteSummary)을 직접 비교한다.
+  - 굵게 판정: 원문 lxml 측정과 대조한다(apple 176개 정확히 일치).
+  - 링크 표시: 실제 표시 숫자와 원문 앵커 목적지를 대조한다.
+- 채점(C14)은 모두 codex 독립 채점이다. 결과는 위 표와 같다.
+
+## 원리 충돌 해소의 실제 모습
+
+- ① 매번 같은 일은 명령이 숨긴다. 스케일 환산·시점 판정·범위 표시·실패 판정·저장을 그렇게 했다. 계산은 모델의 Python에 맡겼고, 런 기록에서 모델이 결과 파일 전체로 계산했다(2025 상관 0.29997이 독립 기대값과 일치).
+- ② 출력 단위는 결과에, 입력 단위는 help에 둔다. 단위 표는 SKILL.md와 help에서 빠졌다. `screen --query`의 비율 입력(0.2)은 help·`screen fields`가 말하고, 실행기에서 20으로 번역돼 나갔다.
+- ③ SKILL.md는 모든 경로가 쓰는 것만 담는다(머지 시점 4,425자, 공시 절 포함). 명령별 사실은 help와 영수증에 있다.
+- ④ 통째 읽기를 막지 않는다. C20 시험에서 문장이 없어도 지도 범위로 읽었다(읽은 글자 차이 1%).
+- ⑤ 지도는 문서의 신호만 쓴다. 목차는 링크 묶음 규칙으로만 정하고, "Item 1A" 정규식은 없다. NBIS의 1행 표 제목은 set-apart로 오른다.
+- ⑥ 값의 스케일만 바꾼다. 원천 응답은 파일 옆에 두지 않는다.
+
+## 남은 한계
+
+- 효율 합격선(help ≤ 57K)을 못 채웠다(짝 A 80.7K, 짝 B 74.2K). 성진이 수용했다.
+- 짝 A의 correlation은 invest만 불합격이었다. 계산은 맞았고, 최종 표의 두 값을 뒤바꿔 적은 전사 실수였다. 짝 B·C에서는 재현되지 않았다. 짝 C에서는 growth-screen이 invest만 불합격이었다(모델이 덧붙인 확인 조회에서 빈 응답을 받은 두 종목을 답에서 빠뜨림). 두 건 모두 성진이 수용했다.
+- 공시 시나리오의 엄격 채점(덧붙인 주장 하나만 어긋나도 불합격)에서 평가 10/14, 홀드아웃 1/2였다. 실패는 모두 모델의 오독이다. 성진이 수용했다.
+- 통과 런에도 덧붙인 설명의 의미 오류가 남는다. 반올림, 순위, 사상 최고 확대, 근거 없는 단정 같은 것이고, 런마다 종류가 다르다.
+- KO `debtToEquity`의 퍼센트 정규화는 모델 시나리오로 검증하지 못했다. 두 번 모두 모델이 다른 경로로 계산했다. 기록 응답 테스트(`test_units`)가 변환을 증명한다.
+- 받기 마감은 Unix·메인 스레드 계약이다(SIGALRM).
+- Yahoo CDN 사본 경로가 바뀌면 `filing`은 `not_found`·`upstream`으로 실패한다.
+
+## 기본값 교정 문장의 기준 모델
+
+SKILL.md와 help의 기본값 교정 문장은 모두 claude-opus-5-5로 확인했다. 해당 문장은 결과 파일로 계산하기, 잠정 봉, 조건 확인, 인용 지침이다. 모델이 바뀌면 같은 은행(`tests/invest/model-scenarios.json`)과 실행기로 다시 본다.
+
+## 옛 `yahoo/`의 측정 이력 (코드 주석에서 옮김)
+
+- `info.py`: 같은 리프 안의 100배 충돌. 실측 AAPL: `dividendYield` 0.32 = 0.32%, `trailingAnnualDividendYield` 0.0031 = 0.31%, `fiftyTwoWeekChangePercent` 31.26 옆에 `52WeekChange` 0.3126.
+- `info.py`: 52WeekChange는 지수(quoteType INDEX)에서만 퍼센트로 온다(2026-09-27 실측: ^GSPC·^DJI·^IXIC·^N225 모두 fiftyTwoWeekChangePercent와 같은 값). 2026-10-06 재측정에서도 같았고, 지금은 `test_units`·`test_live`가 고정한다.
+- `market.py`: 같은 값을 overview는 `market_weight`, 구성종목 표는 `market weight`로 부른다. ytd return의 실측 raw 3.654가 원천 표기로 "365.40%"다.
+- `prices.py`: 비조정 OHLC 6,270값이 전부 float32 정확값이었다(2026-09-24 AAPL 5y). 옵션 체인은 52%만 float32라 7자리 표시를 선언하지 않는다.
+- 2026-10-06 재측정: KO `dividendYield` 2.48 = `dividendRate` 2.12 / 가격 86.51 × 100(퍼센트), `debtToEquity` 115.5(퍼센트), 스크린 비율 성격 필드 34개 전부 퍼센트 포인트(`scenarios/invest/screen-scales.json`).
+
+## `grep -rn "성진:"` 장부
+
+- `scripts/cli.py`: sector·industry의 region은 ISO 국가 코드이고, 서비스하지 않는 코드에는 Yahoo가 경고 없이 미국 결과를 준다. `DOMAIN_REGIONS`는 실측 목록이고, 바뀌면 `test_live`가 실패한다.
+- `invest/yahoo/prices.py`: 원천 정밀도가 실측된 열만 인라인에서 7자리로 보인다. 파일은 받은 자릿수 전부다.
+- `invest/sec/markup.py`(두 곳, sec에서 이식): 표 주변 문맥은 앞뒤 두 블록이다. 더 먼 제목·단위가 필요한 문서가 나오면 넓히고, 다음 표의 머리 조각이 딸려오면 좁힌다.
