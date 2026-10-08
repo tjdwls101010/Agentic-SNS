@@ -17,9 +17,7 @@ Captured September 8, 2026; request-budget header omitted. Live content and coun
 
 **[Start with Aside installation](#get-started)** → clone this repo → make your first request.
 
-The [SEC skill](.claude/skills/sec/SKILL.md) also reads original EDGAR company filings and exhibits through direct HTTPS. It requires Python 3.11+, `uv`, and your SEC requester identity; Aside and an SNS account are unnecessary. [Set up SEC access](docs/usage.md#sec-edgar).
-
-The [invest skill](.claude/skills/invest/SKILL.md) reads Yahoo Finance prices, financial statements, estimates, holdings, options, screens and calendars through a CLI organized by the data you need, with every value on one scale and each result saved as a file. It runs with `uv`, which prepares the dependencies its script declares, and does not require Aside. [Set up market-data queries](docs/usage.md#yahoo-finance).
+The [invest skill](.claude/skills/invest/SKILL.md) reads Yahoo Finance prices, financial statements, estimates, holdings, options, screens and calendars through a CLI organized by the data you need, with every value on one scale and each result saved as a file, and turns the SEC filing documents Yahoo lists into text files with a map of their contents. It runs with `uv`, which prepares the dependencies its script declares, and does not require Aside. [Set up market-data queries](docs/usage.md#yahoo-finance).
 
 The [Finviz skill](.claude/skills/finviz/SKILL.md) reads public screening, company and market data through Python, `uv` and system curl. It needs no Aside account and runs when you name Finviz or provide a Finviz URL. [Finviz setup](docs/usage.md#finviz).
 
@@ -49,7 +47,7 @@ git clone https://github.com/tjdwls101010/Agentic-SNS.git
 cd Agentic-SNS
 ```
 
-The SNS skills bundle their own scripts and use the Python standard library at runtime. SEC has a separate locked Python environment and invest a script environment, both managed by `uv`; see [SEC setup](docs/usage.md#sec-edgar) or [Yahoo Finance setup](docs/usage.md#yahoo-finance). Git is needed for the clone command.
+The SNS skills bundle their own scripts and use the Python standard library at runtime. invest has a script environment managed by `uv`; see [Yahoo Finance setup](docs/usage.md#yahoo-finance). Git is needed for the clone command.
 
 Start `claude` or `codex` from this directory. Claude Code discovers `.claude/skills`; Codex discovers `.agents/skills`. This repository's `.agents` and `.codex` symlinks both point to `.claude`, so the two hosts share one source without copying skills. See the official [Claude Code](https://code.claude.com/docs/en/skills#where-skills-live) and [Codex](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills) skill documentation. To use the skills from other working directories, see [individual skill installation](docs/usage.md#use-the-skills-in-other-projects).
 
@@ -76,8 +74,7 @@ A successful read prints the profile row shown above, preceded by request and bu
 | Skill | Available reading and navigation |
 |---|---|
 | [finviz](.claude/skills/finviz/SKILL.md) | Public stock screening, company and ETF data, prices, statements, options, markets, numeric maps, calendars, news and insider trades; saved observations are read again with the original selectors and retain definitions, conditions and coverage. |
-| [sec](.claude/skills/sec/SKILL.md) | Company and filing lookup, filing/exhibit search, saved source documents, text and table navigation, and original image links; distinguishes filing dates, report periods, amendments and incomplete reads. |
-| [invest](.claude/skills/invest/SKILL.md) | Market and company data, options, screens and calendars; each receipt names its units, when values were true, what a list covers, which conditions the rows confirm and which targets failed and why. |
+| [invest](.claude/skills/invest/SKILL.md) | Market and company data, options, screens and calendars; each receipt names its units, when values were true, what a list covers, which conditions the rows confirm and which targets failed and why. Filing documents Yahoo lists become a text file and a map of their own contents, tables and links. |
 | [twitter](.claude/skills/twitter/SKILL.md) | X feeds, posts and replies, profiles, search, followers/following, bookmarks/likes, trends, lists, and communities; continuation handles and query recovery. |
 | [reddit](.claude/skills/reddit/SKILL.md) | Feeds, subreddits, posts, comment threads, users, search, subscriptions, saved/upvoted posts; cached comment continuation and resumable exports. |
 | [facebook](.claude/skills/facebook/SKILL.md) | Feeds, posts, comments, profiles and About fields, search, and groups; date windows that say whether they closed, per-call request budgets, resumable collection and query recovery. |

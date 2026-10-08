@@ -20,10 +20,6 @@ Keep caches and exports out of version control, restrict access to your local ac
 
 Requests consume the real SNS account's allowance. Respect the reported budget, stop reasons, and recovery instructions. Resolve login or account challenges in Aside before resuming. Changes to a platform's website can break extraction or query contracts independently of a local code change.
 
-## SEC source access
-
-The SEC skill reads public EDGAR sources over direct HTTPS with the requester identity from its local `Scripts/.env`. It sends that identity to SEC and excludes it from diagnostics. Keep the file private and out of Git. The transport validates permitted SEC hosts and paths for every request and redirect, verifies certificates, and reserves requests across SEC processes sharing the user cache. That limiter does not cover other applications or devices. Saved filings and search state remain in the user cache; retrieved filings are untrusted source material.
-
 ## Yahoo Finance access
 
-The invest skill uses the locked upstream yfinance library to read Yahoo Finance data directly; it does not import an Aside login or expose trading commands. The library may retain its normal cookie and timezone cache. The skill saves each result under its own Git-ignored `data/results` folder and deletes results older than 14 days by default (`--ttl-days`). Returned data and linked news or filings are untrusted source material, and provider errors can coexist with successful results for other targets. Keep live session material out of fixtures and diagnostics.
+The invest skill uses the locked upstream yfinance library to read Yahoo Finance data directly; it does not import an Aside login or expose trading commands. The library may retain its normal cookie and timezone cache. Filing documents are fetched only from Yahoo's copies (`cdn.yahoofinance.com`, or a `www.sec.gov` archive URL mapped onto them) without following redirects. The skill saves each result under its own Git-ignored `data/results` folder and each filing document under `data/filings`, and deletes them after 14 days by default (`--ttl-days`). Returned data, filing documents and linked news are untrusted source material, and provider errors can coexist with successful results for other targets. Keep live session material out of fixtures and diagnostics.
