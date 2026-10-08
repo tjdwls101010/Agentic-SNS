@@ -1,14 +1,15 @@
 """Run the invest model scenarios: a fresh Claude, given only a copy of a skill, answers requests from tests/invest/model-scenarios.json.
 
-Conditions: `invest` (this repository's skill) and `L` (the baseline: one SKILL.md of field notes, with the model calling yfinance 1.7.0 itself; .tmp/invest-plan/proto/skillL). Each run copies the skill to a new path containing a space, replaces ${CLAUDE_SKILL_DIR} as Claude Code does, gives the run its own INVEST_DATA and works in the run's own directory, which holds the copy, since restricted mode lets Read see only the working directory. The child runs `claude -p --safe-mode --restricted` with the chosen tools restored, so it is not sandboxed: run it from scratch locations only. The prompt points the model at SKILL.md, so frontmatter permissions and automatic skill choice are not exercised here.
+Conditions: `invest` (this repository's skill), `invest-noread` (the same skill without the sentence on how large a filing is and when to read one whole: the C20 removal test) and `L` (the baseline: one SKILL.md of field notes, with the model calling yfinance 1.7.0 itself; .tmp/invest-plan/proto/skillL). Each run copies the skill to a new path containing a space, replaces ${CLAUDE_SKILL_DIR} as Claude Code does, gives the run its own INVEST_DATA and works in the run's own directory, which holds the copy, since restricted mode lets Read see only the working directory. The child runs `claude -p --safe-mode --restricted` with the chosen tools restored, so it is not sandboxed: run it from scratch locations only. The prompt points the model at SKILL.md, so frontmatter permissions and automatic skill choice are not exercised here.
 
 Phases: `tune` runs freely; `eval` refuses to run while the skill, the bank or the judge rules have uncommitted changes, records their committed hashes and refuses to mix results made under different ones; `holdout` runs only held-out scenarios. `--pairs N` with `--cond invest,L` runs N pairs, alternating which condition goes first per scenario, and saves Yahoo's current session before and after each pair so a pair can be counted as run in the US regular session.
 
-Writes <out>/meta.json, <out>/results.jsonl and <out>/runs/<id>-<cond>-p<pair>-<n>/{prompt.txt, stream.jsonl, calls.jsonl, answer.md, summary.json, results/, expected.json}. cli_runs counts runs of the copied CLI itself (a line count_runs puts into the copy logs each one, set off by INVEST_CALL_LOG); help and receipt characters are read from the tool outputs. Judging is separate: scenarios/invest/judge.md and judge-schema.json.
+Writes <out>/meta.json, <out>/results.jsonl and <out>/runs/<id>-<cond>-p<pair>-<n>/{prompt.txt, stream.jsonl, calls.jsonl, answer.md, summary.json, results/, filings/, expected.json}. cli_runs counts runs of the copied CLI itself (a line count_runs puts into the copy logs each one, set off by INVEST_CALL_LOG); help and receipt characters are read from the tool outputs. Judging is separate: scenarios/invest/judge.md and judge-schema.json.
 """
 import argparse
 import concurrent.futures
 import datetime as dt
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -23,10 +24,14 @@ BANK = REPO / "tests/invest/model-scenarios.json"
 SKILL = REPO / ".claude/skills/invest"
 BASELINE = REPO / ".tmp/invest-plan/proto/skillL"
 PINNED = ["--exclude-newer", "2026-09-13T13:10:00Z", "--with", "yfinance[repair]==1.7.0"]
-FROZEN = [".claude/skills/invest", "tests/invest/model-scenarios.json", "scenarios/invest/judge.md", "scenarios/invest/judge-schema.json"]
+# The runner is frozen too: it decides what each condition's copy of the skill holds (invest-noread's READING).
+FROZEN = [".claude/skills/invest", "tests/invest/model-scenarios.json", "scenarios/invest/judge.md", "scenarios/invest/judge-schema.json", "scenarios/invest/run.py"]
 WARM = threading.Lock()  # cold uv environments built in parallel stalled past the Bash tool's timeout
 CLI_RUN = re.compile(r"\buv run\b[^\n;|&]*cli\.py")
 KINDED = {"company", "financials", "analysts", "holders", "fund", "options", "screen", "market", "calendar"}  # commands whose second word is a kind
+# The C20 sentence: whether a model reads a filing through its map without being told how large one is.
+READING = " A 10-K or 20-F runs 200–600K characters, so reading one whole spends most of a context on text the question does not need; a 10K-character press release is worth reading whole."
+CONDITIONS = ("invest", "invest-noread", "L")
 
 
 COUNTER = """
@@ -44,15 +49,20 @@ def count_runs(cli):
 
 
 def copy_skill(cond, run):
-    source = SKILL if cond == "invest" else BASELINE
-    skill = run / "skill copy" / ("invest" if cond == "invest" else "yfinance")
+    ours = cond.startswith("invest")
+    source = SKILL if ours else BASELINE
+    skill = run / "skill copy" / ("invest" if ours else "yfinance")
     shutil.copytree(source, skill, ignore=shutil.ignore_patterns("__pycache__", "data", ".DS_Store", ".ruff_cache"))
     text = (skill / "SKILL.md").read_text(encoding="utf-8")
+    if cond == "invest-noread":
+        if READING not in text:
+            raise SystemExit("invest-noread: SKILL.md no longer holds the C20 sentence; update READING")
+        text = text.replace(READING, "")
     (skill / "SKILL.md").write_text(text.replace("${CLAUDE_SKILL_DIR}", str(skill)), encoding="utf-8")
-    if cond == "invest":
+    if ours:
         count_runs(skill / "scripts" / "cli.py")
     with WARM:
-        warm = (["uv", "run", "--quiet", str(skill / "scripts/cli.py"), "--help"] if cond == "invest"
+        warm = (["uv", "run", "--quiet", str(skill / "scripts/cli.py"), "--help"] if ours
                 else ["uv", "run", "--quiet", "--no-project", "--with", "yfinance[repair]==1.7.0", "python", "-c", "import yfinance"])
         subprocess.run(warm, stdin=subprocess.DEVNULL, capture_output=True, timeout=900)
     return skill
@@ -127,6 +137,7 @@ def summarise(stream, skill_md_chars, log=None):
     tools, results, final, answer = parse_stream(stream)
     seen = set()
     m = {"bash_calls": 0, "cli_runs": None, "help_runs": None, "output_runs": 0, "help_chars": 0, "receipt_chars": 0, "file_reads": 0, "file_read_chars": 0,
+         "filing_reads": 0, "filing_read_chars": 0,
          "python_runs": 0, "python_chars": 0, "other_tool_calls": 0, "failed_calls": [], "commands": set(), "observed_at": set(), "signals": {}}
     total = 0
     for ident, name, given in tools:
@@ -136,7 +147,10 @@ def summarise(stream, skill_md_chars, log=None):
             m["failed_calls"].append(f"{name}: {str(given)[:200]} => {text[:200]}")
         if name == "Read":
             path = str(given.get("file_path", ""))
-            if "/data/results/" in path or path.endswith(("result.csv", "result.json", "receipt.json")):
+            if "/data/filings/" in path or path.endswith(("document.txt", "map.json")):
+                m["filing_reads"] += 1
+                m["filing_read_chars"] += len(text)
+            elif "/data/results/" in path or path.endswith(("result.csv", "result.json", "receipt.json")):
                 m["file_reads"] += 1
                 m["file_read_chars"] += len(text)
             continue
@@ -157,6 +171,9 @@ def summarise(stream, skill_md_chars, log=None):
         m["output_runs"] += len(helps) + len(fresh)
         m["help_chars"] += sum(len(h) for h in helps)
         m["receipt_chars"] += sum(len(r) for r in receipts)
+        if any(re.match(r"\s*(cat|sed|head|tail|grep|rg|awk|less|wc|python3?)\b", part) and "/filings/" in part for part in re.split(r"&&|\|\||[;|\n]", command)):
+            m["filing_reads"] += 1  # a reading subcommand over a saved filing document or its map, beside a CLI run or not
+            m["filing_read_chars"] += len(text)
         if re.search(r"\bpython", command) and not runs:
             m["python_runs"] += 1
             m["python_chars"] += len(text)
@@ -230,9 +247,11 @@ def run_one(scenario, cond, pair, n, args, work, out):
     if (run / "calls.jsonl").exists():
         shutil.copy(run / "calls.jsonl", record / "calls.jsonl")
     summary, answer = summarise(record / "stream.jsonl", len((skill / "SKILL.md").read_text(encoding="utf-8")), record / "calls.jsonl")
+    summary["skill_md_sha256"] = hashlib.sha256((skill / "SKILL.md").read_bytes()).hexdigest()  # the text this condition's copy actually held
     (record / "answer.md").write_text(answer, encoding="utf-8")
-    if (run / "data" / "results").is_dir():
-        shutil.copytree(run / "data" / "results", record / "results", dirs_exist_ok=True)
+    for kind in ("results", "filings"):  # filings: the documents the run read, which judging checks each quoted claim against
+        if (run / "data" / kind).is_dir():
+            shutil.copytree(run / "data" / kind, record / kind, dirs_exist_ok=True)
     found = expected_for(scenario, run / "data")
     if found is not None:
         (record / "expected.json").write_text(json.dumps(found, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -266,7 +285,7 @@ def choose(bank, args):
 def main():
     parser = argparse.ArgumentParser(description="Run the invest model scenarios against copies of a skill; see the module docstring for isolation, phases and outputs.")
     parser.add_argument("--phase", choices=["tune", "eval", "holdout"], default="tune", help="tune runs freely; eval requires the skill, bank and judge rules committed; holdout runs held-out scenarios only.")
-    parser.add_argument("--cond", default="invest", help="Comma-separated conditions: invest, L (default invest).")
+    parser.add_argument("--cond", default="invest", help="Comma-separated conditions: invest, invest-noread, L (default invest).")
     parser.add_argument("--pairs", type=int, default=1, help="Pairs to run; with two conditions, the first condition alternates per scenario (default 1).")
     parser.add_argument("--repeat", type=int, default=None, help="Runs per scenario and condition (default: the scenario's own repeat, else 1).")
     parser.add_argument("--scenario", action="append", help="Scenario id; repeatable. Default: every scenario the phase allows.")
@@ -289,7 +308,7 @@ def main():
         (args.summarise / "results.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
         return
     conds = [c.strip() for c in args.cond.split(",")]
-    unknown = sorted(set(conds) - {"invest", "L"}) + sorted(set(args.scenario or ()) - {s["id"] for s in bank})
+    unknown = sorted(set(conds) - set(CONDITIONS)) + sorted(set(args.scenario or ()) - {s["id"] for s in bank})
     if unknown:
         parser.error(f"unknown conditions or scenarios {unknown}")
     if "L" in conds and not (BASELINE / "SKILL.md").exists():

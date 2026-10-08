@@ -25,8 +25,8 @@ def arguments(command):
 def test_the_root_map_fits_a_screen_and_names_every_command():
     root = document()
     assert len(root) <= 2500, len(root)
-    listed = [line.split()[0] for line in root.splitlines()[root.splitlines().index("commands:") + 1:] if line.startswith("  ")][:len(COMMANDS)]
-    assert listed == COMMANDS
+    listed = [line.split()[0] for line in root.splitlines()[root.splitlines().index("commands:") + 1:] if line.startswith("  ")][:len(COMMANDS) + 1]
+    assert listed == COMMANDS + ["filing"]
     assert "COMMAND --help" in root and "exit codes: 0 ok" in root
 
 
@@ -84,8 +84,20 @@ def test_no_document_carries_a_table_of_output_field_units(command):
         assert field not in text, (command, field)
 
 
+def test_the_filing_document_states_its_receipt_file_map_identity_and_formats():
+    text = document("filing")
+    assert len(text) <= 4000, len(text)
+    sections = [line[:-1] for line in text.splitlines() if line.endswith(":") and not line.startswith(" ")]
+    assert sections == ["arguments", "receipt", "the file", "the map", "identity", "formats"]
+    for key in ("status", "receipt_path", "source", "path", "map_path", "lines", "chars", "contents", "headings", "limits", "reused", "trimmed"):
+        assert re.search(rf"\b{key}\b", text), key
+    assert re.search(r"failures \(error\.code\): ([a-z_, ]+);", text)[1].split(", ") == ["invalid", "unsupported", "empty_document", "not_found", "upstream", "local_io"]
+    assert "7 also when every document is unsupported or empty_document." in text
+    assert all(len(line) <= 400 for line in text.splitlines()), "one statement per line, but no paragraph-sized line"
+
+
 def test_help_makes_no_request_and_creates_no_data_folder(tmp_path):
-    for scope in [[]] + [[c] for c in COMMANDS] + [["holders", "institutional"]]:
+    for scope in [[]] + [[c] for c in COMMANDS + ["filing"]] + [["holders", "institutional"]]:
         proc = subprocess.run([sys.executable, str(CLI), *scope, "--help"], capture_output=True, text=True, timeout=60,
                               env=dict(os.environ, INVEST_DATA=str(tmp_path / "data"), PYTHONPATH="", YF_HTTP_FIXTURE=""))
         assert proc.returncode == 0, (scope, proc.stderr[-300:])

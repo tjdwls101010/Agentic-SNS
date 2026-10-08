@@ -1,0 +1,389 @@
+{
+ "method": "Read from the originals with lxml, independently of invest's parser: internal links grouped by their table, or by their nearest block outside tables; a group is the contents when it has 3+ distinct targets, its links follow the targets' document order at least 90% of the time, it comes before its first target, and it has more targets than any other such group. title joins the texts of the group's links to one target; destination is the first 40 characters of text from that target on.",
+ "contents": {
+  "apple.html": [
+   {
+    "title": "Part I",
+    "destination": "This Annual Report on Form 10-K (“Form 1"
+   },
+   {
+    "title": "Item 1. Business 1",
+    "destination": "Item 1. Business Company Background The "
+   },
+   {
+    "title": "Item 1A. Risk Factors 5",
+    "destination": "Item 1A. Risk Factors The Company’s busi"
+   },
+   {
+    "title": "Item 1B. Unresolved Staff Comments 17",
+    "destination": "Item 1B. Unresolved Staff Comments None."
+   },
+   {
+    "title": "Item 1C. Cybersecurity 17",
+    "destination": "Item 1C. Cybersecurity The Company’s man"
+   },
+   {
+    "title": "Item 2. Properties 18",
+    "destination": "Item 2. Properties The Company’s headqua"
+   },
+   {
+    "title": "Item 3. Legal Proceedings 18",
+    "destination": "Item 3. Legal Proceedings Digital Market"
+   },
+   {
+    "title": "Item 4. Mine Safety Disclosures 18",
+    "destination": "Item 4. Mine Safety Disclosures Not appl"
+   },
+   {
+    "title": "Part II",
+    "destination": "PART II Item 5. Market for Registrant’s "
+   },
+   {
+    "title": "Item 5. Market for Registrant’s Common Equity, Related Stockholder Matters and Issuer Purchases of Equity Securities 19",
+    "destination": "Item 5. Market for Registrant’s Common E"
+   },
+   {
+    "title": "Item 6. [Reserved] 20",
+    "destination": "Item 6. [Reserved] Apple Inc. | 2024 For"
+   },
+   {
+    "title": "Item 7. Management’s Discussion and Analysis of Financial Condition and Results of Operations 21",
+    "destination": "Item 7. Management’s Discussion and Anal"
+   },
+   {
+    "title": "Item 7A. Quantitative and Qualitative Disclosures About Market Risk 27",
+    "destination": "Item 7A. Quantitative and Qualitative Di"
+   },
+   {
+    "title": "Item 8. Financial Statements and Supplementary Data 28",
+    "destination": "Item 8. Financial Statements and Supplem"
+   },
+   {
+    "title": "Item 9. Changes in and Disagreements with Accountants on Accounting and Financial Disclosure 51",
+    "destination": "Item 9. Changes in and Disagreements wit"
+   },
+   {
+    "title": "Item 9A. Controls and Procedures 51",
+    "destination": "Item 9A. Controls and Procedures Evaluat"
+   },
+   {
+    "title": "Item 9B. Other Information 52",
+    "destination": "Item 9B. Other Information Insider Tradi"
+   },
+   {
+    "title": "Item 9C. Disclosure Regarding Foreign Jurisdictions that Prevent Inspections 52",
+    "destination": "Item 9C. Disclosure Regarding Foreign Ju"
+   },
+   {
+    "title": "Part III",
+    "destination": "PART III Item 10. Directors, Executive O"
+   },
+   {
+    "title": "Item 10. Directors, Executive Officers and Corporate Governance 52",
+    "destination": "Item 10. Directors, Executive Officers a"
+   },
+   {
+    "title": "Item 11. Executive Compensation 52",
+    "destination": "Item 11. Executive Compensation The info"
+   },
+   {
+    "title": "Item 12 Security Ownership of Certain Beneficial Owners and Management and Related Stockholder Matters 52",
+    "destination": "Item 12. Security Ownership of Certain B"
+   },
+   {
+    "title": "Item 13 Certain Relationships and Related Transactions, and Director Independence 52",
+    "destination": "Item 13. Certain Relationships and Relat"
+   },
+   {
+    "title": "Item 14. Principal Accountant Fees and Services 52",
+    "destination": "Item 14. Principal Accountant Fees and S"
+   },
+   {
+    "title": "Part IV",
+    "destination": "PART IV Item 15. Exhibit and Financial S"
+   },
+   {
+    "title": "Item 15. Exhibit and Financial Statement Schedules 53",
+    "destination": "Item 15. Exhibit and Financial Statement"
+   },
+   {
+    "title": "Item 16. Form 10-K Summary 56",
+    "destination": "Item 16. Form 10-K Summary None. Apple I"
+   }
+  ],
+  "microsoft.html": [
+   {
+    "title": "Business",
+    "destination": "ITEM 1. B USINESS GENERAL Microsoft is a"
+   },
+   {
+    "title": "Information about our Executive Officers",
+    "destination": "INFORMATION ABOUT OUR EXECUTIV E OFFICER"
+   },
+   {
+    "title": "Risk Factors",
+    "destination": "ITEM 1A. RIS K FACTORS Our operations an"
+   },
+   {
+    "title": "Unresolved Staff Comments",
+    "destination": "ITEM 1B. UNRESOLVE D STAFF COMMENTS We h"
+   },
+   {
+    "title": "Cybersecurity",
+    "destination": "ITEM 1C. CY BERSECURITY RISK MANAGEMENT "
+   },
+   {
+    "title": "Properties",
+    "destination": "ITEM 2. PR OPERTIES Our corporate headqu"
+   },
+   {
+    "title": "Legal Proceedings",
+    "destination": "ITEM 3. LEGAL PROCEEDINGS Refer to Note "
+   },
+   {
+    "title": "Mine Safety Disclosures",
+    "destination": "ITEM 4. MINE SAFE TY DISCLOSURES Not app"
+   },
+   {
+    "title": "Market for Registrant’s Common Equity, Related Stockholder Matters, and Issuer Purchases of Equity Securities",
+    "destination": "ITEM 5. MARKET FOR REGISTRANT’S COM MON "
+   },
+   {
+    "title": "[Reserved]",
+    "destination": "ITEM 6. [R ESERVED] 33 PART II Item 7 IT"
+   },
+   {
+    "title": "Management’s Discussion and Analysis of Financial Condition and Results of Operations",
+    "destination": "ITEM 7. MANAGEMENT’S DISCUSSION AND ANAL"
+   },
+   {
+    "title": "Quantitative and Qualitative Disclosures About Market Risk",
+    "destination": "ITEM 7A. QUANTITATIVE AND QUALITAT IVE D"
+   },
+   {
+    "title": "Financial Statements and Supplementary Data",
+    "destination": "ITEM 8. FINANCIAL STATE MENTS AND SUPPLE"
+   },
+   {
+    "title": "Changes in and Disagreements with Accountants on Accounting and Financial Disclosure",
+    "destination": "ITEM 9. CHANGES IN AND DISAGREEMENTS WIT"
+   },
+   {
+    "title": "Controls and Procedures",
+    "destination": "ITEM 9A. CONTROLS AND PROCEDURES Under t"
+   },
+   {
+    "title": "Report of Management on Internal Control over Financial Reporting",
+    "destination": "REPORT OF MANAGEMENT ON INTERNAL C ONTRO"
+   },
+   {
+    "title": "Report of Independent Registered Public Accounting Firm",
+    "destination": "REPORT OF INDEPENDENT REGIST ERED PUBLIC"
+   },
+   {
+    "title": "Other Information",
+    "destination": "ITEM 9B. OTHER INFORMATION Insider Tradi"
+   },
+   {
+    "title": "Disclosure Regarding Foreign Jurisdictions that Prevent Inspections",
+    "destination": "ITEM 9C. DISCLOSURE REGARDING FOREIGN J "
+   },
+   {
+    "title": "Directors, Executive Officers, and Corporate Governance",
+    "destination": "ITEM 10. DIRECTORS, EXECUTIVE OFF ICERS,"
+   },
+   {
+    "title": "Executive Compensation",
+    "destination": "ITEM 11. EXECUTI VE COMPENSATION The inf"
+   },
+   {
+    "title": "Security Ownership of Certain Beneficial Owners and Management and Related Stockholder Matters",
+    "destination": "ITEM 12. SECURITY OWNERSHIP OF CERTAIN B"
+   },
+   {
+    "title": "Certain Relationships and Related Transactions, and Director Independence",
+    "destination": "ITEM 13. CERTAIN RELATIONSHIPS AND RELAT"
+   },
+   {
+    "title": "Principal Accountant Fees and Services",
+    "destination": "ITEM 14. PRINCIPAL ACCOU NTANT FEES AND "
+   },
+   {
+    "title": "Exhibit and Financial Statement Schedules",
+    "destination": "ITEM 15. EXHIBIT AND FINANC IAL STATEMEN"
+   },
+   {
+    "title": "Form 10-K Summary",
+    "destination": "ITEM 16. FORM 10-K SUMMARY None. 100 SIG"
+   },
+   {
+    "title": "Signatures",
+    "destination": "SIGNAT URES Pursuant to the requirements"
+   }
+  ],
+  "mrvl.html": [
+   {
+    "title": "PART I. FINANCIAL INFORMATION",
+    "destination": "Table of Contents PART I: FINANCIAL INFO"
+   },
+   {
+    "title": "Financial Statements:",
+    "destination": "Item 1. Financial Statements MARVELL TEC"
+   },
+   {
+    "title": "Unaudited Condensed Consolidated Balance Sheets as of August 1 , 2026 and January 31, 2026 2",
+    "destination": "MARVELL TECHNOLOGY, INC. UNAUDITED CONDE"
+   },
+   {
+    "title": "Unaudited Condensed Consolidated Statements of Operations for the three and six months ended August 1 , 2026 and 2 , 2025 3 three",
+    "destination": "Table of Contents MARVELL TECHNOLOGY, IN"
+   },
+   {
+    "title": "Unaudited Condensed Consolidated Statements of Comprehensive Income for the three and six months ended August 1 , 2026 and 2 , 2025 4",
+    "destination": "Table of Contents MARVELL TECHNOLOGY, IN"
+   },
+   {
+    "title": "Unaudited Condensed Consolidated Statements of Stockholders’ Equity for the 5",
+    "destination": "Table of Contents MARVELL TECHNOLOGY, IN"
+   },
+   {
+    "title": "Unaudited Condensed Consolidated Statements of Cash Flows for the six months ended August 1 , 2026 and 2 , 2025 7",
+    "destination": "Table of Contents MARVELL TECHNOLOGY, IN"
+   },
+   {
+    "title": "Notes to Unaudited Condensed Consolidated Financial Statements 8",
+    "destination": "Table of Contents MARVELL TECHNOLOGY, IN"
+   },
+   {
+    "title": "Management’s Discussion and Analysis of Financial Condition and Results of Operations 28",
+    "destination": "Table of Contents Item 2. Management’s D"
+   },
+   {
+    "title": "Quantitative and Qualitative Disclosures About Market Risk 37",
+    "destination": "Item 3. Quantitative and Qualitative Dis"
+   },
+   {
+    "title": "Controls and Procedures 38",
+    "destination": "Table of Contents Item 4. Controls and P"
+   },
+   {
+    "title": "PART II. OTHER INFORMATION",
+    "destination": "Table of Contents PART II. OTHER INFORMA"
+   },
+   {
+    "title": "Legal Proceedings 39",
+    "destination": "Item 1. Legal Proceedings The informatio"
+   },
+   {
+    "title": "Risk Factors 39",
+    "destination": "Item 1A. Risk Factors Investing in our c"
+   },
+   {
+    "title": "Unregistered Sales of Equity Securities and Use of Proceeds 69",
+    "destination": "Item 2. Unregistered Sales of Equity Sec"
+   },
+   {
+    "title": "Other Information 70",
+    "destination": "Item 5. Other Information (c) Trading Pl"
+   },
+   {
+    "title": "Exhibits 71",
+    "destination": "Table of Contents Item 6. Exhibits Exhib"
+   },
+   {
+    "title": "Signatures 76",
+    "destination": "SIGNATURES Pursuant to the requirements "
+   }
+  ],
+  "nbis.html": [
+   {
+    "title": "Unaudited Condensed Consolidated Balance Sheets as of December 31, 2025 and June 30, 2026",
+    "destination": "UNAUDITED CONDENSED CONSOLIDATED BALANCE"
+   },
+   {
+    "title": "Unaudited Condensed Consolidated Statements of Operations for the Three and Six Months Ended June 30, 2025 and 2026",
+    "destination": "UNAUDITED CONDENSED CONSOLIDATED STATEME"
+   },
+   {
+    "title": "Unaudited Condensed Consolidated Statements of Comprehensive Income / (Loss) for the Three and Six Months Ended June 30, 2025 and 2026",
+    "destination": "E/(LOSS) (In millions of U.S. dollars (“"
+   },
+   {
+    "title": "Unaudited Condensed Consolidated Statements of Shareholders’ Equity for the Three and Six Months Ended June 30, 2025 and 2026",
+    "destination": "TEMENTS OF SHAREHOLDERS’ EQUITY (In mill"
+   },
+   {
+    "title": "Unaudited Condensed Consolidated Statements of Cash Flows for the Six Months Ended June 30, 2025 and 2026",
+    "destination": "S (In millions of U.S. dollars (“$”))"
+   },
+   {
+    "title": "Notes to the Unaudited Condensed Consolidated Financial Statements",
+    "destination": "(In millions of U.S. dollars (“$”), exce"
+   }
+  ],
+  "asml.html": null
+ },
+ "elements": {
+  "apple.html": {
+   "images": 2,
+   "image_sample": [
+    "aapl-20240928_g1.jpg",
+    "aapl-20240928_g2.jpg"
+   ],
+   "internal_links": 102,
+   "external_links": 64,
+   "external_sample": [
+    "https://www.sec.gov/Archives/edgar/data/320193/000119312520213158/d49399dex31.htm",
+    "https://www.sec.gov/Archives/edgar/data/320193/000114036124038403/ny20033611x2_ex3-2.htm",
+    "a10-kexhibit4109282024.htm"
+   ],
+   "tables": 63
+  },
+  "microsoft.html": {
+   "images": 0,
+   "image_sample": [],
+   "internal_links": 34,
+   "external_links": 53,
+   "external_sample": [
+    "https://www.sec.gov/Archives/edgar/data/789019/000119312516782569/d305147dex31.htm",
+    "https://www.sec.gov/Archives/edgar/data/789019/000119312525154103/d84624dex32.htm",
+    "https://www.sec.gov/Archives/edgar/data/789019/000119312515357088/d97665dex41.htm"
+   ],
+   "tables": 88
+  },
+  "mrvl.html": {
+   "images": 1,
+   "image_sample": [
+    "mrvl-20260801_g1.jpg"
+   ],
+   "internal_links": 153,
+   "external_links": 79,
+   "external_sample": [
+    "https://www.sec.gov/Archives/edgar/data/0001058057/000119312520282762/d42915dex21.htm",
+    "https://www.sec.gov/Archives/edgar/data/0001058057/000105805719000024/q22010q08032019exhibit21.htm",
+    "https://www.sec.gov/Archives/edgar/data/1835632/000119312523071340/d483967dex31.htm"
+   ],
+   "tables": 55
+  },
+  "nbis.html": {
+   "images": 0,
+   "image_sample": [],
+   "internal_links": 40,
+   "external_links": 0,
+   "external_sample": [],
+   "tables": 79
+  },
+  "asml.html": {
+   "images": 12,
+   "image_sample": [
+    "financialstatementsusgaa001.jpg",
+    "financialstatementsusgaa002.jpg",
+    "financialstatementsusgaa003.jpg"
+   ],
+   "internal_links": 0,
+   "external_links": 0,
+   "external_sample": [],
+   "tables": 0
+  }
+ }
+}

@@ -55,5 +55,5 @@ DATASETS = {
     "company.filings": Dataset(
         filings, form="records", preview=filing_preview, units={"epochDate": u(DATETIME, EPOCH), "maxAge": u(COUNT)},
         coverage="the SEC filings Yahoo currently lists for the symbol, newest first; Form 4 and older filings may be absent",
-        notes=("date is the filing date; exhibits map each document type to Yahoo's copy of the SEC document.",)),
+        notes=("date is the filing date; exhibits map document types to Yahoo's copies of the SEC documents, which `filing` reads.",)),
 }

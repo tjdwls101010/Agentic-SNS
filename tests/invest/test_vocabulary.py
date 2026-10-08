@@ -41,4 +41,5 @@ def test_the_kinds_cli_declares_are_the_catalogs_kinds():
         kinds = rest.split("  ")[-1] if " KIND" in line else ""
         declared[typed] = [k.strip() for k in kinds.split("|")] if " KIND" in line else []
     catalog = load.kinds()
+    assert declared.pop("filing") == [], "filing reads SEC documents, not a Yahoo dataset, and takes no KIND"
     assert {c: sorted(k) for c, k in declared.items()} == {c: sorted(k) for c, k in catalog.items()}
