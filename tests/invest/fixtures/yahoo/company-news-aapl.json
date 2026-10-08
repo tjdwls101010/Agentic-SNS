@@ -1,0 +1,1474 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:30:50+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "company",
+   "news",
+   "AAPL",
+   "--limit",
+   "50"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v1/finance/search",
+   "params": {
+    "q": "AAPL",
+    "quotesCount": "0",
+    "enableFuzzyQuery": "False",
+    "newsCount": "50",
+    "quotesQueryId": "tss_match_phrase_query",
+    "newsQueryId": "news_cie_vespa",
+    "listsCount": "0",
+    "enableCb": "True",
+    "enableNavLinks": "False",
+    "enableResearchReports": "False",
+    "enableCulturalAssets": "False",
+    "recommendedCount": "8"
+   },
+   "status": 200,
+   "json": {
+    "explains": [],
+    "count": 47,
+    "quotes": [
+     {
+      "index": "78ddc07626ff4bbcae663e88514c23a0",
+      "name": "AAPlasma",
+      "permalink": "aaplasma",
+      "isYahooFinance": false
+     }
+    ],
+    "news": [
+     {
+      "uuid": "6c61db8a-f02f-3772-baa4-050c11d04722",
+      "title": "Is Taiwan Semiconductor the Best AI Stock to Buy Now?",
+      "publisher": "Motley Fool",
+      "link": "https://finance.yahoo.com/technology/ai/articles/taiwan-semiconductor-best-ai-stock-052000090.html",
+      "providerPublishTime": 1791264000,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/motleyfool.com/5a8ec465344c07e0c003ca3207aefa04.jpg",
+         "width": 1400,
+         "height": 840,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/0669CA54DC947141C05DD7875B10AF52D11E24CA5E43959AD3B4A766C0565BEE/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmotleyfool.com%2F5a8ec465344c07e0c003ca3207aefa04.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "TSM",
+       "NVDA",
+       "AAPL",
+       "AMD"
+      ]
+     },
+     {
+      "uuid": "3654441b-c2b4-3951-87d6-2af7a74fac24",
+      "title": "Here's How Many Shares of Apple You'd Need for $10,000 in Yearly Dividends",
+      "publisher": "Motley Fool",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/heres-many-shares-apple-youd-030655372.html",
+      "providerPublishTime": 1791256015,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/motleyfool.com/4cdee7f7117101b2984f155680950a15.png",
+         "width": 1200,
+         "height": 800,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/29B264F480F878C9244207BC3D5D92CEF2017DAED680D5DEBEE2B10454896531/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmotleyfool.com%2F4cdee7f7117101b2984f155680950a15.png",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL",
+       "NVDA"
+      ]
+     },
+     {
+      "uuid": "835b6a2a-4ba2-3e06-bc2a-ced1a9af66bc",
+      "title": "NYSE’s Parent Just Filed to Tokenize 63 US Stocks on a Crypto-Native Exchange — And the SEC Already Gave It Permission",
+      "publisher": "Forkast News",
+      "link": "https://finance.yahoo.com/markets/crypto/articles/nyse-parent-just-filed-tokenize-025259404.html",
+      "providerPublishTime": 1791255179,
+      "type": "STORY",
+      "relatedTickers": [
+       "NVDA",
+       "TSLA",
+       "AAPL",
+       "MSFT",
+       "AMZN",
+       "WMT",
+       "KO",
+       "CSCO",
+       "MCD"
+      ]
+     },
+     {
+      "uuid": "6fc2b173-fedf-3487-898a-821e226ba334",
+      "title": "Tech Stars’ Market Cap Approaches $25 Trillion",
+      "publisher": "The Wall Street Journal",
+      "link": "https://finance.yahoo.com/m/6fc2b173-fedf-3487-898a-821e226ba334/tech-stars%E2%80%99-market-cap.html",
+      "providerPublishTime": 1791235734,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/wsj.com/7b2c285183be07ca3c4e8242b25a59a8.png",
+         "width": 1200,
+         "height": 630,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/69E5E705C465BC982984B87DFBA9D9F27CF4846DAB42AA4539F0CC74879826D7/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fwsj.com%2F7b2c285183be07ca3c4e8242b25a59a8.png",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "NVDA",
+       "MSFT",
+       "AAPL",
+       "GOOG",
+       "AMZN",
+       "META",
+       "TSLA"
+      ]
+     },
+     {
+      "uuid": "ea648c2f-3d09-3d11-93f7-4b6a601aefcb",
+      "title": "BlackBerry (BB) Lost the Smartphone War. Is QNX Winning Big Enough to Justify the Price?",
+      "publisher": "Insider Monkey",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/blackberry-bb-lost-smartphone-war-210615603.html",
+      "providerPublishTime": 1791234375,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/insidermonkey.com/dd449b00da2bef4568fb1128e93ab85c.jpg",
+         "width": 1280,
+         "height": 720,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/FCB3B6E01DB77C5CB245D577C64233F70645EC6E65D8DA5BA142070757B46EA2/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Finsidermonkey.com%2Fdd449b00da2bef4568fb1128e93ab85c.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "BB",
+       "AAPL",
+       "BB"
+      ]
+     },
+     {
+      "uuid": "687e77fb-486c-339d-9a49-1b7cbc3224cb",
+      "title": "Nvidia Stock Hits Record as Key Supplier’s Revenue Booms on AI Demand",
+      "publisher": "Barrons.com",
+      "link": "https://finance.yahoo.com/m/687e77fb-486c-339d-9a49-1b7cbc3224cb/nvidia-stock-hits-record-as.html",
+      "providerPublishTime": 1791231660,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/Barrons.com/a4e63dc9443edfcc188ba31a30eb7f8e.jpg",
+         "width": 1280,
+         "height": 640,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/7C33DBBC49B2EFB25D8C804ECB8E5F8E31B145BAA6ED23A5B1D330A54A74ACE5/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2FBarrons.com%2Fa4e63dc9443edfcc188ba31a30eb7f8e.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "NVDA",
+       "2317.TW",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "43df4787-4188-347b-903d-b5b750705408",
+      "title": "SpaceX Stock Jumps 7.6%. It’s Now a Super Intelligence Company.",
+      "publisher": "Barrons.com",
+      "link": "https://finance.yahoo.com/m/43df4787-4188-347b-903d-b5b750705408/spacex-stock-jumps-7.6%25.-it%E2%80%99s.html",
+      "providerPublishTime": 1791231360,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/Barrons.com/e3094e25bb447e9a9afc75a942c98a56.jpg",
+         "width": 1280,
+         "height": 640,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/D26A774D92C0713861A5FA97670110AE0EC75A6627E2CC4B2CCB1668C064E026/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2FBarrons.com%2Fe3094e25bb447e9a9afc75a942c98a56.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "SPCX",
+       "TSLA",
+       "AAPL",
+       "^GSPC"
+      ]
+     },
+     {
+      "uuid": "f601391c-9f92-4aeb-9709-a248eb80c00b",
+      "title": "TSMC stock hits all-time high after Elon Musk confirms early Terafab talks",
+      "publisher": "Yahoo Finance",
+      "link": "https://finance.yahoo.com/markets/stocks/article/tsmc-stock-hits-all-time-high-after-elon-musk-confirms-early-terafab-talks-162904771.html",
+      "providerPublishTime": 1791230059,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://s.yimg.com/os/creatr-uploaded-images/2026-07/18c026f0-8132-11f1-bb9d-ea7d18b91fd7",
+         "width": 6000,
+         "height": 4136,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/D89D215EEE54C42EF594CBB3837C64012265E68E448E50BE03DD8EAC614BE7B1/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fs.yimg.com%2Fos%2Fcreatr-uploaded-images%2F2026-07%2F18c026f0-8132-11f1-bb9d-ea7d18b91fd7",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "TSM",
+       "INTC",
+       "TSLA",
+       "SPCX",
+       "AAPL",
+       "NVDA",
+       "AMD",
+       "TSM"
+      ]
+     },
+     {
+      "uuid": "3468ecdb-97e1-33ff-8c49-1980f981220c",
+      "title": "OKX and ICE Plan 24/7 Trading for Tokenized U.S. Stocks",
+      "publisher": "CryptoProwl",
+      "link": "https://finance.yahoo.com/markets/crypto/articles/okx-ice-plan-24-7-180100788.html",
+      "providerPublishTime": 1791223260,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/cryptoprowl_304/98b663d4c024fd0c36be5d00de0bc825.jpg",
+         "width": 1000,
+         "height": 600,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/67D71DCF719089D009F6842709A20989A8320AF653A8D7149A5C18AC5CA4AE79/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fcryptoprowl_304%2F98b663d4c024fd0c36be5d00de0bc825.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "ICE",
+       "CRCL",
+       "MSTR",
+       "NVDA",
+       "TSLA",
+       "AAPL",
+       "MSFT",
+       "SPCX",
+       "COIN",
+       "HOOD",
+       "USDT",
+       "USDG",
+       "USDC",
+       "CBRS",
+       "BTGO",
+       "SECZ",
+       "UNI"
+      ]
+     },
+     {
+      "uuid": "8786745b-e3c6-3647-a020-d7e465cd3d52",
+      "title": "3 US Tech Stocks Investors Are Repricing As Treasury Yields Pressure Growth",
+      "publisher": "Simply Wall St.",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/3-us-tech-stocks-investors-170728410.html",
+      "providerPublishTime": 1791220048,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/simply_wall_st__316/2fb89ed01f3911d46e18d848163ce4ef.jpg",
+         "width": 1600,
+         "height": 900,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/7E9970430EEB669FFBEEA78C2D980607B14F5C343F015863698279B03BDF26CB/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fsimply_wall_st__316%2F2fb89ed01f3911d46e18d848163ce4ef.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "MSFT",
+       "GC=F",
+       "AAPL",
+       "NVDA",
+       "NET",
+       "SNOW"
+      ]
+     },
+     {
+      "uuid": "7acd82dc-0368-3507-83e4-62b9aeb62679",
+      "title": "Nvidia Is 'Tip Of The Spear' For AI Trade, Says Dan Niles — Warns 'At A Certain Point Either The Bond Market's Wrong Or Stock Market Is Wrong'",
+      "publisher": "Stocktwits",
+      "link": "https://finance.yahoo.com/technology/ai/articles/nvidia-tip-spear-ai-trade-165934601.html",
+      "providerPublishTime": 1791219574,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/stocktwits_383/347348c3624fd37e723c54c8e762a76e",
+         "width": 1280,
+         "height": 863,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/BB6981B097F22F14C45429DE1A527C23DF076193F121F3715269C9A6B60EA91B/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fstocktwits_383%2F347348c3624fd37e723c54c8e762a76e",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "NVDA",
+       "GOOG",
+       "AAPL",
+       "META"
+      ]
+     },
+     {
+      "uuid": "7a68b250-31c0-3c6f-8a46-bb42b1a8bc27",
+      "title": "For Sensible Investors, The Worst Performing Mag 7 Should Be a No-Brainer",
+      "publisher": "24/7 Wall St.",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/sensible-investors-worst-performing-mag-164534839.html",
+      "providerPublishTime": 1791218734,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/24_7_wall_st__718/e87a842b2a18ac4aea2b0e1f86683631.jpg",
+         "width": 2560,
+         "height": 1707,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/821287FF22E0444232B82405E160D6AE3C6920995E0251FF1700B5174C827F4F/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2F24_7_wall_st__718%2Fe87a842b2a18ac4aea2b0e1f86683631.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "TSLA",
+       "NVDA",
+       "AAPL",
+       "GOOG",
+       "SPY",
+       "UBER"
+      ]
+     },
+     {
+      "uuid": "f1273782-ac1c-3e62-9aa1-20bf9ca05a40",
+      "title": "Jim Cramer Predicts “Big Move Coming” For Microsoft Stock",
+      "publisher": "24/7 Wall St.",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/jim-cramer-predicts-big-move-153046888.html",
+      "providerPublishTime": 1791214246,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/24_7_wall_st__718/2c38ba9cf95e8a29d4ce8025b517bc6b.jpg",
+         "width": 1366,
+         "height": 767,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/C359E165F0BB11C6B77D1B7DC957A5CC32AD41D658445A2E18DA18C4E31D4355/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2F24_7_wall_st__718%2F2c38ba9cf95e8a29d4ce8025b517bc6b.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "MSFT",
+       "GOOG",
+       "AAPL",
+       "NVDA"
+      ]
+     },
+     {
+      "uuid": "761e1dc6-7d9f-3d24-8e89-b7c124ab7695",
+      "title": "Apple Changes Mac OS to Warn Users About Aggressive AI Agents",
+      "publisher": "TIKR",
+      "link": "https://finance.yahoo.com/technology/ai/articles/apple-changes-mac-os-warn-151610165.html",
+      "providerPublishTime": 1791213370,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/tikr_258/7ecb5661219d0ec9e7b6278f515c8fa9",
+         "width": 1280,
+         "height": 720,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/763734F4919C53C74948808DD93849C61100D295E2DA18A4F2C32F1C57E6B829/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Ftikr_258%2F7ecb5661219d0ec9e7b6278f515c8fa9",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "495ed234-d35f-384e-9f3d-eeaa0df45d0b",
+      "title": "‘I Could Build an Easy Case Against Meta:’ USC Researcher Ranks Which Big Tech Giant Dies First",
+      "publisher": "24/7 Wall St.",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/could-build-easy-case-against-145925723.html",
+      "providerPublishTime": 1791212365,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/24_7_wall_st__718/006b810aba9fc740dfcb90168e04d048.jpg",
+         "width": 1180,
+         "height": 692,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/23004F0EE81CE98AD1DB412D6DA9E4415C9B973A2E2939632A59F085A0768E68/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2F24_7_wall_st__718%2F006b810aba9fc740dfcb90168e04d048.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "META",
+       "ANTH.PVT",
+       "AAPL",
+       "VFFSX",
+       "META PLATFORMS",
+       "GOOG",
+       "AMZN"
+      ]
+     },
+     {
+      "uuid": "b0d42f45-0b75-37ce-81e3-84fc5a5a9ca8",
+      "title": "Prediction: By the End of 2027, Microsoft Will Be More Valuable Than Apple",
+      "publisher": "Motley Fool",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/prediction-end-2027-microsoft-more-145002512.html",
+      "providerPublishTime": 1791211802,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/motleyfool.com/4fc6648a825076d22dca8ac146c408fd.jpg",
+         "width": 1400,
+         "height": 933,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/8600A7C393D71BFC763E3EE9A88F96E80AB830A0F5F01EE2F57BFE7F24B10716/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmotleyfool.com%2F4fc6648a825076d22dca8ac146c408fd.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "MSFT",
+       "AAPL",
+       "NVDA"
+      ]
+     },
+     {
+      "uuid": "59cf3d09-0980-3420-800d-b5493b1d1b70",
+      "title": "Visual Computing Market Report 2026: Global Size, Share, Trends and Growth Forecast to 2030 | Capitalize on AI, Real-Time 3D and AR/VR with NVIDIA, Apple, Microsoft and AMD",
+      "publisher": "GlobeNewswire",
+      "link": "https://finance.yahoo.com/technology/articles/visual-computing-market-report-2026-133700784.html",
+      "providerPublishTime": 1791207420,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/globenewswire.com/93d5b27580f67db722dd7c112e43e8bc.jpg",
+         "width": 480,
+         "height": 58,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/BB9B58157D9D52FE5136EB09C714B2275F8906CDA5F9FF04CECC4362D75E9038/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fglobenewswire.com%2F93d5b27580f67db722dd7c112e43e8bc.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL",
+       "MSFT",
+       "NVDA",
+       "AMD"
+      ]
+     },
+     {
+      "uuid": "43eb02d5-f481-3192-b971-39e48e5ac068",
+      "title": "Global Context-Aware Computing Market Report 2026: Size, Share, Trends and Forecast to 2030 | Capitalize on AI and Edge Growth with Amazon, Apple, Alphabet, Microsoft, and Oracle",
+      "publisher": "GlobeNewswire",
+      "link": "https://finance.yahoo.com/technology/articles/global-context-aware-computing-market-132400336.html",
+      "providerPublishTime": 1791206640,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/globenewswire.com/93d5b27580f67db722dd7c112e43e8bc.jpg",
+         "width": 480,
+         "height": 58,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/BB9B58157D9D52FE5136EB09C714B2275F8906CDA5F9FF04CECC4362D75E9038/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fglobenewswire.com%2F93d5b27580f67db722dd7c112e43e8bc.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL",
+       "GOOG",
+       "AMZN",
+       "MSFT",
+       "ORCL"
+      ]
+     },
+     {
+      "uuid": "9e7a5925-923e-3cd8-9995-74da9578650a",
+      "title": "Human-Computer Interaction Market Report 2026: Global Forecast to 2030 | Capitalize on AI, IoT and Multimodal Interfaces as Apple, Google, Microsoft and Meta Scale a $1.97T Market",
+      "publisher": "GlobeNewswire",
+      "link": "https://finance.yahoo.com/technology/articles/human-computer-interaction-market-report-132300346.html",
+      "providerPublishTime": 1791206580,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/globenewswire.com/93d5b27580f67db722dd7c112e43e8bc.jpg",
+         "width": 480,
+         "height": 58,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/BB9B58157D9D52FE5136EB09C714B2275F8906CDA5F9FF04CECC4362D75E9038/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fglobenewswire.com%2F93d5b27580f67db722dd7c112e43e8bc.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL",
+       "GOOG",
+       "MSFT",
+       "META",
+       "AMZN"
+      ]
+     },
+     {
+      "uuid": "0c94bd3a-0a4e-396a-8b74-790a5efd8700",
+      "title": "Meta Muse: Sparking the AI Revolution",
+      "publisher": "Zacks",
+      "link": "https://finance.yahoo.com/technology/ai/articles/meta-muse-sparking-ai-revolution-132000416.html",
+      "providerPublishTime": 1791206400,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/zacks.com/3308a725c54bb5fbabc29a5469631cfb.jpg",
+         "width": 620,
+         "height": 413,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/E3D119CB1FFC1CC244007F161A84B8E62F5454639F205A3009E1287B8565D23F/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fzacks.com%2F3308a725c54bb5fbabc29a5469631cfb.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "NVDA",
+       "GOOG",
+       "OPAI.PVT",
+       "AAPL",
+       "MDB",
+       "EXPE",
+       "META"
+      ]
+     },
+     {
+      "uuid": "1deff1e2-6ab4-3516-a066-9421b60e882f",
+      "title": "Will Siri Overhaul Help Apple (AAPL) Restore Its AI Credibility?",
+      "publisher": "Insider Monkey",
+      "link": "https://finance.yahoo.com/technology/ai/articles/siri-overhaul-help-apple-aapl-124652463.html",
+      "providerPublishTime": 1791204412,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/insidermonkey.com/62cb46e6eeef5e0adeaa5b81e9188f72.jpg",
+         "width": 800,
+         "height": 1200,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/74A60C75BF24564A8E3C833079290EA6F0FDE7830F954735FD9114A76CECD89A/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Finsidermonkey.com%2F62cb46e6eeef5e0adeaa5b81e9188f72.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "d7a21629-7467-3dec-85e0-27a5cf7c8bc2",
+      "title": "Who’s Worse At AI Monetization, Tesla or Apple?",
+      "publisher": "24/7 Wall St.",
+      "link": "https://finance.yahoo.com/technology/ai/articles/worse-ai-monetization-tesla-apple-124556466.html",
+      "providerPublishTime": 1791204356,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/24_7_wall_st__718/43f0fb5b8e47fa798d331c7447ec736e",
+         "width": 1376,
+         "height": 768,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/083B11897BA28B4DAA0C2FD696D3C84C4C00AA97D67816839334E45A7BD63FE0/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2F24_7_wall_st__718%2F43f0fb5b8e47fa798d331c7447ec736e",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "TSLA",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "21821f17-77ef-3c0a-b12c-1c2878b6038c",
+      "title": "Prediction: Qualcomm Could Be on the Verge of a Major Transformation",
+      "publisher": "24/7 Wall St.",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/prediction-qualcomm-could-verge-major-124542844.html",
+      "providerPublishTime": 1791204342,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/24_7_wall_st__718/82b97906c198aba8ecf69c54eb07f25d.jpg",
+         "width": 785,
+         "height": 500,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/E7C66A88EF206CAA1BC0243FD142BA43712CE81E203B2EFAB073710CD1ABD0D6/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2F24_7_wall_st__718%2F82b97906c198aba8ecf69c54eb07f25d.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "QCOM",
+       "AVGO",
+       "MRVL",
+       "AAPL",
+       "TXN"
+      ]
+     },
+     {
+      "uuid": "d7b0e3f8-c80f-3b32-a310-691823b4cfe2",
+      "title": "Nvidia Gets Another AI Demand Signal As Foxconn Sales Hit Record High – Apple Faces Holiday Test",
+      "publisher": "Stocktwits",
+      "link": "https://finance.yahoo.com/technology/ai/articles/nvidia-gets-another-ai-demand-121803306.html",
+      "providerPublishTime": 1791202683,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/stocktwits_383/546e99e2995bdcbf0105b6203c32dffe",
+         "width": 1000,
+         "height": 750,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/C58BEA3D81CC6E277986404E84FAA2D9C222C7425189BDF532351C4F554A38C5/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fstocktwits_383%2F546e99e2995bdcbf0105b6203c32dffe",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "2317.TW",
+       "NVDA",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "51922e20-fd75-3cc7-8bb0-1846ccdc16f6",
+      "title": "Here’s the 1 ETF I Would Put $1,000 Into This October",
+      "publisher": "24/7 Wall St.",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/1-etf-put-1-000-111502030.html",
+      "providerPublishTime": 1791198902,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/24_7_wall_st__718/cbecd1beefd2c063c7701d81e6e026ca.jpg",
+         "width": 1500,
+         "height": 1000,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/6019B4E921EB725527314663553F23C03C216A6F64E3EED6CBF7B900E8A2892F/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2F24_7_wall_st__718%2Fcbecd1beefd2c063c7701d81e6e026ca.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "QQQ",
+       "NVDA",
+       "SPY",
+       "AAPL",
+       "^GSPC",
+       "MU"
+      ]
+     },
+     {
+      "uuid": "5e24b400-4777-34dc-aa94-fd2f04e3cd51",
+      "title": "As Muse Tops the App Store and Instinct Raises $1 Billion, Snaplii Offers a Separate Wallet for AI Agent Spending, With Cashback",
+      "publisher": "ACCESS Newswire",
+      "link": "https://finance.yahoo.com/technology/ai/articles/muse-tops-app-store-instinct-110000657.html",
+      "providerPublishTime": 1791198000,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/accesswire.ca/571560156f08e54e848351a3e31cf700.jpg",
+         "width": 2400,
+         "height": 1260,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/314BCEAE0DCC0F0CE28A9C672FDAB3E39821E3CA4B22B13CA08C67914A415DF1/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Faccesswire.ca%2F571560156f08e54e848351a3e31cf700.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "META",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "4317d629-3d90-3f46-9581-63ab6df9a011",
+      "title": "The Pentagon Bet $400 Million That One U.S. Company Could Break China’s Rare Earth Monopoly. MP Materials Is About To Deliver GM’s First Rare Earth Magnets Not Made In China",
+      "publisher": "24/7 Wall St.",
+      "link": "https://finance.yahoo.com/energy/articles/pentagon-bet-400-million-one-102631241.html",
+      "providerPublishTime": 1791195991,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/24_7_wall_st__718/3760c3d7a84c4694d016601ac4762c4e.jpg",
+         "width": 2560,
+         "height": 1707,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/613218FCA754DEE30234FDE48AC9CE375F4FF50BBEE07A3DCB1AFF3041E7A4A1/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2F24_7_wall_st__718%2F3760c3d7a84c4694d016601ac4762c4e.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "MP",
+       "AAPL",
+       "GM"
+      ]
+     },
+     {
+      "uuid": "1a3b58a9-9127-351b-ac39-4eb037dac8f2",
+      "title": "Nvidia, Tesla Shares Head for 24/7 Onchain Trading Under OKX and NYSE Owner’s Venture",
+      "publisher": "Unchained",
+      "link": "https://finance.yahoo.com/markets/crypto/articles/nvidia-tesla-shares-head-24-094537514.html",
+      "providerPublishTime": 1791193537,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/unchained_510/47a53804c082ed67d1b140a343bae1ce.png",
+         "width": 1024,
+         "height": 576,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/7831CEE9E0479F1AC6510E219E1BBEBBBDB3561A9ACE34677F7BA8BFD12074ED/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Funchained_510%2F47a53804c082ed67d1b140a343bae1ce.png",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "NVDA",
+       "TSLA",
+       "USDG33793-USD",
+       "AAPL",
+       "MSFT",
+       "AMZN",
+       "COIN",
+       "MSTR",
+       "HOOD",
+       "USDC-USD"
+      ]
+     },
+     {
+      "uuid": "9d34588f-beac-3e6d-8c74-941ec0778bc2",
+      "title": "Where Will Nvidia Stock Be in 2030? Three Scenarios for the World's Most Valuable AI Company",
+      "publisher": "Motley Fool",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/where-nvidia-stock-2030-three-092000986.html",
+      "providerPublishTime": 1791192000,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/motleyfool.com/67e5820b6f3fe225335f191162c54153.png",
+         "width": 1200,
+         "height": 800,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/98E55D7F3BD4CC93AAD334034318BE22DB2D4D6FB156A8F155BE0DCD4EA5A783/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmotleyfool.com%2F67e5820b6f3fe225335f191162c54153.png",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "NVDA",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "c72d1af8-6963-356f-9060-28df81360f31",
+      "title": "Prediction: Alphabet's Profit Growth Carries It to $5 Trillion Before 2028",
+      "publisher": "Motley Fool",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/prediction-alphabets-profit-growth-carries-075701761.html",
+      "providerPublishTime": 1791187021,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/motleyfool.com/ae2d44ea95a54a2f2ffd005300e870f9.jpg",
+         "width": 1400,
+         "height": 840,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/2AE6654B27729DFD269F8A4B1EF4C834E8AB4EF6C292B55F3B7C66336BAC181A/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmotleyfool.com%2Fae2d44ea95a54a2f2ffd005300e870f9.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "GOOG",
+       "NVDA",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "71871fab-dbb7-396f-ae75-baebf49b7e89",
+      "title": "QCOM Gains Overnight After Patent Deal With China’s Huawei Covering AI Chip Tech",
+      "publisher": "Stocktwits",
+      "link": "https://finance.yahoo.com/technology/ai/articles/qcom-gains-overnight-patent-deal-074054209.html",
+      "providerPublishTime": 1791186054,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/stocktwits_383/5d9735561d76580bc2f2923ebd5167d9.jpg",
+         "width": 1000,
+         "height": 750,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/CAAA7AE3E523F8723F81401EE782A23CE20B486794256354B1DCF8E23BB70B43/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fstocktwits_383%2F5d9735561d76580bc2f2923ebd5167d9.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "QCOM",
+       "AMZN",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "4fef654e-c740-33fb-b8a3-405c13ab8468",
+      "title": "Michael Saylor Proves Bitcoin Is Tame With a Chart Where His Own Stock Hits 94%",
+      "publisher": "BeInCrypto",
+      "link": "https://finance.yahoo.com/markets/crypto/articles/michael-saylor-proves-bitcoin-tame-064412496.html",
+      "providerPublishTime": 1791182652,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/beincrypto_us_662/ed0e4c5f4cb3cc4f82e87476f87e7701.png",
+         "width": 1280,
+         "height": 720,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/576683412764C321258382980298BB82264D37D86A718F06EDA11782CFA868D4/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fbeincrypto_us_662%2Fed0e4c5f4cb3cc4f82e87476f87e7701.png",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "MSTR",
+       "BTC-USD",
+       "AMZN",
+       "NVDA",
+       "META",
+       "TSLA",
+       "GOOG",
+       "MSFT",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "157aaad0-be1a-3c03-92db-528c675f9b6c",
+      "title": "Could Investing $5,000 in SpaceX Help Make You a Millionaire?",
+      "publisher": "Motley Fool",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/could-investing-5-000-spacex-015000588.html",
+      "providerPublishTime": 1791165000,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/motleyfool.com/506d30e9b09a637f58a89c727ecc8917.png",
+         "width": 1200,
+         "height": 800,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/29343CDA2E354B6A6D14D214E5B6F7E8F5A5678495E712EDDBC4D9159EA06E86/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmotleyfool.com%2F506d30e9b09a637f58a89c727ecc8917.png",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "SPCX",
+       "NVDA",
+       "AAPL",
+       "AMZN",
+       "MSFT"
+      ]
+     },
+     {
+      "uuid": "305b4c26-d8d3-3214-a574-07e47e4f1f1f",
+      "title": "Apple's biggest AI advantage may face new privacy challenge",
+      "publisher": "TheStreet",
+      "link": "https://finance.yahoo.com/technology/ai/articles/apples-biggest-ai-advantage-may-180300703.html",
+      "providerPublishTime": 1791136980,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/thestreet_881/de53b263c22faf868f93433575fee5a0.jpg",
+         "width": 3840,
+         "height": 2560,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/7D26B1D68516EEA3DEEE0EEB77B98B326F84C0D720829D23F3CB88543F476171/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fthestreet_881%2Fde53b263c22faf868f93433575fee5a0.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "17aa6933-87ff-334c-bf5e-c94e7cf24619",
+      "title": "Amazon Stock Is Underperforming Amid Agentic AI Fears. How to Play AMZN Here.",
+      "publisher": "Barchart",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/amazon-stock-underperforming-amid-agentic-153002081.html",
+      "providerPublishTime": 1791127802,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/barchart_com_477/afaec7a65bcc5585158771b427bbb12e.jpg",
+         "width": 1280,
+         "height": 799,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/AEA343C496E41495EE56F99C7217CF5D618F8DA2E0DA325DE21FAC3C4C390C4E/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fbarchart_com_477%2Fafaec7a65bcc5585158771b427bbb12e.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AMZN",
+       "TSLA",
+       "AAPL",
+       "^GSPC",
+       "NVDA",
+       "^NDX"
+      ]
+     },
+     {
+      "uuid": "abf5deb3-88c4-37b5-9b58-4a992353680e",
+      "title": "LinkDaddy Reports 1.52M AI Crawler Requests to AI Verified Registry",
+      "publisher": "TMX Newsfile",
+      "link": "https://finance.yahoo.com/technology/ai/articles/linkdaddy-reports-1-52m-ai-141900806.html",
+      "providerPublishTime": 1791123540,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/newsfile_64/0440cc6efd04745bb9f241dc9f7c31e0.jpg",
+         "width": 550,
+         "height": 309,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/2000B12376EE69AF1B013571069D30E799C64ADCE8DC1B15C4A735939BC7441A/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fnewsfile_64%2F0440cc6efd04745bb9f241dc9f7c31e0.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "NET",
+       "OPAI.PVT",
+       "META",
+       "AMZN",
+       "AAPL",
+       "ANTH.PVT",
+       "MSFT",
+       "PEAI.PVT",
+       "GOOG"
+      ]
+     },
+     {
+      "uuid": "c31d4c4d-90ab-3481-b0a7-2ed427eff952",
+      "title": "Stock Funds Cling to a 10.3% Gain for 2026",
+      "publisher": "The Wall Street Journal",
+      "link": "https://finance.yahoo.com/m/c31d4c4d-90ab-3481-b0a7-2ed427eff952/stock-funds-cling-to-a-10.3%25.html",
+      "providerPublishTime": 1791122400,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/wsj.com/83a10764c8b2c4b28e477b407515e373.jpg",
+         "width": 1280,
+         "height": 640,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/318281F27930A4F9E0AEDF9C3EE0D329E277AD8CBB50FD044BEFDECFECB685B3/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fwsj.com%2F83a10764c8b2c4b28e477b407515e373.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "LSEG.L",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "34170044-5ac5-3f4b-8e2e-ec81b7258c05",
+      "title": "Here's How Much You'd Need to Invest in VGT to Generate $500 per Month in Dividends",
+      "publisher": "Motley Fool",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/heres-much-youd-invest-vgt-125900381.html",
+      "providerPublishTime": 1791118740,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/motleyfool.com/0331a5f77b0bd8b1ce4abcb0bb923c03.jpg",
+         "width": 1400,
+         "height": 929,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/5125D067AEF6D39A7394B9C55DFEFC56614C3D769622CF4C5B683B7CA1B8581E/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmotleyfool.com%2F0331a5f77b0bd8b1ce4abcb0bb923c03.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "VGT",
+       "MSFT",
+       "NVDA",
+       "AAPL",
+       "AVGO"
+      ]
+     },
+     {
+      "uuid": "1fe37968-471a-3514-a24f-e8244ae19a90",
+      "title": "Analyst Sees 6 Million iPhone Duo Sales This Year. Why That’s Not Enough to Move AAPL Stock.",
+      "publisher": "Barchart",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/analyst-sees-6-million-iphone-125713584.html",
+      "providerPublishTime": 1791118633,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/barchart_com_477/6ffa679c170504e70ccd62eb3554b78c.jpg",
+         "width": 1600,
+         "height": 1063,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/0FF32C114BF8E3C1543311156E905B907609993E65210D68CC2EFE280DE02661/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fbarchart_com_477%2F6ffa679c170504e70ccd62eb3554b78c.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "3145ed52-fbcc-3b81-a109-b87e0762b3a5",
+      "title": "Meta vs. Microsoft: One AI Agent Has a Problem the Other Doesn’t.",
+      "publisher": "Barchart",
+      "link": "https://finance.yahoo.com/technology/ai/articles/meta-vs-microsoft-one-ai-123626389.html",
+      "providerPublishTime": 1791117386,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/barchart_com_477/95f859fc73ecb07f0be79585727c19fd.jpg",
+         "width": 1600,
+         "height": 882,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/5005625191C3801EC7E38E7F22D610ED14498C2FFDF0F8A4664BB542DABFBB25/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fbarchart_com_477%2F95f859fc73ecb07f0be79585727c19fd.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "META",
+       "MSFT",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "73cd22ed-bdb4-3144-b852-c95810d02024",
+      "title": "How Supreme Court Battles Involving Apple, Exxon, and Intel Could Hit Your Portfolio",
+      "publisher": "Barrons.com",
+      "link": "https://finance.yahoo.com/m/73cd22ed-bdb4-3144-b852-c95810d02024/how-supreme-court-battles.html",
+      "providerPublishTime": 1791093600,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/Barrons.com/5cc17c798f1e811849c84b2ccc306eee.jpg",
+         "width": 1280,
+         "height": 640,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/AC3F6EDED697F8EF867B56759D113C63F027B88C7BAE69D4346477A6D2997115/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2FBarrons.com%2F5cc17c798f1e811849c84b2ccc306eee.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "SU",
+       "XOM",
+       "AAPL",
+       "INTC",
+       "APO",
+       "SU"
+      ]
+     },
+     {
+      "uuid": "e09e750c-1a63-3c36-b829-929a5475c34d",
+      "title": "Micron Technology vs. Qualcomm: What Revenue Trends Tell Investors About These Tech Companies",
+      "publisher": "Motley Fool",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/micron-technology-vs-qualcomm-revenue-054012853.html",
+      "providerPublishTime": 1791092412,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/motleyfool.com/1f0880597c2de0fafaf2d488c1b05838.png",
+         "width": 1200,
+         "height": 900,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/AD95039629CBECECD3916B3B1310DCB2150BA2143CDBEEDEA8008FEB7D0B467B/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmotleyfool.com%2F1f0880597c2de0fafaf2d488c1b05838.png",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "QCOM",
+       "MU",
+       "GM",
+       "F",
+       "BMW.DE",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "c9192333-579f-39cd-a654-7511b37cd6cc",
+      "title": "ASML Holding vs. Qualcomm: What Revenue Trends Tell Investors About These Semiconductor Industry Giants",
+      "publisher": "Motley Fool",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/asml-holding-vs-qualcomm-revenue-225232100.html",
+      "providerPublishTime": 1791067952,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/motleyfool.com/3c9428e59d3b32be09f7638e13cfb760.png",
+         "width": 1200,
+         "height": 900,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/86765B56680B8799EA6EDDCA0E45843AD33EED56793C462FE84F05F76B7B6DE0/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmotleyfool.com%2F3c9428e59d3b32be09f7638e13cfb760.png",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "QCOM",
+       "ASML",
+       "TSM",
+       "AMZN",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "2552ea93-eb4d-3b67-837d-ba11a3a66b7e",
+      "title": "Dear Apple Stock Fans, Mark Your Calendars for October 13",
+      "publisher": "Barchart",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/dear-apple-stock-fans-mark-183002230.html",
+      "providerPublishTime": 1791052202,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/barchart_com_477/5c73a52b7903649f6e8fae3cb550b52f.jpg",
+         "width": 1254,
+         "height": 836,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/83D7F2BA130BB2578020F06FBDECF6F698959699B00B334132367F6C85625C13/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fbarchart_com_477%2F5c73a52b7903649f6e8fae3cb550b52f.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "9b60870f-d95f-39f7-9978-288408eb8a69",
+      "title": "This Stock Posted the Best Performance in the “Magnificent Seven” in September. (Hint: It’s Not Nvidia.)",
+      "publisher": "Motley Fool",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/stock-posted-best-performance-magnificent-133001553.html",
+      "providerPublishTime": 1791034201,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/motleyfool.com/d75662c9147ff3a97a560223ceff5026.jpg",
+         "width": 1400,
+         "height": 933,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/D9E1F6D2C31406C4CE6D9A7B96C78F27479F58F92369D639D2198E978EB79767/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmotleyfool.com%2Fd75662c9147ff3a97a560223ceff5026.jpg",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "NVDA",
+       "AMZN",
+       "AAPL"
+      ]
+     },
+     {
+      "uuid": "1c34ab3f-f09c-362a-9a2d-3f769aff73c5",
+      "title": "MarketBeat Week in Review – 09/28 - 10/02",
+      "publisher": "MarketBeat",
+      "link": "https://finance.yahoo.com/markets/stocks/articles/marketbeat-week-review-09-28-110000437.html",
+      "providerPublishTime": 1791025200,
+      "type": "STORY",
+      "thumbnail": {
+       "resolutions": [
+        {
+         "url": "https://media.zenfs.com/en/marketbeat_955/fc8bde4201301e28f56f9c7dc10e889e.png",
+         "width": 1024,
+         "height": 572,
+         "tag": "original"
+        },
+        {
+         "url": "https://s.yimg.com/lo/mysterio/api/DAB752F5E5261B46C4ADAC501E964DAEFBF71EF20ADC5195CBA7F8F52733B3BF/subgraphmysterio/resizefill_w140_h140/https:%2F%2Fmedia.zenfs.com%2Fen%2Fmarketbeat_955%2Ffc8bde4201301e28f56f9c7dc10e889e.png",
+         "width": 140,
+         "height": 140,
+         "tag": "140x140"
+        }
+       ]
+      },
+      "relatedTickers": [
+       "KMX",
+       "CL=F",
+       "AAPL",
+       "NFLX",
+       "FRVO",
+       "ORCL",
+       "RKLB",
+       "WMT",
+       "BA",
+       "NOC",
+       "ORLY",
+       "META",
+       "FUN",
+       "CRWV",
+       "KMX\nNASDAQ",
+       "TSM",
+       "FWRG",
+       "MCD",
+       "AVGO",
+       "SBUX"
+      ]
+     }
+    ],
+    "nav": [],
+    "lists": [],
+    "researchReports": [],
+    "screenerFieldResults": [],
+    "totalTime": 65,
+    "timeTakenForQuotes": 425,
+    "timeTakenForNews": 600,
+    "timeTakenForAlgowatchlist": 400,
+    "timeTakenForPredefinedScreener": 400,
+    "timeTakenForCrunchbase": 400,
+    "timeTakenForNav": 0,
+    "timeTakenForResearchReports": 0,
+    "timeTakenForQuestions": 0,
+    "timeTakenForScreenerField": 0,
+    "timeTakenForCulturalAssets": 0,
+    "timeTakenForSearchLists": 0
+   }
+  }
+ ]
+}

@@ -1,0 +1,511 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:30:25+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "quote",
+   "TM"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v10/finance/quoteSummary/TM",
+   "params": {
+    "modules": "financialData,quoteType,defaultKeyStatistics,assetProfile,summaryDetail",
+    "symbol": "TM"
+   },
+   "status": 200,
+   "json": {
+    "quoteSummary": {
+     "result": [
+      {
+       "assetProfile": {
+        "address1": "1 Toyota-cho",
+        "city": "Toyota",
+        "zip": "471-8571",
+        "country": "Japan",
+        "phone": "81 565 28 2121",
+        "website": "https://global.toyota",
+        "industry": "Auto Manufacturers",
+        "industryKey": "auto-manufacturers",
+        "industryDisp": "Auto Manufacturers",
+        "sector": "Consumer Cyclical",
+        "sectorKey": "consumer-cyclical",
+        "sectorDisp": "Consumer Cyclical",
+        "longBusinessSummary": "Toyota Motor Corporation designs, manufactures, assembles, and sells passenger vehicles, minivans and commercial vehicles, and related parts and accessories in Japan, North America, Europe, Asia, Central and South America, Oceania, Africa, the Middle East, and internationally. The company operates through Automotive, Financial Services, and All Other segments. The company offers subcompact and compact cars; mini-vehicles; mid-size, luxury, sports, and specialty cars; recreational and sport-utility vehicles; pickup trucks; minivans; trucks; and buses. It also develops and sells battery and hybrid electric vehicles and batteries. In addition, the company provides financial services, such as retail financing and leasing, wholesale financing, insurance, and credit cards. Further, it operates GAZOO.com, a web portal for automobile information, as well as engages in telecommunications and other businesses. It offers vehicles under the Toyota and Lexus brand names. It has strategic manufacturing alliance with Joby Aviation, Inc. to establish a joint venture to realize air mobility. Toyota Motor Corporation was founded in 1933 and is headquartered in Toyota, Japan.",
+        "fullTimeEmployees": 367990,
+        "companyOfficers": [
+         {
+          "maxAge": 1,
+          "name": "Mr. Yoichi  Miyazaki",
+          "age": 62,
+          "title": "CFO, Operating Officer, Executive VP & Director",
+          "yearBorn": 1963,
+          "fiscalYear": 2026,
+          "totalPay": {
+           "raw": 1699120,
+           "fmt": "1.7M",
+           "longFmt": "1,699,120"
+          },
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Hiroki  Nakajima",
+          "age": 63,
+          "title": "Operating Officer, Executive VP, CTO & Director",
+          "yearBorn": 1962,
+          "fiscalYear": 2026,
+          "totalPay": {
+           "raw": 1667420,
+           "fmt": "1.67M",
+           "longFmt": "1,667,420"
+          },
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Koji  Sato",
+          "age": 56,
+          "title": "Vice Chairman & Chief Industry Officer",
+          "yearBorn": 1969,
+          "fiscalYear": 2026,
+          "totalPay": {
+           "raw": 2402860,
+           "fmt": "2.4M",
+           "longFmt": "2,402,860"
+          },
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Kenta  Kon",
+          "age": 57,
+          "title": "President, CEO & Representative Director",
+          "yearBorn": 1968,
+          "fiscalYear": 2026,
+          "totalPay": {
+           "raw": 684720,
+           "fmt": "684.72k",
+           "longFmt": "684,720"
+          },
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Takanori  Azuma",
+          "title": "Chief Risk Officer & Chief Officer of Accounting Group",
+          "fiscalYear": 2026,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Dr. Gill A.  Pratt",
+          "title": "Chief Scientist, CEO & Executive Fellow of Toyota Research Institute, Inc.",
+          "fiscalYear": 2026,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Masahiro  Yamamoto",
+          "title": "Chief Officer of General Administration & Human Resources Group",
+          "fiscalYear": 2026,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Hirofumi  Muta",
+          "age": 69,
+          "title": "Chief Officer -Safety & Health Promotion, Plant & Environmental Engg Divs, Production Control Group",
+          "yearBorn": 1956,
+          "fiscalYear": 2026,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Nobuhiko  Murakami",
+          "age": 66,
+          "title": "Senior Managing Officer & CEO of East Asia, Oceania & Middle East Region",
+          "yearBorn": 1959,
+          "fiscalYear": 2026,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Shigeki  Tomoyama",
+          "age": 67,
+          "title": "Executive Fellow & CEO of Japan Business Group",
+          "yearBorn": 1958,
+          "fiscalYear": 2026,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         }
+        ],
+        "compensationAsOfEpochDate": 1798675200,
+        "irWebsite": "http://www.toyota-global.com/investors/",
+        "executiveTeam": [],
+        "maxAge": 86400
+       },
+       "summaryDetail": {
+        "maxAge": 1,
+        "priceHint": 2,
+        "previousClose": 181.49,
+        "open": 183.24,
+        "dayLow": 183.1101,
+        "dayHigh": 184.8,
+        "regularMarketPreviousClose": 181.49,
+        "regularMarketOpen": 183.24,
+        "regularMarketDayLow": 183.1101,
+        "regularMarketDayHigh": 184.8,
+        "dividendRate": 6.27,
+        "dividendYield": 0.034,
+        "exDividendDate": 1774915200,
+        "payoutRatio": 0.2585,
+        "fiveYearAvgDividendYield": 2.74,
+        "beta": 0.375,
+        "trailingPE": 8.089631,
+        "forwardPE": 11.667934,
+        "volume": 333048,
+        "regularMarketVolume": 333048,
+        "averageVolume": 370949,
+        "averageVolume10days": 282480,
+        "averageDailyVolume10Day": 282480,
+        "bid": 0.0,
+        "ask": 0.0,
+        "bidSize": 10000,
+        "askSize": 10000,
+        "marketCap": 218031849472,
+        "nonDilutedMarketCap": 227484611613,
+        "fiftyTwoWeekLow": 166.1,
+        "fiftyTwoWeekHigh": 248.9,
+        "allTimeHigh": 255.23,
+        "allTimeLow": 3.237711,
+        "fulldayPrice": 184.12,
+        "fulldayChange": 3.0299988,
+        "fulldayChangePercent": 0.016695127,
+        "priceToSalesTrailing12Months": 0.004196388,
+        "fiftyDayAverage": 190.681,
+        "twoHundredDayAverage": 201.38655,
+        "trailingAnnualDividendRate": 95.0,
+        "trailingAnnualDividendYield": 0.52344483,
+        "currency": "USD",
+        "fromCurrency": null,
+        "toCurrency": null,
+        "lastMarket": null,
+        "coinMarketCapLink": null,
+        "algorithm": null,
+        "tradeable": false
+       },
+       "defaultKeyStatistics": {
+        "maxAge": 1,
+        "priceHint": 2,
+        "enterpriseValue": 35011220733952,
+        "profitMargins": 0.0863,
+        "floatShares": 17469641423,
+        "sharesOutstanding": 1184183366,
+        "sharesShort": 1035053,
+        "sharesShortPriorMonth": 974286,
+        "sharesShortPreviousMonthDate": 1786665600,
+        "dateShortInterest": 1789430400,
+        "sharesPercentSharesOut": 0.00090000004,
+        "heldPercentInsiders": 4.0000003e-05,
+        "heldPercentInstitutions": 0.02226,
+        "shortRatio": 3.04,
+        "shortPercentOfFloat": 0.00090000004,
+        "beta": 0.375,
+        "impliedSharesOutstanding": 1184183366,
+        "category": null,
+        "bookValue": 12.29717,
+        "priceToBook": 14.97255,
+        "fundFamily": null,
+        "legalType": null,
+        "lastFiscalYearEnd": 1774915200,
+        "nextFiscalYearEnd": 1806451200,
+        "mostRecentQuarter": 1782777600,
+        "earningsQuarterlyGrowth": 0.756,
+        "netIncomeToCommon": 4483796959232,
+        "trailingEps": 22.76,
+        "forwardEps": 15.78,
+        "pegRatio": 1.56,
+        "lastSplitFactor": "11:10",
+        "lastSplitDate": 677808000,
+        "enterpriseToRevenue": 0.674,
+        "enterpriseToEbitda": 6.251,
+        "52WeekChange": -0.09205061,
+        "SandP52WeekChange": 0.1457566,
+        "lastDividendValue": 3.457,
+        "lastDividendDate": 1743379200,
+        "latestShareClass": null,
+        "leadInvestor": null
+       },
+       "quoteType": {
+        "exchange": "NYQ",
+        "quoteType": "EQUITY",
+        "symbol": "TM",
+        "underlyingSymbol": "TM",
+        "shortName": "Toyota Motor Corporation",
+        "longName": "Toyota Motor Corporation",
+        "firstTradeDateEpochUtc": 322151400,
+        "timeZoneFullName": "America/New_York",
+        "timeZoneShortName": "EDT",
+        "uuid": "ac7a4fbd-0d78-3d94-b434-54817e1c208c",
+        "messageBoardId": "finmb_319676",
+        "gmtOffSetMilliseconds": -14400000,
+        "maxAge": 1
+       },
+       "financialData": {
+        "maxAge": 86400,
+        "currentPrice": 184.12,
+        "targetHighPrice": 239.31209,
+        "targetLowPrice": 230.0,
+        "targetMeanPrice": 234.07802,
+        "targetMedianPrice": 233.5,
+        "recommendationKey": "none",
+        "numberOfAnalystOpinions": 4,
+        "totalCash": 13350560858112,
+        "totalCashPerShare": 704.629,
+        "ebitda": 5600540884992,
+        "totalDebt": 43953168580608,
+        "quickRatio": 0.953,
+        "currentRatio": 1.169,
+        "totalRevenue": 51957024686080,
+        "debtToEquity": 114.974,
+        "revenuePerShare": 2530.0994,
+        "returnOnAssets": 0.02339,
+        "returnOnEquity": 0.12404,
+        "grossProfits": 8711846232064,
+        "freeCashflow": -3599962472448,
+        "operatingCashflow": 4132990091264,
+        "earningsGrowth": 0.869,
+        "revenueGrowth": 0.104,
+        "grossMargins": 0.16767,
+        "ebitdaMargins": 0.10779,
+        "operatingMargins": 0.07863,
+        "profitMargins": 0.0863,
+        "financialCurrency": "JPY"
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/v7/finance/quote",
+   "params": {
+    "symbols": "TM"
+   },
+   "status": 200,
+   "json": {
+    "quoteResponse": {
+     "result": [
+      {
+       "language": "en-US",
+       "region": "US",
+       "quoteType": "EQUITY",
+       "typeDisp": "Equity",
+       "quoteSourceName": "Delayed Quote",
+       "triggerable": true,
+       "customPriceAlertConfidence": "HIGH",
+       "currency": "USD",
+       "corporateActions": [],
+       "postMarketTime": 1791236355,
+       "regularMarketTime": 1791230402,
+       "longName": "Toyota Motor Corporation",
+       "shortName": "Toyota Motor Corporation",
+       "marketState": "PREPRE",
+       "exchange": "NYQ",
+       "messageBoardId": "finmb_319676",
+       "exchangeTimezoneName": "America/New_York",
+       "exchangeTimezoneShortName": "EDT",
+       "gmtOffSetMilliseconds": -14400000,
+       "market": "us_market",
+       "esgPopulated": false,
+       "hasPrePostMarketData": true,
+       "firstTradeDateMilliseconds": 322151400000,
+       "priceHint": 2,
+       "postMarketChangePercent": -0.8549298,
+       "postMarketPrice": 182.5459,
+       "postMarketChange": -1.5740967,
+       "regularMarketChange": 2.62999,
+       "regularMarketChangePercent": 1.44911,
+       "fulldayChange": 3.0299988,
+       "fulldayChangePercent": 1.6695127,
+       "fulldayPrice": 184.12,
+       "regularMarketPrice": 184.12,
+       "regularMarketDayHigh": 184.8,
+       "regularMarketDayRange": "183.1101 - 184.8",
+       "regularMarketDayLow": 183.1101,
+       "regularMarketVolume": 333048,
+       "regularMarketPreviousClose": 181.49,
+       "bid": 0.0,
+       "ask": 0.0,
+       "bidSize": 100,
+       "askSize": 100,
+       "fullExchangeName": "NYSE",
+       "financialCurrency": "JPY",
+       "regularMarketOpen": 183.24,
+       "averageDailyVolume3Month": 370949,
+       "averageDailyVolume10Day": 282480,
+       "fiftyTwoWeekLowChange": 18.019989,
+       "fiftyTwoWeekLowChangePercent": 0.10848879,
+       "fiftyTwoWeekRange": "166.1 - 248.9",
+       "fiftyTwoWeekHighChange": -64.78,
+       "fiftyTwoWeekHighChangePercent": -0.26026517,
+       "fiftyTwoWeekLow": 166.1,
+       "fiftyTwoWeekHigh": 248.9,
+       "fiftyTwoWeekChangePercent": -9.205061,
+       "dividendDate": 1780876800,
+       "earningsTimestamp": 1793881800,
+       "earningsTimestampStart": 1793881800,
+       "earningsTimestampEnd": 1793881800,
+       "earningsCallTimestampStart": 1785819600,
+       "earningsCallTimestampEnd": 1785819600,
+       "isEarningsDateEstimate": false,
+       "trailingAnnualDividendRate": 95.0,
+       "trailingPE": 8.089631,
+       "dividendRate": 6.27,
+       "trailingAnnualDividendYield": 0.52344483,
+       "dividendYield": 3.4,
+       "epsTrailingTwelveMonths": 22.76,
+       "epsForward": 15.78,
+       "sharesOutstanding": 1184183366,
+       "impliedSharesOutstanding": 1184183366,
+       "bookValue": 12.29717,
+       "fiftyDayAverage": 190.681,
+       "fiftyDayAverageChange": -6.5610046,
+       "fiftyDayAverageChangePercent": -0.034408275,
+       "twoHundredDayAverage": 201.38655,
+       "twoHundredDayAverageChange": -17.266556,
+       "twoHundredDayAverageChangePercent": -0.085738376,
+       "marketCap": 218031849472,
+       "forwardPE": 11.667934,
+       "priceToBook": 14.97255,
+       "sourceInterval": 15,
+       "exchangeDataDelayedBy": 0,
+       "tradeable": false,
+       "cryptoTradeable": false,
+       "displayName": "Toyota Motor",
+       "symbol": "TM"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/ws/fundamentals-timeseries/v1/finance/timeseries/TM",
+   "params": {
+    "symbol": "TM",
+    "type": "trailingPegRatio"
+   },
+   "status": 200,
+   "json": {
+    "timeseries": {
+     "result": [
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "trailingPegRatio"
+        ]
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  }
+ ]
+}

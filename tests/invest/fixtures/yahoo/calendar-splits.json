@@ -1,0 +1,341 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:32:24+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "calendar",
+   "splits",
+   "--start",
+   "2026-10-05",
+   "--end",
+   "2026-10-09",
+   "--limit",
+   "25"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v1/finance/visualization",
+   "params": {},
+   "status": 200,
+   "body": {
+    "sortType": "DESC",
+    "entityIdType": "splits",
+    "sortField": "startdatetime",
+    "includeFields": [
+     "ticker",
+     "companyshortname",
+     "startdatetime",
+     "optionable",
+     "old_share_worth",
+     "share_worth"
+    ],
+    "size": 25,
+    "offset": 0,
+    "query": {
+     "operator": "AND",
+     "operands": [
+      {
+       "operator": "GTE",
+       "operands": [
+        "startdatetime",
+        "2026-10-05"
+       ]
+      },
+      {
+       "operator": "LTE",
+       "operands": [
+        "startdatetime",
+        "2026-10-10"
+       ]
+      }
+     ]
+    }
+   },
+   "json": {
+    "finance": {
+     "result": [
+      {
+       "criteriaMeta": {
+        "size": 25,
+        "offset": 0,
+        "sortField": "startdatetime",
+        "sortType": "DESC",
+        "entityIdType": "SPLITS",
+        "criteria": [
+         {
+          "field": "startdatetime",
+          "subField": null,
+          "operators": [
+           "GTE"
+          ],
+          "values": [
+           "2026-10-05T00:00:00.000-04:00"
+          ],
+          "labelsSelected": [],
+          "dependentValues": []
+         },
+         {
+          "field": "startdatetime",
+          "subField": null,
+          "operators": [
+           "LTE"
+          ],
+          "values": [
+           "2026-10-10T00:00:00.000-04:00"
+          ],
+          "labelsSelected": [],
+          "dependentValues": []
+         }
+        ],
+        "topOperator": "AND"
+       },
+       "rawCriteria": "{\"sortType\":\"DESC\",\"entityIdType\":\"splits\",\"sortField\":\"startdatetime\",\"includeFields\":[\"ticker\",\"companyshortname\",\"startdatetime\",\"optionable\",\"old_share_worth\",\"share_worth\"],\"size\":25,\"offset\":0,\"query\":{\"operator\":\"AND\",\"operands\":[{\"operator\":\"GTE\",\"operands\":[\"startdatetime\",\"2026-10-05\"]},{\"operator\":\"LTE\",\"operands\":[\"startdatetime\",\"2026-10-10\"]}]}}",
+       "total": 92,
+       "documents": [
+        {
+         "entityIdType": "SPLITS",
+         "columns": [
+          {
+           "id": "ticker",
+           "label": "Symbol",
+           "type": "STRING"
+          },
+          {
+           "id": "companyshortname",
+           "label": "Company",
+           "type": "STRING"
+          },
+          {
+           "id": "startdatetime",
+           "label": "Payable On",
+           "type": "DATE"
+          },
+          {
+           "id": "optionable",
+           "label": "Optionable?",
+           "type": "BOOLEAN"
+          },
+          {
+           "id": "old_share_worth",
+           "label": "Old Share Worth",
+           "type": "NUMBER"
+          },
+          {
+           "id": "share_worth",
+           "label": "Share Worth",
+           "type": "NUMBER"
+          }
+         ],
+         "rows": [
+          [
+           "0O6D.IL",
+           "Miquel y Costas & Miquel SA",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           5,
+           6
+          ],
+          [
+           "7183.T",
+           "Anshin Guarantor Service Co Ltd",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           3377178,
+           1
+          ],
+          [
+           "AGR.VN",
+           "Agribank Securities JSC",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           100,
+           106
+          ],
+          [
+           "DWAHY",
+           "Daiwa House Industry Co Ltd",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           1,
+           2
+          ],
+          [
+           "HDB.VN",
+           "Ho Chi Minh City Development Joint Stock Commercial Bank",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           10000,
+           18125
+          ],
+          [
+           "IBI0.F",
+           "Ibiden Co Ltd",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           1,
+           2
+          ],
+          [
+           "IBIDY",
+           "Ibiden Co Ltd",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           1,
+           2
+          ],
+          [
+           "IMHDY",
+           "Isetan Mitsukoshi Holdings Ltd",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           1,
+           2
+          ],
+          [
+           "KI50.F",
+           "Kioxia Holdings Corp",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           1,
+           3
+          ],
+          [
+           "KXIAY",
+           "Kioxia Holdings Corp",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           1,
+           3
+          ],
+          [
+           "MCM.MC",
+           "Miquel y Costas & Miquel SA",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           5,
+           6
+          ],
+          [
+           "MCMe.XC",
+           "Miquel y Costas & Miquel SA",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           5,
+           6
+          ],
+          [
+           "MJEM-X.CN",
+           "Mijem Newcomm Tech Inc",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           10,
+           1
+          ],
+          [
+           "MOLDTECH.BO",
+           "Mold-Tek Technologies Ltd",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           1,
+           2
+          ],
+          [
+           "MOLDTECH.NS",
+           "Mold-Tek Technologies Ltd",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           1,
+           2
+          ],
+          [
+           "MOLDTKPAC.BO",
+           "Mold-tek Packaging Ltd",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           1,
+           2
+          ],
+          [
+           "MOLDTKPAC.NS",
+           "Mold-tek Packaging Ltd",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           1,
+           2
+          ],
+          [
+           "MQ4.F",
+           "Miquel y Costas & Miquel SA",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           5,
+           6
+          ],
+          [
+           "MQ4.SG",
+           "Miquel y Costas & Miquel SA",
+           "2026-10-09T04:00:00.000Z",
+           false,
+           5,
+           6
+          ],
+          [
+           "203400.KQ",
+           "ABION Inc",
+           "2026-10-08T04:00:00.000Z",
+           false,
+           5,
+           1
+          ],
+          [
+           "307870.KQ",
+           "B2En Co Ltd",
+           "2026-10-08T04:00:00.000Z",
+           false,
+           5,
+           1
+          ],
+          [
+           "3625.TWO",
+           "C-Tech United Corp",
+           "2026-10-08T04:00:00.000Z",
+           false,
+           1000,
+           508
+          ],
+          [
+           "ANT.VN",
+           "An Giang Fruit - Vegetables & Foodstuff JSC",
+           "2026-10-08T04:00:00.000Z",
+           false,
+           5,
+           6
+          ],
+          [
+           "BUILDPRO.BO",
+           "Shankara Buildpro Ltd",
+           "2026-10-08T04:00:00.000Z",
+           false,
+           1,
+           5
+          ],
+          [
+           "BUILDPRO.NS",
+           "Shankara Buildpro Ltd",
+           "2026-10-08T04:00:00.000Z",
+           false,
+           1,
+           5
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "error": null
+    }
+   }
+  }
+ ]
+}

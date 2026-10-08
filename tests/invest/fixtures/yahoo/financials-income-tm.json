@@ -1,0 +1,4010 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:30:54+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "financials",
+   "income",
+   "TM"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/ws/fundamentals-timeseries/v1/finance/timeseries/TM",
+   "params": {
+    "symbol": "TM",
+    "type": "annualTaxEffectOfUnusualItems,annualTaxRateForCalcs,annualNormalizedEBITDA,annualNormalizedDilutedEPS,annualNormalizedBasicEPS,annualTotalUnusualItems,annualTotalUnusualItemsExcludingGoodwill,annualNetIncomeFromContinuingOperationNetMinorityInterest,annualReconciledDepreciation,annualReconciledCostOfRevenue,annualEBITDA,annualEBIT,annualNetInterestIncome,annualInterestExpense,annualInterestIncome,annualContinuingAndDiscontinuedDilutedEPS,annualContinuingAndDiscontinuedBasicEPS,annualNormalizedIncome,annualNetIncomeFromContinuingAndDiscontinuedOperation,annualTotalExpenses,annualRentExpenseSupplemental,annualReportedNormalizedDilutedEPS,annualReportedNormalizedBasicEPS,annualTotalOperatingIncomeAsReported,annualDividendPerShare,annualDilutedAverageShares,annualBasicAverageShares,annualDilutedEPS,annualDilutedEPSOtherGainsLosses,annualTaxLossCarryforwardDilutedEPS,annualDilutedAccountingChange,annualDilutedExtraordinary,annualDilutedDiscontinuousOperations,annualDilutedContinuousOperations,annualBasicEPS,annualBasicEPSOtherGainsLosses,annualTaxLossCarryforwardBasicEPS,annualBasicAccountingChange,annualBasicExtraordinary,annualBasicDiscontinuousOperations,annualBasicContinuousOperations,annualDilutedNIAvailtoComStockholders,annualAverageDilutionEarnings,annualNetIncomeCommonStockholders,annualOtherunderPreferredStockDividend,annualPreferredStockDividends,annualNetIncome,annualMinorityInterests,annualNetIncomeIncludingNoncontrollingInterests,annualNetIncomeFromTaxLossCarryforward,annualNetIncomeExtraordinary,annualNetIncomeDiscontinuousOperations,annualNetIncomeContinuousOperations,annualEarningsFromEquityInterestNetOfTax,annualTaxProvision,annualPretaxIncome,annualOtherIncomeExpense,annualOtherNonOperatingIncomeExpenses,annualSpecialIncomeCharges,annualGainOnSaleOfPPE,annualGainOnSaleOfBusiness,annualOtherSpecialCharges,annualWriteOff,annualImpairmentOfCapitalAssets,annualRestructuringAndMergernAcquisition,annualSecuritiesAmortization,annualEarningsFromEquityInterest,annualGainOnSaleOfSecurity,annualNetNonOperatingInterestIncomeExpense,annualTotalOtherFinanceCost,annualInterestExpenseNonOperating,annualInterestIncomeNonOperating,annualOperatingIncome,annualOperatingExpense,annualOtherOperatingExpenses,annualOtherTaxes,annualProvisionForDoubtfulAccounts,annualDepreciationAmortizationDepletionIncomeStatement,annualDepletionIncomeStatement,annualDepreciationAndAmortizationInIncomeStatement,annualAmortization,annualAmortizationOfIntangiblesIncomeStatement,annualDepreciationIncomeStatement,annualResearchAndDevelopment,annualSellingGeneralAndAdministration,annualSellingAndMarketingExpense,annualGeneralAndAdministrativeExpense,annualOtherGandA,annualInsuranceAndClaims,annualRentAndLandingFees,annualSalariesAndWages,annualGrossProfit,annualCostOfRevenue,annualTotalRevenue,annualExciseTaxes,annualOperatingRevenue,annualLossAdjustmentExpense,annualNetPolicyholderBenefitsAndClaims,annualPolicyholderBenefitsGross,annualPolicyholderBenefitsCeded,annualOccupancyAndEquipment,annualProfessionalExpenseAndContractServicesExpense,annualOtherNonInterestExpense"
+   },
+   "status": 200,
+   "json": {
+    "timeseries": {
+     "result": [
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualGrossProfit"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualGrossProfit": [
+        {
+         "dataId": 20046,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 6313016000000.0,
+          "fmt": "6.31T"
+         }
+        },
+        {
+         "dataId": 20046,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 9368318000000.0,
+          "fmt": "9.37T"
+         }
+        },
+        {
+         "dataId": 20046,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 9578038000000.0,
+          "fmt": "9.58T"
+         }
+        },
+        {
+         "dataId": 20046,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 8463740000000.0,
+          "fmt": "8.46T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualAverageDilutionEarnings"
+        ]
+       },
+       "timestamp": [
+        1648684800,
+        1680220800,
+        1711843200
+       ],
+       "annualAverageDilutionEarnings": [
+        {
+         "dataId": 20385,
+         "asOfDate": "2022-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 23000000.0,
+          "fmt": "23.00M"
+         }
+        },
+        {
+         "dataId": 20385,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 0.0,
+          "fmt": "0.00"
+         }
+        },
+        {
+         "dataId": 20385,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 0.0,
+          "fmt": "0.00"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualOtherIncomeExpense"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualOtherIncomeExpense": [
+        {
+         "dataId": 20117,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 798778000000.0,
+          "fmt": "798.78B"
+         }
+        },
+        {
+         "dataId": 20117,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1095801000000.0,
+          "fmt": "1.10T"
+         }
+        },
+        {
+         "dataId": 20117,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1373449000000.0,
+          "fmt": "1.37T"
+         }
+        },
+        {
+         "dataId": 20117,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1005368000000.0,
+          "fmt": "1.01T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualOperatingIncome"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualOperatingIncome": [
+        {
+         "dataId": 20109,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2725026000000.0,
+          "fmt": "2.73T"
+         },
+         "businessSegmentData": [
+          {
+           "dataValue": 103451000000.0,
+           "segmentType": "Business",
+           "segmentName": "All Other",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 2180637000000.0,
+           "segmentType": "Business",
+           "segmentName": "Automotive",
+           "isPrimarySegment": 1
+          },
+          {
+           "dataValue": 437516000000.0,
+           "segmentType": "Business",
+           "segmentName": "Financial Services",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 3420000000.0,
+           "segmentType": "Business",
+           "segmentName": "Inter-segment Elimination/ Unallocated Amount",
+           "isPrimarySegment": 0
+          }
+         ]
+        },
+        {
+         "dataId": 20109,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 5352935000000.0,
+          "fmt": "5.35T"
+         },
+         "businessSegmentData": [
+          {
+           "dataValue": 175241000000.0,
+           "segmentType": "Business",
+           "segmentName": "All Other",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 4621475000000.0,
+           "segmentType": "Business",
+           "segmentName": "Automotive",
+           "isPrimarySegment": 1
+          },
+          {
+           "dataValue": 570023000000.0,
+           "segmentType": "Business",
+           "segmentName": "Financial Services",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": -13805000000.0,
+           "segmentType": "Business",
+           "segmentName": "Inter-segment Elimination/ Unallocated Amount",
+           "isPrimarySegment": 0
+          }
+         ]
+        },
+        {
+         "dataId": 20109,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4795586000000.0,
+          "fmt": "4.80T"
+         },
+         "businessSegmentData": [
+          {
+           "dataValue": 181194000000.0,
+           "segmentType": "Business",
+           "segmentName": "All Other",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 3940278000000.0,
+           "segmentType": "Business",
+           "segmentName": "Automotive",
+           "isPrimarySegment": 1
+          },
+          {
+           "dataValue": 683519000000.0,
+           "segmentType": "Business",
+           "segmentName": "Financial Services",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": -9405000000.0,
+           "segmentType": "Business",
+           "segmentName": "Inter-segment Elimination/ Unallocated Amount",
+           "isPrimarySegment": 0
+          }
+         ]
+        },
+        {
+         "dataId": 20109,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3766216000000.0,
+          "fmt": "3.77T"
+         },
+         "businessSegmentData": [
+          {
+           "dataValue": 132079000000.0,
+           "segmentType": "Business",
+           "segmentName": "All Other",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 2777049000000.0,
+           "segmentType": "Business",
+           "segmentName": "Automotive",
+           "isPrimarySegment": 1
+          },
+          {
+           "dataValue": 851722000000.0,
+           "segmentType": "Business",
+           "segmentName": "Financial Services",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 5366000000.0,
+           "segmentType": "Business",
+           "segmentName": "Inter-segment Elimination/ Unallocated Amount",
+           "isPrimarySegment": 0
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualInterestExpenseNonOperating"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualInterestExpenseNonOperating": [
+        {
+         "dataId": 20064,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 47356000000.0,
+          "fmt": "47.36B"
+         }
+        },
+        {
+         "dataId": 20064,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 64733000000.0,
+          "fmt": "64.73B"
+         }
+        },
+        {
+         "dataId": 20064,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 84106000000.0,
+          "fmt": "84.11B"
+         }
+        },
+        {
+         "dataId": 20064,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 60293000000.0,
+          "fmt": "60.29B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNormalizedIncome"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualNormalizedIncome": [
+        {
+         "dataId": 20316,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2292317680000.0,
+          "fmt": "2.29T"
+         }
+        },
+        {
+         "dataId": 20316,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4715797912000.0,
+          "fmt": "4.72T"
+         }
+        },
+        {
+         "dataId": 20316,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4148267931000.0,
+          "fmt": "4.15T"
+         }
+        },
+        {
+         "dataId": 20316,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3440831355000.0,
+          "fmt": "3.44T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualTotalRevenue"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualTotalRevenue": [
+        {
+         "dataId": 20100,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 37154298000000.0,
+          "fmt": "37.15T"
+         }
+        },
+        {
+         "dataId": 20100,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 45095325000000.0,
+          "fmt": "45.10T"
+         }
+        },
+        {
+         "dataId": 20100,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 48036704000000.0,
+          "fmt": "48.04T"
+         }
+        },
+        {
+         "dataId": 20100,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 50684952000000.0,
+          "fmt": "50.68T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDilutedEPS"
+        ]
+       },
+       "timestamp": [
+        1743379200,
+        1751241600,
+        1759190400,
+        1774915200
+       ],
+       "annualDilutedEPS": [
+        {
+         "dataId": 29009,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3595.6,
+          "fmt": "3.60k"
+         }
+        },
+        {
+         "dataId": 29009,
+         "asOfDate": "2025-06-30",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3251.3,
+          "fmt": "3.25k"
+         }
+        },
+        {
+         "dataId": 29009,
+         "asOfDate": "2025-09-30",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3534.8,
+          "fmt": "3.53k"
+         }
+        },
+        {
+         "dataId": 29009,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2952.5,
+          "fmt": "2.95k"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNetInterestIncome"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualNetInterestIncome": [
+        {
+         "dataId": 20095,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 144928000000.0,
+          "fmt": "144.93B"
+         }
+        },
+        {
+         "dataId": 20095,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 516350000000.0,
+          "fmt": "516.35B"
+         }
+        },
+        {
+         "dataId": 20095,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 245554000000.0,
+          "fmt": "245.55B"
+         }
+        },
+        {
+         "dataId": 20095,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 381412000000.0,
+          "fmt": "381.41B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualGainOnSaleOfSecurity"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualGainOnSaleOfSecurity": [
+        {
+         "dataId": 20219,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 233824000000.0,
+          "fmt": "233.82B"
+         }
+        },
+        {
+         "dataId": 20219,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 314746000000.0,
+          "fmt": "314.75B"
+         }
+        },
+        {
+         "dataId": 20219,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 825727000000.0,
+          "fmt": "825.73B"
+         }
+        },
+        {
+         "dataId": 20219,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 526865000000.0,
+          "fmt": "526.87B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualEBITDA"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualEBITDA": [
+        {
+         "dataId": 20190,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 5755993000000.0,
+          "fmt": "5.76T"
+         }
+        },
+        {
+         "dataId": 20190,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 9116884000000.0,
+          "fmt": "9.12T"
+         }
+        },
+        {
+         "dataId": 20190,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 8749929000000.0,
+          "fmt": "8.75T"
+         }
+        },
+        {
+         "dataId": 20190,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 7605808000000.0,
+          "fmt": "7.61T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualBasicAverageShares"
+        ]
+       },
+       "timestamp": [
+        1743379200,
+        1751241600,
+        1759190400,
+        1774915200
+       ],
+       "annualBasicAverageShares": [
+        {
+         "dataId": 29010,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1325245600.0,
+          "fmt": "1.33B"
+         }
+        },
+        {
+         "dataId": 29010,
+         "asOfDate": "2025-06-30",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1314339926.0,
+          "fmt": "1.31B"
+         }
+        },
+        {
+         "dataId": 29010,
+         "asOfDate": "2025-09-30",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1306100425.0,
+          "fmt": "1.31B"
+         }
+        },
+        {
+         "dataId": 29010,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1303327400.0,
+          "fmt": "1.30B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualTaxProvision"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualTaxProvision": [
+        {
+         "dataId": 20145,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1175765000000.0,
+          "fmt": "1.18T"
+         }
+        },
+        {
+         "dataId": 20145,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1893665000000.0,
+          "fmt": "1.89T"
+         }
+        },
+        {
+         "dataId": 20145,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1624835000000.0,
+          "fmt": "1.62T"
+         }
+        },
+        {
+         "dataId": 20145,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1167234000000.0,
+          "fmt": "1.17T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualReconciledCostOfRevenue"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualReconciledCostOfRevenue": [
+        {
+         "dataId": 20314,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 30841282000000.0,
+          "fmt": "30.84T"
+         }
+        },
+        {
+         "dataId": 20314,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 35727007000000.0,
+          "fmt": "35.73T"
+         }
+        },
+        {
+         "dataId": 20314,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 38458666000000.0,
+          "fmt": "38.46T"
+         }
+        },
+        {
+         "dataId": 20314,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 42221212000000.0,
+          "fmt": "42.22T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualMinorityInterests"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualMinorityInterests": [
+        {
+         "dataId": 20087,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": -41650000000.0,
+          "fmt": "-41.65B"
+         }
+        },
+        {
+         "dataId": 20087,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": -126488000000.0,
+          "fmt": "-126.49B"
+         }
+        },
+        {
+         "dataId": 20087,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": -24670000000.0,
+          "fmt": "-24.67B"
+         }
+        },
+        {
+         "dataId": 20087,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": -137664000000.0,
+          "fmt": "-137.66B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualTotalUnusualItemsExcludingGoodwill"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualTotalUnusualItemsExcludingGoodwill": [
+        {
+         "dataId": 20417,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 233824000000.0,
+          "fmt": "233.82B"
+         }
+        },
+        {
+         "dataId": 20417,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 314746000000.0,
+          "fmt": "314.75B"
+         }
+        },
+        {
+         "dataId": 20417,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 825727000000.0,
+          "fmt": "825.73B"
+         }
+        },
+        {
+         "dataId": 20417,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 526865000000.0,
+          "fmt": "526.87B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualEBIT"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualEBIT": [
+        {
+         "dataId": 20189,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3716089000000.0,
+          "fmt": "3.72T"
+         }
+        },
+        {
+         "dataId": 20189,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 7029818000000.0,
+          "fmt": "7.03T"
+         }
+        },
+        {
+         "dataId": 20189,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 6498696000000.0,
+          "fmt": "6.50T"
+         }
+        },
+        {
+         "dataId": 20189,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 5213289000000.0,
+          "fmt": "5.21T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualOtherunderPreferredStockDividend"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualBasicEPS"
+        ]
+       },
+       "timestamp": [
+        1743379200,
+        1751241600,
+        1759190400,
+        1774915200
+       ],
+       "annualBasicEPS": [
+        {
+         "dataId": 29004,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3595.6,
+          "fmt": "3.60k"
+         }
+        },
+        {
+         "dataId": 29004,
+         "asOfDate": "2025-06-30",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3251.3,
+          "fmt": "3.25k"
+         }
+        },
+        {
+         "dataId": 29004,
+         "asOfDate": "2025-09-30",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3534.8,
+          "fmt": "3.53k"
+         }
+        },
+        {
+         "dataId": 29004,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2952.5,
+          "fmt": "2.95k"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualTotalUnusualItems"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualTotalUnusualItems": [
+        {
+         "dataId": 20416,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 233824000000.0,
+          "fmt": "233.82B"
+         }
+        },
+        {
+         "dataId": 20416,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 314746000000.0,
+          "fmt": "314.75B"
+         }
+        },
+        {
+         "dataId": 20416,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 825727000000.0,
+          "fmt": "825.73B"
+         }
+        },
+        {
+         "dataId": 20416,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 526865000000.0,
+          "fmt": "526.87B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualTotalExpenses"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualTotalExpenses": [
+        {
+         "dataId": 20164,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 34429272000000.0,
+          "fmt": "34.43T"
+         }
+        },
+        {
+         "dataId": 20164,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 39742390000000.0,
+          "fmt": "39.74T"
+         }
+        },
+        {
+         "dataId": 20164,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 43241118000000.0,
+          "fmt": "43.24T"
+         }
+        },
+        {
+         "dataId": 20164,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 46918736000000.0,
+          "fmt": "46.92T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualEarningsFromEquityInterest"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualEarningsFromEquityInterest": [
+        {
+         "dataId": 20208,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 643063000000.0,
+          "fmt": "643.06B"
+         }
+        },
+        {
+         "dataId": 20208,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 763137000000.0,
+          "fmt": "763.14B"
+         }
+        },
+        {
+         "dataId": 20208,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 591219000000.0,
+          "fmt": "591.22B"
+         }
+        },
+        {
+         "dataId": 20208,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 552742000000.0,
+          "fmt": "552.74B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNetIncomeContinuousOperations"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualNetIncomeContinuousOperations": [
+        {
+         "dataId": 20094,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2492967000000.0,
+          "fmt": "2.49T"
+         }
+        },
+        {
+         "dataId": 20094,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 5071421000000.0,
+          "fmt": "5.07T"
+         }
+        },
+        {
+         "dataId": 20094,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4789755000000.0,
+          "fmt": "4.79T"
+         }
+        },
+        {
+         "dataId": 20094,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3985761000000.0,
+          "fmt": "3.99T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualPretaxIncome"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualPretaxIncome": [
+        {
+         "dataId": 20136,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3668733000000.0,
+          "fmt": "3.67T"
+         }
+        },
+        {
+         "dataId": 20136,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 6965085000000.0,
+          "fmt": "6.97T"
+         }
+        },
+        {
+         "dataId": 20136,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 6414590000000.0,
+          "fmt": "6.41T"
+         }
+        },
+        {
+         "dataId": 20136,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 5152996000000.0,
+          "fmt": "5.15T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualCostOfRevenue"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualCostOfRevenue": [
+        {
+         "dataId": 20013,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 30841282000000.0,
+          "fmt": "30.84T"
+         }
+        },
+        {
+         "dataId": 20013,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 35727007000000.0,
+          "fmt": "35.73T"
+         }
+        },
+        {
+         "dataId": 20013,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 38458666000000.0,
+          "fmt": "38.46T"
+         }
+        },
+        {
+         "dataId": 20013,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 42221212000000.0,
+          "fmt": "42.22T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNetIncome"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualNetIncome": [
+        {
+         "dataId": 20091,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2451318000000.0,
+          "fmt": "2.45T"
+         }
+        },
+        {
+         "dataId": 20091,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4944933000000.0,
+          "fmt": "4.94T"
+         }
+        },
+        {
+         "dataId": 20091,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4765086000000.0,
+          "fmt": "4.77T"
+         }
+        },
+        {
+         "dataId": 20091,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3848098000000.0,
+          "fmt": "3.85T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualInterestIncomeNonOperating"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualInterestIncomeNonOperating": [
+        {
+         "dataId": 20075,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 234102000000.0,
+          "fmt": "234.10B"
+         }
+        },
+        {
+         "dataId": 20075,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 454688000000.0,
+          "fmt": "454.69B"
+         }
+        },
+        {
+         "dataId": 20075,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 364628000000.0,
+          "fmt": "364.63B"
+         }
+        },
+        {
+         "dataId": 20075,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 311519000000.0,
+          "fmt": "311.52B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNetIncomeFromContinuingAndDiscontinuedOperation"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualNetIncomeFromContinuingAndDiscontinuedOperation": [
+        {
+         "dataId": 20309,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2451318000000.0,
+          "fmt": "2.45T"
+         }
+        },
+        {
+         "dataId": 20309,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4944933000000.0,
+          "fmt": "4.94T"
+         }
+        },
+        {
+         "dataId": 20309,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4765086000000.0,
+          "fmt": "4.77T"
+         }
+        },
+        {
+         "dataId": 20309,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3848098000000.0,
+          "fmt": "3.85T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualOperatingExpense"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualOperatingExpense": [
+        {
+         "dataId": 20108,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3587990000000.0,
+          "fmt": "3.59T"
+         }
+        },
+        {
+         "dataId": 20108,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4015383000000.0,
+          "fmt": "4.02T"
+         }
+        },
+        {
+         "dataId": 20108,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4782452000000.0,
+          "fmt": "4.78T"
+         }
+        },
+        {
+         "dataId": 20108,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4697524000000.0,
+          "fmt": "4.70T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNormalizedEBITDA"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualNormalizedEBITDA": [
+        {
+         "dataId": 20420,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 5522169000000.0,
+          "fmt": "5.52T"
+         }
+        },
+        {
+         "dataId": 20420,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 8802138000000.0,
+          "fmt": "8.80T"
+         }
+        },
+        {
+         "dataId": 20420,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 7924202000000.0,
+          "fmt": "7.92T"
+         }
+        },
+        {
+         "dataId": 20420,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 7078943000000.0,
+          "fmt": "7.08T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualInterestIncome"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualInterestIncome": [
+        {
+         "dataId": 20177,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 234102000000.0,
+          "fmt": "234.10B"
+         }
+        },
+        {
+         "dataId": 20177,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 454688000000.0,
+          "fmt": "454.69B"
+         }
+        },
+        {
+         "dataId": 20177,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 364628000000.0,
+          "fmt": "364.63B"
+         }
+        },
+        {
+         "dataId": 20177,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 311519000000.0,
+          "fmt": "311.52B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualOtherNonOperatingIncomeExpenses"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualOtherNonOperatingIncomeExpenses": [
+        {
+         "dataId": 20412,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": -78109000000.0,
+          "fmt": "-78.11B"
+         }
+        },
+        {
+         "dataId": 20412,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 17918000000.0,
+          "fmt": "17.92B"
+         }
+        },
+        {
+         "dataId": 20412,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": -43497000000.0,
+          "fmt": "-43.50B"
+         }
+        },
+        {
+         "dataId": 20412,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": -74239000000.0,
+          "fmt": "-74.24B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualSellingGeneralAndAdministration"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualSellingGeneralAndAdministration": [
+        {
+         "dataId": 20159,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3587990000000.0,
+          "fmt": "3.59T"
+         }
+        },
+        {
+         "dataId": 20159,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4015383000000.0,
+          "fmt": "4.02T"
+         }
+        },
+        {
+         "dataId": 20159,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4782452000000.0,
+          "fmt": "4.78T"
+         }
+        },
+        {
+         "dataId": 20159,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4697524000000.0,
+          "fmt": "4.70T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualTotalOtherFinanceCost"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualTotalOtherFinanceCost": [
+        {
+         "dataId": 20368,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 41818000000.0,
+          "fmt": "41.82B"
+         }
+        },
+        {
+         "dataId": 20368,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": -126395000000.0,
+          "fmt": "-126.39B"
+         }
+        },
+        {
+         "dataId": 20368,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 34968000000.0,
+          "fmt": "34.97B"
+         }
+        },
+        {
+         "dataId": 20368,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": -130186000000.0,
+          "fmt": "-130.19B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualEarningsFromEquityInterestNetOfTax"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDilutedNIAvailtoComStockholders"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualDilutedNIAvailtoComStockholders": [
+        {
+         "dataId": 20424,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2451318000000.0,
+          "fmt": "2.45T"
+         }
+        },
+        {
+         "dataId": 20424,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4944933000000.0,
+          "fmt": "4.94T"
+         }
+        },
+        {
+         "dataId": 20424,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4765086000000.0,
+          "fmt": "4.77T"
+         }
+        },
+        {
+         "dataId": 20424,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3848098000000.0,
+          "fmt": "3.85T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualTotalOperatingIncomeAsReported"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualTotalOperatingIncomeAsReported": [
+        {
+         "dataId": 20435,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2725025000000.0,
+          "fmt": "2.73T"
+         }
+        },
+        {
+         "dataId": 20435,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 5352934000000.0,
+          "fmt": "5.35T"
+         }
+        },
+        {
+         "dataId": 20435,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4795586000000.0,
+          "fmt": "4.80T"
+         }
+        },
+        {
+         "dataId": 20435,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3766216000000.0,
+          "fmt": "3.77T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualTaxEffectOfUnusualItems"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualTaxEffectOfUnusualItems": [
+        {
+         "dataId": 20419,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 74823680000.0,
+          "fmt": "74.82B"
+         }
+        },
+        {
+         "dataId": 20419,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 85610912000.0,
+          "fmt": "85.61B"
+         }
+        },
+        {
+         "dataId": 20419,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 208908931000.0,
+          "fmt": "208.91B"
+         }
+        },
+        {
+         "dataId": 20419,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 119598355000.0,
+          "fmt": "119.60B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNetIncomeCommonStockholders"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualNetIncomeCommonStockholders": [
+        {
+         "dataId": 20093,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2451318000000.0,
+          "fmt": "2.45T"
+         }
+        },
+        {
+         "dataId": 20093,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4944933000000.0,
+          "fmt": "4.94T"
+         }
+        },
+        {
+         "dataId": 20093,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4765086000000.0,
+          "fmt": "4.77T"
+         }
+        },
+        {
+         "dataId": 20093,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3848098000000.0,
+          "fmt": "3.85T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNetIncomeIncludingNoncontrollingInterests"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualNetIncomeIncludingNoncontrollingInterests": [
+        {
+         "dataId": 20346,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2492967000000.0,
+          "fmt": "2.49T"
+         }
+        },
+        {
+         "dataId": 20346,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 5071421000000.0,
+          "fmt": "5.07T"
+         }
+        },
+        {
+         "dataId": 20346,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4789755000000.0,
+          "fmt": "4.79T"
+         }
+        },
+        {
+         "dataId": 20346,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3985761000000.0,
+          "fmt": "3.99T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNetNonOperatingInterestIncomeExpense"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualNetNonOperatingInterestIncomeExpense": [
+        {
+         "dataId": 20077,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 144928000000.0,
+          "fmt": "144.93B"
+         }
+        },
+        {
+         "dataId": 20077,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 516350000000.0,
+          "fmt": "516.35B"
+         }
+        },
+        {
+         "dataId": 20077,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 245554000000.0,
+          "fmt": "245.55B"
+         }
+        },
+        {
+         "dataId": 20077,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 381412000000.0,
+          "fmt": "381.41B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualOperatingRevenue"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualOperatingRevenue": [
+        {
+         "dataId": 20112,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 37154298000000.0,
+          "fmt": "37.15T"
+         },
+         "businessSegmentData": [
+          {
+           "dataValue": 1224943000000.0,
+           "segmentType": "Business",
+           "segmentName": "All Other",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 33820000000000.0,
+           "segmentType": "Business",
+           "segmentName": "Automotive",
+           "isPrimarySegment": 1
+          },
+          {
+           "dataValue": 2809647000000.0,
+           "segmentType": "Business",
+           "segmentName": "Financial Services",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": -700293000000.0,
+           "segmentType": "Business",
+           "segmentName": "Inter-segment Elimination/ Unallocated Amount",
+           "isPrimarySegment": 0
+          }
+         ],
+         "geographicSegmentData": [
+          {
+           "dataValue": 7150555000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "Asia",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 3970857000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "Europe",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 6742304000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "Japan",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 13578084000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "North America",
+           "isPrimarySegment": 1
+          },
+          {
+           "dataValue": 5712497000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "Other",
+           "isPrimarySegment": 0
+          }
+         ]
+        },
+        {
+         "dataId": 20112,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 45095325000000.0,
+          "fmt": "45.10T"
+         },
+         "businessSegmentData": [
+          {
+           "dataValue": 1368164000000.0,
+           "segmentType": "Business",
+           "segmentName": "All Other",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 41266204000000.0,
+           "segmentType": "Business",
+           "segmentName": "Automotive",
+           "isPrimarySegment": 1
+          },
+          {
+           "dataValue": 3484198000000.0,
+           "segmentType": "Business",
+           "segmentName": "Financial Services",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": -1023242000000.0,
+           "segmentType": "Business",
+           "segmentName": "Inter-segment Elimination/ Unallocated Amount",
+           "isPrimarySegment": 0
+          }
+         ],
+         "geographicSegmentData": [
+          {
+           "dataValue": 7742141000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "Asia",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 5396610000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "Europe",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 7399192000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "Japan",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 17694375000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "North America",
+           "isPrimarySegment": 1
+          },
+          {
+           "dataValue": 6863007000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "Other",
+           "isPrimarySegment": 0
+          }
+         ]
+        },
+        {
+         "dataId": 20112,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 48036704000000.0,
+          "fmt": "48.04T"
+         },
+         "businessSegmentData": [
+          {
+           "dataValue": 1447114000000.0,
+           "segmentType": "Business",
+           "segmentName": "All Other",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 43199865000000.0,
+           "segmentType": "Business",
+           "segmentName": "Automotive",
+           "isPrimarySegment": 1
+          },
+          {
+           "dataValue": 4481180000000.0,
+           "segmentType": "Business",
+           "segmentName": "Financial Services",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": -1091455000000.0,
+           "segmentType": "Business",
+           "segmentName": "Inter-segment Elimination/ Unallocated Amount",
+           "isPrimarySegment": 0
+          }
+         ],
+         "geographicSegmentData": [
+          {
+           "dataValue": 7944206000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "Asia",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 5979720000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "Europe",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 7723171000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "Japan",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 18985399000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "North America",
+           "isPrimarySegment": 1
+          },
+          {
+           "dataValue": 7404208000000.0,
+           "segmentType": "Geographic",
+           "segmentName": "Other",
+           "isPrimarySegment": 0
+          }
+         ]
+        },
+        {
+         "dataId": 20112,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 50684952000000.0,
+          "fmt": "50.68T"
+         },
+         "businessSegmentData": [
+          {
+           "dataValue": 1651412000000.0,
+           "segmentType": "Business",
+           "segmentName": "All Other",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": 45417703000000.0,
+           "segmentType": "Business",
+           "segmentName": "Automotive",
+           "isPrimarySegment": 1
+          },
+          {
+           "dataValue": 4857115000000.0,
+           "segmentType": "Business",
+           "segmentName": "Financial Services",
+           "isPrimarySegment": 0
+          },
+          {
+           "dataValue": -1241278000000.0,
+           "segmentType": "Business",
+           "segmentName": "Inter-segment Elimination/ Unallocated Amount",
+           "isPrimarySegment": 0
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualReconciledDepreciation"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualReconciledDepreciation": [
+        {
+         "dataId": 20315,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2039904000000.0,
+          "fmt": "2.04T"
+         }
+        },
+        {
+         "dataId": 20315,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2087066000000.0,
+          "fmt": "2.09T"
+         }
+        },
+        {
+         "dataId": 20315,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2251233000000.0,
+          "fmt": "2.25T"
+         }
+        },
+        {
+         "dataId": 20315,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2392519000000.0,
+          "fmt": "2.39T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNetIncomeFromContinuingOperationNetMinorityInterest"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualNetIncomeFromContinuingOperationNetMinorityInterest": [
+        {
+         "dataId": 20331,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 2451318000000.0,
+          "fmt": "2.45T"
+         }
+        },
+        {
+         "dataId": 20331,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4944933000000.0,
+          "fmt": "4.94T"
+         }
+        },
+        {
+         "dataId": 20331,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 4765086000000.0,
+          "fmt": "4.77T"
+         }
+        },
+        {
+         "dataId": 20331,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 3848098000000.0,
+          "fmt": "3.85T"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualTaxRateForCalcs"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualTaxRateForCalcs": [
+        {
+         "dataId": 20418,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 0.32,
+          "fmt": "0.32"
+         }
+        },
+        {
+         "dataId": 20418,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 0.272,
+          "fmt": "0.27"
+         }
+        },
+        {
+         "dataId": 20418,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 0.253,
+          "fmt": "0.25"
+         }
+        },
+        {
+         "dataId": 20418,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 0.227,
+          "fmt": "0.23"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDilutedAverageShares"
+        ]
+       },
+       "timestamp": [
+        1743379200,
+        1751241600,
+        1759190400,
+        1774915200
+       ],
+       "annualDilutedAverageShares": [
+        {
+         "dataId": 29011,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1325245600.0,
+          "fmt": "1.33B"
+         }
+        },
+        {
+         "dataId": 29011,
+         "asOfDate": "2025-06-30",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1314339926.0,
+          "fmt": "1.31B"
+         }
+        },
+        {
+         "dataId": 29011,
+         "asOfDate": "2025-09-30",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1306100425.0,
+          "fmt": "1.31B"
+         }
+        },
+        {
+         "dataId": 29011,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 1303327400.0,
+          "fmt": "1.30B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualInterestExpense"
+        ]
+       },
+       "timestamp": [
+        1680220800,
+        1711843200,
+        1743379200,
+        1774915200
+       ],
+       "annualInterestExpense": [
+        {
+         "dataId": 20057,
+         "asOfDate": "2023-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 47356000000.0,
+          "fmt": "47.36B"
+         }
+        },
+        {
+         "dataId": 20057,
+         "asOfDate": "2024-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 64733000000.0,
+          "fmt": "64.73B"
+         }
+        },
+        {
+         "dataId": 20057,
+         "asOfDate": "2025-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 84106000000.0,
+          "fmt": "84.11B"
+         }
+        },
+        {
+         "dataId": 20057,
+         "asOfDate": "2026-03-31",
+         "periodType": "12M",
+         "currencyCode": "JPY",
+         "reportedValue": {
+          "raw": 60293000000.0,
+          "fmt": "60.29B"
+         }
+        }
+       ]
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualOtherOperatingExpenses"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDepreciationAmortizationDepletionIncomeStatement"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualContinuingAndDiscontinuedBasicEPS"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualImpairmentOfCapitalAssets"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualInsuranceAndClaims"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDividendPerShare"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualContinuingAndDiscontinuedDilutedEPS"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualOtherGandA"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDepletionIncomeStatement"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDepreciationIncomeStatement"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNetIncomeFromTaxLossCarryforward"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNetIncomeExtraordinary"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualRestructuringAndMergernAcquisition"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualExciseTaxes"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualBasicAccountingChange"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDilutedAccountingChange"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualOtherNonInterestExpense"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNetPolicyholderBenefitsAndClaims"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualRentExpenseSupplemental"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualTaxLossCarryforwardBasicEPS"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualReportedNormalizedBasicEPS"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualBasicExtraordinary"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNormalizedBasicEPS"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDilutedContinuousOperations"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualTaxLossCarryforwardDilutedEPS"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDilutedEPSOtherGainsLosses"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualProvisionForDoubtfulAccounts"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDilutedDiscontinuousOperations"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualOtherSpecialCharges"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualOtherTaxes"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualProfessionalExpenseAndContractServicesExpense"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualPolicyholderBenefitsCeded"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualBasicContinuousOperations"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualGeneralAndAdministrativeExpense"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDepreciationAndAmortizationInIncomeStatement"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualOccupancyAndEquipment"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualSecuritiesAmortization"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualReportedNormalizedDilutedEPS"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualBasicDiscontinuousOperations"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualSpecialIncomeCharges"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualAmortization"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualRentAndLandingFees"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualSalariesAndWages"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualBasicEPSOtherGainsLosses"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualLossAdjustmentExpense"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualAmortizationOfIntangiblesIncomeStatement"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualPolicyholderBenefitsGross"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNetIncomeDiscontinuousOperations"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualPreferredStockDividends"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualNormalizedDilutedEPS"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualGainOnSaleOfPPE"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualResearchAndDevelopment"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualDilutedExtraordinary"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualGainOnSaleOfBusiness"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualWriteOff"
+        ]
+       }
+      },
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "annualSellingAndMarketingExpense"
+        ]
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/v10/finance/quoteSummary/TM",
+   "params": {
+    "modules": "financialData,quoteType,defaultKeyStatistics,assetProfile,summaryDetail",
+    "symbol": "TM"
+   },
+   "status": 200,
+   "json": {
+    "quoteSummary": {
+     "result": [
+      {
+       "assetProfile": {
+        "address1": "1 Toyota-cho",
+        "city": "Toyota",
+        "zip": "471-8571",
+        "country": "Japan",
+        "phone": "81 565 28 2121",
+        "website": "https://global.toyota",
+        "industry": "Auto Manufacturers",
+        "industryKey": "auto-manufacturers",
+        "industryDisp": "Auto Manufacturers",
+        "sector": "Consumer Cyclical",
+        "sectorKey": "consumer-cyclical",
+        "sectorDisp": "Consumer Cyclical",
+        "longBusinessSummary": "Toyota Motor Corporation designs, manufactures, assembles, and sells passenger vehicles, minivans and commercial vehicles, and related parts and accessories in Japan, North America, Europe, Asia, Central and South America, Oceania, Africa, the Middle East, and internationally. The company operates through Automotive, Financial Services, and All Other segments. The company offers subcompact and compact cars; mini-vehicles; mid-size, luxury, sports, and specialty cars; recreational and sport-utility vehicles; pickup trucks; minivans; trucks; and buses. It also develops and sells battery and hybrid electric vehicles and batteries. In addition, the company provides financial services, such as retail financing and leasing, wholesale financing, insurance, and credit cards. Further, it operates GAZOO.com, a web portal for automobile information, as well as engages in telecommunications and other businesses. It offers vehicles under the Toyota and Lexus brand names. It has strategic manufacturing alliance with Joby Aviation, Inc. to establish a joint venture to realize air mobility. Toyota Motor Corporation was founded in 1933 and is headquartered in Toyota, Japan.",
+        "fullTimeEmployees": 367990,
+        "companyOfficers": [
+         {
+          "maxAge": 1,
+          "name": "Mr. Yoichi  Miyazaki",
+          "age": 62,
+          "title": "CFO, Operating Officer, Executive VP & Director",
+          "yearBorn": 1963,
+          "fiscalYear": 2026,
+          "totalPay": {
+           "raw": 1699120,
+           "fmt": "1.7M",
+           "longFmt": "1,699,120"
+          },
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Hiroki  Nakajima",
+          "age": 63,
+          "title": "Operating Officer, Executive VP, CTO & Director",
+          "yearBorn": 1962,
+          "fiscalYear": 2026,
+          "totalPay": {
+           "raw": 1667420,
+           "fmt": "1.67M",
+           "longFmt": "1,667,420"
+          },
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Koji  Sato",
+          "age": 56,
+          "title": "Vice Chairman & Chief Industry Officer",
+          "yearBorn": 1969,
+          "fiscalYear": 2026,
+          "totalPay": {
+           "raw": 2402860,
+           "fmt": "2.4M",
+           "longFmt": "2,402,860"
+          },
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Kenta  Kon",
+          "age": 57,
+          "title": "President, CEO & Representative Director",
+          "yearBorn": 1968,
+          "fiscalYear": 2026,
+          "totalPay": {
+           "raw": 684720,
+           "fmt": "684.72k",
+           "longFmt": "684,720"
+          },
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Takanori  Azuma",
+          "title": "Chief Risk Officer & Chief Officer of Accounting Group",
+          "fiscalYear": 2026,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Dr. Gill A.  Pratt",
+          "title": "Chief Scientist, CEO & Executive Fellow of Toyota Research Institute, Inc.",
+          "fiscalYear": 2026,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Masahiro  Yamamoto",
+          "title": "Chief Officer of General Administration & Human Resources Group",
+          "fiscalYear": 2026,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Hirofumi  Muta",
+          "age": 69,
+          "title": "Chief Officer -Safety & Health Promotion, Plant & Environmental Engg Divs, Production Control Group",
+          "yearBorn": 1956,
+          "fiscalYear": 2026,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Nobuhiko  Murakami",
+          "age": 66,
+          "title": "Senior Managing Officer & CEO of East Asia, Oceania & Middle East Region",
+          "yearBorn": 1959,
+          "fiscalYear": 2026,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         },
+         {
+          "maxAge": 1,
+          "name": "Mr. Shigeki  Tomoyama",
+          "age": 67,
+          "title": "Executive Fellow & CEO of Japan Business Group",
+          "yearBorn": 1958,
+          "fiscalYear": 2026,
+          "exercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          },
+          "unexercisedValue": {
+           "raw": 0,
+           "fmt": null,
+           "longFmt": "0"
+          }
+         }
+        ],
+        "compensationAsOfEpochDate": 1798675200,
+        "irWebsite": "http://www.toyota-global.com/investors/",
+        "executiveTeam": [],
+        "maxAge": 86400
+       },
+       "summaryDetail": {
+        "maxAge": 1,
+        "priceHint": 2,
+        "previousClose": 181.49,
+        "open": 183.24,
+        "dayLow": 183.1101,
+        "dayHigh": 184.8,
+        "regularMarketPreviousClose": 181.49,
+        "regularMarketOpen": 183.24,
+        "regularMarketDayLow": 183.1101,
+        "regularMarketDayHigh": 184.8,
+        "dividendRate": 6.27,
+        "dividendYield": 0.034,
+        "exDividendDate": 1774915200,
+        "payoutRatio": 0.2585,
+        "fiveYearAvgDividendYield": 2.74,
+        "beta": 0.375,
+        "trailingPE": 8.089631,
+        "forwardPE": 11.667934,
+        "volume": 333048,
+        "regularMarketVolume": 333048,
+        "averageVolume": 370949,
+        "averageVolume10days": 282480,
+        "averageDailyVolume10Day": 282480,
+        "bid": 0.0,
+        "ask": 0.0,
+        "bidSize": 10000,
+        "askSize": 10000,
+        "marketCap": 218031849472,
+        "nonDilutedMarketCap": 227484611613,
+        "fiftyTwoWeekLow": 166.1,
+        "fiftyTwoWeekHigh": 248.9,
+        "allTimeHigh": 255.23,
+        "allTimeLow": 3.237711,
+        "fulldayPrice": 184.12,
+        "fulldayChange": 3.0299988,
+        "fulldayChangePercent": 0.016695127,
+        "priceToSalesTrailing12Months": 0.004196388,
+        "fiftyDayAverage": 190.681,
+        "twoHundredDayAverage": 201.38655,
+        "trailingAnnualDividendRate": 95.0,
+        "trailingAnnualDividendYield": 0.52344483,
+        "currency": "USD",
+        "fromCurrency": null,
+        "toCurrency": null,
+        "lastMarket": null,
+        "coinMarketCapLink": null,
+        "algorithm": null,
+        "tradeable": false
+       },
+       "defaultKeyStatistics": {
+        "maxAge": 1,
+        "priceHint": 2,
+        "enterpriseValue": 35011220733952,
+        "profitMargins": 0.0863,
+        "floatShares": 17469641423,
+        "sharesOutstanding": 1184183366,
+        "sharesShort": 1035053,
+        "sharesShortPriorMonth": 974286,
+        "sharesShortPreviousMonthDate": 1786665600,
+        "dateShortInterest": 1789430400,
+        "sharesPercentSharesOut": 0.00090000004,
+        "heldPercentInsiders": 4.0000003e-05,
+        "heldPercentInstitutions": 0.02226,
+        "shortRatio": 3.04,
+        "shortPercentOfFloat": 0.00090000004,
+        "beta": 0.375,
+        "impliedSharesOutstanding": 1184183366,
+        "category": null,
+        "bookValue": 12.29717,
+        "priceToBook": 14.97255,
+        "fundFamily": null,
+        "legalType": null,
+        "lastFiscalYearEnd": 1774915200,
+        "nextFiscalYearEnd": 1806451200,
+        "mostRecentQuarter": 1782777600,
+        "earningsQuarterlyGrowth": 0.756,
+        "netIncomeToCommon": 4483796959232,
+        "trailingEps": 22.76,
+        "forwardEps": 15.78,
+        "pegRatio": 1.56,
+        "lastSplitFactor": "11:10",
+        "lastSplitDate": 677808000,
+        "enterpriseToRevenue": 0.674,
+        "enterpriseToEbitda": 6.251,
+        "52WeekChange": -0.09205061,
+        "SandP52WeekChange": 0.1457566,
+        "lastDividendValue": 3.457,
+        "lastDividendDate": 1743379200,
+        "latestShareClass": null,
+        "leadInvestor": null
+       },
+       "quoteType": {
+        "exchange": "NYQ",
+        "quoteType": "EQUITY",
+        "symbol": "TM",
+        "underlyingSymbol": "TM",
+        "shortName": "Toyota Motor Corporation",
+        "longName": "Toyota Motor Corporation",
+        "firstTradeDateEpochUtc": 322151400,
+        "timeZoneFullName": "America/New_York",
+        "timeZoneShortName": "EDT",
+        "uuid": "ac7a4fbd-0d78-3d94-b434-54817e1c208c",
+        "messageBoardId": "finmb_319676",
+        "gmtOffSetMilliseconds": -14400000,
+        "maxAge": 1
+       },
+       "financialData": {
+        "maxAge": 86400,
+        "currentPrice": 184.12,
+        "targetHighPrice": 239.31209,
+        "targetLowPrice": 230.0,
+        "targetMeanPrice": 234.07802,
+        "targetMedianPrice": 233.5,
+        "recommendationKey": "none",
+        "numberOfAnalystOpinions": 4,
+        "totalCash": 13350560858112,
+        "totalCashPerShare": 704.629,
+        "ebitda": 5600540884992,
+        "totalDebt": 43953168580608,
+        "quickRatio": 0.953,
+        "currentRatio": 1.169,
+        "totalRevenue": 51957024686080,
+        "debtToEquity": 114.974,
+        "revenuePerShare": 2530.0994,
+        "returnOnAssets": 0.02339,
+        "returnOnEquity": 0.12404,
+        "grossProfits": 8711846232064,
+        "freeCashflow": -3599962472448,
+        "operatingCashflow": 4132990091264,
+        "earningsGrowth": 0.869,
+        "revenueGrowth": 0.104,
+        "grossMargins": 0.16767,
+        "ebitdaMargins": 0.10779,
+        "operatingMargins": 0.07863,
+        "profitMargins": 0.0863,
+        "financialCurrency": "JPY"
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/v7/finance/quote",
+   "params": {
+    "symbols": "TM"
+   },
+   "status": 200,
+   "json": {
+    "quoteResponse": {
+     "result": [
+      {
+       "language": "en-US",
+       "region": "US",
+       "quoteType": "EQUITY",
+       "typeDisp": "Equity",
+       "quoteSourceName": "Delayed Quote",
+       "triggerable": true,
+       "customPriceAlertConfidence": "HIGH",
+       "currency": "USD",
+       "shortName": "Toyota Motor Corporation",
+       "longName": "Toyota Motor Corporation",
+       "marketState": "PREPRE",
+       "earningsTimestampEnd": 1793881800,
+       "earningsCallTimestampStart": 1785819600,
+       "earningsCallTimestampEnd": 1785819600,
+       "isEarningsDateEstimate": false,
+       "trailingAnnualDividendRate": 95.0,
+       "trailingPE": 8.089631,
+       "dividendRate": 6.27,
+       "trailingAnnualDividendYield": 0.52344483,
+       "dividendYield": 3.4,
+       "epsTrailingTwelveMonths": 22.76,
+       "epsForward": 15.78,
+       "sharesOutstanding": 1184183366,
+       "impliedSharesOutstanding": 1184183366,
+       "bookValue": 12.29717,
+       "fiftyDayAverage": 190.681,
+       "fiftyDayAverageChange": -6.5610046,
+       "fiftyDayAverageChangePercent": -0.034408275,
+       "twoHundredDayAverage": 201.38655,
+       "twoHundredDayAverageChange": -17.266556,
+       "twoHundredDayAverageChangePercent": -0.085738376,
+       "marketCap": 218031849472,
+       "forwardPE": 11.667934,
+       "priceToBook": 14.97255,
+       "sourceInterval": 15,
+       "exchangeDataDelayedBy": 0,
+       "tradeable": false,
+       "cryptoTradeable": false,
+       "ask": 0.0,
+       "bidSize": 100,
+       "askSize": 100,
+       "fullExchangeName": "NYSE",
+       "financialCurrency": "JPY",
+       "regularMarketOpen": 183.24,
+       "averageDailyVolume3Month": 370949,
+       "averageDailyVolume10Day": 282480,
+       "fiftyTwoWeekLowChange": 18.019989,
+       "fiftyTwoWeekLowChangePercent": 0.10848879,
+       "fiftyTwoWeekRange": "166.1 - 248.9",
+       "fiftyTwoWeekHighChange": -64.78,
+       "fiftyTwoWeekHighChangePercent": -0.26026517,
+       "fiftyTwoWeekLow": 166.1,
+       "fiftyTwoWeekHigh": 248.9,
+       "fiftyTwoWeekChangePercent": -9.205061,
+       "dividendDate": 1780876800,
+       "earningsTimestamp": 1793881800,
+       "earningsTimestampStart": 1793881800,
+       "hasPrePostMarketData": true,
+       "firstTradeDateMilliseconds": 322151400000,
+       "priceHint": 2,
+       "postMarketChangePercent": -0.8549298,
+       "postMarketPrice": 182.5459,
+       "postMarketChange": -1.5740967,
+       "regularMarketChange": 2.62999,
+       "regularMarketChangePercent": 1.44911,
+       "fulldayChange": 3.0299988,
+       "fulldayChangePercent": 1.6695127,
+       "fulldayPrice": 184.12,
+       "regularMarketPrice": 184.12,
+       "regularMarketDayHigh": 184.8,
+       "regularMarketDayRange": "183.1101 - 184.8",
+       "regularMarketDayLow": 183.1101,
+       "regularMarketVolume": 333048,
+       "regularMarketPreviousClose": 181.49,
+       "bid": 0.0,
+       "exchangeTimezoneName": "America/New_York",
+       "exchangeTimezoneShortName": "EDT",
+       "gmtOffSetMilliseconds": -14400000,
+       "market": "us_market",
+       "esgPopulated": false,
+       "corporateActions": [],
+       "postMarketTime": 1791236355,
+       "regularMarketTime": 1791230402,
+       "exchange": "NYQ",
+       "messageBoardId": "finmb_319676",
+       "displayName": "Toyota Motor",
+       "symbol": "TM"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/ws/fundamentals-timeseries/v1/finance/timeseries/TM",
+   "params": {
+    "symbol": "TM",
+    "type": "trailingPegRatio"
+   },
+   "status": 200,
+   "json": {
+    "timeseries": {
+     "result": [
+      {
+       "meta": {
+        "symbol": [
+         "TM"
+        ],
+        "type": [
+         "trailingPegRatio"
+        ]
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  }
+ ]
+}

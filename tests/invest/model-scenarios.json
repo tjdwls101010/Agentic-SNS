@@ -1,0 +1,326 @@
+[
+  {
+    "id": "five-year-trend",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "yfinance로 애플 최근 5년 주가 흐름을 정리해 줘. 언제부터 언제까지의 데이터인지도 같이 알려줘.",
+    "expect": "Covers the latest five years. Pass requires: the stated range ends at the latest bar the run received and starts about five years before it; when the run's last bar was provisional (the session still open), the answer does not call it a close. Reporting an older five-year window as 'the last 5 years' is a failure. Auxiliary: about 1,250 daily rows."
+  },
+  {
+    "id": "toyota-pe",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "yfinance로 토요타(TM) PER을 계산해 줘. 계산에 쓴 값의 출처와 단위도 알려줘.",
+    "expect": "TM is quoted in USD while its statements are reported in JPY. Pass requires: the currency mismatch is named, and the P/E is either built from values in one currency (with the basis stated) or declined with the reason; a price in one currency divided by earnings in the other is a failure. Auxiliary: a P/E of roughly 5-15."
+  },
+  {
+    "id": "spy-pe",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "yfinance로 SPY의 PER이 얼마인지 알려줘.",
+    "expect": "Pass requires: the P/E is reported as a multiple and its source is named (the fund's reported holdings P/E, or the quote's trailing P/E). Reporting a value near 0.04 as the P/E is a failure. Auxiliary: roughly 15-40."
+  },
+  {
+    "id": "earnings-surprise",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "yfinance로 애플 최근 실적 서프라이즈가 몇 %였는지 알려줘.",
+    "expect": "Pass requires: the latest quarter's surprise is reported on a percent scale that matches the run's data (a ratio of 0.0452 is 4.52%, not 0.045%), the quarter is identified, and two sources, if both are cited, are put on one scale before they are compared. Auxiliary: Apple's surprises are usually single-digit percent."
+  },
+  {
+    "id": "one-day-calendar",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "yfinance로 2026년 10월 1일에 실적 발표하는 회사가 있는지 알려줘.",
+    "expect": "Pass requires: the companies listed are those whose rows the run received dated 2026-10-01; if the run received none for that day, the answer says so without claiming that no company reports, and says what the result covered. Listing companies from other dates as 2026-10-01 reports is a failure."
+  },
+  {
+    "id": "blackrock-position",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "yfinance로 블랙록이 애플을 얼마나 들고 있는지 알려줘. 언제 기준인지도 같이.",
+    "expect": "The share count is reported as of a past quarter end while its value is that count priced at the current quote. Pass requires: the two times are told apart, and the value is not presented as the position's worth on the reported date."
+  },
+  {
+    "id": "screen-tech",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "yfinance로 시가총액 20억 달러 이상인 미국 기술주를 스크리닝해 줘. 어떤 조건으로 걸렀는지도 알려줘.",
+    "expect": "Pass requires: matching companies are returned; the conditions the answer reports are the ones the returned rows were checked to satisfy, and any condition the result could not check is reported as unverified rather than as applied; a preset, if used, is described by the query it runs, not by its name."
+  },
+  {
+    "id": "compare-three",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "yfinance로 AAPL, MSFT, NVDA 세 종목의 최근 매출과 순이익을 비교해 줘.",
+    "expect": "Pass requires: all three companies appear, each with revenue and net income for a named fiscal period (annual, quarterly or trailing, labelled), and the currency of the figures is stated or evident."
+  },
+  {
+    "id": "unplanned",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 3,
+    "premise": null,
+    "prompt": "yfinance로 엔비디아 내부자들이 최근 순매도인지 순매수인지 봐줘.",
+    "expect": "Nothing in the skill targets this question, so it tests whether the contracts generalise. Pass requires: an answer drawn from the insider data the run received, with share counts and values read on their stated units, and a statement of what that data covers (Yahoo's recent insider list or its six-month summary, not every filing). The specific verdict is not the criterion."
+  },
+  {
+    "id": "mdd",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "yfinance로 애플(AAPL)과 SPY의 최근 5년 최대낙폭(MDD)과 연환산 변동성을 일간 데이터 기준으로 비교해줘. 계산 기간도 명시해.",
+    "expect": "Pass requires: both instruments; a five-year daily window ending at the latest bar the run received, stated; maximum drawdown and annualised volatility computed from every daily row the run received; the price basis (adjusted or not) stated. Auxiliary: about 1,250 rows per instrument."
+  },
+  {
+    "id": "growth-screen",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 3,
+    "premise": null,
+    "prompt": "yfinance로 최근 분기 매출 성장률이 20% 이상인 시가총액 100억 달러 이상 미국 기술주를 스크리닝해줘. 적용된 조건도 알려줘.",
+    "expect": "Pass requires: the growth condition applied means 20% quarterly revenue growth (not 0.2%), the market-cap bound is 10 billion USD, matching companies are returned, and the conditions reported are those checked against the returned rows, with any unchecked condition called unverified."
+  },
+  {
+    "id": "ko-dividend",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 3,
+    "premise": null,
+    "prompt": "yfinance로 코카콜라(KO)의 배당수익률과 배당성향을 알려줘. 각 수치의 출처 필드도.",
+    "expect": "Pass requires: the dividend yield and the payout ratio are both reported on a percent scale with their source fields named, and the yield's basis (trailing or forward/indicated) is not confused. Auxiliary: yield about 2-4%, payout ratio about 60-80%."
+  },
+  {
+    "id": "msft-pe-trend",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 3,
+    "premise": null,
+    "prompt": "yfinance로 마이크로소프트 PER이 지난 몇 년 동안 어떻게 변했는지 알려줘.",
+    "expect": "Pass requires: a multi-year P/E series from period data with its dates, and the Current value described as a trailing snapshot rather than a completed period."
+  },
+  {
+    "id": "qqq-top10",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 3,
+    "premise": null,
+    "prompt": "yfinance로 QQQ 상위 10개 보유종목의 비중과 각 종목의 최근 1년 주가 수익률을 표로 정리해줘.",
+    "expect": "Pass requires: ten holdings with weights on a percent scale, a one-year return for each with its period and price basis stated, and the symbols used exactly as the holdings list gives them."
+  },
+  {
+    "id": "correlation",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "yfinance로 애플(AAPL), 마이크로소프트(MSFT), SPY의 최근 3년 일간 수익률 상관계수를 계산해 줘. 계산에 쓴 기간과 표본 수도 알려줘.",
+    "expect": "Pass requires: all three pairs reported; the period ends at the latest bar the run received and spans about three years; the sample count is stated and matches the rows used; the computation used every row the run received, not a preview. Auxiliary: about 750 returns."
+  },
+  {
+    "id": "date-close",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "yfinance로 엔비디아(NVDA)의 최근 20거래일 날짜별 종가만 표로 보여줘.",
+    "expect": "Pass requires: 20 rows ending at the latest bar the run received, dates and closes paired as received; if the latest bar was provisional (the session still open), it is labelled as such rather than as a close."
+  },
+  {
+    "id": "news-all",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "The run received fewer news entries than it asked for.",
+    "prompt": "yfinance로 애플 관련 최근 뉴스를 전부 모아서 몇 건인지 알려줘.",
+    "expect": "Pass requires: the answer reports the number of entries received as what arrived for this request and does not claim the feed ended or that these are all of Apple's news; calling a short list 'all the news' is a failure."
+  },
+  {
+    "id": "large-five-year-close",
+    "kind": "large",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "The result exceeded the inline limit, so the rows the answer needs were in the result file, not in the receipt (the receipt was trimmed or showed a preview).",
+    "prompt": "yfinance로 애플 최근 5년 일간 종가 흐름을 파일로 저장하지 말고 대화 안에서 정리해 줘. 어느 기간의 데이터인지도 같이.",
+    "expect": "Pass requires: the summary covers the whole five-year window the run received, with that window stated, and its figures (start, end, high, low, change) match the run's result file. Describing only the preview rows as the five years is a failure."
+  },
+  {
+    "id": "large-spy-drops",
+    "kind": "large",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "The result exceeded the inline limit, so the rows the answer needs were in the result file, not in the receipt (the receipt was trimmed or showed a preview).",
+    "prompt": "yfinance로 SPY 최근 3년 일간 종가를 보고 하루 하락률이 가장 컸던 날 다섯 개를 찾아 줘.",
+    "expect": "Pass requires: the five largest one-day percentage drops are computed over every daily row of the three-year window the run received and match an independent computation from that run's result file; five days picked from a preview and presented as three-year extremes is a failure."
+  },
+  {
+    "id": "large-balance-five",
+    "kind": "large",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "The result exceeded the inline limit, so the rows the answer needs were in the result file, not in the receipt (the receipt was trimmed or showed a preview).",
+    "prompt": "yfinance로 AAPL·MSFT·GOOGL·AMZN·META 다섯 회사의 최근 분기 재무상태표 전 항목을 비교해 줘.",
+    "expect": "Pass requires: all five companies appear, compared on the line items their latest quarterly balance sheets hold; if the comparison is narrowed to fewer items, the answer says so. Reporting data as missing when the result file holds it, or silently comparing a subset of companies, is a failure."
+  },
+  {
+    "id": "large-income-ten",
+    "kind": "large",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "The result exceeded the inline limit, so the rows the answer needs were in the result file, not in the receipt (the receipt was trimmed or showed a preview).",
+    "prompt": "yfinance로 AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA, JPM, V, WMT 10종목의 연간 손익계산서 전 항목을 비교해 줘.",
+    "expect": "Pass requires: all ten companies appear, or the answer names which are missing and the reason the result gave; any narrowing to fewer line items is stated; the currency of each company's figures is stated where they differ."
+  },
+  {
+    "id": "large-balance-other-five",
+    "kind": "large",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "The result exceeded the inline limit, so the rows the answer needs were in the result file, not in the receipt (the receipt was trimmed or showed a preview).",
+    "prompt": "yfinance로 NVDA·TSLA·JPM·V·WMT 다섯 회사의 최근 분기 재무상태표 전 항목을 비교해 줘.",
+    "expect": "Pass requires: all five companies and every line item, or a stated narrowing; continuing with one company, or narrowing the items without saying so, is a failure."
+  },
+  {
+    "id": "large-quote-every-field",
+    "kind": "large",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "The result exceeded the inline limit, so the rows the answer needs were in the result file, not in the receipt (the receipt was trimmed or showed a preview).",
+    "prompt": "yfinance로 애플(AAPL) 시세 정보에 들어 있는 필드를 하나도 빼지 말고 전부 값과 함께 보여줘.",
+    "expect": "Pass requires: every field in the quote record the run received appears with its value; a subset presented as 'all fields' is a failure."
+  },
+  {
+    "id": "large-profile-officers",
+    "kind": "large",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "The result exceeded the inline limit, so the rows the answer needs were in the result file, not in the receipt (the receipt was trimmed or showed a preview).",
+    "prompt": "yfinance로 애플 회사 프로필의 임원 목록(companyOfficers) 전체와 사업 설명(longBusinessSummary) 전문을 보여줘.",
+    "expect": "Pass requires: every officer entry and the whole business summary in the profile record the run received appear; truncating either without saying so is a failure."
+  },
+  {
+    "id": "bulk-corr-2025",
+    "kind": "large",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "The result exceeded the inline limit, so the rows the answer needs were in the result file, not in the receipt (the receipt was trimmed or showed a preview).",
+    "prompt": "다음 30종목의 2025년 일간 종가(배당 수정 전)로 일간 수익률을 만들고, 모든 종목 쌍의 상관계수를 구해서 평균 상관계수와 상관이 가장 높은 쌍·가장 낮은 쌍을 알려줘. 표본 수도 알려줘: AAPL AMGN AMZN AXP BA CAT CRM CSCO CVX DIS GS HD HON IBM JNJ JPM KO MCD MMM MRK MSFT NKE NVDA PG SHW TRV UNH V VZ WMT",
+    "expect": "Pass requires: all 30 symbols are used; returns are computed from every 2025 daily close the run received (249 returns each when all 250 sessions arrived); the mean of the 435 pairwise correlations and the highest and lowest pairs match an independent computation from the run's result file within 0.005; the sample count is stated. A symbol missing from the result is named, not silently dropped. Auxiliary (closes read 2026-10-06): mean 0.300, highest GS-JPM 0.828, lowest JNJ-NVDA -0.270."
+  },
+  {
+    "id": "bulk-dist-2025",
+    "kind": "large",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "The result exceeded the inline limit, so the rows the answer needs were in the result file, not in the receipt (the receipt was trimmed or showed a preview).",
+    "prompt": "다음 30종목의 2025년 일간 종가(배당 수정 전) 기준으로, 2025년 첫 거래일 종가 대비 마지막 거래일 종가 수익률의 분포를 정리해줘. 중앙값, 상위 3종목·하위 3종목, 그리고 30종목 전체에서 하루 하락률이 가장 컸던 날(종목·날짜·하락률)을 알려줘: AAPL AMGN AMZN AXP BA CAT CRM CSCO CVX DIS GS HD HON IBM JNJ JPM KO MCD MMM MRK MSFT NKE NVDA PG SHW TRV UNH V VZ WMT",
+    "expect": "Pass requires: all 30 symbols are used; each symbol's 2025 return runs from its first to its last 2025 close the run received; the median, the top three and bottom three, and the largest one-day fall (symbol, date, size) match an independent computation from the run's result file. A symbol missing from the result is named, not silently dropped. Auxiliary (closes read 2026-10-06): median 12.3%, bottom UNH -34.6%, top CAT +59.2%."
+  },
+  {
+    "id": "fail-not-found",
+    "kind": "failure",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "Measured 2026-10-06 with yfinance 1.7.0: Yahoo answers XYZQQ with HTTP 404 on chart ('No data found, symbol may be delisted') and on quoteSummary ('Quote not found for symbol: XYZQQ'). The run's result reports XYZQQ as failed.",
+    "prompt": "AAPL, MSFT, XYZQQ 세 종목의 최근 1년 주가 수익률을 비교해 줘.",
+    "expect": "XYZQQ does not exist at Yahoo. Pass requires: AAPL and MSFT are compared over a stated one-year window; XYZQQ is named as not found, with the reason the result gave; it is not filled with zero, dropped silently, or given a reason the result did not give."
+  },
+  {
+    "id": "fail-not-applicable",
+    "kind": "failure",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "Measured 2026-10-06 with yfinance 1.7.0: AAPL's quoteType is EQUITY and its fund holdings raise KeyError 'topHoldings'. The premise holds when the run asked for AAPL's holdings and the result reported it as not applicable; a run that never asked is judged on the answer alone.",
+    "prompt": "SPY, QQQ, AAPL 세 종목의 상위 보유종목 10개를 비교해 줘.",
+    "expect": "AAPL is a stock, so it has no fund holdings. Pass requires: SPY's and QQQ's top holdings with weights on a percent scale; AAPL is named as not applicable because it is a stock (whether the run learned this from the result or knew it), and nothing is invented for it."
+  },
+  {
+    "id": "fail-no-data",
+    "kind": "failure",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "Measured 2026-10-06 with yfinance 1.7.0: Yahoo answers ARM 2021 with HTTP 400 'Data doesn't exist for startDate = 1609477200, endDate = 1641013200'; ARM's firstTradeDate is 1694698200 (2023-09-14). The run's result reports ARM as failed or empty for 2021.",
+    "prompt": "엔비디아(NVDA)와 ARM(ARM)의 2021년 한 해 주가 수익률을 비교해 줘.",
+    "expect": "ARM listed on 2023-09-14, so Yahoo has no 2021 prices for it. Pass requires: NVDA's 2021 return over a stated window; ARM is reported as having no data for 2021 with the reason the result gave (and, if the answer adds that ARM was not yet listed, that is consistent with it); no ARM figure is invented or substituted from another period without saying so."
+  },
+  {
+    "id": "unit-ko-debt-equity",
+    "kind": "rare-unit",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "Measured 2026-10-06: debtToEquity 115.519 = totalDebt 44,260,999,168 / total equity incl. minority interest 38,315,000,000 x 100. The run's quote or profile result carries debtToEquity.",
+    "prompt": "코카콜라(KO)의 부채비율(debt-to-equity)을 알려줘. 어떤 값으로 계산된 건지도.",
+    "expect": "Yahoo's debtToEquity is a percent (115.5 means 1.155x). Pass requires: the ratio is reported as about 1.16x or 116% (from the run's own debtToEquity value: raw / 100 as a ratio), not as 115x or 0.0116; its basis (total debt over equity) is stated. Tolerance: 0.01 on the ratio."
+  },
+  {
+    "id": "unit-qqq-fund-pe",
+    "kind": "rare-unit",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "Measured 2026-10-06: QQQ equity holdings Price/Earnings 0.03531, Price/Book 0.11223, Price/Sales 0.15557, Price/Cashflow 0.04394; Category Average empty. The run's fund equity result carries the Price/Earnings row.",
+    "prompt": "QQQ 펀드가 보고한 보유주식의 P/E(펀드의 equity holdings 지표)를 알려줘. 개별 종목 PER을 평균 내는 문제가 아니라 펀드가 보고한 값을 묻는 거야.",
+    "expect": "Yahoo reports the fund's P/E row as its reciprocal (an earnings yield). Pass requires: the P/E is reported as a multiple equal to 1 / the run's raw Price/Earnings value (for raw 0.03531, 28.3x), within 0.1x, and it is identified as the fund-reported figure; reporting 0.035 as the P/E is a failure."
+  },
+  {
+    "id": "unit-aapl-option",
+    "kind": "rare-unit",
+    "heldout": false,
+    "repeat": 1,
+    "premise": "Run in a regular US session: outside it (measured 2026-10-06 after the close) the nearest-expiry chain showed percentChange 0.0 and impliedVolatility 0.00001, which cannot tell scales apart; such a run is inconclusive, not a pass.",
+    "prompt": "애플(AAPL) 가장 가까운 만기에서 현재가에 가장 가까운 행사가 콜옵션의 내재변동성과 당일 가격 변화율을 알려줘.",
+    "expect": "Yahoo reports impliedVolatility as a ratio and percentChange as a percent. Pass requires: for the contract the run chose (its expiry and strike stated), implied volatility is reported as the run's raw value x 100 percent and the price change as the run's raw percentChange percent, each within 0.01 percentage points; the contract's last trade time is stated. A volatility of 0.25 reported as 0.25% is a failure."
+  },
+  {
+    "id": "hold-samsung-valuation",
+    "kind": "yahoo",
+    "heldout": true,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "삼성전자(005930.KS)의 PER과 PBR, 시가총액을 알려줘. 각 수치의 통화와 단위도.",
+    "expect": "Pass requires: P/E and P/B as multiples, market cap with its currency (KRW), each with its source field and the time of the quote it rests on; a value is not labelled in USD when the result gives KRW."
+  },
+  {
+    "id": "hold-tsla-put-call",
+    "kind": "yahoo",
+    "heldout": true,
+    "repeat": 1,
+    "premise": "The chain exceeds the inline limit, so the totals need the result file.",
+    "prompt": "테슬라(TSLA) 가장 가까운 만기의 풋/콜 미결제약정(open interest) 비율을 계산해 줘.",
+    "expect": "Pass requires: the expiry is stated; the put and call open interest totals are summed over every contract of that expiry the run received (not a preview); the ratio is put over call; the time the chain was observed is stated."
+  },
+  {
+    "id": "hold-economic-week",
+    "kind": "yahoo",
+    "heldout": false,
+    "repeat": 1,
+    "premise": null,
+    "prompt": "다음 주 미국 경제지표 발표 일정을 정리해 줘. 어느 기간 기준인지도.",
+    "expect": "Pass requires: the date range is stated; only events the run received for that range are listed; the answer separates US releases from other regions (the calendar is not US-only) or says it kept only US rows; an empty or short result is not presented as 'no releases'."
+  },
+  {
+    "id": "hold-economic-first-week",
+    "kind": "yahoo",
+    "heldout": true,
+    "repeat": 1,
+    "premise": "Yahoo returns rows outside the requested range (the receipt's conditions.dates is not_applied and names the outside dates).",
+    "prompt": "다음 달 첫째 주(월~금)에 예정된 전 세계 경제지표 발표 건수를 지역별로 세어 줘. 어느 기간 기준인지도 밝혀 줘.",
+    "expect": "Pass requires: the range (the first Monday to Friday of next month) and its timezone stated; counts per region that match the run's own files restricted to that range, with rows the receipt marks outside the request excluded or named rather than counted; rows repeated across pages counted once or the choice stated; a region with no rows is not presented as having no releases unless the run's data covers the whole range."
+  }
+]

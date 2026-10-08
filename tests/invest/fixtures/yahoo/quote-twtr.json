@@ -1,0 +1,88 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:30:32+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "quote",
+   "TWTR"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v10/finance/quoteSummary/TWTR",
+   "params": {
+    "modules": "financialData,quoteType,defaultKeyStatistics,assetProfile,summaryDetail",
+    "symbol": "TWTR"
+   },
+   "status": 200,
+   "json": {
+    "quoteSummary": {
+     "result": [
+      {
+       "quoteType": {
+        "quoteType": "NONE",
+        "symbol": "TWTR",
+        "underlyingSymbol": "TWTR",
+        "uuid": "24740290-3933-3a8f-95f5-bf7f073867ca",
+        "maxAge": 1
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/v7/finance/quote",
+   "params": {
+    "symbols": "TWTR"
+   },
+   "status": 200,
+   "json": {
+    "quoteResponse": {
+     "result": [
+      {
+       "language": "en-US",
+       "region": "US",
+       "quoteType": "NONE",
+       "triggerable": false,
+       "customPriceAlertConfidence": "NONE",
+       "corporateActions": [],
+       "hasPrePostMarketData": false,
+       "tradeable": false,
+       "cryptoTradeable": false,
+       "esgPopulated": false,
+       "symbol": "TWTR"
+      }
+     ],
+     "error": null
+    }
+   }
+  },
+  {
+   "path": "/ws/fundamentals-timeseries/v1/finance/timeseries/TWTR",
+   "params": {
+    "symbol": "TWTR",
+    "type": "trailingPegRatio"
+   },
+   "status": 200,
+   "json": {
+    "timeseries": {
+     "result": [
+      {
+       "meta": {
+        "symbol": [
+         "TWTR"
+        ],
+        "type": [
+         "trailingPegRatio"
+        ]
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  }
+ ]
+}

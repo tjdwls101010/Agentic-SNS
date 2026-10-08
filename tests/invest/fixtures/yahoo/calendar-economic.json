@@ -1,0 +1,403 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:32:21+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "calendar",
+   "economic",
+   "--start",
+   "2026-10-05",
+   "--end",
+   "2026-10-09",
+   "--limit",
+   "25"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v1/finance/visualization",
+   "params": {},
+   "status": 200,
+   "body": {
+    "sortType": "DESC",
+    "entityIdType": "economic_event",
+    "sortField": "startdatetime",
+    "includeFields": [
+     "econ_release",
+     "country_code",
+     "startdatetime",
+     "period",
+     "after_release_actual",
+     "consensus_estimate",
+     "prior_release_actual",
+     "originally_reported_actual"
+    ],
+    "size": 25,
+    "offset": 0,
+    "query": {
+     "operator": "AND",
+     "operands": [
+      {
+       "operator": "GTE",
+       "operands": [
+        "startdatetime",
+        "2026-10-05"
+       ]
+      },
+      {
+       "operator": "LTE",
+       "operands": [
+        "startdatetime",
+        "2026-10-10"
+       ]
+      }
+     ]
+    }
+   },
+   "json": {
+    "finance": {
+     "result": [
+      {
+       "criteriaMeta": {
+        "size": 25,
+        "offset": 0,
+        "sortField": "startdatetime",
+        "sortType": "DESC",
+        "entityIdType": "ECONOMIC_EVENT",
+        "criteria": [
+         {
+          "field": "startdatetime",
+          "subField": null,
+          "operators": [
+           "GTE"
+          ],
+          "values": [
+           "2026-10-05T00:00:00.000-04:00"
+          ],
+          "labelsSelected": [],
+          "dependentValues": []
+         },
+         {
+          "field": "startdatetime",
+          "subField": null,
+          "operators": [
+           "LTE"
+          ],
+          "values": [
+           "2026-10-10T00:00:00.000-04:00"
+          ],
+          "labelsSelected": [],
+          "dependentValues": []
+         }
+        ],
+        "topOperator": "AND"
+       },
+       "rawCriteria": "{\"sortType\":\"DESC\",\"entityIdType\":\"economic_event\",\"sortField\":\"startdatetime\",\"includeFields\":[\"econ_release\",\"country_code\",\"startdatetime\",\"period\",\"after_release_actual\",\"consensus_estimate\",\"prior_release_actual\",\"originally_reported_actual\"],\"size\":25,\"offset\":0,\"query\":{\"operator\":\"AND\",\"operands\":[{\"operator\":\"GTE\",\"operands\":[\"startdatetime\",\"2026-10-05\"]},{\"operator\":\"LTE\",\"operands\":[\"startdatetime\",\"2026-10-10\"]}]}}",
+       "total": 301,
+       "documents": [
+        {
+         "entityIdType": "ECONOMIC_EVENT",
+         "columns": [
+          {
+           "id": "econ_release",
+           "label": "Event",
+           "type": "STRING"
+          },
+          {
+           "id": "country_code",
+           "label": "Country Code",
+           "type": "STRING"
+          },
+          {
+           "id": "startdatetime",
+           "label": "Event Time",
+           "type": "DATE"
+          },
+          {
+           "id": "period",
+           "label": "For",
+           "type": "STRING"
+          },
+          {
+           "id": "after_release_actual",
+           "label": "Actual",
+           "type": "STRING"
+          },
+          {
+           "id": "consensus_estimate",
+           "label": "Market Expectation",
+           "type": "STRING"
+          },
+          {
+           "id": "prior_release_actual",
+           "label": "Prior to This",
+           "type": "STRING"
+          },
+          {
+           "id": "originally_reported_actual",
+           "label": "Revised from",
+           "type": "STRING"
+          }
+         ],
+         "rows": [
+          [
+           "CPI YY*",
+           "KW",
+           "2026-10-10T00:00:00.000Z",
+           "Jul",
+           null,
+           null,
+           "2.19",
+           null
+          ],
+          [
+           "Foreign Reserves*",
+           "EG",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "57.22",
+           null
+          ],
+          [
+           "Foreign Trade*",
+           "LT",
+           "2026-10-10T00:00:00.000Z",
+           "Aug",
+           null,
+           null,
+           "-0.64",
+           null
+          ],
+          [
+           "Car Sales YY*",
+           "ID",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "32.4",
+           null
+          ],
+          [
+           "Motorbike Sales YY*",
+           "ID",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "3.2",
+           null
+          ],
+          [
+           "Budget Balance - ILS*",
+           "IL",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "-7.9",
+           null
+          ],
+          [
+           "FX Reserve - USD*",
+           "IL",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "241641",
+           null
+          ],
+          [
+           "Budget Fulfilment*",
+           "RU",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "-2.5",
+           null
+          ],
+          [
+           "CPI YY*",
+           "TZ",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "4.3",
+           null
+          ],
+          [
+           "Imports - USD *",
+           "IN",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "70.67",
+           null
+          ],
+          [
+           "Trade Def Govt -USD *",
+           "IN",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "26.86",
+           null
+          ],
+          [
+           "Exports - USD *",
+           "IN",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "43.81",
+           null
+          ],
+          [
+           "Business Confidence Idx",
+           "ZA",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "125.4",
+           null
+          ],
+          [
+           "Core Inflation YY*",
+           "EG",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "14.9",
+           null
+          ],
+          [
+           "Inflation YY*",
+           "EG",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "14.5",
+           null
+          ],
+          [
+           "CPI YY*",
+           "GH",
+           "2026-10-10T00:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "5",
+           null
+          ],
+          [
+           "CPI MM",
+           "RU",
+           "2026-10-09T16:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "-0.1",
+           null
+          ],
+          [
+           "CPI YY",
+           "RU",
+           "2026-10-09T16:00:00.000Z",
+           "Sep",
+           null,
+           null,
+           "6.3",
+           null
+          ],
+          [
+           "WSD-Beef Output 2027",
+           "US",
+           "2026-10-09T16:00:00.000Z",
+           "Oct",
+           null,
+           null,
+           "24.9",
+           null
+          ],
+          [
+           "WSD-Corn Endstocks 26/27",
+           "US",
+           "2026-10-09T16:00:00.000Z",
+           "Oct",
+           null,
+           null,
+           "1.57",
+           null
+          ],
+          [
+           "WSD-Corn Output 26/27",
+           "US",
+           "2026-10-09T16:00:00.000Z",
+           "Oct",
+           null,
+           null,
+           "15.8",
+           null
+          ],
+          [
+           "WSD-Cotton Output 26/27",
+           "US",
+           "2026-10-09T16:00:00.000Z",
+           "Oct",
+           null,
+           null,
+           "13.2",
+           null
+          ],
+          [
+           "WSD-Cottn Endstocks 26/27",
+           "US",
+           "2026-10-09T16:00:00.000Z",
+           "Oct",
+           null,
+           null,
+           "3.6",
+           null
+          ],
+          [
+           "WSD-Pork Output 2027",
+           "US",
+           "2026-10-09T16:00:00.000Z",
+           "Oct",
+           null,
+           null,
+           "28.09",
+           null
+          ],
+          [
+           "WSD-Soybean Output 26/27",
+           "US",
+           "2026-10-09T16:00:00.000Z",
+           "Oct",
+           null,
+           null,
+           "4.53",
+           null
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "error": null
+    }
+   }
+  }
+ ]
+}

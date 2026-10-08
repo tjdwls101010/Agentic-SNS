@@ -24,7 +24,7 @@ Keep the requested scope bounded. A displayed item limit is not necessarily a li
 
 ## Use the skills in other projects
 
-Each skill is self-contained: copy its complete directory. For SEC this includes `Scripts/` with its `pyproject.toml` and `uv.lock`; for yfinance and the SNS skills it includes `scripts/`. Keep the cloned repository if you link to it.
+Each skill is self-contained: copy its complete directory. For SEC this includes `Scripts/` with its `pyproject.toml` and `uv.lock`; for invest and the SNS skills it includes `scripts/`. Keep the cloned repository if you link to it.
 
 From the clone's root, install the Twitter skill for all your projects in the host you use. Before running a link command, check whether the destination already exists; keep any existing installation rather than creating a link inside it.
 
@@ -47,7 +47,7 @@ mkdir -p "$HOME/.agents/skills"
 ln -s "$PWD/.claude/skills/twitter" "$HOME/.agents/skills/twitter"
 ```
 
-For another skill, replace both occurrences of `twitter` in the selected command with `reddit`, `facebook`, `threads`, `naver-blog`, `sec`, or `yfinance`. Alternatively, copy the complete skill directory into a destination that does not already exist. Restart your agent if it does not discover the installation.
+For another skill, replace both occurrences of `twitter` in the selected command with `reddit`, `facebook`, `threads`, `naver-blog`, `sec`, or `invest`. Alternatively, copy the complete skill directory into a destination that does not already exist. Restart your agent if it does not discover the installation.
 
 For project-only installation, use that project's `.claude/skills` or `.agents/skills` directory instead. After installation outside the clone, resolve CLI commands relative to the installed `SKILL.md`, rather than to your current working directory. `${CLAUDE_SKILL_DIR}` in a skill denotes that skill directory; hosts that do not substitute it must use the actual absolute path.
 
@@ -69,20 +69,20 @@ For example, ask: “Find Microsoft's latest annual filing and read the end of i
 
 ## Yahoo Finance
 
-Install `uv` and copy the complete yfinance skill directory if using it outside this clone. The first run prepares a Python 3.12 or 3.13 environment and installs the dependencies pinned in the header of `scripts/cli.py`; no Aside setup or API key is required.
+Install `uv` and copy the complete invest skill directory if using it outside this clone. The first run prepares a Python 3.12 or 3.13 environment and installs the dependencies pinned in the header of `scripts/cli.py`; no Aside setup or API key is required.
 
 ```bash
-uv run .claude/skills/yfinance/scripts/cli.py --help
-uv run .claude/skills/yfinance/scripts/cli.py financials --help
+uv run .claude/skills/invest/scripts/cli.py --help
+uv run .claude/skills/invest/scripts/cli.py financials --help
 ```
 
-Ask, for example: “Find Apple's reported revenue for the latest four quarters and identify the reporting periods and currency.” The agent discovers the appropriate command and available fields, selects the query and reads its structured result. For another question it can follow returned tickers, option expirations or screener fields without writing Python integration code. `--help` maps the commands, and each command's `--help` owns its interface and what each kind's values mean — units, timing and known gotchas; [skill guidance](../.claude/skills/yfinance/SKILL.md) says how to run the CLI, and each result's status, `coverage`, warnings and `fix` say what to do when it comes back short.
+Ask, for example: “Find Apple's reported revenue for the latest four quarters and identify the reporting periods and currency.” The agent picks the command, reads the short receipt it prints and computes from the file the receipt names. For another question it can follow returned tickers, option expirations or screener fields without writing Python integration code. `--help` maps the commands, and each command's `--help` owns its arguments, receipt and failures; each result carries its own units, times, coverage, confirmed conditions and warnings, and each failure its code and `fix`. [Skill guidance](../.claude/skills/invest/SKILL.md) says how to turn a result into an answer.
 
-Queries always return JSON, and every command answers with one screen by default: the `coverage` field reports how many rows arrived, how many were printed and which end a limit kept, and — for commands that ask the source for a set number, such as news, screens and calendars — how many were asked for; fewer arriving than asked is not by itself the end of what the source has. A table that does not fit the budget is narrowed and comes back as `partial` rather than `ok`, so a narrowed window is never mistaken for the whole range; a result that cannot be narrowed comes back as `too_large`, with the saved `id` and a `fix` that says how to read it. For a computation over every row, such as a five-year drawdown, `--out FILE` writes the rows the query received to a CSV (one `target` column across tickers, every digit as received) and prints only a summary; `read ID --out FILE` does the same for a saved result without a new request.
+Every command prints one short JSON receipt and saves the whole result as a file: `result.csv` in long format with a `target` column, or `result.json` for nested records, beside an untrimmed `receipt.json`, in a new folder under the skill's own `data/results`, or under `$INVEST_DATA` when it is set. The receipt names the file, the unit of each column, and per target the observation time, what the rows cover, which requested conditions the rows confirm, and any failure with its code and `fix`; when it does not fit `--max-chars` it drops the inline rows first and keeps every status and warning. Compute from the file, never from the inline preview.
 
-Each response is saved under an `id` before anything is selected from it, so a result that was too large is still reachable: `read ID` returns it without repeating the request — a table in slices, each naming the next, and a single value such as a fund description whole, under a larger `--max-chars`. Saved observations live in the skill's own `data/observations` folder, or in `$YF_STORE` when it is set; `--ttl-days` deletes old ones and says nothing about whether newer ones are current.
+A folder is published whole or not at all and never overwritten, so a receipt always names a file that exists; `--ttl-days` (default 14, 0 keeps everything) deletes old folders and says nothing about whether newer ones are current. Several symbols in one call share one file and one receipt, and a rate limit stops the remaining targets, which are reported as `not_attempted` rather than left out.
 
-A field's scale is part of its contract rather than something to infer from its magnitude — each kind's `units:` line in its command's `--help` reports, per field, whether a value is a ratio or a percent and whether it is the reciprocal of its own label. Provider restrictions, incomplete datasets and upstream information loss are reported separately from successful observations, and market data and its observation time are not necessarily the same timestamp.
+Values arrive on one scale: a rate is a ratio (0.0245 is 2.45%) and a multiple is a multiple, whatever scale Yahoo used for that field, and `units` says which applies; money carries the currency of its role (`currency` for quote values, `financial_currency` for statements). A screen query's rates are written as ratios too and translated to Yahoo's scale; `screen fields` gives each field's input unit. Provider restrictions, incomplete datasets and upstream failures are reported per target with their own codes, and the time a value was true is reported apart from the time it was observed.
 
 ## CLI reference
 

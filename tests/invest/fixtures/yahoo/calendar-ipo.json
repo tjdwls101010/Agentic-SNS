@@ -1,0 +1,522 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:32:23+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "calendar",
+   "ipo",
+   "--start",
+   "2026-10-05",
+   "--end",
+   "2026-10-09"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v1/finance/visualization",
+   "params": {},
+   "status": 200,
+   "body": {
+    "sortType": "DESC",
+    "entityIdType": "ipo_info",
+    "sortField": "startdatetime",
+    "includeFields": [
+     "ticker",
+     "companyshortname",
+     "exchange_short_name",
+     "filingdate",
+     "startdatetime",
+     "amendeddate",
+     "pricefrom",
+     "priceto",
+     "offerprice",
+     "currencyname",
+     "shares",
+     "dealtype"
+    ],
+    "size": 100,
+    "offset": 0,
+    "query": {
+     "operator": "OR",
+     "operands": [
+      {
+       "operator": "GTELT",
+       "operands": [
+        "startdatetime",
+        "2026-10-05",
+        "2026-10-10"
+       ]
+      },
+      {
+       "operator": "GTELT",
+       "operands": [
+        "filingdate",
+        "2026-10-05",
+        "2026-10-10"
+       ]
+      },
+      {
+       "operator": "GTELT",
+       "operands": [
+        "amendeddate",
+        "2026-10-05",
+        "2026-10-10"
+       ]
+      }
+     ]
+    }
+   },
+   "json": {
+    "finance": {
+     "result": [
+      {
+       "criteriaMeta": {
+        "size": 100,
+        "offset": 0,
+        "sortField": "startdatetime",
+        "sortType": "DESC",
+        "entityIdType": "IPO_INFO",
+        "criteria": [
+         {
+          "field": "startdatetime",
+          "subField": null,
+          "operators": [
+           "GTELT"
+          ],
+          "values": [
+           "2026-10-05T00:00:00.000-04:00",
+           "2026-10-10T00:00:00.000-04:00"
+          ],
+          "labelsSelected": [],
+          "dependentValues": []
+         },
+         {
+          "field": "filingdate",
+          "subField": null,
+          "operators": [
+           "GTELT"
+          ],
+          "values": [
+           "2026-10-05T00:00:00.000-04:00",
+           "2026-10-10T00:00:00.000-04:00"
+          ],
+          "labelsSelected": [],
+          "dependentValues": []
+         },
+         {
+          "field": "amendeddate",
+          "subField": null,
+          "operators": [
+           "GTELT"
+          ],
+          "values": [
+           "2026-10-05T00:00:00.000-04:00",
+           "2026-10-10T00:00:00.000-04:00"
+          ],
+          "labelsSelected": [],
+          "dependentValues": []
+         }
+        ],
+        "topOperator": "OR"
+       },
+       "rawCriteria": "{\"sortType\":\"DESC\",\"entityIdType\":\"ipo_info\",\"sortField\":\"startdatetime\",\"includeFields\":[\"ticker\",\"companyshortname\",\"exchange_short_name\",\"filingdate\",\"startdatetime\",\"amendeddate\",\"pricefrom\",\"priceto\",\"offerprice\",\"currencyname\",\"shares\",\"dealtype\"],\"size\":100,\"offset\":0,\"query\":{\"operator\":\"OR\",\"operands\":[{\"operator\":\"GTELT\",\"operands\":[\"startdatetime\",\"2026-10-05\",\"2026-10-10\"]},{\"operator\":\"GTELT\",\"operands\":[\"filingdate\",\"2026-10-05\",\"2026-10-10\"]},{\"operator\":\"GTELT\",\"operands\":[\"amendeddate\",\"2026-10-05\",\"2026-10-10\"]}]}}",
+       "total": 23,
+       "documents": [
+        {
+         "entityIdType": "IPO_INFO",
+         "columns": [
+          {
+           "id": "ticker",
+           "label": "Symbol",
+           "type": "STRING"
+          },
+          {
+           "id": "companyshortname",
+           "label": "Company",
+           "type": "STRING"
+          },
+          {
+           "id": "exchange_short_name",
+           "label": "Exchange Short Name",
+           "type": "STRING"
+          },
+          {
+           "id": "filingdate",
+           "label": "Filing Date",
+           "type": "DATE"
+          },
+          {
+           "id": "startdatetime",
+           "label": "Date",
+           "type": "DATE"
+          },
+          {
+           "id": "amendeddate",
+           "label": "Amended Date",
+           "type": "DATE"
+          },
+          {
+           "id": "pricefrom",
+           "label": "Price From",
+           "type": "NUMBER"
+          },
+          {
+           "id": "priceto",
+           "label": "Price To",
+           "type": "NUMBER"
+          },
+          {
+           "id": "offerprice",
+           "label": "Price",
+           "type": "NUMBER"
+          },
+          {
+           "id": "currencyname",
+           "label": "Currency",
+           "type": "STRING"
+          },
+          {
+           "id": "shares",
+           "label": "Shares",
+           "type": "NUMBER"
+          },
+          {
+           "id": "dealtype",
+           "label": "Action",
+           "type": "STRING"
+          }
+         ],
+         "rows": [
+          [
+           "ACYB",
+           "First Trust Exchange-Traded Fund",
+           null,
+           null,
+           "2026-10-07T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "",
+           null,
+           "Expected"
+          ],
+          [
+           "AFNXU",
+           "AfterNext Acquisition I Corp. Unit",
+           "Nasdaq",
+           null,
+           "2026-10-07T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "USD",
+           null,
+           "Expected"
+          ],
+          [
+           "CPU",
+           "Amplify ETF Trust",
+           "NYSEArca",
+           null,
+           "2026-10-07T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "",
+           null,
+           "Expected"
+          ],
+          [
+           "OAKL",
+           "Harris Oakmark ETF Trust",
+           "NYSEArca",
+           null,
+           "2026-10-07T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "",
+           null,
+           "Expected"
+          ],
+          [
+           "RINK",
+           "Russell Investments Exchange Traded Funds",
+           null,
+           null,
+           "2026-10-07T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "",
+           null,
+           "Expected"
+          ],
+          [
+           "SMTJ",
+           "The RBB Fund Trust",
+           "NYSEArca",
+           null,
+           "2026-10-07T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "",
+           null,
+           "Expected"
+          ],
+          [
+           "SPXP",
+           "Direxion Shares ETF Trust",
+           null,
+           null,
+           "2026-10-07T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "",
+           null,
+           "Expected"
+          ],
+          [
+           "CTGG",
+           "Qwest Corporation 6.500% Senior Notes due 2051",
+           "Nasdaq",
+           null,
+           "2026-10-06T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "USD",
+           null,
+           "Expected"
+          ],
+          [
+           "CTHH",
+           "Qwest Corporation 6.750% Senior Notes due 2052",
+           "Nasdaq",
+           null,
+           "2026-10-06T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "USD",
+           null,
+           "Expected"
+          ],
+          [
+           "GMAC",
+           "Simplify Exchange Traded Funds",
+           null,
+           null,
+           "2026-10-06T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "",
+           null,
+           "Expected"
+          ],
+          [
+           "HFIX",
+           "Nomura ETF Trust",
+           null,
+           null,
+           "2026-10-06T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "",
+           null,
+           "Expected"
+          ],
+          [
+           "LUMN",
+           "Lumen Technologies, Inc. Common Stock",
+           "Nasdaq",
+           null,
+           "2026-10-06T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "USD",
+           null,
+           "Expected"
+          ],
+          [
+           "PAXGU",
+           "Pine Tree Acquisition Corp. Units",
+           "Nasdaq",
+           null,
+           "2026-10-06T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "USD",
+           null,
+           "Expected"
+          ],
+          [
+           "PSKY",
+           "Paramount Skydance Corporation",
+           "NYSE",
+           null,
+           "2026-10-06T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "USD",
+           null,
+           "Expected"
+          ],
+          [
+           "UBIQ",
+           "ETF Series Solutions",
+           null,
+           null,
+           "2026-10-06T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "",
+           null,
+           "Expected"
+          ],
+          [
+           "DFAC",
+           "DFA Investment Dimensions Group Inc.",
+           "NYSEArca",
+           null,
+           "2026-10-05T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "",
+           null,
+           "Expected"
+          ],
+          [
+           "DFAS",
+           "DFA Investment Dimensions Group Inc.",
+           "NYSEArca",
+           null,
+           "2026-10-05T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "",
+           null,
+           "Expected"
+          ],
+          [
+           "DFAT",
+           "DFA Investment Dimensions Group Inc.",
+           "NYSEArca",
+           null,
+           "2026-10-05T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "",
+           null,
+           "Expected"
+          ],
+          [
+           "IPHX",
+           "Inflection Point Acquisition Corp. VIII Class A Ordinary Shares",
+           "Nasdaq",
+           null,
+           "2026-10-05T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "USD",
+           null,
+           "Expected"
+          ],
+          [
+           "IPHXW",
+           "Inflection Point Acquisition Corp. VIII Warrant",
+           "Nasdaq",
+           null,
+           "2026-10-05T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "USD",
+           null,
+           "Expected"
+          ],
+          [
+           "RWAYM",
+           "Runway Growth Finance Corp. 7.75% Notes Due 2031",
+           "Nasdaq",
+           null,
+           "2026-10-05T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "USD",
+           null,
+           "Expected"
+          ],
+          [
+           "TBCV",
+           "Thunder Bridge Capital Partners V, Ltd. Class A Ordinary Shares",
+           "Nasdaq",
+           null,
+           "2026-10-05T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "USD",
+           null,
+           "Expected"
+          ],
+          [
+           "TBCVW",
+           "Thunder Bridge Capital Partners V, Ltd. Warrants",
+           "Nasdaq",
+           null,
+           "2026-10-05T04:00:00.000Z",
+           null,
+           null,
+           null,
+           null,
+           "USD",
+           null,
+           "Expected"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "error": null
+    }
+   }
+  }
+ ]
+}

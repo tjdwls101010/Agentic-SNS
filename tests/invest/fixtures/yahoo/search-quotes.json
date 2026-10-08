@@ -1,0 +1,190 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:32:27+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "search",
+   "apple"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v1/finance/lookup",
+   "params": {
+    "query": "apple",
+    "type": "all",
+    "start": "0",
+    "count": "10",
+    "fetchPricingData": "True"
+   },
+   "status": 200,
+   "json": {
+    "finance": {
+     "result": [
+      {
+       "start": 0,
+       "count": 10,
+       "total": 10,
+       "documents": [
+        {
+         "exchange": "NMS",
+         "fulldayChange": -0.610015869140625,
+         "fulldayChangePercent": -0.18280915915966034,
+         "fulldayPrice": 332.8500061035156,
+         "industryLink": "https://finance.yahoo.com/sector/technology",
+         "industryName": "Technology",
+         "quoteType": "equity",
+         "rank": 255048,
+         "regularMarketChange": -0.7999879717826843,
+         "regularMarketPercentChange": -0.23973999917507172,
+         "regularMarketPrice": 332.8900146484375,
+         "shortName": "Apple Inc.",
+         "symbol": "AAPL"
+        },
+        {
+         "exchange": "CME",
+         "fulldayChange": -0.70001220703125,
+         "fulldayChangePercent": -0.20802120864391327,
+         "fulldayPrice": 335.80999755859375,
+         "quoteType": "future",
+         "rank": 30095,
+         "regularMarketChange": -0.70001220703125,
+         "regularMarketPercentChange": -0.20802120864391327,
+         "regularMarketPrice": 335.80999755859375,
+         "shortName": "Apple Inc Stock Futures,Dec-202",
+         "symbol": "SAAPL=F"
+        },
+        {
+         "exchange": "CME",
+         "fulldayChange": -0.70001220703125,
+         "fulldayChangePercent": -0.20856042206287384,
+         "fulldayPrice": 334.94000244140625,
+         "quoteType": "future",
+         "rank": 30009,
+         "regularMarketChange": -0.70001220703125,
+         "regularMarketPercentChange": -0.20856042206287384,
+         "regularMarketPrice": 334.94000244140625,
+         "shortName": "Micro Apple Inc Stock Futures,D",
+         "symbol": "XAAPL=F"
+        },
+        {
+         "exchange": "NYQ",
+         "fulldayChange": -0.1100006103515625,
+         "fulldayChangePercent": -0.6662665605545044,
+         "fulldayPrice": 16.399999618530273,
+         "industryLink": "https://finance.yahoo.com/sector/real_estate",
+         "industryName": "Real Estate",
+         "quoteType": "equity",
+         "rank": 20716,
+         "regularMarketChange": -0.11000099778175354,
+         "regularMarketPercentChange": -0.6662669777870178,
+         "regularMarketPrice": 16.399999618530273,
+         "shortName": "Apple Hospitality REIT, Inc.",
+         "symbol": "APLE"
+        },
+        {
+         "exchange": "TOR",
+         "fulldayChange": -0.06999969482421875,
+         "fulldayChangePercent": -0.14925308525562286,
+         "fulldayPrice": 46.83000183105469,
+         "industryLink": "https://finance.yahoo.com/sector/technology",
+         "industryName": "Technology",
+         "quoteType": "equity",
+         "rank": 20162,
+         "regularMarketChange": -0.06999969482421875,
+         "regularMarketPercentChange": -0.14925308525562286,
+         "regularMarketPrice": 46.83000183105469,
+         "shortName": "APPLE CDR (CAD HEDGED)",
+         "symbol": "AAPL.TO"
+        },
+        {
+         "exchange": "GER",
+         "fulldayChange": 2.600006103515625,
+         "fulldayChangePercent": 0.8813579678535461,
+         "fulldayPrice": 297.6000061035156,
+         "industryLink": "https://finance.yahoo.com/sector/technology",
+         "industryName": "Technology",
+         "quoteType": "equity",
+         "rank": 20069,
+         "regularMarketChange": 2.600006103515625,
+         "regularMarketPercentChange": 0.8813579678535461,
+         "regularMarketPrice": 297.6000061035156,
+         "shortName": "Apple Inc.                    R",
+         "symbol": "APC.DE"
+        },
+        {
+         "exchange": "NEO",
+         "fulldayChange": -0.020000457763671875,
+         "fulldayChangePercent": -0.04270864278078079,
+         "fulldayPrice": 46.810001373291016,
+         "industryLink": "https://finance.yahoo.com/sector/technology",
+         "industryName": "Technology",
+         "quoteType": "equity",
+         "rank": 20054,
+         "regularMarketChange": -0.020000457763671875,
+         "regularMarketPercentChange": -0.04270864278078079,
+         "regularMarketPrice": 46.810001373291016,
+         "shortName": "APPLE CDR (CAD HEDGED)",
+         "symbol": "AAPL.NE"
+        },
+        {
+         "exchange": "BTS",
+         "fulldayChange": 0.23649978637695312,
+         "fulldayChangePercent": 0.8567745685577393,
+         "fulldayPrice": 27.569599151611328,
+         "quoteType": "etf",
+         "rank": 20054,
+         "regularMarketChange": -0.03390119969844818,
+         "regularMarketPercentChange": -0.12281499803066254,
+         "regularMarketPrice": 27.569599151611328,
+         "shortName": "Kurv Yield Premium Strategy App",
+         "symbol": "AAPY"
+        },
+        {
+         "exchange": "BTS",
+         "fulldayChange": -0.08710098266601562,
+         "fulldayChangePercent": -0.21798624098300934,
+         "fulldayPrice": 39.869998931884766,
+         "quoteType": "etf",
+         "rank": 20052,
+         "regularMarketChange": -0.08710099756717682,
+         "regularMarketPercentChange": -0.21798600256443024,
+         "regularMarketPrice": 39.869998931884766,
+         "shortName": "T-Rex 2X Long Apple Daily Targe",
+         "symbol": "AAPX"
+        },
+        {
+         "exchange": "PNK",
+         "fulldayChange": 0.0,
+         "fulldayChangePercent": 0.0,
+         "fulldayPrice": 0.12999999523162842,
+         "industryLink": "https://finance.yahoo.com/sector/consumer_cyclical",
+         "industryName": "Consumer Cyclical",
+         "quoteType": "equity",
+         "rank": 20042,
+         "regularMarketChange": 0.0,
+         "regularMarketPercentChange": 0.0,
+         "regularMarketPrice": 0.12999999523162842,
+         "shortName": "Apple iSports Group Inc.",
+         "symbol": "AAPI"
+        }
+       ],
+       "lookupTotals": {
+        "all": 127,
+        "equity": 53,
+        "mutualfund": 11,
+        "etf": 36,
+        "index": 11,
+        "currency": 0,
+        "future": 6,
+        "cryptocurrency": 10,
+        "privateCompany": 0
+       }
+      }
+     ],
+     "error": null
+    }
+   }
+  }
+ ]
+}

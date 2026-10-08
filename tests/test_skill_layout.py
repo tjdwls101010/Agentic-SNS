@@ -36,17 +36,16 @@ SKILLS = {
         'account': 'store', 'continuation': 'store', 'export': 'store',
         'browse': 'feature', 'output': 'feature',
     }),
-    'yfinance': ('yfinance_skill', {
-        'envelope': 'common', 'shape': 'common', 'display': 'common', 'selection': 'common', 'budget': 'common',
-        'leaf': 'common',
+    'invest': ('invest', {
+        'receipts': 'common',
         'yahoo': 'system',
-        'store': 'store', 'export': 'store',
-        'querying': 'feature', 'describe': 'feature',
+        'results': 'store',
+        'load': 'feature',
     }),
 }
 # Skills held to the unit rules: `edges` are the (from, to) feature imports allowed, `jobs` the repository folders whose maintenance code runs the skill. The other registered skills keep the contract above until their own migration.
 UNITS = {
-    'yfinance': {'edges': set(), 'jobs': ['scenarios/yfinance']},
+    'invest': {'edges': set(), 'jobs': ['scenarios/invest']},
 }
 # What each kind of top-level child may import; features also import themselves, and another feature only along an edge UNITS names.
 ALLOWED = {

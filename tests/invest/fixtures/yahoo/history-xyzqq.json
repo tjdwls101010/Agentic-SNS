@@ -1,0 +1,82 @@
+{
+ "provenance": {
+  "recorded_at": "2026-10-06T05:30:39+00:00",
+  "yfinance": "1.7.0",
+  "argv": [
+   "history",
+   "XYZQQ",
+   "--period",
+   "5d"
+  ]
+ },
+ "routes": [
+  {
+   "path": "/v8/finance/chart/XYZQQ",
+   "params": {
+    "range": "1d",
+    "interval": "1d"
+   },
+   "status": 404,
+   "json": {
+    "chart": {
+     "result": null,
+     "error": {
+      "code": "Not Found",
+      "description": "No data found, symbol may be delisted"
+     }
+    }
+   }
+  },
+  {
+   "path": "/v8/finance/chart/XYZQQ",
+   "params": {
+    "range": "1d",
+    "interval": "1d"
+   },
+   "status": 404,
+   "json": {
+    "chart": {
+     "result": null,
+     "error": {
+      "code": "Not Found",
+      "description": "No data found, symbol may be delisted"
+     }
+    }
+   }
+  },
+  {
+   "path": "/v10/finance/quoteSummary/XYZQQ",
+   "params": {
+    "modules": "financialData,quoteType,defaultKeyStatistics,assetProfile,summaryDetail",
+    "symbol": "XYZQQ"
+   },
+   "status": 404,
+   "json": {
+    "quoteSummary": {
+     "result": null,
+     "error": {
+      "code": "Not Found",
+      "description": "Quote not found for symbol: XYZQQ"
+     }
+    }
+   }
+  },
+  {
+   "path": "/v10/finance/quoteSummary/XYZQQ",
+   "params": {
+    "modules": "financialData,quoteType,defaultKeyStatistics,assetProfile,summaryDetail",
+    "symbol": "XYZQQ"
+   },
+   "status": 404,
+   "json": {
+    "quoteSummary": {
+     "result": null,
+     "error": {
+      "code": "Not Found",
+      "description": "Quote not found for symbol: XYZQQ"
+     }
+    }
+   }
+  }
+ ]
+}

@@ -1,6 +1,6 @@
 ---
 name: sec
-description: Read original SEC EDGAR company filings and exhibits, identify companies and reporting periods, and follow evidence through text, tables and images. Use for SEC·EDGAR·미국 공시, company filing forms such as 10-K, 10-Q, 8-K, 6-K, 20-F or Form 4, SEC filing URLs, and for the text inside them — risk factors, management's discussion, financial statement tables and their footnotes, exhibits and their images, including 미국 기업의 연차보고서·분기보고서 원문, 위험요인 원문, 재무제표 표와 주석, 지분변동표 — even when EDGAR is not named. Use it when the question asks where a number came from and only the filing says so. Not for structured price or financial-statement series, which yfinance covers; not for SEC rules or enforcement, general news, Korean DART filings, or sec meaning seconds.
+description: Read original SEC EDGAR company filings and exhibits, identify companies and reporting periods, and follow evidence through text, tables and images. Use for SEC·EDGAR·미국 공시, company filing forms such as 10-K, 10-Q, 8-K, 6-K, 20-F or Form 4, SEC filing URLs, and for the text inside them — risk factors, management's discussion, financial statement tables and their footnotes, exhibits and their images, including 미국 기업의 연차보고서·분기보고서 원문, 위험요인 원문, 재무제표 표와 주석, 지분변동표 — even when EDGAR is not named. Use it when the question asks where a number came from and only the filing says so. Not for structured price or financial-statement series, which the invest skill covers; not for SEC rules or enforcement, general news, Korean DART filings, or sec meaning seconds.
 ---
 
 # SEC
