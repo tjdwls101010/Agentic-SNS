@@ -87,24 +87,46 @@ def group_header(group_id='700'):
         'has_membership_questions': False}}}}})
 
 
+def group_about_body(group_id='700'):
+    return json.dumps({'data': {'group': {'id': group_id, 'about_feed_units': [
+        {'__typename': 'GroupsAboutFeedAboutCardUnit', 'group': {'id': group_id, 'description_with_entities': {'text': 'All about examples.'}}},
+        {'__typename': 'GroupsAboutFeedActivityCardUnit', 'group': {'id': group_id, 'number_of_posts_in_last_day': 3,
+                                                                    'number_of_posts_in_last_month': 90, 'created_time': 1767225600,
+                                                                    'group_total_members_info_text': '90,355 total members'}},
+        {'__typename': 'GroupsAboutFeedRulesCardUnit', 'group': {'id': group_id, 'group_rules': {'nodes': [
+            {'id': 'r1', 'rule_title': 'Be kind', 'description': 'No insults.'}]}}}]}}})
+
+
+def script_group(browser, group_id='700'):
+    browser.respond('query', query_result(group_header(group_id)), name='CometGroupRootQuery')
+    browser.respond('query', query_result(group_about_body(group_id)), name='CometGroupAboutRootQuery')
+
+
 def test_a_group_url_gets_the_group_card(browser, data_dir):
     known_tab(browser, data_dir)
     browser.respond('page', {'status': 200, 'url': 'https://www.facebook.com/groups/examplegroup/',
                              'body': '<script>{"groupID":"700"}</script>', 'explicit': 1, 'resources': 1})
-    browser.respond('query', query_result(group_header()), name='CometGroupRootQuery')
+    script_group(browser)
     code, out, _ = run_cli(browser, 'about', 'https://www.facebook.com/groups/examplegroup/')
     assert code == 0, out
     lines = out.splitlines()
-    assert lines[0] == 'about · 1 shown · stopped=exhausted · requests=2/25'
-    assert lines[1] == ('[e1] group id=700 · Example Group · Public group · 90K members · you: CAN_JOIN · '
+    assert lines[0] == 'about · 1 shown · stopped=exhausted · requests=3/25'
+    assert lines[1] == ('[e1] group id=700 · Example Group · Public group · 90,355 total members · you: CAN_JOIN · '
                         'url: "https://www.facebook.com/groups/examplegroup/"')
-    sent = [c for c in browser.calls() if c['op'] == 'query'][0]['args']
-    assert sent['variables']['groupID'] == '700'
+    assert lines[2] == '     description: "All about examples."'
+    assert lines[3] == '     activity: 3 posts in the last day · 90 in the last month · created 2026-01-01'
+    assert lines[4] == '     rule 1: "Be kind" — "No insults."'
+    sent = [c['args'] for c in browser.calls() if c['op'] == 'query']
+    assert [a['name'] for a in sent] == ['CometGroupRootQuery', 'CometGroupAboutRootQuery']
+    assert sent[0]['variables']['groupID'] == sent[1]['variables']['groupID'] == '700'
+
+
 
 
 def test_a_numeric_group_id_needs_the_groups_url_form(browser, data_dir):
     known_tab(browser, data_dir)
-    browser.respond('query', query_result(group_header('701')), name='CometGroupRootQuery')
+    script_group(browser, '701')
     code, out, _ = run_cli(browser, 'about', 'https://www.facebook.com/groups/701/', '--json')
     result = json.loads(out)
-    assert code == 0 and result['results'][0]['id'] == '701' and result['request_count'] == 1
+    assert code == 0 and result['results'][0]['id'] == '701' and result['request_count'] == 2
+    assert result['results'][0]['rules'] == [{'title': 'Be kind', 'description': 'No insults.'}]

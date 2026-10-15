@@ -94,3 +94,12 @@ def test_real_group_header_card():
     card, issues = graphql.group_card(header, group_id='2968116436545420', captured_at=NOW)
     assert card and card['name'] and card['privacy'] and card['privacy_icon'] and card['member_count_text']
     assert card['join_state'] and issues == []
+
+
+@pytest.mark.skipif(not (CAPTURES / 'p4_group_about_response.ndjson').exists(), reason='no local captures')
+def test_real_group_about_details():
+    details, issues = graphql.group_about(decode((CAPTURES / 'p4_group_about_response.ndjson').read_text()))
+    assert details['description'] and details['privacy_description'] and details['rules']
+    assert all(rule['title'] for rule in details['rules'])
+    assert isinstance(details['posts_last_day'], int) and details['created_at'] and details['member_count_text']
+    assert issues == []

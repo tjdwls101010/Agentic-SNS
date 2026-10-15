@@ -59,6 +59,12 @@ def group_card(chunks, *, group_id, captured_at):
     return groups.card(chunks, group_id=group_id, captured_at=captured_at)
 
 
+def group_about(chunks):
+    """(description, privacy explanation, activity, creation time, exact member text and rules from a group's About
+    screen, or None; response issues)."""
+    return groups.about(chunks)
+
+
 SCHEMAS = {
     'post': {'object': 'post', 'description': 'A post from feed, profile, group, search or post.', 'fields': posts.FIELDS},
     'entity': {'object': 'entity', 'description': 'A person, page or group from search.', 'fields': search.FIELDS},

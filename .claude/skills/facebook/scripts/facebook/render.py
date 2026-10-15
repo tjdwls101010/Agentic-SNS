@@ -99,7 +99,18 @@ def entity(record, index):
             parts.append('you: ' + _line(record['join_state']))
         if record.get('membership_questions'):
             parts.append('membership questions')
-        return f'[e{index}] group id={_line(record["id"])} · ' + ' · '.join(parts) + f' · url: {_handle(record.get("url"))}', False
+        lines = [f'[e{index}] group id={_line(record["id"])} · ' + ' · '.join(parts) + f' · url: {_handle(record.get("url"))}']
+        if record.get('description'):
+            lines.append('     description: ' + _quote(record['description']))
+        activity = [f'{record["posts_last_day"]} posts in the last day' if record.get('posts_last_day') is not None else None,
+                    f'{record["posts_last_month"]} in the last month' if record.get('posts_last_month') is not None else None,
+                    f'created {record["created_at"][:10]}' if record.get('created_at') else None]
+        if any(activity):
+            lines.append('     activity: ' + ' · '.join(a for a in activity if a))
+        for number, rule in enumerate(record.get('rules') or [], 1):
+            lines.append(f'     rule {number}: {_quote(rule["title"])}'
+                         + (f' — {_quote(rule["description"])}' if rule.get('description') else ''))
+        return '\n'.join(lines), False
     verified = {True: 'verified', False: 'unverified', None: 'verified=?'}[record.get('verified')]
     return (f'[e{index}] {_line(record["kind"])} id={_line(record["id"])} · {_line(record.get("name") or "unavailable")} '
             f'· {verified} · url: {_handle(record.get("url"))}'), False

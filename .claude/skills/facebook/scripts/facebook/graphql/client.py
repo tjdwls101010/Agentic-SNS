@@ -13,8 +13,8 @@ from urllib.parse import quote, urlsplit
 
 from facebook.errors import FacebookError, diagnostic
 from facebook.graphql import classify, targets
-from facebook.graphql.records import (about_collections, about_fields, comments_page, group_card, permalink_post,
-                                     posts_page, replies_page, search_page)
+from facebook.graphql.records import (about_collections, about_fields, comments_page, group_about, group_card,
+                                     permalink_post, posts_page, replies_page, search_page)
 from facebook.graphql.records.search import VERTICALS
 from facebook.graphql.records.search import filters as search_filters
 
@@ -303,13 +303,17 @@ class Client:
                                     'collectionToken': collection}, route=url.rstrip('/') + '/about')
 
     def group(self, group_id, *, url):
-        """(the group's card from its header, response issues)."""
+        """(the group's card: its header, then its About screen; response issues). Two requests."""
         chunks = self.query('group_root', {'groupID': group_id}, route=url)
         record, issues = group_card(chunks, group_id=group_id, captured_at=_now())
         if record is None:
             raise FacebookError(6, 'The group response holds no readable group header.', 'Open the group in the '
                                                                                          'browser; it may be hidden.')
-        return record, issues
+        details, more = group_about(self.query('group_about', {'groupID': group_id}, route=url.rstrip('/') + '/about'))
+        record.update({key: None for key in ('description', 'privacy_description', 'posts_last_day',
+                                             'posts_last_month', 'created_at')}, rules=[])
+        record.update(details or {})
+        return record, issues + more
 
     def live_queries(self):
         """Which read queries the tab has loaded right now (doctor); makes no request."""

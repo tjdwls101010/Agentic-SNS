@@ -754,6 +754,113 @@
         ],
         "issues": []
       }
+    },
+    {
+      "name": "group-about-units",
+      "item": "R5 (P4 capture)",
+      "fact": "CometGroupAboutRootQuery {groupID} answers data.group.about_feed_units: an about card (description_with_entities.text; about_info_items with privacy_info label and description), a members card, an activity card (number_of_posts_in_last_day and _month as integers, created_time, group_total_members_info_text as the viewer-language exact total), and a rules card (group_rules.nodes[] rule_title, description).",
+      "parser": "group_about",
+      "args": {},
+      "body_lines": [
+        {
+          "data": {
+            "group": {
+              "id": "700",
+              "about_feed_units": [
+                {
+                  "__typename": "GroupsAboutFeedAboutCardUnit",
+                  "group": {
+                    "id": "700",
+                    "description_with_entities": {
+                      "text": "A group about examples.",
+                      "ranges": []
+                    },
+                    "about_info_items": [
+                      {
+                        "__typename": "XFBPrivacyGroupsAboutInfoItem",
+                        "group": {
+                          "privacy_info": {
+                            "label": {
+                              "text": "Public"
+                            },
+                            "description": {
+                              "text": "Anyone can see who's in the group and what they post."
+                            },
+                            "icon_name": "globe-americas"
+                          },
+                          "id": "700"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "__typename": "GroupsAboutFeedMembersCardUnit",
+                  "group": {
+                    "id": "700",
+                    "group_member_profiles": {
+                      "formatted_count_text": "90K members"
+                    }
+                  }
+                },
+                {
+                  "__typename": "GroupsAboutFeedActivityCardUnit",
+                  "group": {
+                    "id": "700",
+                    "created_time": 1767225600,
+                    "number_of_posts_in_last_day": 62,
+                    "number_of_posts_in_last_month": 1986,
+                    "group_total_members_info_text": "90,355 total members"
+                  }
+                },
+                {
+                  "__typename": "GroupsAboutFeedRulesCardUnit",
+                  "group": {
+                    "id": "700",
+                    "group_rules": {
+                      "nodes": [
+                        {
+                          "id": "r1",
+                          "rule_title": "Be kind",
+                          "description": "No insults."
+                        },
+                        {
+                          "id": "r2",
+                          "rule_title": "No spam",
+                          "description": null
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "description": "A group about examples.",
+            "privacy_description": "Anyone can see who's in the group and what they post.",
+            "member_count_text": "90,355 total members",
+            "posts_last_day": 62,
+            "posts_last_month": 1986,
+            "created_at": "2026-01-01T00:00:00Z",
+            "rules": [
+              {
+                "title": "Be kind",
+                "description": "No insults."
+              },
+              {
+                "title": "No spam",
+                "description": null
+              }
+            ]
+          }
+        ],
+        "issues": []
+      }
     }
   ]
 }

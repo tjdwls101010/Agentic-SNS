@@ -183,7 +183,7 @@ COMMANDS = {
                       (('--section',), {'help': 'Only this locale-independent section, e.g. directory_work (schema about lists them as they appear)'}),
                       'json', 'max_requests'],
         'epilog': ['What About shows depends on the viewing account and the owner\'s privacy settings. Fields are never cut.',
-                   'A group URL gives the group\'s card instead: name, privacy as Facebook labels it, member count as Facebook formats it, the viewing account\'s relation to the group, and whether joining asks questions. requests: 1 to find the id (none for a numeric /groups/<id>/), then 1.',
+                   'A group URL gives the group\'s card instead: name, privacy as Facebook labels and explains it, the member total as Facebook writes it, the viewing account\'s relation to the group, whether joining asks questions, the description, recent activity, creation date and the rules in order. requests: 1 to find the id (none for a numeric /groups/<id>/), then 2 (header and About).',
                    'requests: 1 to find the numeric id (none for a numeric id), 1 for the overview, then 1 per About tab; --section stops at the first tab that shows it.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
