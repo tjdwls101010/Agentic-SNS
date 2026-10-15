@@ -56,7 +56,7 @@ def test_5_requests_made_before_a_startup_failure_are_still_reported(browser, da
                               'resources': 20})
     code, out, _ = run_cli(browser, 'feed')
     result = json.loads(out)
-    assert code == 5 and result['request_count'] == 21 and result['tab_opened_requests'] == 21
+    assert code == 5 and result['request_count'] == 30 and result['tab_opened_requests'] == 30  # its reservation
 
 
 def test_6_a_route_that_times_out_stays_counted_at_its_reservation(browser, data_dir):
@@ -151,3 +151,35 @@ def test_r2_5_a_header_without_context_is_refused_not_crashed(browser, data_dir,
     out_file.write_text('{"kind":"header","format":3}\n')
     code, out, _ = run_cli(browser, 'feed', '--out', str(out_file))
     assert code == 2 and json.loads(out)['error'] == 'argument' and browser.calls() == []
+
+
+# --- third review: accounting at reservation and lifecycle boundaries ---
+
+def test_r3_3_late_route_requests_are_counted_against_its_reservation(browser, data_dir):
+    known_tab(browser, data_dir)
+    rejected = json.dumps({'errors': [{'message': 'PersistedQueryNotFound'}]})
+    browser.respond('query', query_result(rejected, source='stored'))
+    browser.respond('route', {'location': 'https://www.facebook.com/', 'user_id': '1000123', 'explicit': 0,
+                              'resources': 5, 'statuses': [200] * 5,
+                              'live': {'CometNewsFeedPaginationQuery': {'doc_id': '222', 'flags': {}}}})
+    # the next query's ledger delta carries the route's five late requests and its own one
+    browser.respond('query', {**page(['A'], has_next=False), 'resources': 6, 'statuses': [200] * 6})
+    code, out, _ = run_cli(browser, 'feed', '--json')
+    assert code == 0 and json.loads(out)['request_count'] == 1 + 10 + 1
+
+
+def test_r3_4_late_opening_requests_stay_outside_the_budget(browser, data_dir):
+    browser.respond('open', {'tab': {'id': 'T9', 'url': 'https://www.facebook.com/'}})
+    browser.respond('state', {**STATE_OK, 'resources': 1, 'statuses': [200]})
+    browser.respond('query', {**page(['A'], has_next=False), 'resources': 2, 'statuses': [200, 200]})
+    code, out, _ = run_cli(browser, 'feed', '--max-requests', '1', '--json')
+    result = json.loads(out)
+    assert code == 0 and result['results'] and result['tab_opened_requests'] == 30
+    assert result['request_count'] - result['tab_opened_requests'] == 1
+
+
+def test_r3_2_a_known_rate_limit_is_not_followed_by_a_request(browser, data_dir):
+    known_tab(browser, data_dir)
+    browser.respond('query', {'stopped': 'rate_limit', 'statuses': [429], 'unwatched': [], 'explicit': 0, 'resources': 1})
+    code, out, _ = run_cli(browser, 'feed')
+    assert code == 5 and json.loads((data_dir / 'protection/blocked.json').read_text())['reason'] == 'rate_limit'

@@ -133,12 +133,13 @@ def test_state_reads_the_logged_in_user_without_a_request(tmp_path):
     fresh = run(tmp_path, kind='page', source=str(SNIPPETS / 'state.js'), args={'fresh': True},
                 page={'modules': {'CurrentUserInitialData': {'USER_ID': 1000123}}, 'buffered': [200] * 29})
     assert fresh['result'] == {'location': 'https://www.facebook.com/', 'user_id': '1000123', 'runtime': True,
-                               'resources': 29, 'statuses': [200] * 29}
+                               'resources': 29, 'statuses': [200] * 29, 'unwatched': []}
     assert fresh['fetches'] == []
     # a tab the skill did not just open: what it did before the skill watched it is not counted
     known = run(tmp_path, kind='page', source=str(SNIPPETS / 'state.js'), args={'fresh': False},
                 page={'modules': {'CurrentUserInitialData': {'USER_ID': 1}}, 'buffered': [200, 429]})
     assert known['result']['resources'] == 0 and known['result']['statuses'] == []
+    assert known['result']['unwatched'] == [200, 429]  # not counted, but a rate limit there is still seen
 
 
 def test_program_lists_tabs_without_touching_a_page(tmp_path):
@@ -177,3 +178,25 @@ def test_requests_finishing_after_a_call_are_counted_by_the_next(tmp_path):
     first, second = out['result']
     assert first['resources'] == 1 and first['statuses'] == [200]
     assert second['statuses'] == [429]  # the late one is reported at the next look, never dropped
+
+
+def test_a_reloaded_pages_rate_limit_is_reported_not_charged(tmp_path):
+    """Third review, finding 1: a reload the skill did not cause is not counted, but its 429 is still seen."""
+    out = run(tmp_path, kind='sequence', calls=[
+        {'source': str(SNIPPETS / 'page.js'), 'args': {'url': 'https://www.facebook.com/x'}, 'observed': [200]},
+        {'source': str(SNIPPETS / 'page.js'), 'args': {'url': 'https://www.facebook.com/y'}, 'reload': [200, 429]},
+    ], page={'fetch': [{'status': 200, 'body': 'a'}, {'status': 200, 'body': 'b'}]})
+    first, second = out['result']
+    assert first['resources'] == 1
+    assert second['resources'] == 0 and 429 in second['unwatched'] and second['stopped'] == 'rate_limit'
+    assert len(out['fetches']) == 1  # the second call sent nothing
+
+
+def test_a_rate_limit_already_in_the_ledger_stops_the_next_request_before_it_is_sent(tmp_path):
+    """Third review, finding 2."""
+    out = run(tmp_path, kind='sequence', calls=[
+        {'source': str(SNIPPETS / 'page.js'), 'args': {'url': 'https://www.facebook.com/x'}, 'observed': [200]},
+        {'source': str(SNIPPETS / 'page.js'), 'args': {'url': 'https://www.facebook.com/y'}, 'before': [429]},
+    ], page={'fetch': [{'status': 200, 'body': 'a'}, {'status': 200, 'body': 'b'}]})
+    assert out['result'][1]['stopped'] == 'rate_limit' and out['result'][1]['statuses'] == [429]
+    assert len(out['fetches']) == 1

@@ -43,26 +43,26 @@ function fakeWindow() {
     return hydrate(modules[name]);
   };
   const location = new URL(pageSpec.location || 'https://www.facebook.com/');
-  const history = {pushState: (state, title, url) => { const next = new URL(url, location.href); location.href = next.href; }};
+  // A call's own requests finish only once it acts: a fetch, or moving the page.
+  const act = () => { pending.push(...during.splice(0)); };
+  const history = {pushState: (state, title, url) => { const next = new URL(url, location.href); location.href = next.href; act(); }};
   const window = {require, requireLazy: () => {}, dispatchEvent: () => true, location, history};
   const fetch = async (url, init = {}) => {
     const absolute = new URL(url, location.href).href;
     fetches.push({url: absolute, method: init.method || 'GET', headers: init.headers || {}, body: init.body || null,
                   credentials: init.credentials || null});
+    act();
     const response = responses.shift() || {status: 200, url: absolute, body: ''};
     if (response.throw) throw new Error(response.throw);
     return {status: response.status, url: response.url || absolute, text: async () => response.body};
   };
   // Requests the tab finishes, as PerformanceObserver reports them. page.buffered: finished before the page was
   // first watched; a call's before: finished between calls; a call's observed: finished during the call (after a
-  // ledger the call installs has taken its first records).
+  // call has acted: fetched, or moved the page).
   class PerformanceObserver {
-    constructor(callback) { this.callback = callback; this.installing = false; }
-    observe() { this.installing = true; }
-    takeRecords() {
-      if (this.installing) { this.installing = false; return pending.splice(0); }
-      return pending.splice(0).concat(during.splice(0));
-    }
+    constructor(callback) { this.callback = callback; }
+    observe() {}
+    takeRecords() { return pending.splice(0); }
     disconnect() {}
   }
   const performance = {getEntriesByType: () => {
@@ -85,6 +85,11 @@ async function runSequence() {
   sharedContext = vm.createContext(fakeWindow());  // one page across calls, as the dedicated tab is
   const results = [];
   for (const call of spec.calls) {
+    if (call.reload) {  // the page reloads before this call: a new window, its own load already finished
+      sharedContext = vm.createContext(fakeWindow());
+      pending.splice(0);
+      for (const status of call.reload) pending.push(entry(status));
+    }
     finish(call);
     results.push(await runPage(fs.readFileSync(call.source, 'utf8'), call.args));
   }

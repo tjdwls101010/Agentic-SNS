@@ -177,15 +177,16 @@ def describe(exit_codes):
     }
 
 
-REQUESTS = ('request_count counts every network action this invocation started toward facebook.com: each GraphQL '
-            'query, each page fetch, a retry, and every facebook.com request the dedicated tab finished while the '
-            'command ran, which the tab keeps in a ledger across calls so a request finishing after one call is '
-            'counted by the next. Opening the tab is reported in tab_opened_requests and not charged to max_requests; '
-            'moving it to another screen to load a current query id is charged at least 10. Opening or moving the tab '
-            'is charged in full after it runs, so request_count can exceed max_requests by that excess; nothing more '
-            'is sent after. An action that timed out keeps what was reserved for it. fbcdn.net static files are not '
-            'counted. A 429 on any of the tab\'s requests records a rate limit, a checkpoint stays a checkpoint. All '
-            'invocations share one cross-process lock and pacing (1-2 s between requests) for the account.')
+REQUESTS = ('request_count counts what this invocation sent to facebook.com (each GraphQL query, page fetch, retry) and every '
+            'facebook.com request the dedicated tab finished while it ran. What the page itself loads cannot be '
+            'bounded or attributed exactly, so it is prepaid: opening the tab is reserved at 30 (tab_opened_requests, '
+            'not charged to max_requests) and moving it to another screen at 10, the excess is charged when the page '
+            'loads more, and requests finishing after the call that caused them use up those reservations first. '
+            'request_count can therefore exceed max_requests by a navigation\'s excess; nothing more is sent after. '
+            'An action that timed out keeps its reservation. Requests the tab made between commands or on a reload '
+            'the skill did not cause are not counted, but their statuses are checked: a 429 anywhere records a rate '
+            'limit before anything else is sent, and a checkpoint stays a checkpoint. fbcdn.net static files are not '
+            'counted. All invocations share one cross-process lock and pacing (1-2 s between requests).')
 
 ENVELOPE = {
     'ok': 'boolean — false only for the kinds whose ok is false (see kinds)',

@@ -47,7 +47,7 @@ def test_a_vanished_tab_is_reopened_once(browser, data_dir):
     browser.respond('query', page(['A'], has_next=False))
     code, out, _ = run_cli(browser, 'feed')
     assert code == 0, out
-    assert out.splitlines()[0] == 'feed · sort=top · 1 shown · stopped=exhausted · requests=1/25 · tab opened (+21 requests)'
+    assert out.splitlines()[0] == 'feed · sort=top · 1 shown · stopped=exhausted · requests=1/25 · tab opened (+30 requests)'
     assert json.loads((data_dir / 'session/default.json').read_text())['tab'] == 'NEW'
 
 

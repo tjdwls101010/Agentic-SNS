@@ -19,7 +19,11 @@ from facebook.graphql.records.search import VERTICALS
 from facebook.graphql.records.search import filters as search_filters
 
 HOME = 'https://www.facebook.com/'
-ROUTE_RESERVE = 10  # moving the tab to another screen made 6-9 facebook.com requests when measured; counted at least this
+# What the page itself loads cannot be bounded or attributed exactly, so the actions whose size the page decides are
+# prepaid: opening the dedicated tab measured 30 facebook.com requests, moving it to another screen 6-9. Requests the
+# page finishes after the call that caused them are counted against what is left of these reservations first.
+OPEN_RESERVE = 30
+ROUTE_RESERVE = 10
 SNIPPETS = {path.stem: path.read_text(encoding='utf-8')
             for path in (Path(__file__).parent / 'snippets').glob('*.js')}
 SNAPSHOT = json.loads((Path(__file__).with_name('queries.json')).read_text(encoding='utf-8'))
@@ -47,6 +51,7 @@ class Client:
         self.tab = None
         self.account_id = None
         self.opened_now = False
+        self.prepaid = {'setup': 0, 'budget': 0}  # reserved but not yet seen: requests the page may still finish
 
     # --- the tab ---------------------------------------------------------------------------------------------
 
@@ -71,7 +76,7 @@ class Client:
     def _open(self):
         """Open a new dedicated tab: counted as requests (its document and what the page loads), outside the budget."""
         before = {t['target_id'] for t in self.browser.tabs()}
-        with self.guard.request(budgeted=False) as slot:
+        with self.guard.request(reserve=OPEN_RESERVE, budgeted=False) as slot:
             self.browser.open(HOME)
             new = [t for t in self.browser.tabs() if t['target_id'] not in before and _facebook(t['url'])]
             if not new:
@@ -80,7 +85,9 @@ class Client:
             self.memory.set_tab(self.tab)
             self.opened_now = True
             state = self._state(fresh=True)
-            slot.charge(1 + _int(state.get('resources')))
+            seen = 1 + _int(state.get('resources'))
+            slot.charge(seen)
+            self.prepaid['setup'] = max(0, OPEN_RESERVE - seen)
             self._check_state(state, slot)
         return state
 
@@ -130,7 +137,10 @@ class Client:
                         raise
                     if not isinstance(result, dict):
                         raise FacebookError(3, 'The Facebook tab answered invalidly.', 'Run doctor.')
-                    slot.charge(max(_int(result.get('explicit'), 1), _int(result.get('resources'))))
+                    if result.get('stopped'):
+                        slot.cancel()  # the tab already showed a rate limit, so nothing was sent
+                    else:
+                        self._charge(slot, result, reserve)
                     if self.verbose:
                         diagnostic('request', snippet=snippet, label=label, count=self.guard.count,
                                    status=result.get('status'), source=(result.get('used') or {}).get('source'))
@@ -153,6 +163,20 @@ class Client:
                     raise
             self._open()
         raise AssertionError('unreachable')
+
+    def _charge(self, slot, result, reserve):
+        """Charge what the call sent and what the tab finished meanwhile; late requests use up a reservation first."""
+        explicit, seen = _int(result.get('explicit'), 1), _int(result.get('resources'))
+        if reserve > 1:  # a navigation: prepaid, charged in full when the page loaded more
+            slot.charge(max(reserve, seen))
+            self.prepaid['budget'] += max(0, reserve - seen)
+            return
+        extra = max(0, seen - explicit)
+        for bucket in ('setup', 'budget'):
+            used = min(extra, self.prepaid[bucket])
+            self.prepaid[bucket] -= used
+            extra -= used
+        slot.charge(explicit + extra)
 
     def query(self, key, variables, *, route, retried=False):
         """The decoded chunks of one read query; stale stored ids are healed by visiting `route` once."""
@@ -295,7 +319,8 @@ class Client:
 
 def _rate_limited(result, verdict):
     """A 429 on any of the tab's requests is a rate limit, unless the verdict is already a checkpoint (which lasts)."""
-    if verdict.block == 'checkpoint' or 429 not in (result.get('statuses') or []):
+    statuses = list(result.get('statuses') or []) + list(result.get('unwatched') or [])
+    if verdict.block == 'checkpoint' or (429 not in statuses and result.get('stopped') != 'rate_limit'):
         return verdict
     return classify.Verdict('blocked', error=FacebookError(
         5, 'Facebook rate-limited this account; requests are blocked for 30 minutes.',

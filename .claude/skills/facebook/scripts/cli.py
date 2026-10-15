@@ -32,13 +32,14 @@ KIND_EXIT = {'records': 0, 'resumable': 0, 'complete': 0, 'maintenance': 0, 'arg
              'blocked': 5, 'failed': 6, 'empty': 7, 'partial': 8}
 
 REQUESTS = ('how requests are counted: every GraphQL query, page fetch and retry counts, and so does every facebook.com request '
-            'the dedicated tab finishes while the command runs. Opening that tab the first time (about 30, shown as '
-            '"tab opened") is not charged to --max-requests. When Facebook no longer accepts a stored query, the tab '
-            'moves once to the screen that loads it, charged at least 10. The page decides how much opening or moving '
-            'the tab loads, so that is charged in full after it runs and a reading can end above --max-requests by '
-            'the excess; nothing more is sent after. fbcdn.net static files do not count. A rate limit on any of the '
-            'tab\'s requests, even one that finished between commands, blocks like one of ours. All invocations '
-            'share one lock and 1-2 s pacing for the account.')
+            'the dedicated tab finishes while the command runs. What the page itself loads is prepaid: opening the '
+            'tab the first time is charged 30 (shown as "tab opened", not charged to --max-requests), and moving it '
+            'to the screen that loads a current query id, when Facebook no longer accepts a stored one, is charged '
+            '10; more is charged when the page loads more, and requests it finishes later use up those reservations '
+            'first. So a reading can end above --max-requests by that excess; nothing more is sent after. fbcdn.net '
+            'static files do not count. A rate limit on any of the tab\'s requests, even one that finished between '
+            'commands or on a reload, blocks before the next request is sent. All invocations share one lock and '
+            '1-2 s pacing for the account.')
 TEXT_OUTPUT = ('output: first line "<command> · … · N shown · stopped=<reason> · requests=<used>/<budget>"; dated reads '
                'add "window <since>..<until> · <coverage>"; then one record per [p1]/[c1]/[e1] label, each ending with '
                'the arguments of the next command (url, author, replies <handle>); text is shown as text[N of M chars '
