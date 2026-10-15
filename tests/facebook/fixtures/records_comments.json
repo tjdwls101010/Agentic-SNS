@@ -1,0 +1,130 @@
+{
+  "about": "Synthetic GraphQL bodies for comment and reply records (appendix A 24b, 40-42). Same case format as records_posts.json; expected.handles maps a parent comment id to its reply-expansion handle and whether it should be expanded.",
+  "cases": [
+    {
+      "name": "comment-shape-predicate",
+      "item": "24b",
+      "fact": "A comment node has depth, author (dict or null), body (dict or null) and an id; __typename alone does not make a comment. Extraction does not descend under comment_direct_parent.",
+      "parser": "comments",
+      "args": {"post_id": "FP1"},
+      "body_lines": [
+        {"data": {"node": {"comment_rendering_instance_for_feed_location": {"comments": {"edges": [
+          {"node": {"__typename": "Comment", "id": "C1", "depth": 0, "author": {"id": "200", "name": "Commenter Two", "url": "https://www.facebook.com/commenter.two"}, "body": {"text": "a normal comment"}, "created_time": 1767225600, "feedback": {"id": "FC1"}}},
+          {"node": {"__typename": "Comment", "id": "C2", "author": {"id": "201", "name": "No Depth"}, "body": {"text": "typename without depth"}}},
+          {"node": {"id": "C3", "depth": 0, "author": "Someone", "body": {"text": "author is a string"}}},
+          {"node": {"id": "C4", "depth": 0, "author": {"id": "202"}, "body": "body is a string"}},
+          {"node": {"depth": 0, "author": {"id": "203"}, "body": {"text": "no id"}}},
+          {"node": {"id": "C6", "depth": 0, "author": null, "body": null, "created_time": 1767225600, "feedback": {"id": "FC6"}, "comment_direct_parent": {"id": "C7", "depth": 0, "author": {"id": "204", "name": "Hidden Parent"}, "body": {"text": "parent copy"}}}}
+        ], "page_info": {"has_next_page": false, "end_cursor": null}}}}}}
+      ],
+      "expected": {
+        "records": [
+          {"id": "C1", "post_id": "FP1", "depth": 0, "parent_id": null, "text": "a normal comment", "author_name": "Commenter Two", "author_id": "200", "author_url": "https://www.facebook.com/commenter.two", "created_at": "2026-01-01T00:00:00Z"},
+          {"id": "C6", "depth": 0, "text": "", "author_name": null, "author_url": null, "attachments": []}
+        ],
+        "page_info": {"has_next_page": false, "end_cursor": null},
+        "issues": []
+      }
+    },
+    {
+      "name": "comment-merge-and-reaction-priority",
+      "item": "40",
+      "fact": "Comments merge by id. Reactions: feedback.reactors.count, then unified_reactors.count, then reaction_count.count; then comment_action_links[].comment.feedback.reactors.count; last, count_reduced only when it is all digits (1.2K is not guessed).",
+      "parser": "comments",
+      "args": {"post_id": "FP1"},
+      "body_lines": [
+        {"data": {"node": {"comment_rendering_instance_for_feed_location": {"comments": {"edges": [
+          {"node": {"id": "C1", "depth": 0, "author": {"id": "200", "name": "A"}, "body": null, "created_time": 1767225600, "feedback": {"id": "FC1", "reactors": {"count": 5, "count_reduced": "5"}, "unified_reactors": {"count": 9}}}},
+          {"node": {"id": "C2", "depth": 0, "author": {"id": "201", "name": "B"}, "body": {"text": "b"}, "feedback": {"id": "FC2", "unified_reactors": {"count": 7}}}},
+          {"node": {"id": "C3", "depth": 0, "author": {"id": "202", "name": "C"}, "body": {"text": "c"}, "feedback": {"id": "FC3", "reaction_count": {"count": 4}}}},
+          {"node": {"id": "C4", "depth": 0, "author": {"id": "203", "name": "D"}, "body": {"text": "d"}, "feedback": {"id": "FC4"}, "comment_action_links": [{"__typename": "X"}, {"comment": {"feedback": {"reactors": {"count": 3}}}}]}},
+          {"node": {"id": "C5", "depth": 0, "author": {"id": "204", "name": "E"}, "body": {"text": "e"}, "feedback": {"id": "FC5", "reactors": {"count_reduced": "6"}}}},
+          {"node": {"id": "C6", "depth": 0, "author": {"id": "205", "name": "F"}, "body": {"text": "f"}, "feedback": {"id": "FC6", "reactors": {"count_reduced": "1.2K"}}}}
+        ], "page_info": {"has_next_page": true, "end_cursor": "CC1"}}}}}},
+        {"path": ["node", "comment_rendering_instance_for_feed_location", "comments", "edges", 0, "node"], "data": {"id": "C1", "depth": 0, "author": {"id": "200", "name": "A"}, "body": {"text": "late body for C1"}}}
+      ],
+      "expected": {
+        "records": [
+          {"id": "C1", "reaction_count": 5, "text": "late body for C1"},
+          {"id": "C2", "reaction_count": 7},
+          {"id": "C3", "reaction_count": 4},
+          {"id": "C4", "reaction_count": 3},
+          {"id": "C5", "reaction_count": 6},
+          {"id": "C6", "reaction_count": null}
+        ],
+        "page_info": {"has_next_page": true, "end_cursor": "CC1"},
+        "issues": []
+      }
+    },
+    {
+      "name": "reply-handles",
+      "item": "41",
+      "fact": "reply_count = feedback.replies_fields.total_count. Replies are never inline; expanding needs feedback.id and feedback.expansion_info.expansion_token. A count of 0 is not expanded; a missing count lets the token decide.",
+      "parser": "comments",
+      "args": {"post_id": "FP1"},
+      "body_lines": [
+        {"data": {"node": {"comment_rendering_instance_for_feed_location": {"comments": {"edges": [
+          {"node": {"id": "C1", "depth": 0, "author": {"id": "200", "name": "A"}, "body": {"text": "has replies"}, "feedback": {"id": "FC1", "replies_fields": {"total_count": 2}, "expansion_info": {"expansion_token": "tok1"}, "replies_connection": {"edges": [], "page_info": {"has_next_page": true, "end_cursor": null}}}}},
+          {"node": {"id": "C2", "depth": 0, "author": {"id": "201", "name": "B"}, "body": {"text": "zero replies"}, "feedback": {"id": "FC2", "replies_fields": {"total_count": 0}, "expansion_info": {"expansion_token": "tok2"}}}},
+          {"node": {"id": "C3", "depth": 0, "author": {"id": "202", "name": "C"}, "body": {"text": "count not sent"}, "feedback": {"id": "FC3", "expansion_info": {"expansion_token": "tok3"}}}},
+          {"node": {"id": "C4", "depth": 0, "author": {"id": "203", "name": "D"}, "body": {"text": "nothing to expand with"}, "feedback": {"id": "FC4"}}}
+        ], "page_info": {"has_next_page": false, "end_cursor": null}}}}}}
+      ],
+      "expected": {
+        "records": [
+          {"id": "C1", "reply_count": 2},
+          {"id": "C2", "reply_count": 0},
+          {"id": "C3", "reply_count": null},
+          {"id": "C4", "reply_count": null}
+        ],
+        "handles": {
+          "C1": {"feedback_id": "FC1", "expansion_token": "tok1", "expandable": true},
+          "C2": {"feedback_id": "FC2", "expansion_token": "tok2", "expandable": false},
+          "C3": {"feedback_id": "FC3", "expansion_token": "tok3", "expandable": true},
+          "C4": {"feedback_id": "FC4", "expansion_token": null, "expandable": false}
+        },
+        "issues": []
+      }
+    },
+    {
+      "name": "comment-attachment-kinds",
+      "item": "42",
+      "fact": "A comment attachment's kind comes from style_list[0]: photo and album -> photo, animated_image_share -> gif, sticker, video and video_inline -> video, share and link -> link, anything else -> other. Media URLs are not exported.",
+      "parser": "comments",
+      "args": {"post_id": "FP1"},
+      "body_lines": [
+        {"data": {"node": {"comment_rendering_instance_for_feed_location": {"comments": {"edges": [
+          {"node": {"id": "C1", "depth": 0, "author": {"id": "200", "name": "A"}, "body": null, "feedback": {"id": "FC1"}, "attachments": [{"style_list": ["album", "photo"]}, {"style_list": ["animated_image_share"]}, {"style_list": ["sticker"]}, {"style_list": ["video_inline"]}, {"style_list": ["share"]}, {"style_list": ["poll"]}, {"style_list": []}, "not an attachment"]}}
+        ], "page_info": {"has_next_page": false, "end_cursor": null}}}}}}
+      ],
+      "expected": {
+        "records": [
+          {"id": "C1", "text": "", "attachments": [{"kind": "photo"}, {"kind": "gif"}, {"kind": "sticker"}, {"kind": "video"}, {"kind": "link"}, {"kind": "other"}, {"kind": "other"}]}
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "replies-page",
+      "item": "41",
+      "fact": "A reply's parent is comment_direct_parent.id; a reply without a parent link belongs to the expanded parent; a reply to another comment is not this parent's. The replies connection carries its own page_info.",
+      "parser": "replies",
+      "args": {"post_id": "FP1", "parent_id": "C1"},
+      "body_lines": [
+        {"data": {"node": {"__typename": "Feedback", "id": "FC1", "replies_connection": {"edges": [
+          {"node": {"id": "R1", "depth": 1, "author": {"id": "300", "name": "Replier One", "url": "https://www.facebook.com/replier.one"}, "body": {"text": "first reply"}, "created_time": 1767229200, "feedback": {"id": "FR1"}, "comment_direct_parent": {"id": "C1", "depth": 0, "author": {"id": "200", "name": "A"}, "body": {"text": "parent copy"}}}},
+          {"node": {"id": "R2", "depth": 1, "author": {"id": "301", "name": "Replier Two"}, "body": {"text": "second reply"}, "feedback": {"id": "FR2"}}},
+          {"node": {"id": "R3", "depth": 1, "author": {"id": "302", "name": "Elsewhere"}, "body": {"text": "reply to another comment"}, "feedback": {"id": "FR3"}, "comment_direct_parent": {"id": "C9"}}}
+        ], "page_info": {"has_next_page": true, "end_cursor": "RCUR1"}}}}}
+      ],
+      "expected": {
+        "records": [
+          {"id": "R1", "depth": 1, "parent_id": "C1", "text": "first reply", "created_at": "2026-01-01T01:00:00Z", "author_url": "https://www.facebook.com/replier.one"},
+          {"id": "R2", "depth": 1, "parent_id": "C1", "text": "second reply"}
+        ],
+        "page_info": {"has_next_page": true, "end_cursor": "RCUR1"},
+        "issues": []
+      }
+    }
+  ]
+}

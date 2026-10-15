@@ -1,0 +1,84 @@
+{
+  "about": "How requests to Facebook are built (appendix A 11-20). Values are Facebook's web-client conventions as observed; derived numbers (jazoest, base64 tokens, unix times) were computed by hand or with the standard library, not by the skill.",
+  "tokens": {
+    "item": "11",
+    "fact": "Session tokens come from the logged-in home HTML and are never written to disk. jazoest is '2' followed by the sum of the code points of fb_dtsg; __rev equals __spin_r.",
+    "html": "<script>{\"USER_ID\":\"1000123\",\"x\":1}</script><script>[\"DTSGInitialData\",[],{\"token\":\"AB:cd\"},258],[\"LSD\",[],{\"token\":\"lsdTok\"},323],{\"__spin_r\":1027000000}</script>",
+    "expected": {"user_id": "1000123", "fb_dtsg": "AB:cd", "lsd": "lsdTok", "__spin_r": "1027000000", "__rev": "1027000000", "jazoest": "2388"},
+    "missing_token_html": "<script>{\"USER_ID\":\"1000123\"}</script>",
+    "missing_token_outcome": "failed: tokens missing (a logged-in page without them is not usable)"
+  },
+  "graphql_request": {
+    "item": "12",
+    "fact": "A GraphQL read is a POST of a urlencoded form to https://www.facebook.com/api/graphql/ with the browser's cookies.",
+    "method": "POST",
+    "url": "https://www.facebook.com/api/graphql/",
+    "form_fields_in_order": ["av", "__user", "__a", "__comet_req", "fb_dtsg", "jazoest", "lsd", "__spin_r", "__rev", "server_timestamps", "fb_api_caller_class", "fb_api_req_friendly_name", "variables", "doc_id"],
+    "fixed_values": {"__a": "1", "__comet_req": "15", "server_timestamps": "true", "fb_api_caller_class": "RelayModern"},
+    "from_tokens": {"av": "user_id", "__user": "user_id", "fb_dtsg": "fb_dtsg", "jazoest": "jazoest", "lsd": "lsd", "__spin_r": "__spin_r", "__rev": "__rev"},
+    "headers": {"content-type": "application/x-www-form-urlencoded", "origin": "https://www.facebook.com", "x-fb-friendly-name": "<friendly name>", "x-fb-lsd": "<lsd>", "referer": "<the page the query belongs to>"},
+    "read_only": "Only the read queries named in query_names are ever sent; any other friendly name is refused before a request."
+  },
+  "relay_provider_flags": {
+    "item": "13",
+    "fact": "Variables must include the page's __relay_internal__pv__*relayprovider flags. They are found in the page's application/json script tags; a value is kept only when it is a boolean, an integer or an upper-case constant.",
+    "html": "<script type=\"application/json\">{\"require\":[[\"x\",{\"__relay_internal__pv__FooBarrelayprovider\":true,\"__relay_internal__pv__CountThingrelayprovider\":3,\"__relay_internal__pv__Translaterelayprovider\":\"AUTO_TRANSLATE\",\"__relay_internal__pv__Lowerrelayprovider\":\"lower\",\"__relay_internal__pv__Objrelayprovider\":{\"a\":1},\"__relay_internal__pv__Bad-Namerelayprovider\":true}]]}</script><script type=\"application/json\">not json</script>",
+    "expected": {"__relay_internal__pv__FooBarrelayprovider": true, "__relay_internal__pv__CountThingrelayprovider": 3, "__relay_internal__pv__Translaterelayprovider": "AUTO_TRANSLATE"}
+  },
+  "large_body": {
+    "item": "14",
+    "fact": "One REPL log line holds about 12 MiB (measured). When the envelope JSON would exceed 8 MiB, the body is sent as 512 KiB-character body_chunk lines first, and a chunk never ends between the two halves of a surrogate pair.",
+    "chunk_chars": 524288,
+    "threshold_bytes": 8388608,
+    "case": "body = 'a' * 524287 + U+1F600 + 'b' * 9437184: the first chunk is the 524287 'a's, the second starts with U+1F600; joined, the chunks equal the body."
+  },
+  "doc_id_discovery": {
+    "item": "15",
+    "fact": "A query's doc_id is exported by a module named <Name>_facebookRelayOperation in Facebook's own JavaScript (route HTML or static rsrc.php bundles). A candidate is stored only after a replay verifies it.",
+    "bundle": "__d(\"CometNewsFeedPaginationQuery_facebookRelayOperation\",[],(function(a,b,c,d,e,f){e.exports=\"28716439607948928\"}),null);\n__d(\"UnwantedQuery_facebookRelayOperation\",[],(function(a,b,c,d,e,f){e.exports=\"111\"}),null);\n__d('ProfileCometTimelineFeedRefetchQuery_facebookRelayOperation',[],function(a,b,c,d,e,f){e.exports='28178456998478510';});\n__d(\"SearchCometResultsPaginatedResultsQuery_facebookRelayOperation\",[],(function(a,b,c,d,e,f){e.exports=g}),null);",
+    "wanted": ["CometNewsFeedPaginationQuery", "ProfileCometTimelineFeedRefetchQuery", "SearchCometResultsPaginatedResultsQuery"],
+    "expected": {"CometNewsFeedPaginationQuery": "28716439607948928", "ProfileCometTimelineFeedRefetchQuery": "28178456998478510"}
+  },
+  "query_names": {
+    "item": "16",
+    "fact": "The read queries by friendly name, with the connection (or object) each must return and the variable that carries its cursor. Default variables are preserved from the bundled registry of the previous skill version.",
+    "queries": {
+      "about": {"name": "ProfileCometAboutAppSectionQuery", "expected_key": "about_app_sections", "kind": "connection", "cursor_var": null},
+      "timeline": {"name": "ProfileCometTimelineFeedRefetchQuery", "expected_key": "timeline_list_feed_units", "kind": "connection", "cursor_var": "cursor"},
+      "newsfeed": {"name": "CometNewsFeedPaginationQuery", "expected_key": "news_feed", "kind": "connection", "cursor_var": "cursor"},
+      "group": {"name": "GroupsCometFeedRegularStoriesPaginationQuery", "expected_key": "group_feed", "kind": "connection", "cursor_var": "cursor"},
+      "search": {"name": "SearchCometResultsPaginatedResultsQuery", "expected_key": "results", "kind": "connection", "cursor_var": "cursor"},
+      "post": {"name": "CometSinglePostDialogContentQuery", "expected_key": "node", "kind": "object", "cursor_var": null},
+      "comments": {"name": "CommentListComponentsRootQuery", "expected_key": "comments", "kind": "connection", "cursor_var": null},
+      "comments_page": {"name": "CommentsListComponentsPaginationQuery", "expected_key": "comments", "kind": "connection", "cursor_var": "commentsAfterCursor"},
+      "replies": {"name": "Depth1CommentsListPaginationQuery", "expected_key": "replies_connection", "kind": "connection", "cursor_var": "repliesAfterCursor", "unverified": "the reply cursor is the plan's hypothesis until reconnaissance R3 observes a second reply batch"}
+    }
+  },
+  "sort_tokens": {
+    "item": "17",
+    "feed": {"top": {"orderby": ["TOP_STORIES"], "feedStyle": "DEFAULT"}, "recent": {"orderby": ["MOST_RECENT"], "feedStyle": "MOST_RECENT_FEED_DEFAULT"}},
+    "group": {"top": "TOP_POSTS", "recent": "CHRONOLOGICAL", "activity": "RECENT_ACTIVITY"},
+    "comments": {"top": "RANKED_UNFILTERED_INTENT_V1", "recent": "REVERSE_CHRONOLOGICAL_UNFILTERED_INTENT_V1"}
+  },
+  "search_types": {
+    "item": "18",
+    "fact": "args.experience.type selects the vertical; all five share one doc_id.",
+    "map": {"top": "GLOBAL_SEARCH", "posts": "POSTS_TAB", "people": "PEOPLE_TAB", "pages": "PAGES_TAB", "groups": "GROUPS_TAB"}
+  },
+  "about_tokens": {
+    "item": "19",
+    "fact": "sectionToken is base64 of app_section:<id>:2327158227; pageID and userID are both the target id; the overview uses collectionToken null and each collection costs one more request.",
+    "cases": [
+      {"id": "4", "sectionToken": "YXBwX3NlY3Rpb246NDoyMzI3MTU4MjI3"},
+      {"id": "1000123", "sectionToken": "YXBwX3NlY3Rpb246MTAwMDEyMzoyMzI3MTU4MjI3"}
+    ]
+  },
+  "profile_window": {
+    "item": "20",
+    "fact": "A profile window is sent as afterTime and beforeTime: unix seconds at the start of --since and the end of --until in the local time zone; Facebook filters on the server.",
+    "cases": [
+      {"tz": "Asia/Seoul", "since": "2026-09-01", "until": "2026-09-30", "afterTime": 1788188400, "beforeTime": 1790780399},
+      {"tz": "UTC", "since": "2026-09-01", "until": "2026-09-30", "afterTime": 1788220800, "beforeTime": 1790812799}
+    ]
+  }
+}

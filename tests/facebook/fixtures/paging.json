@@ -1,0 +1,158 @@
+{
+  "about": "Pagination and date-window scenarios (appendix A 8, 45-47, 51). Each scenario serves pages in order (records with only the fields the policy reads, page_info, or an error code), the reading options, and what must come out: shown ids in order, the stop reason, pages fetched, the unshown tail kept for the next handle, sponsored posts skipped, and the window coverage. Times are UTC; tz is the local zone the window is judged in.",
+  "scenarios": [
+    {
+      "name": "newest-first-window-closes-at-boundary-page",
+      "item": "45,51",
+      "fact": "Newest-first feed and group pages are chronological (measured 9/9 and 15/15). The window closes on the page that holds a dated, unpinned, unsponsored post older than --since; pinned and undated posts pass any window and never close it; dates compare as local dates.",
+      "options": {"order": "newest_first", "since": "2026-09-10", "until": null, "limit": null, "skip_sponsored": true, "tz": "Asia/Seoul"},
+      "pages": [
+        {"records": [
+          {"id": "P1", "created_at": "2026-09-12T03:00:00Z"},
+          {"id": "P2", "created_at": "2026-01-01T00:00:00Z", "pinned": true},
+          {"id": "P3", "created_at": "2025-01-01T00:00:00Z", "sponsored": true},
+          {"id": "P6", "created_at": null}
+        ], "page_info": {"has_next_page": true, "end_cursor": "CUR1"}},
+        {"records": [
+          {"id": "P4", "created_at": "2026-09-09T16:00:00Z"},
+          {"id": "P5", "created_at": "2026-09-09T14:00:00Z"}
+        ], "page_info": {"has_next_page": true, "end_cursor": "CUR2"}},
+        {"records": [{"id": "NEVER", "created_at": "2026-09-08T00:00:00Z"}], "page_info": {"has_next_page": false, "end_cursor": null}}
+      ],
+      "expected": {"shown": ["P1", "P2", "P6", "P4"], "stop_reason": "window_reached", "pages_fetched": 2, "pending": [], "sponsored_skipped": 1, "coverage": "closed (as served)", "continues": false}
+    },
+    {
+      "name": "until-filters-without-closing",
+      "item": "45",
+      "fact": "--until drops newer posts but does not stop reading; only --since closes a newest-first window.",
+      "options": {"order": "newest_first", "since": null, "until": "2026-09-10", "limit": 2, "skip_sponsored": true, "tz": "UTC"},
+      "pages": [
+        {"records": [{"id": "N1", "created_at": "2026-09-12T00:00:00Z"}, {"id": "N2", "created_at": "2026-09-10T23:59:00Z"}], "page_info": {"has_next_page": true, "end_cursor": "CUR1"}},
+        {"records": [{"id": "N3", "created_at": "2026-09-09T00:00:00Z"}, {"id": "N4", "created_at": "2026-09-08T00:00:00Z"}], "page_info": {"has_next_page": true, "end_cursor": "CUR2"}}
+      ],
+      "expected": {"shown": ["N2", "N3"], "stop_reason": "limit_reached", "pages_fetched": 2, "pending": ["N4"], "coverage": "open — more: continues", "continues": true}
+    },
+    {
+      "name": "ranked-window-is-a-sample",
+      "item": "45,51",
+      "fact": "A ranked order (feed top, group top or activity) cannot close a window: an old post does not mean older ones are done, so the window is a sample.",
+      "options": {"order": "ranked", "since": "2026-09-10", "until": null, "limit": 3, "skip_sponsored": false, "tz": "UTC"},
+      "pages": [
+        {"records": [{"id": "T1", "created_at": "2026-09-12T00:00:00Z"}, {"id": "T2", "created_at": "2026-09-01T00:00:00Z"}, {"id": "T3", "created_at": "2026-09-11T00:00:00Z"}], "page_info": {"has_next_page": true, "end_cursor": "CUR1"}},
+        {"records": [{"id": "T4", "created_at": "2026-09-13T00:00:00Z"}], "page_info": {"has_next_page": true, "end_cursor": "CUR2"}}
+      ],
+      "expected": {"shown": ["T1", "T3", "T4"], "stop_reason": "limit_reached", "pages_fetched": 2, "pending": [], "coverage": "sample (ranked order)", "continues": true}
+    },
+    {
+      "name": "server-filtered-window-closes-at-end",
+      "item": "20,51",
+      "fact": "A profile window is filtered by Facebook; reaching the end of the filtered timeline closes it.",
+      "options": {"order": "server", "since": "2026-09-01", "until": "2026-09-30", "limit": null, "skip_sponsored": false, "tz": "UTC"},
+      "pages": [
+        {"records": [{"id": "S1", "created_at": "2026-09-20T00:00:00Z"}, {"id": "S2", "created_at": "2026-09-02T00:00:00Z"}], "page_info": {"has_next_page": false, "end_cursor": null}}
+      ],
+      "expected": {"shown": ["S1", "S2"], "stop_reason": "exhausted", "pages_fetched": 1, "pending": [], "coverage": "closed (server-filtered)", "continues": false}
+    },
+    {
+      "name": "server-order-and-dedupe",
+      "item": "46",
+      "fact": "Server order is kept and a record repeated on a later page is shown once.",
+      "options": {"order": "ranked", "since": null, "until": null, "limit": null, "skip_sponsored": false, "tz": "UTC"},
+      "pages": [
+        {"records": [{"id": "A"}, {"id": "B"}, {"id": "C"}], "page_info": {"has_next_page": true, "end_cursor": "CUR1"}},
+        {"records": [{"id": "C"}, {"id": "D"}], "page_info": {"has_next_page": false, "end_cursor": null}}
+      ],
+      "expected": {"shown": ["A", "B", "C", "D"], "stop_reason": "exhausted", "pages_fetched": 2, "pending": [], "continues": false}
+    },
+    {
+      "name": "limit-keeps-unshown-tail",
+      "item": "46",
+      "fact": "Records past --limit on the last page are kept for the next handle, which shows them before requesting again.",
+      "options": {"order": "ranked", "since": null, "until": null, "limit": 2, "skip_sponsored": false, "tz": "UTC"},
+      "pages": [
+        {"records": [{"id": "A"}, {"id": "B"}, {"id": "C"}], "page_info": {"has_next_page": true, "end_cursor": "CUR1"}}
+      ],
+      "expected": {"shown": ["A", "B"], "stop_reason": "limit_reached", "pages_fetched": 1, "pending": ["C"], "continues": true},
+      "then": {"continue_with": {"limit": 2}, "pages": [{"records": [{"id": "D"}, {"id": "E"}], "page_info": {"has_next_page": false, "end_cursor": null}}],
+               "expected": {"shown": ["C", "D"], "stop_reason": "limit_reached", "pages_fetched": 1, "pending": ["E"], "continues": true}}
+    },
+    {
+      "name": "tail-then-end",
+      "item": "46",
+      "fact": "When the source has ended, a handle that only holds a tail shows it and stops without a request.",
+      "options": {"order": "ranked", "since": null, "until": null, "limit": 1, "skip_sponsored": false, "tz": "UTC"},
+      "pages": [
+        {"records": [{"id": "A"}, {"id": "B"}], "page_info": {"has_next_page": false, "end_cursor": null}}
+      ],
+      "expected": {"shown": ["A"], "stop_reason": "limit_reached", "pages_fetched": 1, "pending": ["B"], "continues": true},
+      "then": {"continue_with": {"limit": 5}, "pages": [],
+               "expected": {"shown": ["B"], "stop_reason": "exhausted", "pages_fetched": 0, "pending": [], "continues": false}}
+    },
+    {
+      "name": "sponsored-skipped-once",
+      "item": "46",
+      "fact": "Sponsored posts are left out by default and counted; their ids join the seen set so a continuation does not count them again.",
+      "options": {"order": "ranked", "since": null, "until": null, "limit": 1, "skip_sponsored": true, "tz": "UTC"},
+      "pages": [
+        {"records": [{"id": "AD1", "sponsored": true}, {"id": "A"}, {"id": "B"}], "page_info": {"has_next_page": true, "end_cursor": "CUR1"}}
+      ],
+      "expected": {"shown": ["A"], "stop_reason": "limit_reached", "pages_fetched": 1, "pending": ["B"], "sponsored_skipped": 1, "continues": true},
+      "then": {"continue_with": {"limit": 5}, "pages": [{"records": [{"id": "AD1", "sponsored": true}, {"id": "C"}], "page_info": {"has_next_page": false, "end_cursor": null}}],
+               "expected": {"shown": ["B", "C"], "stop_reason": "exhausted", "pages_fetched": 1, "pending": [], "sponsored_skipped": 0, "continues": false}}
+    },
+    {
+      "name": "explicit-empty-first-page",
+      "item": "7,46",
+      "fact": "An explicitly empty first page is an empty result, not a failure.",
+      "options": {"order": "ranked", "since": null, "until": null, "limit": null, "skip_sponsored": false, "tz": "UTC"},
+      "pages": [{"empty": true}],
+      "expected": {"shown": [], "stop_reason": "exhausted", "pages_fetched": 1, "pending": [], "result": "empty", "continues": false}
+    },
+    {
+      "name": "readable-zero-from-nonempty-connection",
+      "item": "46",
+      "fact": "A connection with items of which none could be read is a stale query (the response shape changed), not an empty page.",
+      "options": {"order": "ranked", "since": null, "until": null, "limit": null, "skip_sponsored": false, "tz": "UTC"},
+      "pages": [{"records": [], "has_items": true, "page_info": {"has_next_page": true, "end_cursor": "CUR1"}}],
+      "expected": {"shown": [], "failure": "stale_query", "pages_fetched": 1}
+    },
+    {
+      "name": "items-without-page-info",
+      "item": "8",
+      "fact": "Items without usable pagination metadata (has_next_page true without a cursor, or no page_info) mean the pagination is damaged; records already received are kept.",
+      "options": {"order": "ranked", "since": null, "until": null, "limit": null, "skip_sponsored": false, "tz": "UTC"},
+      "pages": [
+        {"records": [{"id": "A"}], "page_info": {"has_next_page": true, "end_cursor": "CUR1"}},
+        {"records": [{"id": "B"}], "page_info": {"has_next_page": true, "end_cursor": null}}
+      ],
+      "expected": {"shown": ["A", "B"], "failure": "pagination", "pages_fetched": 2}
+    },
+    {
+      "name": "repeated-cursor",
+      "item": "8",
+      "fact": "A cursor served twice in one reading is damaged pagination; reading stops before requesting it again.",
+      "options": {"order": "ranked", "since": null, "until": null, "limit": null, "skip_sponsored": false, "tz": "UTC"},
+      "pages": [
+        {"records": [{"id": "A"}], "page_info": {"has_next_page": true, "end_cursor": "SAME"}},
+        {"records": [{"id": "B"}], "page_info": {"has_next_page": true, "end_cursor": "SAME"}}
+      ],
+      "expected": {"shown": ["A", "B"], "failure": "pagination", "pages_fetched": 2}
+    },
+    {
+      "name": "failure-keeps-earlier-records",
+      "item": "46,51",
+      "fact": "A request that fails after some pages keeps what was read; the window is open and names the failure.",
+      "options": {"order": "newest_first", "since": "2026-09-01", "until": null, "limit": null, "skip_sponsored": false, "tz": "UTC"},
+      "pages": [
+        {"records": [{"id": "A", "created_at": "2026-09-05T00:00:00Z"}], "page_info": {"has_next_page": true, "end_cursor": "CUR1"}},
+        {"error": 6}
+      ],
+      "expected": {"shown": ["A"], "failure": "query", "pages_fetched": 1, "result": "partial", "coverage_starts": "open — "}
+    }
+  ],
+  "stop_priority": {
+    "item": "47",
+    "fact": "When several things stop one reading, the reported one is: a block or login stop, then a real request failure, then a budget stop. A budget stop on its own continues; the others do not override what was already read.",
+    "order": ["blocked", "login", "failed", "budget"]
+  }
+}
