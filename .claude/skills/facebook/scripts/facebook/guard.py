@@ -190,7 +190,7 @@ class Guard:
             self.check()
             if budgeted and self.used + reserve > self.budget:
                 raise FacebookError(8, 'The request budget (--max-requests) is spent.',
-                                    'Run more: to continue, or rerun with a larger --max-requests.')
+                                    'Run more: to continue, or rerun with a larger --max-requests.', reason='budget')
             gap = _next_allowed() - time.time()
             if gap > 0:
                 time.sleep(gap)

@@ -5,6 +5,7 @@ parameters. Query ids and provider flags come from the page's loaded modules whe
 earlier read learned, else from the bundled snapshot. When Facebook no longer accepts a stored query, the tab is moved
 to the screen that loads that query (as a person would open it) and the read is retried once with the live id.
 """
+import base64
 import json
 from datetime import datetime
 from pathlib import Path
@@ -12,7 +13,8 @@ from urllib.parse import quote, urlsplit
 
 from facebook.errors import FacebookError, diagnostic
 from facebook.graphql import classify, targets
-from facebook.graphql.records import comments_page, permalink_post, posts_page, replies_page, search_page
+from facebook.graphql.records import (about_collections, about_fields, comments_page, permalink_post, posts_page,
+                                     replies_page, search_page)
 from facebook.graphql.records.search import VERTICALS
 
 HOME = 'https://www.facebook.com/'
@@ -21,6 +23,7 @@ SNIPPETS = {path.stem: path.read_text(encoding='utf-8')
 SNAPSHOT = json.loads((Path(__file__).with_name('queries.json')).read_text(encoding='utf-8'))
 QUERIES = SNAPSHOT['queries']
 READ_NAMES = sorted(spec['name'] for spec in QUERIES.values())
+ABOUT_SECTION = '2327158227'  # the About app section's id
 FEED_SORTS = {'top': {'orderby': ['TOP_STORIES'], 'feedStyle': 'DEFAULT'},
               'recent': {'orderby': ['MOST_RECENT'], 'feedStyle': 'MOST_RECENT_FEED_DEFAULT'}}
 GROUP_SORTS = {'top': 'TOP_POSTS', 'recent': 'CHRONOLOGICAL', 'activity': 'RECENT_ACTIVITY'}
@@ -233,6 +236,12 @@ class Client:
         chunks = self.query('search', {'args': args, 'cursor': cursor},
                             route=HOME + 'search/' + vertical + '/?q=' + quote(text))
         return search_page(chunks, vertical=vertical, captured_at=_now())
+
+    def about(self, profile_id, collection, *, url):
+        """The decoded About response of the overview (collection None) or of one About tab."""
+        token = base64.b64encode(f'app_section:{profile_id}:{ABOUT_SECTION}'.encode()).decode()
+        return self.query('about', {'pageID': profile_id, 'userID': profile_id, 'sectionToken': token,
+                                    'collectionToken': collection}, route=url.rstrip('/') + '/about')
 
     def live_queries(self):
         """Which read queries the tab has loaded right now (doctor); makes no request."""

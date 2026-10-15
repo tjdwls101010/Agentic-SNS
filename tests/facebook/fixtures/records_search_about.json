@@ -623,9 +623,9 @@
       }
     },
     {
-      "name": "about-any-error-or-patch-is-an-issue",
-      "item": "44",
-      "fact": "About reads every part of its response, so any error or any path patch in it is an issue.",
+      "name": "about-errors-are-issues-unrelated-patches-are-not",
+      "item": "44 (calibrated by P2 capture)",
+      "fact": "About fields are read from every piece of the response wherever they arrive, so a deferred piece that carries fields is used, and one that carries none (a real About response always defers its navigation, timeline_nav_app_sections) changes nothing. An error can have dropped fields, so any error is an issue.",
       "parser": "about",
       "args": {
         "profile_id": "4",
@@ -694,8 +694,7 @@
           }
         ],
         "issues": [
-          "graphql_errors",
-          "unsupported_path_patch"
+          "graphql_errors"
         ]
       }
     }

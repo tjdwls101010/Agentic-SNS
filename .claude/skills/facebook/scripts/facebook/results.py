@@ -133,8 +133,9 @@ def finish(reading, *, command, requests, budget, identity=None, out=None):
         message = failure.message if isinstance(failure, FacebookError) else 'This query returned no results.'
         envelope.update(error='empty', message=message, fix=FIXES['empty'])
     elif kind == 'partial' and failure.code == 8:
-        envelope.update(error='partial', message='The request budget ran out before anything was saved to continue '
-                                                 'from.', fix=FIXES['budget_restart'])
+        message = ('The request budget ran out before anything was saved to continue from.'
+                   if failure.reason == 'budget' else failure.message)
+        envelope.update(error='partial', message=message, fix=FIXES['budget_restart'])
     elif failure is not None and kind != 'resumable':
         envelope.update(error=kind, message=failure.message, fix=failure.fix)
     elif kind == 'resumable':

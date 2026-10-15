@@ -57,6 +57,12 @@ def parse(case):
     if case['parser'] == 'search':
         page = graphql.search_page(case['body_lines'], vertical=args['search_type'], captured_at=NOW)
         return {'records': page.records, 'page_info': page.page_info, 'issues': page.issues}
+    if case['parser'] == 'about_collections':
+        return {'collections': graphql.about_collections(case['body_lines'])}
+    if case['parser'] == 'about':
+        fields, issues = graphql.about_fields(case['bodies'], profile_id=args['profile_id'],
+                                             collection_names=args['collection_names'], captured_at=NOW)
+        return {'records': fields, 'issues': issues}
     raise ValueError(case['parser'])
 
 
@@ -72,6 +78,11 @@ def test_comment_records(case):
 
 @pytest.mark.parametrize('case', cases('records_search_about.json', ('search',)))
 def test_search_records(case):
+    assert subset(case['expected'], parse(case)) == []
+
+
+@pytest.mark.parametrize('case', cases('records_search_about.json', ('about', 'about_collections')))
+def test_about_records(case):
     assert subset(case['expected'], parse(case)) == []
 
 

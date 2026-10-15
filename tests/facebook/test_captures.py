@@ -78,3 +78,11 @@ def test_real_search_pages():
         assert page.issues == [] and isinstance(page.page_info, dict)
     page = graphql.search_page(decode(groups['body']), vertical='groups', captured_at=NOW)
     assert page.records and {r['kind'] for r in page.records} == {'group'} and page.issues == []
+
+
+@pytest.mark.skipif(observed('r5_group_page') is None, reason='no local captures')
+def test_real_page_about_overview():
+    about = decode(observed('r5_group_page')[4]['body'])
+    assert len(graphql.about_collections(about)) >= 3
+    fields, issues = graphql.about_fields([about], profile_id='p', collection_names=[None], captured_at=NOW)
+    assert fields and issues == []
