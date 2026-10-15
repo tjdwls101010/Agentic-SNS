@@ -1,0 +1,243 @@
+"""Comment records and their extraction.
+
+Comments need their own extraction path rather than reusing ``parse.py``:
+a comment node carries its own ``feedback`` object, so the story walker
+counts comments as top-level *posts*. The two shapes are told apart by the
+``depth`` + ``author`` + ``body`` triple that only comments have.
+
+``depth`` ``0`` is a comment on the post, ``>= 1`` a reply.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable, Iterator
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+from facebook.graphql.records.fields import _iso, timestamp
+from facebook.graphql.records.parse import deep_merge, iter_json_objects
+
+
+@dataclass
+class Comment:
+    id: str
+    post_id: str  # feedback id of the post this comment belongs to
+    author_name: str | None
+    author_url: str | None
+    author_id: str | None
+    text: str
+    created_at: datetime | None
+    depth: int  # 0 = top-level, >= 1 = reply
+    parent_id: str | None
+    reaction_count: int | None
+    reply_count: int | None
+    captured_at: datetime
+    attachments: list[dict]  # [{kind}] — what a comment carries besides text
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "post_id": self.post_id,
+            "author_name": self.author_name,
+            "author_url": self.author_url,
+            "author_id": self.author_id,
+            "text": self.text,
+            "created_at": _iso(self.created_at),
+            "depth": self.depth,
+            "parent_id": self.parent_id,
+            "reaction_count": self.reaction_count,
+            "reply_count": self.reply_count,
+            "attachments": [dict(a) for a in self.attachments],
+            "captured_at": _iso(self.captured_at),
+        }
+
+
+FIELDS = {
+    "id": "string — stable identity of the comment",
+    "post_id": "string — id of the post it belongs to; matches that post record's id",
+    "author_name": "string | null — display name of the commenter",
+    "author_url": "string | null — the commenter's profile URL; the profile and about commands' argument",
+    "author_id": "string | null — numeric id of the commenter",
+    "text": "string — the comment body as received; empty for a comment that is only an attachment",
+    "created_at": "string | null — ISO-8601 UTC time the comment was made",
+    "depth": "integer — 0 for a comment on the post, 1 or more for a reply",
+    "parent_id": "string | null — id of the comment this one replies to; null at depth 0",
+    "reaction_count": "integer | null — reactions; null when not sent, never guessed from an abbreviation",
+    "reply_count": "integer | null — replies Facebook reports; null when not sent",
+    "attachments": "array<object> — what the comment carries besides text; empty text plus an attachment is that "
+                   "attachment, not an empty comment",
+    "attachments[].kind": "string — photo | gif | sticker | video | link | other; media URLs are not included",
+    "captured_at": "string — ISO-8601 UTC time this tool received it; changes every run",
+}
+
+
+# --- extraction ---------------------------------------------------------------
+
+
+def _is_comment_shaped(obj: Any) -> bool:
+    return (
+        isinstance(obj, dict)
+        and "depth" in obj
+        and "author" in obj and isinstance(obj.get("author"), dict | type(None))
+        and isinstance(obj.get("body"), dict | type(None))
+        and obj.get("id") is not None
+    )
+
+
+def iter_comment_nodes(bodies: Iterable[bytes]) -> Iterator[dict]:
+    """Merge comment fragments by id in first-seen order, before any caller limits them."""
+
+    def walk(obj: Any) -> Iterator[dict]:
+        if isinstance(obj, dict):
+            if _is_comment_shaped(obj):
+                yield obj
+            for key, value in obj.items():
+                if key != "comment_direct_parent":
+                    yield from walk(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                yield from walk(item)
+
+    nodes = {}
+    for chunk in iter_json_objects(bodies):
+        for node in walk(chunk):
+            key = str(node["id"])
+            nodes[key] = deep_merge(nodes.get(key, {}), node)
+    yield from nodes.values()
+
+def _count(node: dict, *path: str) -> int | None:
+    current: Any = node
+    for key in path:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current if type(current) is int and current >= 0 else None
+
+
+def reaction_count(node: dict) -> int | None:
+    """Reactions on a comment — which live nowhere near where a post keeps them.
+
+    A comment's own ``feedback.reaction_count`` is always null; what it carries
+    is ``feedback.reactors.count_reduced``, a *display string* ("6", and "1.2K"
+    once the number is large enough to abbreviate). The exact integer is in the
+    comment's action-links subtree, so that is preferred and the display string
+    is only parsed as a last resort — and only when it is plainly numeric,
+    since guessing at "1.2K" would invent precision.
+    """
+    feedback = node.get("feedback") or {}
+    for path in (("reactors", "count"), ("unified_reactors", "count"), ("reaction_count", "count")):
+        value = _count(feedback, *path)
+        if value is not None:
+            return value
+
+    for link in node.get("comment_action_links") or []:
+        if isinstance(link, dict):
+            value = _count(link, "comment", "feedback", "reactors", "count")
+            if value is not None:
+                return value
+
+    reduced = (feedback.get("reactors") or {}).get("count_reduced")
+    if isinstance(reduced, str) and reduced.isdigit():
+        return int(reduced)
+    return None
+
+
+def expansion_token(node: dict) -> str | None:
+    """The handle that expands this comment's replies (``Depth1CommentsListPaginationQuery``).
+
+    Replies are never delivered inline — ``replies_connection.edges`` comes back
+    empty even when ``replies_fields.total_count`` is non-zero, so fetching them
+    costs one extra request per comment that has any.
+    """
+    feedback = node.get("feedback")
+    if not isinstance(feedback, dict):
+        return None
+    info = feedback.get("expansion_info")
+    if not isinstance(info, dict):
+        return None
+    token = info.get("expansion_token")
+    return token if isinstance(token, str) else None
+
+
+def feedback_id(node: dict) -> str | None:
+    feedback = node.get("feedback")
+    return feedback.get("id") if isinstance(feedback, dict) else None
+
+
+#: A comment attachment's first style names what it is.
+_ATTACHMENT_KINDS = {"photo": "photo", "album": "photo", "animated_image_share": "gif", "sticker": "sticker",
+                     "video": "video", "video_inline": "video", "share": "link", "link": "link"}
+
+
+def attachment_kinds(node: dict) -> list[dict]:
+    kinds = []
+    for attachment in node.get("attachments") or []:
+        if not isinstance(attachment, dict):
+            continue
+        styles = attachment.get("style_list")
+        first = styles[0] if isinstance(styles, list) and styles and isinstance(styles[0], str) else None
+        kinds.append({"kind": _ATTACHMENT_KINDS.get(first, "other")})
+    return kinds
+
+
+def build_comment(node: dict, *, post_id: str, captured_at: datetime) -> Comment:
+    author = node.get("author") or {}
+    body = node.get("body") or {}
+    parent = node.get("comment_direct_parent") or {}
+    created = node.get("created_time")
+    author_id = author.get("id")
+
+    return Comment(
+        id=str(node["id"]),
+        post_id=post_id,
+        author_name=author.get("name") if isinstance(author.get("name"), str) else None,
+        author_url=author.get("url") if isinstance(author.get("url"), str) else None,
+        author_id=str(author_id) if author_id is not None else None,
+        text=body.get("text") if isinstance(body.get("text"), str) else "",
+        created_at=timestamp(created),
+        depth=node.get("depth") if isinstance(node.get("depth"), int) else 0,
+        parent_id=str(parent["id"]) if isinstance(parent, dict) and parent.get("id") else None,
+        reaction_count=reaction_count(node),
+        reply_count=_count(node, "feedback", "replies_fields", "total_count"),
+        captured_at=captured_at,
+        attachments=attachment_kinds(node),
+    )
+
+
+def build_comments(
+    bodies: Iterable[bytes], *, post_id: str, captured_at: datetime, sort: str = "top"
+) -> list[Comment]:
+    """Merge repeated ids and place replies after parents; recent sorts siblings newest first.
+
+    This function makes no requests and applies no limit. Callers limit the
+    top-level comments before spending their request budget on reply expansion.
+    """
+    if sort not in {"top", "recent"}:
+        raise ValueError("sort must be top or recent")
+    comments = [build_comment(node, post_id=post_id, captured_at=captured_at)
+                for node in iter_comment_nodes(bodies)]
+    if sort == "recent":
+        comments.sort(key=lambda c: c.created_at or datetime.min.replace(tzinfo=UTC), reverse=True)
+    by_id = {c.id: c for c in comments}
+    children: dict[str, list[Comment]] = {}
+    for comment in comments:
+        if comment.parent_id in by_id and comment.parent_id != comment.id:
+            children.setdefault(comment.parent_id, []).append(comment)
+    result: list[Comment] = []
+    seen: set[str] = set()
+
+    def append_tree(comment: Comment) -> None:
+        if comment.id in seen:
+            return
+        seen.add(comment.id)
+        result.append(comment)
+        for child in children.get(comment.id, []):
+            append_tree(child)
+
+    for comment in comments:
+        if comment.parent_id not in by_id:
+            append_tree(comment)
+    for comment in comments:
+        append_tree(comment)
+    return result
