@@ -5,14 +5,16 @@ from facebook.paging import paginate
 
 def search(options):
     text, vertical = options['target'], options['type']
-    identity = {'type': vertical}
-    words = ['--type', vertical]
+    recent, since, until = bool(options.get('recent')), options.get('since'), options.get('until')
+    identity = {'type': vertical, 'recent': recent, 'since': since, 'until': until}
+    words = ['--type', vertical] + (['--recent'] if recent else []) + (['--since', since] if since else []) \
+        + (['--until', until] if until else [])
 
     def read(connection, state, out):
         issues, notes = [], []
 
         def fetch(cursor):
-            page = connection.client.search(text, vertical, cursor)
+            page = connection.client.search(text, vertical, cursor, recent=recent, since=since, until=until)
             issues.extend(page.issues)
             notes.extend(page.issues)
             return page.records, page.page_info, page.has_items
@@ -38,4 +40,5 @@ def search(options):
                                        'state': result['state']}
         return reading
 
-    return connect.run(options, command='search', target=text, identity=identity, reader=read)
+    window = {'order': 'server', 'since': since, 'until': until} if since or until else None
+    return connect.run(options, command='search', target=text, identity=identity, reader=read, window=window)

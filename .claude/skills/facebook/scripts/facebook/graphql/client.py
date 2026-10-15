@@ -16,6 +16,7 @@ from facebook.graphql import classify, targets
 from facebook.graphql.records import (about_collections, about_fields, comments_page, permalink_post, posts_page,
                                      replies_page, search_page)
 from facebook.graphql.records.search import VERTICALS
+from facebook.graphql.records.search import filters as search_filters
 
 HOME = 'https://www.facebook.com/'
 ROUTE_RESERVE = 10  # moving the tab to another screen made 6-9 facebook.com requests when measured; counted at least this
@@ -254,11 +255,11 @@ class Client:
         chunks = self.query('replies' if depth <= 1 else 'replies_deep', variables, route=url)
         return replies_page(chunks, post_id=post_id, parent_id=parent_id, captured_at=_now())
 
-    def search(self, text, vertical, cursor, *, filters=()):
-        """One page of search results; filters are Facebook's filter JSON strings (see search filters)."""
+    def search(self, text, vertical, cursor, *, recent=False, since=None, until=None):
+        """One page of search results; recent, since and until are Facebook's post filters."""
         base = QUERIES['search']['variables']['args']
         args = {**base, 'text': text, 'experience': {**base['experience'], 'type': VERTICALS[vertical]},
-                'filters': list(filters)}
+                'filters': search_filters(recent=recent, since=since, until=until, today=_now().date().isoformat())}
         chunks = self.query('search', {'args': args, 'cursor': cursor},
                             route=HOME + 'search/' + vertical + '/?q=' + quote(text))
         return search_page(chunks, vertical=vertical, captured_at=_now())

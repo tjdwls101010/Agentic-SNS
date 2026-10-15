@@ -163,8 +163,11 @@ COMMANDS = {
         'help': 'Search posts, people, pages or groups.',
         'run': search.search,
         'arguments': [(('target',), {'metavar': 'TEXT', 'help': 'What to search for'}),
-                      (('--type',), {'choices': ['top', 'posts', 'people', 'pages', 'groups'], 'default': 'top', 'help': 'top mixes posts with people, pages and groups in Facebook\'s order'})] + list(LIST),
+                      (('--type',), {'choices': ['top', 'posts', 'people', 'pages', 'groups'], 'default': 'top', 'help': 'top mixes posts with people, pages and groups in Facebook\'s order'}),
+                      (('--recent',), {'action': 'store_true', 'help': 'Posts only (top, posts): Facebook\'s "recent posts" filter'}),
+                      'since', 'until'] + list(LIST),
         'epilog': ['Results are in Facebook\'s order for this account; people and pages with the same name are different results (compare url and verified).',
+                   '--recent, --since and --until are Facebook\'s post filters (top and posts only): Facebook applies the dates, so reaching the end closes the window as far as search returns posts; results stay in Facebook\'s order, not by date.',
                    'requests: 1 per page of about 5 results.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
@@ -238,6 +241,10 @@ def validate(options):
                             'Rerun the same command with the same --out path.')
     if options['command'] == 'replies' and not (options['target'].isascii() and options['target'].isdigit()):
         raise FacebookError(2, 'A replies handle is the number printed after "replies".', 'Copy the whole replies line.')
+    if options['command'] == 'search' and options['type'] not in ('top', 'posts') and (
+            options.get('recent') or options.get('since') or options.get('until')):
+        raise FacebookError(2, '--recent, --since and --until filter posts; use them with --type top or posts.',
+                            'Drop the filter, or search --type posts.')
     if options['command'] == 'search' and not options['target'].strip():
         raise FacebookError(2, 'Search text must not be empty.', 'Pass the words to search for.')
 

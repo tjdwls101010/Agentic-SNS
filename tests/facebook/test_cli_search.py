@@ -62,3 +62,33 @@ def test_option_like_search_text_goes_after_a_double_dash(browser, data_dir):
 def test_empty_search_text_is_refused(browser, data_dir):
     code, out, _ = run_cli(browser, 'search', '   ')
     assert code == 2 and browser.calls() == []
+
+
+def test_recent_and_date_filters_are_sent_as_facebooks_filter_strings(browser, data_dir):
+    known_tab(browser, data_dir)
+    browser.respond('query', query_result(results_body([{'node': {**story('SF1'), '__typename': 'Story'}}], has_next=False)))
+    code, out, _ = run_cli(browser, 'search', 'ai', '--type', 'posts', '--recent', '--since', '2026-09-01',
+                           '--until', '2026-09-30', '--json')
+    result = json.loads(out)
+    assert code == 0 and result['window'] == {'since': '2026-09-01', 'until': '2026-09-30',
+                                              'coverage': 'closed (server-filtered)'}
+    filters = [json.loads(f) for f in
+               [c for c in browser.calls() if c['op'] == 'query'][0]['args']['variables']['args']['filters']]
+    assert filters[0] == {'name': 'recent_posts', 'args': ''}
+    assert filters[1]['name'] == 'creation_time'
+    assert json.loads(filters[1]['args']) == {'start_year': '2026', 'start_month': '2026-09', 'end_year': '2026',
+                                              'end_month': '2026-09', 'start_day': '2026-09-01', 'end_day': '2026-09-30'}
+
+
+def test_filters_continue_with_the_same_filters(browser, data_dir):
+    known_tab(browser, data_dir)
+    browser.respond('query', query_result(results_body([{'node': {**story('SF1'), '__typename': 'Story'}}])))
+    code, out, _ = run_cli(browser, 'search', 'ai', '--type', 'posts', '--recent', '--limit', '1')
+    assert out.splitlines()[-1].endswith("search ai --type posts --recent --limit 1 --after 1")
+
+
+def test_post_filters_need_a_post_vertical(browser, data_dir):
+    for args in (['--type', 'people', '--recent'], ['--type', 'groups', '--since', '2026-01-01']):
+        code, out, _ = run_cli(browser, 'search', 'x', *args)
+        assert code == 2 and 'posts' in json.loads(out)['message']
+    assert browser.calls() == []

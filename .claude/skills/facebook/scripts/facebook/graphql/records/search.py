@@ -5,6 +5,8 @@ result. The requested vertical decides the kind of a User node (Facebook sends p
 Group is unambiguous, and the groups vertical keeps only groups. A top search keeps the connection's index order even
 when deferred pieces arrive out of order.
 """
+import json
+
 from facebook.graphql.records import posts
 from facebook.graphql.records.parse import pieces, unplaced
 from facebook.graphql.records.time import iso
@@ -19,6 +21,21 @@ FIELDS = {
 }
 VERTICALS = {'top': 'GLOBAL_SEARCH', 'posts': 'POSTS_TAB', 'people': 'PEOPLE_TAB', 'pages': 'PAGES_TAB',
              'groups': 'GROUPS_TAB'}
+def filters(*, recent=False, since=None, until=None, today=None):
+    """Facebook's search filter strings: recent_posts, and creation_time for a day range (observed in P2)."""
+    found = []
+    if recent:
+        found.append(json.dumps({'name': 'recent_posts', 'args': ''}, separators=(',', ':')))
+    if since or until:
+        start, end = since or FIRST_DAY, until or today
+        dates = {'start_year': start[:4], 'start_month': start[:7], 'end_year': end[:4], 'end_month': end[:7],
+                 'start_day': start, 'end_day': end}
+        found.append(json.dumps({'name': 'creation_time', 'args': json.dumps(dates, separators=(',', ':'))},
+                                separators=(',', ':')))
+    return found
+
+
+FIRST_DAY = '2004-02-04'  # Facebook's first day: an open start of a date filter
 WRAPPERS = frozenset({'node', 'result', 'entity', 'profile', 'group', 'page', 'user', 'rendering_strategy', 'view_model'})
 CONNECTIONS = ('results', 'search_results')
 _KIND_OF_VERTICAL = {'people': 'person', 'pages': 'page', 'groups': 'group'}
