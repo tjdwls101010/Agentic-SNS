@@ -56,8 +56,9 @@ def run(options, *, command, target, identity, reader, window=None):
 
 def _continue(reading, options, account_id):
     continuation = reading.pop('continuation', None)
-    if not continuation or options.get('out'):
-        return
+    failure = reading.get('failure')
+    if not continuation or options.get('out') or (isinstance(failure, FacebookError) and failure.code in (4, 5)):
+        return  # after a block or a logout, a continuation would only invite another request
     context = _context(continuation['command'], continuation['target'], continuation['identity'], account_id)
     try:
         number = handles.save(context, continuation['state'])

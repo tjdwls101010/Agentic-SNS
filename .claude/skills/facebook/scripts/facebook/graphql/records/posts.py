@@ -1,5 +1,5 @@
 """Post records: every field decided here and described once in FIELDS."""
-from facebook.graphql.records.parse import SHARE_EXCLUDE, Stories, find_attached_story, is_story, iter_story_dicts
+from facebook.graphql.records.parse import SHARE_EXCLUDE, Stories, find_attached_story, is_comment, is_story, iter_story_dicts
 from facebook.graphql.records.time import iso, timestamp
 
 FIELDS = {
@@ -19,7 +19,7 @@ FIELDS = {
     'text_truncated': 'boolean — Facebook marked the received body as cut; open the post for the rest',
     'media': 'array<object> — photos and videos of the post itself, in order',
     'media[].kind': 'string — image | video',
-    'media[].url': 'string — signed, expiring, viewer-scoped; share only when the user needs the media',
+    'media[].url': 'string | null — signed, expiring, viewer-scoped; share only when the user needs the media; null for a video whose playable URL Facebook did not send (its poster is the image before it)',
     'media[].width': 'integer | null — pixels',
     'media[].height': 'integer | null — pixels',
     'media[].alt': 'string | null — Facebook\'s automatic description of the photo, in the viewer\'s language; '
@@ -66,21 +66,38 @@ def _actors(story):
 
 
 def _media(story, exclude_links=False):
-    """Photos and videos: one image per media node (image, else photo_image), a video per playable URL."""
+    """Photos and videos in order: one image per media node (image, else photo_image) with its alt text, and a video
+    per playable URL or per node typed Video (whose image is its poster; images inside it are not separate media)."""
     media, seen = [], set()
-    for node in iter_story_dicts(story, exclude_keys=SHARE_EXCLUDE, exclude_links=exclude_links):
-        image = node.get('image') if isinstance(node.get('image'), dict) and isinstance(node['image'].get('uri'), str) \
-            else node.get('photo_image') if isinstance(node.get('photo_image'), dict) \
-            and isinstance(node['photo_image'].get('uri'), str) else None
+
+    def visit(obj):
+        if isinstance(obj, list):
+            for item in obj:
+                visit(item)
+            return
+        if not isinstance(obj, dict) or is_comment(obj):
+            return
+        if exclude_links and isinstance(obj.get('url'), str) and 'uri' not in obj and ('title' in obj or 'description' in obj):
+            return
+        image = next((obj[key] for key in ('image', 'photo_image')
+                      if isinstance(obj.get(key), dict) and isinstance(obj[key].get('uri'), str)), None)
         if image is not None and image['uri'] not in seen:
             seen.add(image['uri'])
-            alt = node.get('accessibility_caption')
+            alt = obj.get('accessibility_caption')
             media.append({'kind': 'image', 'url': image['uri'], 'width': _dimension(image.get('width')),
                           'height': _dimension(image.get('height')), 'alt': alt if isinstance(alt, str) and alt else None})
-        playable = node.get('playable_url') or node.get('playable_url_quality_hd')
+        playable = obj.get('playable_url') or obj.get('playable_url_quality_hd')
         if isinstance(playable, str) and playable not in seen:
             seen.add(playable)
             media.append({'kind': 'video', 'url': playable, 'width': None, 'height': None, 'alt': None})
+        elif obj.get('__typename') == 'Video' and image is not None:
+            media.append({'kind': 'video', 'url': None, 'width': None, 'height': None, 'alt': None})
+            return
+        for key, value in obj.items():
+            if key not in SHARE_EXCLUDE:
+                visit(value)
+
+    visit(story)
     return media
 
 

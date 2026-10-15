@@ -31,7 +31,7 @@ EXIT_CODES = {
 KIND_EXIT = {'records': 0, 'resumable': 0, 'complete': 0, 'maintenance': 0, 'argument': 2, 'aside': 3, 'login': 4,
              'blocked': 5, 'failed': 6, 'empty': 7, 'partial': 8}
 
-REQUESTS = ('requests: every GraphQL query, page fetch and retry counts, and so does every facebook.com request the '
+REQUESTS = ('how requests are counted: every GraphQL query, page fetch and retry counts, and so does every facebook.com request the '
             'browser tab makes while the command runs (the first use opens a dedicated facebook.com tab once: about '
             '30 requests the page makes itself, reported but not charged to --max-requests). fbcdn.net static files '
             'do not count. All invocations share one lock and 1-2 s pacing for the account.')
@@ -41,7 +41,7 @@ TEXT_OUTPUT = ('output: first line "<command> · … · N shown · stopped=<reas
                'shown, complete|truncated]; then coverage: lines; detail: <command> when --chars cut a comment (it '
                're-reads the same page with --chars 0); last, more: <command> when reading can continue.')
 JSON_OUTPUT = ('--json: one JSON envelope instead (ok, command, stop_reason, request_count, max_requests, coverage, '
-               'next, detail, error, message, fix, results); schema result describes every field.')
+               'next, error, message, fix, results, with full texts); schema result describes every field.')
 OUT_OUTPUT = ('--out FILE: records go to an NDJSON file a whole page at a time and stdout gets one summary line (one '
               'JSON object with --json); rerun the same command with the same file to resume. --out cannot be '
               'combined with --after. The file holds other people\'s data: keep it outside the repository.')
@@ -191,12 +191,12 @@ def epilog(name, spec):
         if 'out' in [a for a in spec['arguments'] if isinstance(a, str)]:
             lines.append(OUT_OUTPUT)
         lines += [FAILURE, DETAIL]
-    lines.append('exit codes: ' + '; '.join(f'{code} {EXIT_CODES[code]}' for code in spec['exits']))
+    lines.append('exit codes:\n' + '\n'.join(f'  {code}  {EXIT_CODES[code]}' for code in spec['exits']))
     return '\n\n'.join(lines)
 
 
 def parser():
-    root = Parser(prog='cli.py', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter,
+    root = Parser(prog='cli.py', description=__doc__, formatter_class=argparse.RawTextHelpFormatter,
                   epilog='Read-only. Run <command> --help for its arguments, output, requests and exit codes; schema '
                          'describes every output field.\n\nexit codes:\n'
                          + '\n'.join(f'  {code}  {meaning}' for code, meaning in EXIT_CODES.items()))
@@ -239,6 +239,8 @@ def emit(kind, envelope, options):
         if isinstance(envelope.get(key), list):
             envelope[key] = command_line(envelope[key])
     machine = options.get('json') or options['command'] in ('doctor', 'schema')
+    if machine:
+        envelope.pop('detail', None)  # JSON carries full texts; detail: only re-reads a page text output cut
     if options.get('out') and envelope.get('out') is not None:
         print(json.dumps({k: v for k, v in envelope.items() if k != 'results'}, ensure_ascii=False) if machine
               else render_summary(envelope))

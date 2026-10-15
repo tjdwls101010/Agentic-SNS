@@ -194,7 +194,6 @@ ENVELOPE = {
     'fix': 'string — what to do next; a resumable budget stop carries one too',
     'coverage': 'array<string> — what this result does not cover: unread parts, response issues',
     'next': 'string — the command that continues this reading; run it as it is (text prints it as more:)',
-    'detail': 'string — the same page again with full text, when text was cut by --chars (text prints detail:)',
     'out': 'string — the --out file',
     'count': 'integer — records saved in the --out file so far',
     'already_complete': 'boolean — the --out file was complete before this run; nothing was read',

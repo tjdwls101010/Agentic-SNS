@@ -47,7 +47,15 @@ class Browser:
         return [json.loads(line) for line in self.log.read_text().splitlines() if line.strip()]
 
     def write(self):
-        (self.root / 'scenario.json').write_text(json.dumps(self.scenario))
+        """Save the scenario, keeping which responses earlier runs already used."""
+        path = self.root / 'scenario.json'
+        if path.exists():
+            used = json.loads(path.read_text())['responses']
+            for mine, theirs in zip(self.scenario['responses'], used):
+                mine['used'] = theirs.get('used', False)
+            self.scenario['tabs'] = json.loads(path.read_text())['tabs'] + [
+                t for t in self.scenario['tabs'] if t not in json.loads(path.read_text())['tabs']]
+        path.write_text(json.dumps(self.scenario))
 
 
 @pytest.fixture
@@ -65,3 +73,47 @@ def run_cli(browser, *args, env=None):
     result = subprocess.run([sys.executable, str(CLI), *args], capture_output=True, text=True, env=environment,
                             timeout=120)
     return result.returncode, result.stdout, result.stderr
+
+
+STATE_OK = {'location': 'https://www.facebook.com/', 'user_id': '1000123', 'runtime': True, 'resources': 0}
+
+
+def known_tab(browser, data_dir, target='T1'):
+    """A dedicated tab the skill already knows and that is still open."""
+    browser.tab(target)
+    (data_dir / 'session').mkdir(parents=True, exist_ok=True)
+    (data_dir / 'session/default.json').write_text(json.dumps({'tab': target, 'queries': {}}))
+    browser.respond('state', STATE_OK)
+    return browser
+
+
+def story(identity, created='2026-09-12T03:00:00Z', text=None, **flags):
+    """A minimal feed story for a scripted response; created is an ISO time or None."""
+    from datetime import datetime
+    node = {'feedback': {'id': identity}, 'actors': [{'id': '9' + identity, 'name': 'Author ' + identity,
+                                                      'url': 'https://www.facebook.com/author.' + identity.lower()}],
+            'message': {'text': text if text is not None else f'post {identity}'},
+            'permalink_url': f'https://www.facebook.com/author.{identity.lower()}/posts/{identity}'}
+    if created:
+        node['creation_time'] = int(datetime.fromisoformat(created.replace('Z', '+00:00')).timestamp())
+    if flags.get('sponsored'):
+        node['sponsored_data'] = {'ad_id': '1'}
+    if flags.get('pinned'):
+        node['is_pinned'] = True
+    return node
+
+
+def graphql_body(connection_path, stories, has_next=True, cursor='CUR1'):
+    """An NDJSON GraphQL body with one connection at connection_path (e.g. ['viewer', 'news_feed'])."""
+    connection = {'edges': [{'node': s} for s in stories],
+                  'page_info': {'has_next_page': has_next, 'end_cursor': cursor if has_next else None}}
+    data = connection
+    for key in reversed(connection_path):
+        data = {key: data}
+    return json.dumps({'data': data})
+
+
+def query_result(body, status=200, source='live', doc_id='111', resources=1):
+    return {'status': status, 'url': 'https://www.facebook.com/api/graphql/', 'body': body,
+            'used': {'source': source, 'doc_id': doc_id, 'flags': {'__relay_internal__pv__Xrelayprovider': True}
+                     if source == 'live' else None}, 'explicit': 1, 'resources': resources}

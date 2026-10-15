@@ -6,11 +6,13 @@ earlier read learned, else from the bundled snapshot. When Facebook no longer ac
 to the screen that loads that query (as a person would open it) and the read is retried once with the live id.
 """
 import json
+from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from facebook.errors import FacebookError, diagnostic
-from facebook.graphql import classify
+from facebook.graphql import classify, targets
+from facebook.graphql.records import posts_page
 
 HOME = 'https://www.facebook.com/'
 SNIPPETS = {path.stem: path.read_text(encoding='utf-8')
@@ -18,6 +20,9 @@ SNIPPETS = {path.stem: path.read_text(encoding='utf-8')
 SNAPSHOT = json.loads((Path(__file__).with_name('queries.json')).read_text(encoding='utf-8'))
 QUERIES = SNAPSHOT['queries']
 READ_NAMES = sorted(spec['name'] for spec in QUERIES.values())
+FEED_SORTS = {'top': {'orderby': ['TOP_STORIES'], 'feedStyle': 'DEFAULT'},
+              'recent': {'orderby': ['MOST_RECENT'], 'feedStyle': 'MOST_RECENT_FEED_DEFAULT'}}
+GROUP_SORTS = {'top': 'TOP_POSTS', 'recent': 'CHRONOLOGICAL', 'activity': 'RECENT_ACTIVITY'}
 
 
 class Client:
@@ -140,7 +145,7 @@ class Client:
             raise verdict.error
         if used.get('source') in ('live', 'live_id') and isinstance(used.get('doc_id'), str):
             self.memory.learn(spec['name'], used['doc_id'], used.get('flags'))
-        return verdict.chunks if verdict.kind == 'ok' else []
+        return verdict.chunks
 
     def page(self, url):
         """The HTML of one facebook.com page (to find an id the queries need)."""
@@ -164,10 +169,41 @@ class Client:
                                    'current one.', classify.STALE_FIX, reason='stale')
         self.memory.learn(name, live['doc_id'], live.get('flags'))
 
+    # --- reads, in the skill's terms ---------------------------------------------------------------------------
+
+    def resolve(self, kind, url):
+        """The numeric id of a normalized profile, group or post URL: from the URL itself, else from its page."""
+        direct = {'profile': targets.direct_profile_id, 'group': targets.direct_group_id}.get(kind)
+        found = direct(url) if direct else None
+        if found:
+            return found
+        found = targets.find_id(kind, self.page(url))
+        if not found:
+            raise FacebookError(6, f'Could not find the {kind} id on its page.', 'Check the URL in the browser; it may '
+                                                                                 'be private, removed or misspelled.')
+        return found
+
+    def feed(self, sort, cursor):
+        chunks = self.query('newsfeed', {**FEED_SORTS[sort], 'cursor': cursor}, route=HOME)
+        return posts_page(chunks, source='newsfeed', connection_key='news_feed', captured_at=_now())
+
+    def timeline(self, profile_id, cursor, *, after_time, before_time, url):
+        chunks = self.query('timeline', {'id': profile_id, 'cursor': cursor, 'afterTime': after_time,
+                                         'beforeTime': before_time}, route=url)
+        return posts_page(chunks, source='timeline', connection_key='timeline_list_feed_units', captured_at=_now())
+
+    def group_feed(self, group_id, sort, cursor, *, url):
+        chunks = self.query('group', {'id': group_id, 'sortingSetting': GROUP_SORTS[sort], 'cursor': cursor}, route=url)
+        return posts_page(chunks, source='group', connection_key='group_feed', captured_at=_now())
+
     def live_queries(self):
         """Which read queries the tab has loaded right now (doctor); makes no request."""
         result = self._evaluate('modules', {'names': READ_NAMES})
         return result if isinstance(result, dict) else {}
+
+
+def _now():
+    return datetime.now().astimezone()
 
 
 def _facebook(url):
