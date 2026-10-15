@@ -242,7 +242,7 @@ def emit(kind, envelope, options):
     machine = options.get('json') or options['command'] in ('doctor', 'schema')
     if machine:
         envelope.pop('detail', None)  # JSON carries full texts; detail: only re-reads a page text output cut
-    if options.get('out') and envelope.get('out') is not None:
+    if options.get('out') and envelope.get('out') is not None and (envelope['ok'] or envelope.get('count')):
         print(json.dumps({k: v for k, v in envelope.items() if k != 'results'}, ensure_ascii=False) if machine
               else render_summary(envelope))
     elif machine or (not envelope['ok'] and not envelope.get('results')):

@@ -35,7 +35,10 @@ def run(options, *, command, target, identity, reader, window=None):
         state = handles.load(options['after'], context) if options.get('after') else None
         out = OutFile(out_path, context) if out_path else None
         try:
-            reading = reader(connection, state, out)
+            if out is not None and out.complete:
+                reading = {'results': [], 'stop_reason': 'exhausted', 'already_complete': True}
+            else:
+                reading = reader(connection, state, out)
             if out is not None:
                 reading['count'] = out.count
                 reading['continuable'] = out.state is not None and not out.complete
