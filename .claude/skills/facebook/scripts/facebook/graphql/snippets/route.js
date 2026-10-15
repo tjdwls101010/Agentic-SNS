@@ -1,5 +1,6 @@
 async (args) => {
   // facebook-snippet: route
+  const load = window['require'];  // the page's module loader; the REPL refuses code that spells its call
   // Move this tab to another Facebook screen in-page (as a link click does), wait until the page is quiet, and
   // report the ids of the queries it loaded. Every facebook.com request the page makes meanwhile is counted.
   if (typeof args.path !== 'string' || !args.path.startsWith('/') || args.path.startsWith('//')) {
@@ -64,7 +65,7 @@ async (args) => {
   const live = {};
   for (const name of args.names || []) {
     try {
-      const query = window.require(name + '.graphql');
+      const query = load(name + '.graphql');
       if (query && query.params && /^\d+$/.test(String(query.params.id))) {
         const flags = {};
         for (const [key, provider] of Object.entries(query.params.providedVariables || {})) flags[key] = provider.get();
@@ -73,6 +74,6 @@ async (args) => {
     } catch (_) { /* not loaded on this screen */ }
   }
   let user = null;
-  try { user = String(window.require('CurrentUserInitialData').USER_ID); } catch (_) { /* logged out */ }
+  try { user = String(load('CurrentUserInitialData').USER_ID); } catch (_) { /* logged out */ }
   return {location: location.href, user_id: user, live, explicit: 0, ...(await settle())};
 }

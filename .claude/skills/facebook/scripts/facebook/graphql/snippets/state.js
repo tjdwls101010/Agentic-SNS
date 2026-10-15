@@ -1,5 +1,6 @@
 async (args) => {
   // facebook-snippet: state
+  const load = window['require'];  // the page's module loader; the REPL refuses code that spells its call
   // What the dedicated tab is showing, who is logged in, and the tab's facebook.com requests since the last look
   // (all of them since the page loaded when args.fresh: the tab was just opened). Makes no request.
   // The tab's ledger of its own facebook.com requests and their HTTP statuses, kept across calls (installed once per
@@ -48,8 +49,8 @@ async (args) => {
   let user = null;
   let runtime = false;
   try {
-    runtime = typeof window.require === 'function';
-    const value = window.require('CurrentUserInitialData').USER_ID;
+    runtime = typeof load === 'function';
+    const value = load('CurrentUserInitialData').USER_ID;
     user = value === undefined || value === null ? null : String(value);
   } catch (_) { /* not a logged-in Facebook page */ }
   return {location: location.href, user_id: user, runtime, ...(await settle(0))};

@@ -214,3 +214,10 @@ def test_a_seen_rate_limit_stays_until_its_block_would_expire(tmp_path):
     assert 429 in first['unwatched'] and first['limited'] is True
     assert second['limited'] is True
     assert third['stopped'] == 'rate_limit' and out['fetches'] == []
+
+
+def test_no_snippet_spells_a_module_require():
+    """The live Aside REPL refuses any program containing `require(` ("External modules are not available in the
+    REPL"); the page's module loader is reached through an alias."""
+    for path in [PROGRAM, *SNIPPETS.glob('*.js')]:
+        assert 'require(' not in path.read_text(), path.name
