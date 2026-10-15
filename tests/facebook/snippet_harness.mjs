@@ -17,7 +17,7 @@ const fetches = [];
 const pageSpec = spec.page || {};
 const pending = [], during = [];
 let finished = 0;
-const entry = (status) => ({name: 'https://www.facebook.com/ajax/o' + finished++, responseStatus: status});
+const entry = (status) => ({name: 'https://www.facebook.com/ajax/o' + finished++, responseStatus: status, startTime: 0, duration: 1});
 const finish = (call) => {
   for (const status of call.before || []) pending.push(entry(status));
   for (const status of call.observed || []) during.push(entry(status));
@@ -65,7 +65,7 @@ function fakeWindow() {
     takeRecords() { return pending.splice(0); }
     disconnect() {}
   }
-  const performance = {getEntriesByType: () => {
+  const performance = {timeOrigin: Date.now(), getEntriesByType: () => {
     const count = resources[Math.min(resourceCalls++, resources.length - 1)];
     return Array.from({length: count}, (_, i) => ({name: 'https://www.facebook.com/ajax/x' + i}));
   }};

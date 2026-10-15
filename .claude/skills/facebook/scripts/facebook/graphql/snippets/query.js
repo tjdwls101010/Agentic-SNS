@@ -57,7 +57,16 @@ async (args) => {
   const host = /^https:\/\/([a-z0-9-]+\.)*facebook\.com\//;
   const ledger = window.__facebookSkillLedger || (() => {
     const made = {entries: [], read: 0, unwatched: []};
-    const keep = list => { for (const entry of list) if (host.test(entry.name)) made.entries.push(entry.responseStatus || 0); };
+    const keep = list => {
+      for (const entry of list) {
+        if (!host.test(entry.name)) continue;
+        made.entries.push(entry.responseStatus || 0);
+        // A rate limit is remembered with its time, so a result lost on the way cannot hide it from later calls.
+        if (entry.responseStatus === 429) {
+          made.limitedAt = Math.max(made.limitedAt || 0, performance.timeOrigin + entry.startTime + entry.duration);
+        }
+      }
+    };
     made.observer = new PerformanceObserver(list => keep(list.getEntries()));
     made.observer.observe({type: 'resource', buffered: true});
     keep(made.observer.takeRecords());
@@ -71,6 +80,8 @@ async (args) => {
     window.__facebookSkillLedger = made;
     return made;
   })();
+  // Facebook's rate limit lasts about 30 minutes; until then every call stops before sending and says so again.
+  const limited = () => Boolean(ledger.limitedAt) && Date.now() - ledger.limitedAt < 30 * 60 * 1000;
   const unread = () => {
     ledger.keep(ledger.observer.takeRecords());
     return ledger.entries.slice(ledger.read).concat(ledger.unwatched || []);
@@ -82,10 +93,10 @@ async (args) => {
     const unwatched = ledger.unwatched || [];
     ledger.read = ledger.entries.length;
     ledger.unwatched = [];
-    return {resources: statuses.length, statuses, unwatched};
+    return {resources: statuses.length, statuses, unwatched, limited: limited()};
   };
   // A rate limit the tab already saw (between calls, or on a reload) stops this call before it sends anything.
-  if (unread().includes(429)) return {stopped: 'rate_limit', explicit: 0, ...(await settle(0))};
+  if (unread().includes(429) || limited()) return {stopped: 'rate_limit', explicit: 0, ...(await settle(0))};
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);
   const used = {source, doc_id: doc, flags: source === 'live' ? flags : null};

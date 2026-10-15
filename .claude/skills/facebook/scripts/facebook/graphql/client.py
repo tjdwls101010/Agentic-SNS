@@ -320,7 +320,8 @@ class Client:
 def _rate_limited(result, verdict):
     """A 429 on any of the tab's requests is a rate limit, unless the verdict is already a checkpoint (which lasts)."""
     statuses = list(result.get('statuses') or []) + list(result.get('unwatched') or [])
-    if verdict.block == 'checkpoint' or (429 not in statuses and result.get('stopped') != 'rate_limit'):
+    if verdict.block == 'checkpoint' or (429 not in statuses and result.get('stopped') != 'rate_limit'
+                                         and not result.get('limited')):
         return verdict
     return classify.Verdict('blocked', error=FacebookError(
         5, 'Facebook rate-limited this account; requests are blocked for 30 minutes.',

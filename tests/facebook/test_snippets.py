@@ -133,7 +133,7 @@ def test_state_reads_the_logged_in_user_without_a_request(tmp_path):
     fresh = run(tmp_path, kind='page', source=str(SNIPPETS / 'state.js'), args={'fresh': True},
                 page={'modules': {'CurrentUserInitialData': {'USER_ID': 1000123}}, 'buffered': [200] * 29})
     assert fresh['result'] == {'location': 'https://www.facebook.com/', 'user_id': '1000123', 'runtime': True,
-                               'resources': 29, 'statuses': [200] * 29, 'unwatched': []}
+                               'resources': 29, 'statuses': [200] * 29, 'unwatched': [], 'limited': False}
     assert fresh['fetches'] == []
     # a tab the skill did not just open: what it did before the skill watched it is not counted
     known = run(tmp_path, kind='page', source=str(SNIPPETS / 'state.js'), args={'fresh': False},
@@ -200,3 +200,17 @@ def test_a_rate_limit_already_in_the_ledger_stops_the_next_request_before_it_is_
     ], page={'fetch': [{'status': 200, 'body': 'a'}, {'status': 200, 'body': 'b'}]})
     assert out['result'][1]['stopped'] == 'rate_limit' and out['result'][1]['statuses'] == [429]
     assert len(out['fetches']) == 1
+
+
+def test_a_seen_rate_limit_stays_until_its_block_would_expire(tmp_path):
+    """Fourth review: if the result that carried a 429 is lost, the next calls still stop and report it."""
+    out = run(tmp_path, kind='sequence', calls=[
+        {'source': str(SNIPPETS / 'state.js'), 'args': {}},          # reports the reload's 429 (result lost)
+        {'source': str(SNIPPETS / 'state.js'), 'args': {}},
+        {'source': str(SNIPPETS / 'page.js'), 'args': {'url': 'https://www.facebook.com/x'}},
+    ], page={'buffered': [200, 429], 'modules': {'CurrentUserInitialData': {'USER_ID': '7'}},
+             'fetch': [{'status': 200, 'body': 'a'}]})
+    first, second, third = out['result']
+    assert 429 in first['unwatched'] and first['limited'] is True
+    assert second['limited'] is True
+    assert third['stopped'] == 'rate_limit' and out['fetches'] == []
