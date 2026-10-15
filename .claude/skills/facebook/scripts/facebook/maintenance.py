@@ -33,7 +33,7 @@ def doctor(options):
     except FacebookError as error:
         reading = {'results': [], 'failure': error}
     return finish(reading, command='doctor', requests=connection.guard.count if connection else 0,
-                  budget=protection.MAX_BUDGET)
+                  budget=protection.MAX_BUDGET, setup=connection.guard.setup if connection else 0)
 
 
 def schema(options):

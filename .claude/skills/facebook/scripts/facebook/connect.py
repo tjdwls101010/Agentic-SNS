@@ -57,7 +57,8 @@ def run(options, *, command, target, identity, reader, window=None):
     if window:
         reading['window'] = window
     return finish(reading, command=command, requests=connection.guard.count if connection else 0,
-                  budget=options['max_requests'], identity=_public(identity), out=out_path)
+                  budget=options['max_requests'], identity=_public(identity), out=out_path,
+                  setup=connection.guard.setup if connection else 0)
 
 
 def _continue(reading, options, account_id):

@@ -110,7 +110,12 @@ class Client:
         for attempt in range(2):
             try:
                 with self.guard.request() as slot:
-                    result = self.browser.evaluate(self.tab, SNIPPETS[snippet], args)
+                    try:
+                        result = self.browser.evaluate(self.tab, SNIPPETS[snippet], args)
+                    except FacebookError as error:
+                        if error.reason == 'tab_missing':
+                            slot.cancel()  # the program never reached a page, so nothing went to Facebook
+                        raise
                     if not isinstance(result, dict):
                         raise FacebookError(3, 'The Facebook tab answered invalidly.', 'Run doctor.')
                     slot.charge(max(_int(result.get('explicit'), 1), _int(result.get('resources'))))

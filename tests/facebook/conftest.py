@@ -30,10 +30,12 @@ class Browser:
     def __init__(self, root):
         self.root = root
         self.scenario = {'tabs': [], 'responses': []}
+        self.added_tabs, self.vanishing = [], None
         self.log = root / 'aside-log.jsonl'
 
     def tab(self, target='TAB1', url='https://www.facebook.com/'):
         self.scenario['tabs'].append({'id': target, 'url': url})
+        self.added_tabs.append({'id': target, 'url': url})
         return self
 
     def respond(self, op, response, **match):
@@ -46,15 +48,21 @@ class Browser:
             return []
         return [json.loads(line) for line in self.log.read_text().splitlines() if line.strip()]
 
+    def vanish_after_state(self, target):
+        """The tab disappears right after its next state check, as when a person closes it."""
+        self.vanishing = target
+        return self
+
     def write(self):
-        """Save the scenario, keeping which responses earlier runs already used."""
+        """Save the scenario, keeping what earlier runs did to it (responses used, tabs opened or closed)."""
         path = self.root / 'scenario.json'
         if path.exists():
-            used = json.loads(path.read_text())['responses']
-            for mine, theirs in zip(self.scenario['responses'], used):
+            previous = json.loads(path.read_text())
+            for mine, theirs in zip(self.scenario['responses'], previous['responses']):
                 mine['used'] = theirs.get('used', False)
-            self.scenario['tabs'] = json.loads(path.read_text())['tabs'] + [
-                t for t in self.scenario['tabs'] if t not in json.loads(path.read_text())['tabs']]
+            self.scenario['tabs'] = previous['tabs'] + [t for t in self.added_tabs if t not in previous['tabs']]
+        self.scenario['vanish_after_state'] = self.vanishing
+        self.added_tabs, self.vanishing = [], None
         path.write_text(json.dumps(self.scenario))
 
 

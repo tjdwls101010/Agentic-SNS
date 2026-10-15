@@ -110,8 +110,11 @@ def render_page(envelope, *, chars=None, command=None):
     header.append(f'{len(results)} shown')
     if envelope.get('sponsored_skipped'):
         header.append(f'sponsored_skipped={envelope["sponsored_skipped"]}')
+    tab = envelope.get('tab_opened_requests') or 0
     header += [f'stopped={_line(envelope.get("stop_reason"))}',
-               f'requests={envelope.get("request_count", 0)}/{envelope.get("max_requests", 0)}']
+               f'requests={envelope.get("request_count", 0) - tab}/{envelope.get("max_requests", 0)}']
+    if tab:
+        header.append(f'tab opened (+{tab} requests)')
     lines = [' · '.join(header)]
     window = envelope.get('window')
     if window:
@@ -148,7 +151,11 @@ def render_summary(envelope):
     parts = [_line(envelope.get('command') or ''), f'{envelope.get("count", 0)} saved to {json.dumps(envelope.get("out"), ensure_ascii=False)}']
     if 'sponsored_skipped' in envelope:
         parts.append(f'sponsored_skipped={envelope["sponsored_skipped"]}')
-    parts += [f'stopped={envelope.get("stop_reason")}', f'requests={envelope.get("request_count", 0)}/{envelope.get("max_requests", 0)}']
+    tab = envelope.get('tab_opened_requests') or 0
+    parts += [f'stopped={envelope.get("stop_reason")}',
+              f'requests={envelope.get("request_count", 0) - tab}/{envelope.get("max_requests", 0)}']
+    if tab:
+        parts.append(f'tab opened (+{tab} requests)')
     if envelope.get('already_complete'):
         parts.append('already complete')
     if envelope.get('window'):

@@ -87,7 +87,7 @@ def failure_envelope(error, command=None):
     return kind, envelope
 
 
-def finish(reading, *, command, requests, budget, identity=None, out=None):
+def finish(reading, *, command, requests, budget, identity=None, out=None, setup=0):
     """(kind, envelope) of one reading.
 
     `reading` holds results, stop_reason (the natural stop when nothing failed), failure (FacebookError or None),
@@ -128,6 +128,8 @@ def finish(reading, *, command, requests, budget, identity=None, out=None):
     if 'sponsored_skipped' in reading:
         envelope['sponsored_skipped'] = reading['sponsored_skipped']
     envelope['request_count'] = requests
+    if setup:
+        envelope['tab_opened_requests'] = setup
     envelope['max_requests'] = budget
     if kind == 'empty':
         message = failure.message if isinstance(failure, FacebookError) else 'This query returned no results.'
@@ -189,6 +191,8 @@ ENVELOPE = {
     'window': 'object — dated reads only: {since, until, coverage}; coverage follows window_coverage',
     'sponsored_skipped': 'integer — feed only: advertisements left out of results and --limit',
     'request_count': 'integer — requests this invocation made (see requests)',
+    'tab_opened_requests': 'integer — of request_count, the requests of opening the dedicated tab (not charged to '
+                           'max_requests); absent when the tab was already open',
     'max_requests': 'integer — the budget it had',
     'error': 'string — the kind of failure (see kinds); absent on success',
     'message': 'string — what failed',
@@ -205,7 +209,7 @@ ENVELOPE = {
 
 TEXT = {
     'header': '<command>[ · sort=…][ · type=…] · <n> shown[ · sponsored_skipped=<n>] · stopped=<stop_reason> · '
-              'requests=<used>/<budget>',
+              'requests=<charged>/<budget>[ · tab opened (+<n> requests)]',
     'window': 'dated reads add a second line: window <since>..<until> · <coverage>',
     'records': '[p<n>] posts, [c<n>] comments and replies, [e<n>] people, pages and groups, then about fields; each '
                'record ends with the arguments of the next command: url (post), author (profile, about), '

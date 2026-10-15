@@ -83,6 +83,10 @@ def main(argv):
     if aside.get('tab') not in [t['id'] for t in scenario['tabs']]:
         print(json.dumps({'kind': 'error', 'error': 'tab_missing', 'message': 'no such tab'}))
         return 0
+    if snippet == 'state' and scenario.get('vanish_after_state') == aside.get('tab'):
+        scenario['tabs'] = [t for t in scenario['tabs'] if t['id'] != aside.get('tab')]
+        scenario['vanish_after_state'] = None
+        save(scenario)
     response = take(scenario, snippet, args)
     if response is None:
         print(f'fake aside: no scripted response for {snippet} {json.dumps(args)[:300]}', file=sys.stderr)

@@ -146,6 +146,14 @@ class Slot:
                 self._guard.setup += count - self.reserved
             self.reserved = count
 
+    def cancel(self):
+        """Nothing was sent (the browser tab was gone before the request): give the reservation back."""
+        if self.budgeted:
+            self._guard.used -= self.reserved
+        else:
+            self._guard.setup -= self.reserved
+        self.reserved = 0
+
     def block(self, reason):
         """Persist a block before the lock is released: checkpoint (until unblocked) or rate_limit (30 minutes)."""
         if reason not in REASONS:
