@@ -12,7 +12,7 @@ from urllib.parse import quote, urlsplit
 
 from facebook.errors import FacebookError, diagnostic
 from facebook.graphql import classify, targets
-from facebook.graphql.records import posts_page
+from facebook.graphql.records import comments_page, permalink_post, posts_page, replies_page
 
 HOME = 'https://www.facebook.com/'
 SNIPPETS = {path.stem: path.read_text(encoding='utf-8')
@@ -23,6 +23,10 @@ READ_NAMES = sorted(spec['name'] for spec in QUERIES.values())
 FEED_SORTS = {'top': {'orderby': ['TOP_STORIES'], 'feedStyle': 'DEFAULT'},
               'recent': {'orderby': ['MOST_RECENT'], 'feedStyle': 'MOST_RECENT_FEED_DEFAULT'}}
 GROUP_SORTS = {'top': 'TOP_POSTS', 'recent': 'CHRONOLOGICAL', 'activity': 'RECENT_ACTIVITY'}
+# all: ranked, nothing filtered out ("All comments"); relevant: Facebook's "Most relevant", which can leave comments
+# out; newest: newest first, nothing filtered out.
+COMMENT_SORTS = {'all': 'RANKED_UNFILTERED_INTENT_V1', 'relevant': 'RANKED_FILTERED_INTENT_V1',
+                 'newest': 'REVERSE_CHRONOLOGICAL_UNFILTERED_INTENT_V1'}
 
 
 class Client:
@@ -195,6 +199,30 @@ class Client:
     def group_feed(self, group_id, sort, cursor, *, url):
         chunks = self.query('group', {'id': group_id, 'sortingSetting': GROUP_SORTS[sort], 'cursor': cursor}, route=url)
         return posts_page(chunks, source='group', connection_key='group_feed', captured_at=_now())
+
+    def permalink(self, story_id, url):
+        """(the post record, response issues); the record's id is the feedback id its comments hang on."""
+        chunks = self.query('post', {'storyID': story_id}, route=url)
+        record, issues = permalink_post(chunks, captured_at=_now())
+        if record is None:
+            raise FacebookError(6, 'The post response holds no readable post.', 'Open the post in the browser; it may '
+                                                                                'be private or removed.')
+        return record, issues
+
+    def comments(self, feedback_id, sort, cursor, *, url):
+        """One page of a post's parent comments, with reply handles."""
+        variables = {'id': feedback_id, 'commentsIntentToken': COMMENT_SORTS[sort]}
+        if cursor is None:
+            chunks = self.query('comments', variables, route=url)
+        else:
+            chunks = self.query('comments_page', {**variables, 'commentsAfterCursor': cursor}, route=url)
+        return comments_page(chunks, post_id=feedback_id, captured_at=_now())
+
+    def replies(self, feedback_id, token, cursor, *, depth, parent_id, post_id, url):
+        """One batch of replies to one comment (depth 1) or to one reply (depth 2)."""
+        variables = {'id': feedback_id, 'expansionToken': token, 'repliesAfterCursor': cursor}
+        chunks = self.query('replies' if depth <= 1 else 'replies_deep', variables, route=url)
+        return replies_page(chunks, post_id=post_id, parent_id=parent_id, captured_at=_now())
 
     def live_queries(self):
         """Which read queries the tab has loaded right now (doctor); makes no request."""

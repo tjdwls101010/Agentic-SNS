@@ -45,6 +45,9 @@ def run(options, *, command, target, identity, reader, window=None):
             if out is not None:
                 out.close()
         _continue(reading, options, connection.account_id)
+        if reading.pop('detail', None):
+            reading['detail'] = words(command, target, reading.get('words', []), options, after=options.get('after'),
+                                      chars=0)
     except FacebookError as error:
         reading = {**(reading or {}), 'failure': error}
         reading.setdefault('results', [])
@@ -68,10 +71,10 @@ def _continue(reading, options, account_id):
         return
     reading['continuable'] = True
     reading['next'] = words(continuation['command'], continuation['target'], continuation['words'], options,
-                            after=number, limit=continuation.get('limit', options.get('limit')))
+                            after=number, limit=continuation.get('limit', ...))
 
 
-def words(command, target, identity_words, options, *, after=None, out=None, limit=None):
+def words(command, target, identity_words, options, *, after=None, out=None, limit=..., chars=None):
     """The argument words that rerun or continue a command: target last after `--` when it looks like an option."""
     result = [command]
     tail = []
@@ -81,11 +84,12 @@ def words(command, target, identity_words, options, *, after=None, out=None, lim
         else:
             result.append(str(target))
     result += identity_words
-    limit = options.get('limit') if limit is None else limit
+    limit = options.get('limit') if limit is ... else limit  # an explicit None drops --limit
     if limit is not None:
         result += ['--limit', str(limit)]
-    if options.get('chars') is not None:
-        result += ['--chars', str(options['chars'])]
+    chars = options.get('chars') if chars is None else chars
+    if chars is not None:
+        result += ['--chars', str(chars)]
     if after is not None:
         result += ['--after', str(after)]
     if out is not None:

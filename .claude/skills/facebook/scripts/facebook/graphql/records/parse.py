@@ -126,15 +126,15 @@ def pieces(chunks):
 
 
 def unplaced(chunks, consumed=lambda path, data: False):
-    """(story ids touched, response-level issues) for patches and errors no record builder used."""
-    anchors, touched, issues = [], set(), []
+    """({story id: reasons} for patches and errors placed on a story, response-level issues) — pieces no builder used."""
+    anchors, touched, issues = [], {}, []
     for path, data, errors, _ in pieces(chunks):
         anchors.append((list(path or []), data))
         if (path is not None and not is_story(data) and not (isinstance(data, dict) and is_story(data.get('node')))
                 and not consumed(path, data) and _patch_is_read(path, data)):
             owner = _story_at(anchors, path)
             if owner:
-                touched.add(owner)
+                touched.setdefault(owner, []).append('unsupported_path_patch')
             else:
                 issues.append('unsupported_path_patch')
         for error in errors:
@@ -143,7 +143,7 @@ def unplaced(chunks, consumed=lambda path, data: False):
                 continue
             owner = _story_at(anchors, where) if isinstance(where, list) and where else None
             if owner:
-                touched.add(owner)
+                touched.setdefault(owner, []).append('graphql_errors')
             else:
                 issues.append('graphql_errors')
     return touched, list(dict.fromkeys(issues))

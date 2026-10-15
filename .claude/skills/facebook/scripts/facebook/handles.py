@@ -27,8 +27,9 @@ def _directory(create=True):
 
 
 def save(context, state):
-    """Store `state` for the query `context`; returns the new handle number."""
+    """Store `state` for the query `context`; returns the new handle number. Expired handles are removed."""
     directory = _directory()
+    _prune(directory)
     try:
         fd = os.open(directory / 'counter', os.O_RDWR | os.O_CREAT, 0o600)
         with os.fdopen(fd, 'r+b') as counter:
@@ -72,6 +73,17 @@ def load(number, context):
     if not isinstance(state, dict):
         raise FacebookError(2, f'Handle {int(number)} is incomplete.', _RESTART)
     return state
+
+
+def _prune(directory):
+    """Handles hold other people's ids; one past its TTL is useless, so it is deleted when a new one is saved."""
+    cutoff = time.time() - TTL_SECONDS
+    for path in directory.glob('*.json'):
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+        except OSError:
+            pass
 
 
 def clean():

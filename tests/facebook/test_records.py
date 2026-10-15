@@ -47,12 +47,30 @@ def parse(case):
     if case['parser'] == 'permalink':
         record, issues = graphql.permalink_post(case['body_lines'], captured_at=NOW)
         return {'records': [record] if record else [], 'issues': issues}
+    if case['parser'] == 'comments':
+        page = graphql.comments_page(case['body_lines'], post_id=args['post_id'], captured_at=NOW)
+        return {'records': page.records, 'page_info': page.page_info, 'issues': page.issues, 'handles': page.handles}
+    if case['parser'] == 'replies':
+        page = graphql.replies_page(case['body_lines'], post_id=args['post_id'], parent_id=args['parent_id'],
+                                    captured_at=NOW)
+        return {'records': page.records, 'page_info': page.page_info, 'issues': page.issues}
     raise ValueError(case['parser'])
 
 
 @pytest.mark.parametrize('case', cases('records_posts.json'))
 def test_post_records(case):
     assert subset(case['expected'], parse(case)) == []
+
+
+@pytest.mark.parametrize('case', cases('records_comments.json'))
+def test_comment_records(case):
+    assert subset(case['expected'], parse(case)) == []
+
+
+def test_comment_records_carry_every_documented_field():
+    case = fixture('records_comments.json')['cases'][0]
+    record = parse(case)['records'][0]
+    assert set(record) == {key for key in graphql.SCHEMAS['comment']['fields'] if '[' not in key}
 
 
 def test_post_records_carry_every_documented_field():

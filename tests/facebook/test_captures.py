@@ -35,3 +35,35 @@ def test_real_feed_pages_read_without_unexpected_issues(path):
         assert record['incomplete'] is False
     photos = [m for r in page.records for m in r['media'] if m['kind'] == 'image' and m['alt']]
     assert photos  # P2: every photo-typed media node carried accessibility_caption; video posters do not
+
+
+def observed(name):
+    path = CAPTURES / f'{name}.json'
+    if not path.exists():
+        return None
+    return [o for o in json.loads(path.read_text())['observed'] if o.get('mode') == 'graphql']
+
+
+@pytest.mark.skipif(observed('r3_thread') is None, reason='no local captures')
+def test_real_permalink_and_comment_pages():
+    responses = observed('r3_thread')
+    record, issues = graphql.permalink_post(decode(responses[0]['body']), captured_at=NOW)
+    assert record and record['text'] and record['author_url'] and record['created_at'] and issues == []
+    page = graphql.comments_page(decode(responses[1]['body']), post_id=record['id'], captured_at=NOW)
+    assert page.records and page.issues == [] and isinstance(page.page_info, dict)
+    assert all(r['depth'] == 0 and r['author_url'] and r['created_at'] for r in page.records)
+
+
+@pytest.mark.skipif(observed('r3b_replies') is None, reason='no local captures')
+def test_real_reply_batches_and_their_cursor():
+    responses = observed('r3b_replies')
+    parents = graphql.comments_page(decode(responses[1]['body']), post_id='P', captured_at=NOW)
+    target = max(parents.records, key=lambda r: r['reply_count'] or 0)
+    assert parents.handles[target['id']]['expandable']
+    batch = graphql.replies_page(decode(responses[2]['body']), post_id='P', parent_id=target['id'], captured_at=NOW)
+    assert len(batch.records) == 10 and all(r['depth'] == 1 and r['parent_id'] == target['id'] for r in batch.records)
+    assert batch.page_info['has_next_page'] is True and batch.page_info['end_cursor']
+    second = observed('r3c_replies2')
+    if second:
+        more = graphql.replies_page(decode(second[0]['body']), post_id='P', parent_id=target['id'], captured_at=NOW)
+        assert len(more.records) == 10 and not {r['id'] for r in more.records} & {r['id'] for r in batch.records}

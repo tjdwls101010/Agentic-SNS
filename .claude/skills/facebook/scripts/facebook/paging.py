@@ -18,13 +18,13 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
     seen, closed}). keep(record) filters what is shown; skip(record) leaves a record out and counts it (its id is
     remembered so a continuation does not count it again); closes(records) ends the source after that page.
     commit(records, state, reason, skipped) is called once per complete page (for --out); with whole_pages a page is
-    never split at the limit. Returns {results, stop_reason, failure, state, skipped, pages}; state is None when
+    never split at the limit. max_pages counts pages served, an unshown tail from an earlier reading included. Returns {results, stop_reason, failure, state, skipped, pages}; state is None when
     nothing is left to continue.
     """
     state = dict(state or {})
     cursor, waiting = state.get('cursor'), list(state.get('pending') or [])
     seen, closed = set(state.get('seen') or []), bool(state.get('closed'))
-    results, skipped, visited, pages = [], [], set(), 0
+    results, skipped, visited, pages, served = [], [], set(), 0, 0
 
     def snapshot():
         if cursor == END and not waiting:
@@ -41,7 +41,7 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
             records, waiting, fetched = waiting, [], False
         elif cursor == END:
             return outcome('exhausted')
-        elif max_pages is not None and pages >= max_pages:
+        elif max_pages is not None and served >= max_pages:
             return outcome('limit_reached')
         else:
             key = json.dumps(cursor, sort_keys=True)
@@ -67,6 +67,7 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
                 damaged = True
             if closes and closes(records):
                 cursor, closed, damaged = END, True, False
+        served += 1
         page, page_skipped = [], []
         for record in records:
             identity = record.get('id')
@@ -89,7 +90,7 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
             reason = None
         elif cursor == END and not waiting:
             reason = 'window_reached' if closed else 'exhausted'
-        elif full or (max_pages is not None and pages >= max_pages):
+        elif full or (max_pages is not None and served >= max_pages):
             reason = 'limit_reached'
         else:
             reason = None

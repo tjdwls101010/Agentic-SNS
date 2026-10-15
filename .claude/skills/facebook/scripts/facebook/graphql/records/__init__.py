@@ -1,7 +1,7 @@
 """Decoded GraphQL chunks → the skill's records. Pure: no request, `captured_at` comes from the caller."""
 from dataclasses import dataclass, field
 
-from facebook.graphql.records import posts
+from facebook.graphql.records import comments, posts
 from facebook.graphql.records.parse import find_page_info, has_items
 
 
@@ -26,6 +26,20 @@ def permalink_post(chunks, *, captured_at):
     return posts.permalink(chunks, captured_at=captured_at)
 
 
+def comments_page(chunks, *, post_id, captured_at):
+    """A post's parent comments in server order, with each one's reply handle in .handles."""
+    records, handles, info = comments.parents(chunks, post_id=post_id, captured_at=captured_at)
+    return Page(records, info, has_items(chunks, 'comments'), comments.issues(chunks), handles)
+
+
+def replies_page(chunks, *, post_id, parent_id, captured_at):
+    """One batch of replies to `parent_id`, with each reply's own reply handle in .handles."""
+    records, handles, info = comments.replies(chunks, post_id=post_id, parent_id=parent_id, captured_at=captured_at)
+    return Page(records, info, has_items(chunks, 'replies_connection'), comments.issues(chunks), handles)
+
+
 SCHEMAS = {
     'post': {'object': 'post', 'description': 'A post from feed, profile, group, search or post.', 'fields': posts.FIELDS},
+    'comment': {'object': 'comment', 'description': 'A comment or reply from post, comments or replies.',
+                'fields': comments.FIELDS},
 }

@@ -229,7 +229,7 @@
     "shouldChangeNodeFieldName": true,
     "useDefaultActor": false
    },
-   "expected_key": "node",
+   "expected_key": "node_v2",
    "kind": "object",
    "cursor_var": null
   },
