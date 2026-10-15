@@ -8,7 +8,7 @@ from facebook.paths import data_dir
 from facebook.results import describe as describe_result
 from facebook.results import finish
 
-SCHEMA_OBJECTS = ['result', 'out', 'post', 'comment', 'entity', 'about']
+SCHEMA_OBJECTS = ['result', 'out', 'post', 'comment', 'entity', 'about', 'group']
 
 
 def doctor(options):

@@ -1,7 +1,7 @@
 """Decoded GraphQL chunks → the skill's records. Pure: no request, `captured_at` comes from the caller."""
 from dataclasses import dataclass, field
 
-from facebook.graphql.records import about, comments, posts, search
+from facebook.graphql.records import about, comments, groups, posts, search
 from facebook.graphql.records.parse import find_page_info, has_items
 
 
@@ -54,10 +54,16 @@ def about_fields(bodies, *, profile_id, collection_names, captured_at):
     return about.fields(bodies, profile_id=profile_id, collection_names=collection_names, captured_at=captured_at)
 
 
+def group_card(chunks, *, group_id, captured_at):
+    """(the group's card from its header, or None; response issues)."""
+    return groups.card(chunks, group_id=group_id, captured_at=captured_at)
+
+
 SCHEMAS = {
     'post': {'object': 'post', 'description': 'A post from feed, profile, group, search or post.', 'fields': posts.FIELDS},
     'entity': {'object': 'entity', 'description': 'A person, page or group from search.', 'fields': search.FIELDS},
     'about': {'object': 'about', 'description': 'One visible About field from about.', 'fields': about.FIELDS},
+    'group': {'object': 'group', 'description': 'A group\'s card from about <group URL>.', 'fields': groups.FIELDS},
     'comment': {'object': 'comment', 'description': 'A comment or reply from post, comments or replies.',
                 'fields': comments.FIELDS},
 }

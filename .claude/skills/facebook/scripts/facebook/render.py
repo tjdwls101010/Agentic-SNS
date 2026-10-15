@@ -92,6 +92,14 @@ def comment(record, index, parent_label, chars):
 
 
 def entity(record, index):
+    if 'privacy' in record:  # a group card
+        parts = [_line(record.get('name') or 'unavailable')] + [_line(record[key]) for key in ('privacy', 'member_count_text')
+                                                                 if record.get(key)]
+        if record.get('join_state'):
+            parts.append('you: ' + _line(record['join_state']))
+        if record.get('membership_questions'):
+            parts.append('membership questions')
+        return f'[e{index}] group id={_line(record["id"])} · ' + ' · '.join(parts) + f' · url: {_handle(record.get("url"))}', False
     verified = {True: 'verified', False: 'unverified', None: 'verified=?'}[record.get('verified')]
     return (f'[e{index}] {_line(record["kind"])} id={_line(record["id"])} · {_line(record.get("name") or "unavailable")} '
             f'· {verified} · url: {_handle(record.get("url"))}'), False

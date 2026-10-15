@@ -91,6 +91,8 @@ def _check_header(header, context):
     if header.get('format') != FORMAT:
         raise FacebookError(2, 'The --out file was written by an earlier version of this skill.',
                             'Use a new --out path; the old file is left as it was.')
+    if not isinstance(header.get('context'), dict):
+        raise FacebookError(2, 'The --out file\'s header names no query.', 'Use a new --out path.')
     if context is not None and header.get('context') != context:
         raise FacebookError(2, 'The --out file belongs to another command, target, order or account.',
                             'Use a new --out path, or rerun the command that started this file.')

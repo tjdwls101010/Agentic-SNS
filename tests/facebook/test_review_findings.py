@@ -100,3 +100,54 @@ def test_10_a_foreign_collection_is_refused_before_the_browser(browser, data_dir
     calls = len(browser.calls())
     code, out, _ = run_cli(browser, 'feed', '--sort', 'recent', '--out', str(out_file))
     assert code == 2 and len(browser.calls()) == calls
+
+
+# --- second review of the repairs ---
+
+def test_r2_1_a_checkpoint_outranks_a_background_rate_limit(browser, data_dir):
+    known_tab(browser, data_dir)
+    browser.respond('query', {'status': 200, 'url': 'https://www.facebook.com/api/graphql/',
+                              'body': json.dumps({'checkpoint_url': 'https://www.facebook.com/checkpoint/1/'}),
+                              'used': {'source': 'live'}, 'explicit': 1, 'resources': 2, 'statuses': [200, 429]})
+    code, out, _ = run_cli(browser, 'feed')
+    record = json.loads((data_dir / 'protection/blocked.json').read_text())
+    assert code == 5 and record['reason'] == 'checkpoint' and record['expires_at'] is None
+
+
+def test_r2_2_a_rate_limit_beside_a_failed_request_still_blocks(browser, data_dir):
+    known_tab(browser, data_dir)
+    browser.respond('query', {'network_error': 'aborted', 'used': {'source': 'live'}, 'explicit': 1, 'resources': 2,
+                              'statuses': [429, 0]})
+    code, out, _ = run_cli(browser, 'feed')
+    assert code == 5 and 'next' not in json.loads(out)
+    assert json.loads((data_dir / 'protection/blocked.json').read_text())['reason'] == 'rate_limit'
+
+
+def test_r2_2_a_rate_limit_seen_while_no_command_ran_blocks_at_the_next_start(browser, data_dir):
+    browser.tab('T1')
+    (data_dir / 'session').mkdir(parents=True, exist_ok=True)
+    (data_dir / 'session/default.json').write_text(json.dumps({'tab': 'T1', 'queries': {}}))
+    browser.respond('state', {**STATE_OK, 'statuses': [200, 429]})
+    code, out, _ = run_cli(browser, 'feed')
+    assert code == 5 and not [c for c in browser.calls() if c['op'] == 'query']
+    assert json.loads((data_dir / 'protection/blocked.json').read_text())['reason'] == 'rate_limit'
+
+
+def test_r2_4_a_screen_that_loads_more_than_reserved_is_charged_in_full(browser, data_dir):
+    known_tab(browser, data_dir)
+    rejected = json.dumps({'errors': [{'message': 'PersistedQueryNotFound'}]})
+    browser.respond('query', query_result(rejected, source='stored'))
+    browser.respond('route', {'location': 'https://www.facebook.com/', 'user_id': '1000123', 'explicit': 0,
+                              'resources': 12, 'statuses': [200] * 12,
+                              'live': {'CometNewsFeedPaginationQuery': {'doc_id': '222', 'flags': {}}}})
+    code, out, _ = run_cli(browser, 'feed', '--max-requests', '11', '--json')
+    result = json.loads(out)
+    assert result['request_count'] == 13 and result['stop_reason'] == 'budget'  # truthful, and nothing more is sent
+    assert len([c for c in browser.calls() if c['op'] == 'query']) == 1
+
+
+def test_r2_5_a_header_without_context_is_refused_not_crashed(browser, data_dir, tmp_path):
+    out_file = tmp_path / 'f.ndjson'
+    out_file.write_text('{"kind":"header","format":3}\n')
+    code, out, _ = run_cli(browser, 'feed', '--out', str(out_file))
+    assert code == 2 and json.loads(out)['error'] == 'argument' and browser.calls() == []

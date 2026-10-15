@@ -63,6 +63,9 @@ def parse(case):
         fields, issues = graphql.about_fields(case['bodies'], profile_id=args['profile_id'],
                                              collection_names=args['collection_names'], captured_at=NOW)
         return {'records': fields, 'issues': issues}
+    if case['parser'] == 'group_card':
+        record, issues = graphql.group_card(case['body_lines'], group_id=args['group_id'], captured_at=NOW)
+        return {'records': [record] if record else [], 'issues': issues}
     raise ValueError(case['parser'])
 
 
@@ -81,7 +84,7 @@ def test_search_records(case):
     assert subset(case['expected'], parse(case)) == []
 
 
-@pytest.mark.parametrize('case', cases('records_search_about.json', ('about', 'about_collections')))
+@pytest.mark.parametrize('case', cases('records_search_about.json', ('about', 'about_collections', 'group_card')))
 def test_about_records(case):
     assert subset(case['expected'], parse(case)) == []
 

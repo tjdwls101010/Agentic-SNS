@@ -6,6 +6,8 @@ from facebook.errors import FacebookError
 
 
 def about(options):
+    if graphql.is_group_url(options['target']):
+        return _group(options)
     target = graphql.normalize_profile(options['target'])
     wanted = options.get('section')
     identity = {'section': wanted}
@@ -51,3 +53,17 @@ def about(options):
         return reading
 
     return connect.run(options, command='about', target=target, identity=identity, reader=read)
+
+
+def _group(options):
+    """A group's card: its header as the group page shows it to this account."""
+    target = graphql.normalize_group(options['target'])
+    if options.get('section'):
+        raise FacebookError(2, '--section is for profiles and pages; a group has one card.', 'Drop --section.')
+
+    def read(connection, state, out):
+        group_id = connection.client.resolve('group', target)
+        record, issues = connection.client.group(group_id, url=target)
+        return {'results': [record], 'stop_reason': 'exhausted', 'issues': issues}
+
+    return connect.run(options, command='about', target=target, identity={'section': None}, reader=read)

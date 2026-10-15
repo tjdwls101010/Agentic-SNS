@@ -303,6 +303,16 @@
    "expected_key": "replies_connection",
    "kind": "connection",
    "cursor_var": "repliesAfterCursor"
+  },
+  "group_root": {
+   "name": "CometGroupRootQuery",
+   "doc_id": null,
+   "variables": {
+    "scale": 2
+   },
+   "expected_key": "group",
+   "kind": "object",
+   "cursor_var": null
   }
  }
 }

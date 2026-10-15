@@ -31,12 +31,14 @@ EXIT_CODES = {
 KIND_EXIT = {'records': 0, 'resumable': 0, 'complete': 0, 'maintenance': 0, 'argument': 2, 'aside': 3, 'login': 4,
              'blocked': 5, 'failed': 6, 'empty': 7, 'partial': 8}
 
-REQUESTS = ('how requests are counted: every GraphQL query, page fetch and retry counts, and so does every facebook.com request the '
-            'browser tab makes while the command runs. The first use opens a dedicated facebook.com tab once (about '
-            '30 requests the page makes itself, reported as "tab opened" and not charged to --max-requests). When '
-            'Facebook no longer accepts a stored query, the tab moves once to the screen that loads it, counted as at '
-            'least 10. fbcdn.net static files do not count. A rate limit seen on any of the tab\'s requests blocks like '
-            'one of ours. All invocations share one lock and 1-2 s pacing for the account.')
+REQUESTS = ('how requests are counted: every GraphQL query, page fetch and retry counts, and so does every facebook.com request '
+            'the dedicated tab finishes while the command runs. Opening that tab the first time (about 30, shown as '
+            '"tab opened") is not charged to --max-requests. When Facebook no longer accepts a stored query, the tab '
+            'moves once to the screen that loads it, charged at least 10. The page decides how much opening or moving '
+            'the tab loads, so that is charged in full after it runs and a reading can end above --max-requests by '
+            'the excess; nothing more is sent after. fbcdn.net static files do not count. A rate limit on any of the '
+            'tab\'s requests, even one that finished between commands, blocks like one of ours. All invocations '
+            'share one lock and 1-2 s pacing for the account.')
 TEXT_OUTPUT = ('output: first line "<command> · … · N shown · stopped=<reason> · requests=<used>/<budget>"; dated reads '
                'add "window <since>..<until> · <coverage>"; then one record per [p1]/[c1]/[e1] label, each ending with '
                'the arguments of the next command (url, author, replies <handle>); text is shown as text[N of M chars '
@@ -172,12 +174,13 @@ COMMANDS = {
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
     'about': {
-        'help': 'Read a profile\'s or page\'s visible About fields.',
+        'help': 'Read a profile\'s or page\'s visible About fields, or a group\'s card.',
         'run': about.about,
-        'arguments': [(('target',), {'help': 'Profile or page URL, vanity name or numeric id'}),
+        'arguments': [(('target',), {'help': 'Profile or page URL, vanity name or numeric id; or a group by its /groups/ URL'}),
                       (('--section',), {'help': 'Only this locale-independent section, e.g. directory_work (schema about lists them as they appear)'}),
                       'json', 'max_requests'],
         'epilog': ['What About shows depends on the viewing account and the owner\'s privacy settings. Fields are never cut.',
+                   'A group URL gives the group\'s card instead: name, privacy as Facebook labels it, member count as Facebook formats it, the viewing account\'s relation to the group, and whether joining asks questions. requests: 1 to find the id (none for a numeric /groups/<id>/), then 1.',
                    'requests: 1 to find the numeric id (none for a numeric id), 1 for the overview, then 1 per About tab; --section stops at the first tab that shows it.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },

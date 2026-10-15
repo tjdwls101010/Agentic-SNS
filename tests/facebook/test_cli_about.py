@@ -77,3 +77,34 @@ def test_budget_names_what_the_profile_needs(browser, data_dir):
     code, out, _ = run_cli(browser, 'about', '4', '--max-requests', '1', '--json')
     result = json.loads(out)
     assert code == 8 and '3 requests' in result['message'] and result['results']
+
+
+def group_header(group_id='700'):
+    return json.dumps({'data': {'group': {'id': group_id, 'profile_header_renderer': {'group': {
+        '__typename': 'Group', 'id': group_id, 'name': 'Example Group', 'url': 'https://www.facebook.com/groups/examplegroup/',
+        'group_address': 'examplegroup', 'privacy_info': {'icon_name': 'globe-americas', 'title': {'text': 'Public group'}},
+        'group_member_profiles': {'formatted_count_text': '90K members'}, 'viewer_join_state': 'CAN_JOIN',
+        'has_membership_questions': False}}}}})
+
+
+def test_a_group_url_gets_the_group_card(browser, data_dir):
+    known_tab(browser, data_dir)
+    browser.respond('page', {'status': 200, 'url': 'https://www.facebook.com/groups/examplegroup/',
+                             'body': '<script>{"groupID":"700"}</script>', 'explicit': 1, 'resources': 1})
+    browser.respond('query', query_result(group_header()), name='CometGroupRootQuery')
+    code, out, _ = run_cli(browser, 'about', 'https://www.facebook.com/groups/examplegroup/')
+    assert code == 0, out
+    lines = out.splitlines()
+    assert lines[0] == 'about · 1 shown · stopped=exhausted · requests=2/25'
+    assert lines[1] == ('[e1] group id=700 · Example Group · Public group · 90K members · you: CAN_JOIN · '
+                        'url: "https://www.facebook.com/groups/examplegroup/"')
+    sent = [c for c in browser.calls() if c['op'] == 'query'][0]['args']
+    assert sent['variables']['groupID'] == '700'
+
+
+def test_a_numeric_group_id_needs_the_groups_url_form(browser, data_dir):
+    known_tab(browser, data_dir)
+    browser.respond('query', query_result(group_header('701')), name='CometGroupRootQuery')
+    code, out, _ = run_cli(browser, 'about', 'https://www.facebook.com/groups/701/', '--json')
+    result = json.loads(out)
+    assert code == 0 and result['results'][0]['id'] == '701' and result['request_count'] == 1

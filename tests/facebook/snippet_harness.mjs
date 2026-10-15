@@ -15,6 +15,14 @@ import vm from 'node:vm';
 const spec = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const fetches = [];
 const pageSpec = spec.page || {};
+const pending = [], during = [];
+let finished = 0;
+const entry = (status) => ({name: 'https://www.facebook.com/ajax/o' + finished++, responseStatus: status});
+const finish = (call) => {
+  for (const status of call.before || []) pending.push(entry(status));
+  for (const status of call.observed || []) during.push(entry(status));
+};
+for (const status of pageSpec.buffered || []) pending.push(entry(status));
 let resourceCalls = 0;
 const resources = pageSpec.resources || [0];
 
@@ -45,13 +53,16 @@ function fakeWindow() {
     if (response.throw) throw new Error(response.throw);
     return {status: response.status, url: response.url || absolute, text: async () => response.body};
   };
-  // Requests the page makes during a call, as PerformanceObserver reports them: page.observed lists their statuses.
-  const observed = (pageSpec.observed || []).map((status, i) => ({name: 'https://www.facebook.com/ajax/o' + i,
-                                                                  responseStatus: status}));
+  // Requests the tab finishes, as PerformanceObserver reports them. page.buffered: finished before the page was
+  // first watched; a call's before: finished between calls; a call's observed: finished during the call (after a
+  // ledger the call installs has taken its first records).
   class PerformanceObserver {
-    constructor(callback) { this.callback = callback; this.delivered = false; }
-    observe() {}
-    takeRecords() { if (this.delivered) return []; this.delivered = true; return observed; }
+    constructor(callback) { this.callback = callback; this.installing = false; }
+    observe() { this.installing = true; }
+    takeRecords() {
+      if (this.installing) { this.installing = false; return pending.splice(0); }
+      return pending.splice(0).concat(during.splice(0));
+    }
     disconnect() {}
   }
   const performance = {getEntriesByType: () => {
@@ -63,10 +74,21 @@ function fakeWindow() {
           encodeURIComponent, decodeURIComponent, Error, RegExp, Buffer};
 }
 
+let sharedContext = null;
 async function runPage(source, args) {
-  const context = vm.createContext(fakeWindow());
+  const context = sharedContext || vm.createContext(fakeWindow());
   const fn = vm.runInContext('(' + source.trim().replace(/;\s*$/, '') + ')', context);
   return await fn(args);
+}
+
+async function runSequence() {
+  sharedContext = vm.createContext(fakeWindow());  // one page across calls, as the dedicated tab is
+  const results = [];
+  for (const call of spec.calls) {
+    finish(call);
+    results.push(await runPage(fs.readFileSync(call.source, 'utf8'), call.args));
+  }
+  return results;
 }
 
 async function runProgram() {
@@ -90,6 +112,7 @@ async function runProgram() {
   return printed;
 }
 
-const result = spec.kind === 'program' ? await runProgram()
+if (spec.kind === 'page') finish(pageSpec);
+const result = spec.kind === 'program' ? await runProgram() : spec.kind === 'sequence' ? await runSequence()
   : await runPage(fs.readFileSync(spec.source, 'utf8'), spec.args);
 process.stdout.write(JSON.stringify({result, fetches}) + '\n');

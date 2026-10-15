@@ -86,3 +86,11 @@ def test_real_page_about_overview():
     assert len(graphql.about_collections(about)) >= 3
     fields, issues = graphql.about_fields([about], profile_id='p', collection_names=[None], captured_at=NOW)
     assert fields and issues == []
+
+
+@pytest.mark.skipif(observed('r5_group_page') is None, reason='no local captures')
+def test_real_group_header_card():
+    header = decode(observed('r5_group_page')[0]['body'])
+    card, issues = graphql.group_card(header, group_id='2968116436545420', captured_at=NOW)
+    assert card and card['name'] and card['privacy'] and card['privacy_icon'] and card['member_count_text']
+    assert card['join_state'] and issues == []

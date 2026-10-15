@@ -5,28 +5,37 @@ async (args) => {
   if (typeof args.path !== 'string' || !args.path.startsWith('/') || args.path.startsWith('//')) {
     return {refused: 'not a path on this site', explicit: 0, resources: 0};
   }
-  // Every facebook.com request this tab makes during the call, with its HTTP status, as the browser records it.
+  // The tab's ledger of its own facebook.com requests and their HTTP statuses, kept across calls (installed once per
+  // page load), so a request that finishes after one call is counted, and its status checked, by the next.
   const host = /^https:\/\/([a-z0-9-]+\.)*facebook\.com\//;
-  const statuses = [];
-  const watcher = new PerformanceObserver(list => {
-    for (const entry of list.getEntries()) if (host.test(entry.name)) statuses.push(entry.responseStatus || 0);
-  });
-  watcher.observe({type: 'resource', buffered: false});
-  const settle = async () => {
-    await new Promise(resolve => setTimeout(resolve, 50));
-    for (const entry of watcher.takeRecords()) if (host.test(entry.name)) statuses.push(entry.responseStatus || 0);
-    watcher.disconnect();
+  const ledger = window.__facebookSkillLedger || (() => {
+    const made = {entries: [], read: 0};
+    const keep = list => { for (const entry of list) if (host.test(entry.name)) made.entries.push(entry.responseStatus || 0); };
+    made.observer = new PerformanceObserver(list => keep(list.getEntries()));
+    made.observer.observe({type: 'resource', buffered: true});
+    keep(made.observer.takeRecords());
+    made.keep = keep;
+    if (!args.fresh) made.read = made.entries.length;  // what the tab did before the skill watched it is not counted
+    window.__facebookSkillLedger = made;
+    return made;
+  })();
+  const settle = async (wait = 50) => {
+    await new Promise(resolve => setTimeout(resolve, wait));
+    ledger.keep(ledger.observer.takeRecords());
+    const statuses = ledger.entries.slice(ledger.read);
+    ledger.read = ledger.entries.length;
     return {resources: statuses.length, statuses};
   };
   history.pushState({}, '', args.path);
   window.dispatchEvent(new PopStateEvent('popstate', {state: {}}));
   const deadline = Date.now() + 15000;
-  let last = 0, quietSince = Date.now();
+  const before = ledger.entries.length;
+  let last = before, quietSince = Date.now();
   while (Date.now() < deadline) {
     await new Promise(resolve => setTimeout(resolve, 250));
-    for (const entry of watcher.takeRecords()) if (host.test(entry.name)) statuses.push(entry.responseStatus || 0);
-    if (statuses.length !== last) { last = statuses.length; quietSince = Date.now(); }
-    if (statuses.length > 0 && Date.now() - quietSince > 2500) break;
+    ledger.keep(ledger.observer.takeRecords());
+    if (ledger.entries.length !== last) { last = ledger.entries.length; quietSince = Date.now(); }
+    if (ledger.entries.length > before && Date.now() - quietSince > 2500) break;
   }
   const live = {};
   for (const name of args.names || []) {

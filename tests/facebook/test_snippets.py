@@ -130,11 +130,15 @@ def test_route_reports_queries_the_screen_loaded_and_its_requests(tmp_path):
 
 
 def test_state_reads_the_logged_in_user_without_a_request(tmp_path):
-    out = run(tmp_path, kind='page', source=str(SNIPPETS / 'state.js'), args={},
-              page={'modules': {'CurrentUserInitialData': {'USER_ID': 1000123}}, 'resources': [29]})
-    assert out['result'] == {'location': 'https://www.facebook.com/', 'user_id': '1000123', 'runtime': True,
-                             'resources': 29}
-    assert out['fetches'] == []
+    fresh = run(tmp_path, kind='page', source=str(SNIPPETS / 'state.js'), args={'fresh': True},
+                page={'modules': {'CurrentUserInitialData': {'USER_ID': 1000123}}, 'buffered': [200] * 29})
+    assert fresh['result'] == {'location': 'https://www.facebook.com/', 'user_id': '1000123', 'runtime': True,
+                               'resources': 29, 'statuses': [200] * 29}
+    assert fresh['fetches'] == []
+    # a tab the skill did not just open: what it did before the skill watched it is not counted
+    known = run(tmp_path, kind='page', source=str(SNIPPETS / 'state.js'), args={'fresh': False},
+                page={'modules': {'CurrentUserInitialData': {'USER_ID': 1}}, 'buffered': [200, 429]})
+    assert known['result']['resources'] == 0 and known['result']['statuses'] == []
 
 
 def test_program_lists_tabs_without_touching_a_page(tmp_path):
@@ -162,3 +166,14 @@ def test_large_results_are_chunked_without_splitting_a_surrogate_pair(tmp_path):
     assert len(lines[0]['body']) == size - 1 and lines[1]['body'].startswith('\U0001F600')
     assert all(len(line) < 12 * 1024 * 1024 for line in out['result'])
     assert aside.parse('\n'.join(out['result'])) == value
+
+
+def test_requests_finishing_after_a_call_are_counted_by_the_next(tmp_path):
+    """Second review, finding 3: the tab keeps one ledger of its facebook.com requests; nothing finished is lost."""
+    out = run(tmp_path, kind='sequence', calls=[
+        {'source': str(SNIPPETS / 'page.js'), 'args': {'url': 'https://www.facebook.com/x'}, 'observed': [200]},
+        {'source': str(SNIPPETS / 'state.js'), 'args': {}, 'before': [429]},
+    ], page={'fetch': [{'status': 200, 'body': '<html>'}], 'modules': {'CurrentUserInitialData': {'USER_ID': '7'}}})
+    first, second = out['result']
+    assert first['resources'] == 1 and first['statuses'] == [200]
+    assert second['statuses'] == [429]  # the late one is reported at the next look, never dropped

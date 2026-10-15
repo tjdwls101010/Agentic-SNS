@@ -697,6 +697,63 @@
           "graphql_errors"
         ]
       }
+    },
+    {
+      "name": "group-card-from-the-group-header",
+      "item": "R5 (P2 capture)",
+      "fact": "CometGroupRootQuery {groupID} answers data.group.profile_header_renderer.group: name, url, group_address (vanity), privacy_info.title.text (viewer language) and icon_name (locale-independent), group_member_profiles.formatted_count_text (a formatted string, not a number), viewer_join_state, has_membership_questions.",
+      "parser": "group_card",
+      "args": {
+        "group_id": "700"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "group": {
+              "id": "700",
+              "profile_header_renderer": {
+                "group": {
+                  "__typename": "Group",
+                  "id": "700",
+                  "name": "Example Group",
+                  "url": "https://www.facebook.com/groups/examplegroup/",
+                  "group_address": "examplegroup",
+                  "privacy_info": {
+                    "icon_name": "globe-americas",
+                    "title": {
+                      "text": "Public group",
+                      "ranges": []
+                    }
+                  },
+                  "group_member_profiles": {
+                    "formatted_count_text": "90K members"
+                  },
+                  "viewer_join_state": "CAN_JOIN",
+                  "has_membership_questions": false,
+                  "group_type_name_for_content": "GROUP"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "kind": "group",
+            "id": "700",
+            "name": "Example Group",
+            "url": "https://www.facebook.com/groups/examplegroup/",
+            "vanity": "examplegroup",
+            "privacy": "Public group",
+            "privacy_icon": "globe-americas",
+            "member_count_text": "90K members",
+            "join_state": "CAN_JOIN",
+            "membership_questions": false
+          }
+        ],
+        "issues": []
+      }
     }
   ]
 }

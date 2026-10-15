@@ -13,8 +13,8 @@ from urllib.parse import quote, urlsplit
 
 from facebook.errors import FacebookError, diagnostic
 from facebook.graphql import classify, targets
-from facebook.graphql.records import (about_collections, about_fields, comments_page, permalink_post, posts_page,
-                                     replies_page, search_page)
+from facebook.graphql.records import (about_collections, about_fields, comments_page, group_card, permalink_post,
+                                     posts_page, replies_page, search_page)
 from facebook.graphql.records.search import VERTICALS
 from facebook.graphql.records.search import filters as search_filters
 
@@ -62,8 +62,8 @@ class Client:
             self._open()
         return self.account_id
 
-    def _state(self):
-        state = self.browser.evaluate(self.tab, SNIPPETS['state'], {})
+    def _state(self, fresh=False):
+        state = self.browser.evaluate(self.tab, SNIPPETS['state'], {'fresh': fresh})
         if not isinstance(state, dict) or not isinstance(state.get('location'), str):
             raise FacebookError(3, 'The Facebook tab answered invalidly.', 'Run doctor.')
         return state
@@ -79,14 +79,15 @@ class Client:
             self.tab = new[-1]['target_id']
             self.memory.set_tab(self.tab)
             self.opened_now = True
-            state = self._state()
+            state = self._state(fresh=True)
             slot.charge(1 + _int(state.get('resources')))
             self._check_state(state, slot)
         return state
 
     def _check_state(self, state, slot):
-        """Raise for a checkpoint (recorded in `slot` first), a logout, a broken page, or another account."""
-        verdict = classify.location(state['location'], state.get('user_id'))
+        """Raise for a checkpoint or a rate limit among the tab's requests (recorded in `slot` first), a logout, a
+        broken page, or another account."""
+        verdict = _rate_limited(state, classify.location(state['location'], state.get('user_id')))
         if verdict.block:
             slot.block(verdict.block)
         if verdict.error:
@@ -137,17 +138,15 @@ class Client:
                         raise FacebookError(2, 'The browser refused a request this skill must not make.',
                                             'Report this as a skill bug.')
                     if result.get('network_error'):
-                        raise FacebookError(6, 'The request to Facebook did not complete.', 'Retry later; run doctor '
-                                                                                            'if it keeps failing.')
-                    if 429 in (result.get('statuses') or []):
-                        verdict = classify.Verdict('blocked', error=FacebookError(
-                            5, 'Facebook rate-limited this account; requests are blocked for 30 minutes.',
-                            'Stop requests and retry after the block expires; check Facebook first.',
-                            reason='rate_limit'), block='rate_limit')
+                        verdict = _rate_limited(result, classify.Verdict('failed', error=FacebookError(
+                            6, 'The request to Facebook did not complete.', 'Retry later; run doctor if it keeps '
+                                                                            'failing.')))
                     else:
-                        verdict = verdict_of(result)
+                        verdict = _rate_limited(result, verdict_of(result))
                     if verdict.block:
                         slot.block(verdict.block)
+                    if result.get('network_error'):
+                        raise verdict.error
                     return result, verdict
             except FacebookError as error:
                 if error.reason != 'tab_missing' or attempt:
@@ -270,10 +269,29 @@ class Client:
         return self.query('about', {'pageID': profile_id, 'userID': profile_id, 'sectionToken': token,
                                     'collectionToken': collection}, route=url.rstrip('/') + '/about')
 
+    def group(self, group_id, *, url):
+        """(the group's card from its header, response issues)."""
+        chunks = self.query('group_root', {'groupID': group_id}, route=url)
+        record, issues = group_card(chunks, group_id=group_id, captured_at=_now())
+        if record is None:
+            raise FacebookError(6, 'The group response holds no readable group header.', 'Open the group in the '
+                                                                                         'browser; it may be hidden.')
+        return record, issues
+
     def live_queries(self):
         """Which read queries the tab has loaded right now (doctor); makes no request."""
         result = self._evaluate('modules', {'names': READ_NAMES})
         return result if isinstance(result, dict) else {}
+
+
+def _rate_limited(result, verdict):
+    """A 429 on any of the tab's requests is a rate limit, unless the verdict is already a checkpoint (which lasts)."""
+    if verdict.block == 'checkpoint' or 429 not in (result.get('statuses') or []):
+        return verdict
+    return classify.Verdict('blocked', error=FacebookError(
+        5, 'Facebook rate-limited this account; requests are blocked for 30 minutes.',
+        'Stop requests and retry after the block expires; check Facebook first.', reason='rate_limit'),
+        block='rate_limit')
 
 
 def _now():
