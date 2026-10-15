@@ -100,3 +100,11 @@ def test_aside_program_output(case, tmp_path, monkeypatch):
         assert 'lost its connection' in error.value.message
     else:
         assert error.value.reason != 'tab_missing' and 'cannot read' not in error.value.message
+
+
+@pytest.mark.parametrize('character', [' ', ' ', '\u0085'])
+def test_line_separators_inside_strings_survive_the_program_output(character):
+    """Review finding 9: JSON.stringify leaves these literal; only a newline ends a line of program output."""
+    body = json.dumps({'text': f'A{character}B'}, ensure_ascii=False)
+    stdout = json.dumps({'kind': 'result', 'chunks': 0, 'body': body}, ensure_ascii=False) + '\n'
+    assert aside.parse(stdout) == {'text': f'A{character}B'}

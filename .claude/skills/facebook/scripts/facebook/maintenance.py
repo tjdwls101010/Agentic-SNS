@@ -18,6 +18,7 @@ def doctor(options):
         if options.get('unblock'):
             protection.unblock()
         connection = Connection(protection.MAX_BUDGET, options.get('verbose'))
+        connection.start()
         client = connection.client
         state = connection.guard.state()
         live = client.live_queries()

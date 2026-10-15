@@ -2,7 +2,7 @@
 from facebook import guard as protection
 from facebook import handles
 from facebook.aside import Aside
-from facebook.collection import OutFile
+from facebook.collection import OutFile, peek
 from facebook.errors import FacebookError
 from facebook.graphql import Client
 from facebook.results import finish
@@ -10,15 +10,22 @@ from facebook.session import Session
 
 
 class Connection:
-    """One invocation's guarded connection: the client, its guard, and the Facebook account in use."""
+    """One invocation's guarded connection: the client, its guard, and the Facebook account in use.
+
+    Built first and started second, so the requests a failed start already made are still reported.
+    """
 
     def __init__(self, budget, verbose=False):
         self.guard = protection.Guard(budget)
-        self.guard.check()  # a saved block stops the invocation before the browser is touched
         browser = Aside()
         self.memory = Session(browser.account_key)
         self.client = Client(browser, self.guard, self.memory, verbose)
+        self.account_id = None
+
+    def start(self):
+        self.guard.check()  # a saved block stops the invocation before the browser is touched
         self.account_id = self.client.start()
+        return self
 
 
 def run(options, *, command, target, identity, reader, window=None):
@@ -30,27 +37,12 @@ def run(options, *, command, target, identity, reader, window=None):
     connection, reading = None, None
     out_path = options.get('out')
     try:
-        connection = Connection(options['max_requests'], options.get('verbose'))
-        context = _context(command, target, identity, connection.account_id)
-        state = handles.load(options['after'], context) if options.get('after') else None
-        out = OutFile(out_path, context) if out_path else None
-        try:
-            if out is not None and out.complete:
-                reading = {'results': [], 'stop_reason': 'exhausted', 'already_complete': True}
-            else:
-                reading = reader(connection, state, out)
-            if out is not None:
-                reading['count'] = out.count
-                reading['continuable'] = out.state is not None and not out.complete
-                if reading.get('stop_reason') == 'budget' or isinstance(reading.get('failure'), FacebookError):
-                    reading['next'] = words(command, target, reading.get('words', []), options, out=out_path)
-        finally:
-            if out is not None:
-                out.close()
-        _continue(reading, options, connection.account_id)
-        if reading.pop('detail', None):
-            reading['detail'] = words(command, target, reading.get('words', []), options, after=options.get('after'),
-                                      chars=0)
+        if out_path:
+            reading = _settled_file(out_path, _context(command, target, identity, None))
+        if reading is None:
+            connection = Connection(options['max_requests'], options.get('verbose'))
+            connection.start()
+            reading = _read(connection, options, command, target, identity, reader, out_path)
     except FacebookError as error:
         reading = {**(reading or {}), 'failure': error}
         reading.setdefault('results', [])
@@ -59,6 +51,47 @@ def run(options, *, command, target, identity, reader, window=None):
     return finish(reading, command=command, requests=connection.guard.count if connection else 0,
                   budget=options['max_requests'], identity=_public(identity), out=out_path,
                   setup=connection.guard.setup if connection else 0)
+
+
+def _settled_file(path, context):
+    """Decide a --out file from the file alone, before the browser: a foreign or older file is refused, a complete one
+    reads nothing. Returns the reading of a complete file, else None (read on)."""
+    saved, complete, count = peek(path)
+    if saved is None:
+        return None
+    if {k: v for k, v in saved.items() if k != 'account_id'} != {k: v for k, v in context.items() if k != 'account_id'}:
+        raise FacebookError(2, 'The --out file belongs to another command, target, order or account.',
+                            'Use a new --out path, or rerun the command that started this file.')
+    if complete:
+        return {'results': [], 'stop_reason': 'exhausted', 'already_complete': True, 'count': count}
+    return None
+
+
+def _read(connection, options, command, target, identity, reader, out_path):
+    context = _context(command, target, identity, connection.account_id)
+    state = handles.load(options['after'], context) if options.get('after') else None
+    out = OutFile(out_path, context) if out_path else None
+    reading = None
+    try:
+        if out is not None and out.complete:
+            reading = {'results': [], 'stop_reason': 'exhausted', 'already_complete': True}
+        else:
+            reading = reader(connection, state, out)
+        if out is not None:
+            reading['count'] = out.count
+            reading['continuable'] = out.state is not None and not out.complete
+            failure = reading.get('failure')
+            stopped = isinstance(failure, FacebookError) and failure.code in (4, 5)
+            if not stopped and (reading.get('stop_reason') == 'budget' or isinstance(failure, FacebookError)):
+                reading['next'] = words(command, target, reading.get('words', []), options, out=out_path)
+    finally:
+        if out is not None:
+            out.close()
+    _continue(reading, options, connection.account_id)
+    if reading.pop('detail', None):
+        reading['detail'] = words(command, target, reading.get('words', []), options, after=options.get('after'),
+                                  chars=0)
+    return reading
 
 
 def _continue(reading, options, account_id):

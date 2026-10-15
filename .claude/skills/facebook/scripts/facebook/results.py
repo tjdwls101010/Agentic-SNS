@@ -179,9 +179,11 @@ def describe(exit_codes):
 
 REQUESTS = ('request_count counts every network action this invocation started toward facebook.com: each GraphQL '
             'query, each page fetch, a retry, and every facebook.com request the browser tab made while the command '
-            'ran (opening the dedicated tab, or moving it to another Facebook screen to load that screen\'s queries). '
-            'Static files from fbcdn.net are not counted. An action that timed out is still counted. All invocations '
-            'share one cross-process lock and pacing (1-2 s between requests) for the account.')
+            'ran (opening the dedicated tab, reported in tab_opened_requests and not charged to max_requests; moving '
+            'it to another Facebook screen to load that screen\'s queries, counted as at least 10). Static files from '
+            'fbcdn.net are not counted. An action that timed out keeps what was reserved for it. A 429 on any of the '
+            'tab\'s requests records a rate limit. All invocations share one cross-process lock and pacing (1-2 s '
+            'between requests) for the account.')
 
 ENVELOPE = {
     'ok': 'boolean — false only for the kinds whose ok is false (see kinds)',

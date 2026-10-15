@@ -6,9 +6,6 @@ async (args) => {
     'GroupsCometFeedRegularStoriesPaginationQuery', 'SearchCometResultsPaginatedResultsQuery',
     'CometSinglePostDialogContentQuery', 'CommentListComponentsRootQuery', 'CommentsListComponentsPaginationQuery',
     'Depth1CommentsListPaginationQuery', 'Depth2CommentsListPaginationQuery', 'CometGroupRootQuery'];
-  const host = /^https:\/\/([a-z0-9-]+\.)*facebook\.com\//;
-  const count = () => performance.getEntriesByType('resource').filter(entry => host.test(entry.name)).length;
-  const before = count();
   if (!READ_QUERIES.includes(args.name) || !args.variables || typeof args.variables !== 'object') {
     return {refused: 'not a read query', explicit: 0, resources: 0};
   }
@@ -54,6 +51,19 @@ async (args) => {
                        variables: JSON.stringify(Object.assign({}, args.variables, provided)),
                        server_timestamps: 'true', doc_id: doc});
   const body = Object.entries(form).map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v)).join('&');
+  // Every facebook.com request this tab makes during the call, with its HTTP status, as the browser records it.
+  const host = /^https:\/\/([a-z0-9-]+\.)*facebook\.com\//;
+  const statuses = [];
+  const watcher = new PerformanceObserver(list => {
+    for (const entry of list.getEntries()) if (host.test(entry.name)) statuses.push(entry.responseStatus || 0);
+  });
+  watcher.observe({type: 'resource', buffered: false});
+  const settle = async () => {
+    await new Promise(resolve => setTimeout(resolve, 50));
+    for (const entry of watcher.takeRecords()) if (host.test(entry.name)) statuses.push(entry.responseStatus || 0);
+    watcher.disconnect();
+    return {resources: statuses.length, statuses};
+  };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 60000);
   const used = {source, doc_id: doc, flags: source === 'live' ? flags : null};
@@ -63,9 +73,9 @@ async (args) => {
       headers: {'content-type': 'application/x-www-form-urlencoded', 'x-fb-friendly-name': args.name,
                 'x-fb-lsd': String(form.lsd || '')}});
     const text = await response.text();
-    return {status: response.status, url: response.url, body: text, used, explicit: 1, resources: count() - before};
+    return {status: response.status, url: response.url, body: text, used, explicit: 1, ...(await settle())};
   } catch (error) {
-    return {network_error: String(error).slice(0, 200), used, explicit: 1, resources: count() - before};
+    return {network_error: String(error).slice(0, 200), used, explicit: 1, ...(await settle())};
   } finally {
     clearTimeout(timer);
   }

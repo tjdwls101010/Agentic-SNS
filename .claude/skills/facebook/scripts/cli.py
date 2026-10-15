@@ -32,9 +32,11 @@ KIND_EXIT = {'records': 0, 'resumable': 0, 'complete': 0, 'maintenance': 0, 'arg
              'blocked': 5, 'failed': 6, 'empty': 7, 'partial': 8}
 
 REQUESTS = ('how requests are counted: every GraphQL query, page fetch and retry counts, and so does every facebook.com request the '
-            'browser tab makes while the command runs (the first use opens a dedicated facebook.com tab once: about '
-            '30 requests the page makes itself, reported but not charged to --max-requests). fbcdn.net static files '
-            'do not count. All invocations share one lock and 1-2 s pacing for the account.')
+            'browser tab makes while the command runs. The first use opens a dedicated facebook.com tab once (about '
+            '30 requests the page makes itself, reported as "tab opened" and not charged to --max-requests). When '
+            'Facebook no longer accepts a stored query, the tab moves once to the screen that loads it, counted as at '
+            'least 10. fbcdn.net static files do not count. A rate limit seen on any of the tab\'s requests blocks like '
+            'one of ours. All invocations share one lock and 1-2 s pacing for the account.')
 TEXT_OUTPUT = ('output: first line "<command> · … · N shown · stopped=<reason> · requests=<used>/<budget>"; dated reads '
                'add "window <since>..<until> · <coverage>"; then one record per [p1]/[c1]/[e1] label, each ending with '
                'the arguments of the next command (url, author, replies <handle>); text is shown as text[N of M chars '

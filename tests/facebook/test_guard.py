@@ -126,3 +126,23 @@ def test_unblock_clears_the_block_and_keeps_pacing(data_dir):
     assert not (data_dir / 'protection/blocked.json').exists()
     assert json.loads((data_dir / 'protection/pace.json').read_text()) == {'next_allowed_at': 5.0}
     assert guard.Guard(1).state()['blocked'] is False
+
+
+@pytest.mark.parametrize('name', ['blocked.json', 'pace.json'])
+def test_a_json_null_state_file_fails_closed(data_dir, name):
+    """Review finding 2: a corrupted file holding `null` must not read as 'no state'."""
+    write(data_dir, name, 'null')
+    with pytest.raises(FacebookError) as error:
+        request()
+    assert error.value.code == 5 and 'unreadable' in error.value.message
+
+
+def test_observing_the_tab_happens_under_the_lock_and_respects_a_block(data_dir):
+    """Review finding 7: a state probe and the block it may record form one critical section."""
+    g = guard.Guard(1)
+    with g.observe() as slot:
+        slot.block('checkpoint')
+    assert g.count == 0
+    with pytest.raises(FacebookError):
+        with g.observe():
+            pass

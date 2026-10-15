@@ -140,3 +140,25 @@ def test_unwritable_location_is_an_argument_error(tmp_path):
     with pytest.raises(FacebookError) as error:
         collection.OutFile(tmp_path / 'missing-dir' / 'out.ndjson', X)
     assert error.value.code == 2
+
+
+def test_a_corrupted_line_inside_a_committed_page_is_refused_unchanged(tmp_path):
+    """Review finding 4: only a tail after the last page marker may be dropped."""
+    path = tmp_path / 'out.ndjson'
+    committed(path, X, ([{'id': 'A'}], {'cursor': 'C1'}, None), ([{'id': 'B'}], {'cursor': 'C2'}, None))
+    text = path.read_text().replace('{"id":"B"}', '{"id":"B"')
+    path.write_text(text)
+    before = path.read_bytes()
+    with pytest.raises(FacebookError) as error:
+        collection.OutFile(path, X)
+    assert error.value.code == 2 and 'integrity' in error.value.message
+    assert path.read_bytes() == before
+
+
+def test_peek_reads_a_files_query_and_completeness_without_changing_it(tmp_path):
+    path = tmp_path / 'out.ndjson'
+    committed(path, X, ([{'id': 'A'}], {'cursor': None}, 'exhausted'))
+    before = path.read_bytes()
+    assert collection.peek(path) == (X, True, 1)
+    assert collection.peek(tmp_path / 'missing.ndjson') == (None, False, 0)
+    assert path.read_bytes() == before

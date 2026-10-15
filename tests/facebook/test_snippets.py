@@ -41,7 +41,7 @@ LIVE = {'params': {'id': '555', 'name': 'CometNewsFeedPaginationQuery',
 def query_case(tmp_path, modules, name='CometNewsFeedPaginationQuery', fallback=None):
     return run(tmp_path, kind='page', source=str(SNIPPETS / 'query.js'),
                args={'name': name, 'variables': {'count': 3, 'cursor': None}, 'fallback': fallback or {}},
-               page={'modules': modules, 'fetch': [{'status': 200, 'body': '{"data":{}}'}], 'resources': [10, 11]})
+               page={'modules': modules, 'fetch': [{'status': 200, 'body': '{"data":{}}'}], 'observed': [200]})
 
 
 def test_query_uses_the_live_module_and_the_pages_own_parameters(tmp_path):
@@ -60,7 +60,8 @@ def test_query_uses_the_live_module_and_the_pages_own_parameters(tmp_path):
     assert json.loads(fields['variables']) == {'count': 3, 'cursor': None, '__relay_internal__pv__Arelayprovider': True}
     result = out['result']
     assert result['used'] == {'source': 'live', 'doc_id': '555', 'flags': {'__relay_internal__pv__Arelayprovider': True}}
-    assert result['explicit'] == 1 and result['resources'] == 1 and result['status'] == 200
+    assert result['explicit'] == 1 and result['resources'] == 1 and result['statuses'] == [200]
+    assert result['status'] == 200
 
 
 def test_query_without_the_pages_parameters_builds_the_documented_form(tmp_path):
@@ -121,11 +122,11 @@ def test_route_reports_queries_the_screen_loaded_and_its_requests(tmp_path):
               args={'path': '/search/top/?q=x', 'names': ['SearchCometResultsPaginatedResultsQuery']},
               page={'modules': {'SearchCometResultsPaginatedResultsQuery.graphql': {
                   'params': {'id': '999', 'providedVariables': {'p': 1}}}, 'CurrentUserInitialData': {'USER_ID': '7'}},
-                  'resources': [5, 9, 9]})
+                  'observed': [200, 200, 429, 200]})
     result = out['result']
     assert result['location'] == 'https://www.facebook.com/search/top/?q=x' and result['user_id'] == '7'
     assert result['live'] == {'SearchCometResultsPaginatedResultsQuery': {'doc_id': '999', 'flags': {'p': 1}}}
-    assert result['resources'] == 4 and out['fetches'] == []
+    assert result['resources'] == 4 and result['statuses'] == [200, 200, 429, 200] and out['fetches'] == []
 
 
 def test_state_reads_the_logged_in_user_without_a_request(tmp_path):

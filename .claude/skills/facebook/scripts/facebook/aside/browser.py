@@ -88,7 +88,8 @@ class Aside:
 def parse(stdout):
     """The value of one program run: chunk lines in index order, then one result line (or one error line)."""
     try:
-        lines = [json.loads(line) for line in (_ANSI.sub('', raw).strip() for raw in stdout.splitlines())
+        # JSON.stringify leaves U+2028, U+2029 and U+0085 literal inside strings; only a newline ends a line.
+        lines = [json.loads(line) for line in (_ANSI.sub('', raw).strip(' \t\r') for raw in stdout.split('\n'))
                  if line.startswith('{')]
         lines = [line for line in lines if isinstance(line, dict) and line.get('kind') in ('chunk', 'result', 'error')]
         if not lines:

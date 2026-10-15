@@ -18,6 +18,7 @@ from facebook.graphql.records import (about_collections, about_fields, comments_
 from facebook.graphql.records.search import VERTICALS
 
 HOME = 'https://www.facebook.com/'
+ROUTE_RESERVE = 10  # moving the tab to another screen made 6-9 facebook.com requests when measured; counted at least this
 SNIPPETS = {path.stem: path.read_text(encoding='utf-8')
             for path in (Path(__file__).parent / 'snippets').glob('*.js')}
 SNAPSHOT = json.loads((Path(__file__).with_name('queries.json')).read_text(encoding='utf-8'))
@@ -53,9 +54,11 @@ class Client:
         known = self.memory.tab
         if known and any(t['target_id'] == known and _usable(t['url']) for t in self.browser.tabs()):
             self.tab = known
-            self._check_state(self._state())
+            with self.guard.observe() as slot:  # what the tab shows and the block it implies, in one critical section
+                state = self._state()
+                self._check_state(state, slot)
         else:
-            self._check_state(self._open(), recorded=True)
+            self._open()
         return self.account_id
 
     def _state(self):
@@ -77,39 +80,46 @@ class Client:
             self.opened_now = True
             state = self._state()
             slot.charge(1 + _int(state.get('resources')))
-            verdict = classify.location(state['location'], state.get('user_id'))
-            if verdict.block:
-                slot.block(verdict.block)
+            self._check_state(state, slot)
         return state
 
-    def _check_state(self, state, recorded=False):
+    def _check_state(self, state, slot):
+        """Raise for a checkpoint (recorded in `slot` first), a logout, a broken page, or another account."""
         verdict = classify.location(state['location'], state.get('user_id'))
-        if verdict.block and not recorded:
-            self.guard.block(verdict.block)
+        if verdict.block:
+            slot.block(verdict.block)
         if verdict.error:
             raise verdict.error
         if not state.get('runtime'):
             raise FacebookError(3, 'The Facebook tab is not a working Facebook page.', 'Run doctor; close the tab if '
                                                                                          'it keeps failing.')
+        if self.account_id is not None and state['user_id'] != self.account_id:
+            raise FacebookError(4, 'The Aside browser is now logged in to a different Facebook account than when '
+                                   'this command started.', 'Check which account Aside is logged in to, then rerun '
+                                                            'the command.', reason='account_changed')
         self.account_id = state['user_id']
 
     def _evaluate(self, snippet, args):
         """Run a page function in the tab; a tab that vanished is reopened once."""
         try:
-            return self.browser.evaluate(self.tab, SNIPPETS[snippet], args)
+            with self.guard.observe():
+                return self.browser.evaluate(self.tab, SNIPPETS[snippet], args)
         except FacebookError as error:
             if error.reason != 'tab_missing':
                 raise
-        self._check_state(self._open(), recorded=True)
-        return self.browser.evaluate(self.tab, SNIPPETS[snippet], args)
+        self._open()
+        with self.guard.observe():
+            return self.browser.evaluate(self.tab, SNIPPETS[snippet], args)
 
     # --- requests --------------------------------------------------------------------------------------------
 
-    def _request(self, snippet, args, verdict_of, label):
-        """One guarded request: block check, budget and pacing; the response classified before the lock is released."""
+    def _request(self, snippet, args, verdict_of, label, reserve=1):
+        """One guarded request: block check, budget and pacing; the response classified before the lock is released.
+
+        A 429 among the facebook.com requests the page made meanwhile is a rate limit like one of ours."""
         for attempt in range(2):
             try:
-                with self.guard.request() as slot:
+                with self.guard.request(reserve=reserve) as slot:
                     try:
                         result = self.browser.evaluate(self.tab, SNIPPETS[snippet], args)
                     except FacebookError as error:
@@ -128,14 +138,20 @@ class Client:
                     if result.get('network_error'):
                         raise FacebookError(6, 'The request to Facebook did not complete.', 'Retry later; run doctor '
                                                                                             'if it keeps failing.')
-                    verdict = verdict_of(result)
+                    if 429 in (result.get('statuses') or []):
+                        verdict = classify.Verdict('blocked', error=FacebookError(
+                            5, 'Facebook rate-limited this account; requests are blocked for 30 minutes.',
+                            'Stop requests and retry after the block expires; check Facebook first.',
+                            reason='rate_limit'), block='rate_limit')
+                    else:
+                        verdict = verdict_of(result)
                     if verdict.block:
                         slot.block(verdict.block)
                     return result, verdict
             except FacebookError as error:
                 if error.reason != 'tab_missing' or attempt:
                     raise
-            self._check_state(self._open(), recorded=True)
+            self._open()
         raise AssertionError('unreachable')
 
     def query(self, key, variables, *, route, retried=False):
@@ -172,8 +188,13 @@ class Client:
         """Move the tab to the screen that loads `name` (as a person would open it), so its live id is used next."""
         path = urlsplit(url)
         relative = (path.path or '/') + (('?' + path.query) if path.query else '')
+        if self.guard.remaining < ROUTE_RESERVE:
+            raise FacebookError(8, f'Facebook no longer accepts the stored {name}; loading the current one needs '
+                                   f'about {ROUTE_RESERVE} more requests than the budget has left.',
+                                'Rerun with a larger --max-requests.', reason='budget')
         result, verdict = self._request('route', {'path': relative, 'names': [name]},
-                                        lambda r: classify.location(r.get('location'), r.get('user_id')), 'route')
+                                        lambda r: classify.location(r.get('location'), r.get('user_id')), 'route',
+                                        reserve=ROUTE_RESERVE)
         if verdict.error:
             raise verdict.error
         live = (result.get('live') or {}).get(name)

@@ -44,6 +44,74 @@ def describe():
     }
 
 
+def _scan(data):
+    """What a file's bytes hold: its header, the committed pages, and where the trusted part ends.
+
+    Only a tail after the last page marker may be incomplete; a line that does not parse before a later marker means
+    a committed page was damaged, which is an integrity failure.
+    """
+    lines = data.split(b'\n')
+    try:
+        header = json.loads(lines[0])
+    except ValueError:
+        header = None
+    result = {'header': header, 'ids': set(), 'skipped': set(), 'count': 0, 'parents': 0, 'state': None,
+              'complete': False, 'boundary': len(lines[0]) + 1}
+    offset, page, broken = len(lines[0]) + 1, [], False
+    complete_lines = lines[1:-1]  # the last element follows the final newline: empty, or a partial line
+    for raw in complete_lines:
+        offset += len(raw) + 1
+        try:
+            record = json.loads(raw)
+            if not isinstance(record, dict):
+                raise ValueError
+        except ValueError:
+            broken = True
+            continue
+        if record.get('kind') == 'page' and 'id' not in record:
+            page_ids = [r.get('id') for r in page]
+            if broken or record.get('ids') != page_ids or record.get('n') != len(page):
+                raise FacebookError(2, 'The --out file failed its integrity check: a page line does not match the '
+                                       'records above it.', 'Keep this file as it is and use a new path.')
+            result['ids'].update(i for i in page_ids if i is not None)
+            result['skipped'].update(record.get('skipped') or [])
+            result['count'] += len(page)
+            result['parents'] += sum(1 for r in page if r.get('depth') == 0)
+            result['state'] = record.get('state')
+            result['complete'] = record.get('stop_reason') in COMPLETE
+            result['boundary'], page = offset, []
+        elif not broken:
+            page.append(record)
+    return result
+
+
+def _check_header(header, context):
+    if not isinstance(header, dict) or header.get('kind') != 'header':
+        raise FacebookError(2, 'The --out file is not a collection written by this skill.', 'Use a new --out path.')
+    if header.get('format') != FORMAT:
+        raise FacebookError(2, 'The --out file was written by an earlier version of this skill.',
+                            'Use a new --out path; the old file is left as it was.')
+    if context is not None and header.get('context') != context:
+        raise FacebookError(2, 'The --out file belongs to another command, target, order or account.',
+                            'Use a new --out path, or rerun the command that started this file.')
+
+
+def peek(path):
+    """(the query context a file was written for, whether it is complete, records saved), reading only; (None, False,
+    0) when the file does not exist or is empty. A file that is not a current collection raises like opening it."""
+    try:
+        data = Path(path).expanduser().read_bytes()
+    except FileNotFoundError:
+        return None, False, 0
+    except OSError:
+        raise FacebookError(2, 'Cannot read the --out file.', 'Choose a readable path.') from None
+    if not data:
+        return None, False, 0
+    scan = _scan(data)
+    _check_header(scan['header'], None)
+    return scan['header']['context'], scan['complete'], scan['count']
+
+
 class OutFile:
     """One --out file opened for one query context; the lock is held until close()."""
 
@@ -70,54 +138,18 @@ class OutFile:
             raise FacebookError(2, 'Cannot read the --out file.', 'Use a new --out path.') from None
 
     def _recover(self):
-        first = self.stream.readline()
-        if not first:
+        data = self.stream.read()
+        if not data:
             self.stream.write(_line({'kind': 'header', 'format': FORMAT, 'context': self.context,
                                      'started_at': datetime.now(timezone.utc).isoformat()}))
             self.stream.flush()
             os.fsync(self.stream.fileno())
             return
-        try:
-            header = json.loads(first)
-        except ValueError:
-            header = None
-        if not isinstance(header, dict) or header.get('kind') != 'header':
-            raise FacebookError(2, 'The --out file is not a collection written by this skill.', 'Use a new --out '
-                                                                                               'path.')
-        if header.get('format') != FORMAT:
-            raise FacebookError(2, 'The --out file was written by an earlier version of this skill.',
-                                'Use a new --out path; the old file is left as it was.')
-        if header.get('context') != self.context:
-            raise FacebookError(2, 'The --out file belongs to another command, target, order or account.',
-                                'Use a new --out path, or rerun the command that started this file.')
-        boundary, page = self.stream.tell(), []
-        ids, skipped, count, parents, state, complete = set(), set(), 0, 0, None, False
-        while line := self.stream.readline():
-            if not line.endswith(b'\n'):
-                break
-            try:
-                record = json.loads(line)
-            except ValueError:
-                break
-            if not isinstance(record, dict):
-                break
-            if record.get('kind') == 'page' and 'id' not in record:
-                page_ids = [r.get('id') for r in page]
-                if record.get('ids') != page_ids or record.get('n') != len(page):
-                    raise FacebookError(2, 'The --out file failed its integrity check: a page line does not match '
-                                           'the records above it.', 'Keep this file as it is and use a new path.')
-                ids.update(i for i in page_ids if i is not None)
-                skipped.update(record.get('skipped') or [])
-                count += len(page)
-                parents += sum(1 for r in page if r.get('depth') == 0)
-                state = record.get('state')
-                complete = record.get('stop_reason') in COMPLETE
-                boundary, page = self.stream.tell(), []
-            else:
-                page.append(record)
-        self.ids, self.skipped, self.count, self.parent_count = ids, skipped, count, parents
-        self.state, self.complete = state, complete
-        self.stream.seek(boundary)
+        scan = _scan(data)
+        _check_header(scan['header'], self.context)
+        self.ids, self.skipped, self.count = scan['ids'], scan['skipped'], scan['count']
+        self.parent_count, self.state, self.complete = scan['parents'], scan['state'], scan['complete']
+        self.stream.seek(scan['boundary'])
         self.stream.truncate()
 
     def commit(self, records, state, stop_reason, skipped=(), notes=()):

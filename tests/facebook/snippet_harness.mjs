@@ -4,7 +4,8 @@
 //
 // case: {"kind": "page" | "program", "source": "<path to the .js file>", "args": {...}, "page": {...}}
 //   page: {"location": "https://www.facebook.com/", "modules": {"<name>": value or {"params": {...}}},
-//          "fetch": [{"status", "url", "body"}] (responses in order), "resources": [count before, count after ...]}
+//          "fetch": [{"status", "url", "body"}] (responses in order), "resources": [entry counts, one per read],
+//          "observed": [statuses of the facebook.com requests made during the call]}
 // For kind "program", the aside REPL globals (listBrowserTabs, attachBrowserTab, console) are faked and the page
 // function inside is the snippet named by "function".
 // Prints one JSON line: {"result": <what the code returned or printed>, "fetches": [{url, method, headers, body}]}.
@@ -44,11 +45,20 @@ function fakeWindow() {
     if (response.throw) throw new Error(response.throw);
     return {status: response.status, url: response.url || absolute, text: async () => response.body};
   };
+  // Requests the page makes during a call, as PerformanceObserver reports them: page.observed lists their statuses.
+  const observed = (pageSpec.observed || []).map((status, i) => ({name: 'https://www.facebook.com/ajax/o' + i,
+                                                                  responseStatus: status}));
+  class PerformanceObserver {
+    constructor(callback) { this.callback = callback; this.delivered = false; }
+    observe() {}
+    takeRecords() { if (this.delivered) return []; this.delivered = true; return observed; }
+    disconnect() {}
+  }
   const performance = {getEntriesByType: () => {
     const count = resources[Math.min(resourceCalls++, resources.length - 1)];
     return Array.from({length: count}, (_, i) => ({name: 'https://www.facebook.com/ajax/x' + i}));
   }};
-  return {window, fetch, performance, location, history, PopStateEvent: class { constructor(type) { this.type = type; } },
+  return {window, fetch, performance, PerformanceObserver, location, history, PopStateEvent: class { constructor(type) { this.type = type; } },
           URL, AbortController, setTimeout, clearTimeout, JSON, Object, Array, String, Number, Promise, Date, Math,
           encodeURIComponent, decodeURIComponent, Error, RegExp, Buffer};
 }

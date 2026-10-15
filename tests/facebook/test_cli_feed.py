@@ -104,7 +104,7 @@ def test_stale_stored_query_is_healed_by_visiting_the_screen_once(browser, data_
     code, out, _ = run_cli(browser, 'feed', '--json')
     result = json.loads(out)
     assert code == 0 and [r['id'] for r in result['results']] == ['A']
-    assert result['request_count'] == 1 + 4 + 1
+    assert result['request_count'] == 1 + 10 + 1  # moving the tab is counted at least its reservation of 10
     route = [c for c in browser.calls() if c['op'] == 'route'][0]['args']
     assert route['path'] == '/' and route['names'] == ['CometNewsFeedPaginationQuery']
     learned = json.loads((data_dir / 'session/default.json').read_text())['queries']['CometNewsFeedPaginationQuery']

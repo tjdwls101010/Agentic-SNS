@@ -57,13 +57,16 @@ def _write(name, value):
 
 
 def _read(name):
-    """The parsed state file, None when absent; unreadable state raises (fail closed)."""
+    """The parsed state file (an object), None when absent; anything else raises (fail closed)."""
     try:
-        return json.loads((_directory() / name).read_text())
+        value = json.loads((_directory() / name).read_text())
     except FileNotFoundError:
         return None
     except (OSError, ValueError):
         raise _UNREADABLE from None
+    if not isinstance(value, dict):
+        raise _UNREADABLE
+    return value
 
 
 def _active_block():
@@ -213,10 +216,13 @@ class Guard:
             finally:
                 _reserve_pace()
 
-    def block(self, reason):
-        """Persist a block seen without a request of ours (e.g. the tab itself shows a checkpoint)."""
+    @contextmanager
+    def observe(self):
+        """The critical section of looking at the tab without a request (its state, its loaded modules): a saved
+        block stops it, and a block it sees is recorded before the lock is released."""
         with _locked():
-            Slot(self, 0, False).block(reason)
+            self.check()
+            yield Slot(self, 0, False)
 
     def state(self):
         """What doctor reports: the active block, if any, and when the next request may start."""
