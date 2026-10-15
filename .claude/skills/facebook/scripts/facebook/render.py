@@ -80,7 +80,7 @@ def post(record, index, chars):
 def comment(record, index, parent_label, chars):
     depth = record.get('depth') or 0
     indent = '  ' * min(max(depth, 0), 10)
-    parent = f' reply-to={parent_label or "unavailable"}' if depth else ''
+    parent = f' reply-to={parent_label}' if depth and parent_label else ''
     kinds = ','.join(_line(a.get('kind')) for a in record.get('attachments') or [])
     text, cut = _text(record, chars)
     tail = f'   replies {record["replies_handle"]}' if record.get('replies_handle') else ''
@@ -116,6 +116,9 @@ def render_page(envelope, *, chars=None, command=None):
     if tab:
         header.append(f'tab opened (+{tab} requests)')
     lines = [' · '.join(header)]
+    thread = envelope.get('thread')
+    if thread:
+        lines.append(f'thread: post {_handle(thread.get("post_url"))} · replies to comment {_line(thread.get("parent_id"))}')
     window = envelope.get('window')
     if window:
         lines.append(f'window {window.get("since") or ""}..{window.get("until") or ""} · {_line(window["coverage"])}')

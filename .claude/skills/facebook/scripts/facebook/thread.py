@@ -41,6 +41,72 @@ def comments(options):
     return connect.run(options, command='comments', target=target, identity={'sort': sort}, reader=read)
 
 
+def replies(options):
+    number = options['target']
+
+    def read(connection, state, out):
+        start = handles.load(number, _reply_context(connection))
+        reading = _replies(connection, options, start, out)
+        reading['details'] = {'thread': {'post_url': start['post_url'], 'parent_id': start['parent_id'],
+                                         'depth': start['depth']}}
+        return reading
+
+    return connect.run(options, command='replies', target=number, identity={}, reader=read)
+
+
+def _reply_context(connection):
+    return {'command': 'replies', 'target': None, 'account_id': connection.account_id}
+
+
+def _replies(connection, options, start, out):
+    """Batches of replies to one comment; each reply with deeper replies gets a handle; continued by a new handle."""
+    issues, notes = [], []
+    context = _reply_context(connection)
+
+    def fetch(cursor):
+        page = connection.client.replies(start['feedback_id'], start['expansion_token'], cursor, depth=start['depth'],
+                                         parent_id=start['parent_id'], post_id=start['post_id'], url=start['post_url'])
+        issues.extend(page.issues)
+        notes.extend(page.issues)
+        for record in page.records:
+            handle = page.handles.get(record['id']) or {}
+            # Facebook nests replies two levels deep; a deeper reply's own replies are not opened.
+            if handle.get('expandable') and record['depth'] == 1:
+                record['replies_handle'] = handles.save(context, {
+                    'feedback_id': handle['feedback_id'], 'expansion_token': handle['expansion_token'],
+                    'parent_id': record['id'], 'post_id': start['post_id'], 'post_url': start['post_url'], 'depth': 2,
+                    'cursor': None})
+        return page.records, page.page_info, page.has_items
+
+    def commit(records, page_state, reason, skipped):
+        out.commit(records, page_state, reason, skipped, list(dict.fromkeys(notes)))
+        notes.clear()
+
+    state = dict(out.state) if out is not None and out.state else {
+        'cursor': start.get('cursor'), 'pending': start.get('pending') or [], 'seen': start.get('seen') or []}
+    limit = options.get('limit')
+    if out is not None:
+        state.update(seen=sorted(out.ids, key=str), pending=[])
+        if limit is not None:
+            if out.count >= limit:
+                return {'results': [], 'stop_reason': 'limit_reached', 'words': []}
+            limit -= out.count
+    one_batch = limit is None and out is None
+    result = paginate(fetch, limit=limit, state=state, max_pages=1 if one_batch else None,
+                      commit=commit if out is not None else None, whole_pages=out is not None)
+    reading = {'results': [] if out is not None else result['results'], 'stop_reason': result['stop_reason'],
+               'failure': result['failure'], 'issues': issues, 'words': [], 'partial': bool(result['results']),
+               'detail': True}
+    if result['state'] is not None and out is None:
+        number = handles.save(context, {**start, 'cursor': result['state']['cursor'],
+                                        'pending': result['state']['pending'], 'seen': result['state']['seen']})
+        reading['next'] = connect.words('replies', str(number), [], options)
+        reading['continuable'] = True
+    elif result['state'] is not None:
+        reading['continuable'] = True
+    return reading
+
+
 def _parents(connection, options, target, sort, feedback_id, state, *, out=None, max_pages=None):
     """Pages of parent comments, each given its reply handle; continued as a comments command."""
     issues, notes = [], []

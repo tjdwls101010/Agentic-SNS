@@ -83,8 +83,8 @@ def day(value):
 
 OPTIONS = {
     'limit': (('--limit',), {'type': positive, 'help': 'Records to show; omitted: until the source ends or the request budget is spent'}),
-    'since': (('--since',), {'type': day, 'help': 'First local day to include, YYYY-MM-DD'}),
-    'until': (('--until',), {'type': day, 'help': 'Last local day to include, YYYY-MM-DD'}),
+    'since': (('--since',), {'type': day, 'metavar': 'DAY', 'help': 'First local day to include, YYYY-MM-DD'}),
+    'until': (('--until',), {'type': day, 'metavar': 'DAY', 'help': 'Last local day to include, YYYY-MM-DD'}),
     'chars': (('--chars',), {'type': chars, 'help': 'Characters of each text to show (default 180; 0 = all received); --json and --out keep all'}),
     'after': (('--after',), {'type': positive, 'metavar': 'HANDLE', 'help': 'Continue from the numbered handle a more: line printed'}),
     'out': (('--out',), {'metavar': 'FILE', 'help': 'Collect into this NDJSON file, one committed page at a time; rerun the same command to resume. --limit then counts what is saved'}),
@@ -108,7 +108,7 @@ COMMANDS = {
     'profile': {
         'help': 'Read a profile\'s or page\'s timeline.',
         'run': listing.profile,
-        'arguments': [(('target',), {'help': 'Profile or page URL, vanity name (zuck) or numeric id'}), 'since', 'until'] + list(LIST),
+        'arguments': [(('target',), {'help': 'Profile or page URL, vanity name or numeric id'}), 'since', 'until'] + list(LIST),
         'epilog': ['--since/--until are applied by Facebook (server-filtered); reaching the end closes the window.',
                    'A timeline can hold posts by other people (posts on the timeline, shares); each record names its author.',
                    'requests: 1 to find the numeric id (none for a numeric id), then 1 per page of about 3-5 posts.'],
@@ -146,6 +146,17 @@ COMMANDS = {
                    'requests: 2 to find the post (none when continuing with --after), then 1 per page of about 10 comments.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
+    'replies': {
+        'help': 'Read one batch of replies under a comment, by the handle post or comments printed.',
+        'run': thread.replies,
+        'arguments': [(('target',), {'metavar': 'HANDLE', 'help': 'The number after "replies" on a comment or reply'}),
+                      (('--limit',), {'type': positive, 'help': 'Replies to show; omitted: one batch (about 10), or every batch with --out. With --out it counts replies saved'}),
+                      'chars', 'out', 'json', 'max_requests'],
+        'epilog': ['A handle names a batch: the first batch of a comment\'s replies, or the batch after one already shown (more: prints that one). It is not used up: running it again reads the same batch again, live.',
+                   'Each reply that has replies of its own ends with replies <handle>, which reads that deeper branch. Facebook\'s reply count includes those deeper replies.',
+                   'requests: 1 per batch of about 10 replies.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8),
+    },
     'search': {
         'help': 'Search posts, people, pages or groups.',
         'run': search.search,
@@ -170,18 +181,19 @@ COMMANDS = {
         'run': maintenance.doctor,
         'arguments': [(('--unblock',), {'action': 'store_true', 'help': 'Clear a saved block, only after a person has checked Facebook in the Aside browser'})],
         'epilog': ['It opens the dedicated facebook.com tab if none is open (about 30 requests the page makes itself) and otherwise makes no request.',
-                   'Prints the Facebook account id in use, where account protection and personal data are kept, and which queries are live in the tab.'],
+                   'output: one JSON envelope; results[0] holds aside, tab {target_id, opened_now}, login, account_id (the Facebook account in use), blocked and block_reason, queries (which read queries are live in the tab), data_dir, protection_state and holds_personal_data. A saved block is reported as exit 5 without touching the browser.',
+                   '--unblock clears a saved checkpoint or rate limit first; it means nothing unless a person has looked at Facebook in the Aside browser and confirmed the account is fine.'],
         'exits': (0, 2, 3, 4, 5),
     },
     'schema': {
         'help': 'Describe results, files and record fields; always JSON, no request.',
         'run': maintenance.schema,
         'arguments': [(('object',), {'nargs': '?', 'choices': maintenance.SCHEMA_OBJECTS, 'help': 'What to describe; omitted: the list of objects'})],
-        'epilog': [],
+        'epilog': ['output: one JSON envelope; results holds the requested description (result: the envelope, stop reasons, exit codes, window coverage, request counting and the text page; out: the --out file; post, comment, entity, about: record fields), or one line per object.'],
         'exits': (0, 2),
     },
 }
-READS = ('feed', 'profile', 'group', 'post', 'comments', 'search', 'about')
+READS = ('feed', 'profile', 'group', 'post', 'comments', 'replies', 'search', 'about')
 
 
 def epilog(name, spec):
@@ -222,6 +234,8 @@ def validate(options):
     if options.get('after') and options.get('out'):
         raise FacebookError(2, '--after and --out cannot be combined; --out resumes its own file.',
                             'Rerun the same command with the same --out path.')
+    if options['command'] == 'replies' and not (options['target'].isascii() and options['target'].isdigit()):
+        raise FacebookError(2, 'A replies handle is the number printed after "replies".', 'Copy the whole replies line.')
     if options['command'] == 'search' and not options['target'].strip():
         raise FacebookError(2, 'Search text must not be empty.', 'Pass the words to search for.')
 
