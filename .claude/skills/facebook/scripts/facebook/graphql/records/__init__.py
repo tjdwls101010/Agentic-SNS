@@ -1,7 +1,7 @@
 """Decoded GraphQL chunks → the skill's records. Pure: no request, `captured_at` comes from the caller."""
 from dataclasses import dataclass, field
 
-from facebook.graphql.records import comments, posts
+from facebook.graphql.records import comments, posts, search
 from facebook.graphql.records.parse import find_page_info, has_items
 
 
@@ -38,8 +38,15 @@ def replies_page(chunks, *, post_id, parent_id, captured_at):
     return Page(records, info, has_items(chunks, 'replies_connection'), comments.issues(chunks), handles)
 
 
+def search_page(chunks, *, vertical, captured_at):
+    """One page of search results (top, posts, people, pages or groups) in the connection's order."""
+    records, issues = search.results(chunks, vertical=vertical, captured_at=captured_at)
+    return Page(records, find_page_info(chunks, 'results'), has_items(chunks, 'results'), issues)
+
+
 SCHEMAS = {
     'post': {'object': 'post', 'description': 'A post from feed, profile, group, search or post.', 'fields': posts.FIELDS},
+    'entity': {'object': 'entity', 'description': 'A person, page or group from search.', 'fields': search.FIELDS},
     'comment': {'object': 'comment', 'description': 'A comment or reply from post, comments or replies.',
                 'fields': comments.FIELDS},
 }

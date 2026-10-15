@@ -12,7 +12,8 @@ from urllib.parse import quote, urlsplit
 
 from facebook.errors import FacebookError, diagnostic
 from facebook.graphql import classify, targets
-from facebook.graphql.records import comments_page, permalink_post, posts_page, replies_page
+from facebook.graphql.records import comments_page, permalink_post, posts_page, replies_page, search_page
+from facebook.graphql.records.search import VERTICALS
 
 HOME = 'https://www.facebook.com/'
 SNIPPETS = {path.stem: path.read_text(encoding='utf-8')
@@ -223,6 +224,15 @@ class Client:
         variables = {'id': feedback_id, 'expansionToken': token, 'repliesAfterCursor': cursor}
         chunks = self.query('replies' if depth <= 1 else 'replies_deep', variables, route=url)
         return replies_page(chunks, post_id=post_id, parent_id=parent_id, captured_at=_now())
+
+    def search(self, text, vertical, cursor, *, filters=()):
+        """One page of search results; filters are Facebook's filter JSON strings (see search filters)."""
+        base = QUERIES['search']['variables']['args']
+        args = {**base, 'text': text, 'experience': {**base['experience'], 'type': VERTICALS[vertical]},
+                'filters': list(filters)}
+        chunks = self.query('search', {'args': args, 'cursor': cursor},
+                            route=HOME + 'search/' + vertical + '/?q=' + quote(text))
+        return search_page(chunks, vertical=vertical, captured_at=_now())
 
     def live_queries(self):
         """Which read queries the tab has loaded right now (doctor); makes no request."""

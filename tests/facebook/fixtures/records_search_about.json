@@ -6,21 +6,111 @@
       "item": "43",
       "fact": "An entity is a result-root node with __typename User, Page or Group and an id, a string name and a string url. In the people vertical a User is a person. verified is is_verified when it is a boolean, else null. Repeated ids appear once.",
       "parser": "search",
-      "args": {"search_type": "people"},
+      "args": {
+        "search_type": "people"
+      },
       "body_lines": [
-        {"data": {"serpResponse": {"results": {"edges": [
-          {"rendering_strategy": {"view_model": {"profile": {"__typename": "User", "id": "500", "name": "Sample Person", "url": "https://www.facebook.com/sample.person", "is_verified": true}}}},
-          {"rendering_strategy": {"view_model": {"profile": {"__typename": "User", "id": "501", "name": "Sample Person", "url": "https://www.facebook.com/profile.php?id=501", "is_verified": "no"}}}},
-          {"rendering_strategy": {"view_model": {"profile": {"__typename": "User", "id": "500", "name": "Sample Person", "url": "https://www.facebook.com/sample.person", "is_verified": true}}}},
-          {"rendering_strategy": {"view_model": {"profile": {"__typename": "User", "id": "502", "name": null, "url": "https://www.facebook.com/x"}}}}
-        ], "page_info": {"has_next_page": true, "end_cursor": "SCUR1"}}}}}
+        {
+          "data": {
+            "serpResponse": {
+              "results": {
+                "edges": [
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "500",
+                          "name": "Sample Person",
+                          "url": "https://www.facebook.com/sample.person",
+                          "is_verified": true
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  },
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "501",
+                          "name": "Sample Person",
+                          "url": "https://www.facebook.com/profile.php?id=501",
+                          "is_verified": "no"
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  },
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "500",
+                          "name": "Sample Person",
+                          "url": "https://www.facebook.com/sample.person",
+                          "is_verified": true
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  },
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "502",
+                          "name": null,
+                          "url": "https://www.facebook.com/x"
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": true,
+                  "end_cursor": "SCUR1"
+                }
+              }
+            }
+          }
+        }
       ],
       "expected": {
         "records": [
-          {"kind": "person", "id": "500", "name": "Sample Person", "url": "https://www.facebook.com/sample.person", "verified": true},
-          {"kind": "person", "id": "501", "verified": null}
+          {
+            "kind": "person",
+            "id": "500",
+            "name": "Sample Person",
+            "url": "https://www.facebook.com/sample.person",
+            "verified": true
+          },
+          {
+            "kind": "person",
+            "id": "501",
+            "verified": null
+          }
         ],
-        "page_info": {"has_next_page": true, "end_cursor": "SCUR1"},
+        "page_info": {
+          "has_next_page": true,
+          "end_cursor": "SCUR1"
+        },
         "issues": []
       }
     },
@@ -29,14 +119,51 @@
       "item": "43",
       "fact": "In the pages vertical Facebook sends pages with __typename User, so the vertical decides the kind.",
       "parser": "search",
-      "args": {"search_type": "pages"},
+      "args": {
+        "search_type": "pages"
+      },
       "body_lines": [
-        {"data": {"serpResponse": {"results": {"edges": [
-          {"rendering_strategy": {"view_model": {"profile": {"__typename": "User", "id": "600", "name": "Example Page", "url": "https://www.facebook.com/examplepage", "is_verified": false}}}}
-        ], "page_info": {"has_next_page": false, "end_cursor": null}}}}}
+        {
+          "data": {
+            "serpResponse": {
+              "results": {
+                "edges": [
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "600",
+                          "name": "Example Page",
+                          "url": "https://www.facebook.com/examplepage",
+                          "is_verified": false
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
       ],
       "expected": {
-        "records": [{"kind": "page", "id": "600", "name": "Example Page", "verified": false}],
+        "records": [
+          {
+            "kind": "page",
+            "id": "600",
+            "name": "Example Page",
+            "verified": false
+          }
+        ],
         "issues": []
       }
     },
@@ -45,15 +172,66 @@
       "item": "43",
       "fact": "Group is unambiguous. The groups vertical drops non-Group nodes (nested users are members or admins, not results).",
       "parser": "search",
-      "args": {"search_type": "groups"},
+      "args": {
+        "search_type": "groups"
+      },
       "body_lines": [
-        {"data": {"serpResponse": {"results": {"edges": [
-          {"rendering_strategy": {"view_model": {"profile": {"__typename": "Group", "id": "700", "name": "Example Group", "url": "https://www.facebook.com/groups/700/"}}}},
-          {"rendering_strategy": {"view_model": {"profile": {"__typename": "User", "id": "701", "name": "An Admin", "url": "https://www.facebook.com/an.admin"}}}}
-        ], "page_info": {"has_next_page": false, "end_cursor": null}}}}}
+        {
+          "data": {
+            "serpResponse": {
+              "results": {
+                "edges": [
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "Group",
+                          "id": "700",
+                          "name": "Example Group",
+                          "url": "https://www.facebook.com/groups/700/"
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  },
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "701",
+                          "name": "An Admin",
+                          "url": "https://www.facebook.com/an.admin"
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
       ],
       "expected": {
-        "records": [{"kind": "group", "id": "700", "name": "Example Group", "url": "https://www.facebook.com/groups/700/"}],
+        "records": [
+          {
+            "kind": "group",
+            "id": "700",
+            "name": "Example Group",
+            "url": "https://www.facebook.com/groups/700/"
+          }
+        ],
         "issues": []
       }
     },
@@ -62,23 +240,122 @@
       "item": "43",
       "fact": "Only result wrappers (node, result, entity, profile, group, page, user, rendering_strategy, view_model) are followed; a Story, Comment or feedback-bearing node is not entered, so a post's author is not an entity. A top search keeps the connection's index order even when deferred pieces arrive out of order.",
       "parser": "search",
-      "args": {"search_type": "top"},
+      "args": {
+        "search_type": "top"
+      },
       "body_lines": [
-        {"data": {"serpResponse": {"results": {"edges": [
-          {"rendering_strategy": {"view_model": null}},
-          {"rendering_strategy": {"view_model": null}},
-          {"node": {"__typename": "Story", "feedback": {"id": "SF1"}, "creation_time": 1767225600, "message": {"text": "a post in search"}, "actors": [{"__typename": "User", "id": "800", "name": "Post Author", "url": "https://www.facebook.com/post.author"}]}}
-        ], "page_info": {"has_next_page": true, "end_cursor": "SCUR2"}}}}},
-        {"path": ["serpResponse", "results", "edges", 1, "rendering_strategy"], "data": {"view_model": {"profile": {"__typename": "Page", "id": "610", "name": "Second Result Page", "url": "https://www.facebook.com/secondpage"}}}},
-        {"path": ["serpResponse", "results", "edges", 0, "rendering_strategy"], "data": {"view_model": {"profile": {"__typename": "User", "id": "510", "name": "First Result Person", "url": "https://www.facebook.com/first.person"}}}}
+        {
+          "data": {
+            "serpResponse": {
+              "results": {
+                "edges": [
+                  {
+                    "rendering_strategy": {
+                      "view_model": null
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  },
+                  {
+                    "rendering_strategy": {
+                      "view_model": null
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  },
+                  {
+                    "node": {
+                      "__typename": "Story",
+                      "feedback": {
+                        "id": "SF1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "a post in search"
+                      },
+                      "actors": [
+                        {
+                          "__typename": "User",
+                          "id": "800",
+                          "name": "Post Author",
+                          "url": "https://www.facebook.com/post.author"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": true,
+                  "end_cursor": "SCUR2"
+                }
+              }
+            }
+          }
+        },
+        {
+          "path": [
+            "serpResponse",
+            "results",
+            "edges",
+            1,
+            "rendering_strategy"
+          ],
+          "data": {
+            "view_model": {
+              "profile": {
+                "__typename": "Page",
+                "id": "610",
+                "name": "Second Result Page",
+                "url": "https://www.facebook.com/secondpage"
+              }
+            }
+          }
+        },
+        {
+          "path": [
+            "serpResponse",
+            "results",
+            "edges",
+            0,
+            "rendering_strategy"
+          ],
+          "data": {
+            "view_model": {
+              "profile": {
+                "__typename": "User",
+                "id": "510",
+                "name": "First Result Person",
+                "url": "https://www.facebook.com/first.person"
+              }
+            }
+          }
+        }
       ],
       "expected": {
         "records": [
-          {"kind": "person", "id": "510"},
-          {"kind": "page", "id": "610"},
-          {"id": "SF1", "text": "a post in search", "author_name": "Post Author", "source": "search"}
+          {
+            "kind": "person",
+            "id": "510"
+          },
+          {
+            "kind": "page",
+            "id": "610"
+          },
+          {
+            "id": "SF1",
+            "text": "a post in search",
+            "author_name": "Post Author",
+            "source": "search"
+          }
         ],
-        "page_info": {"has_next_page": true, "end_cursor": "SCUR2"},
+        "page_info": {
+          "has_next_page": true,
+          "end_cursor": "SCUR2"
+        },
         "issues": []
       }
     },
@@ -87,15 +364,60 @@
       "item": "43",
       "fact": "The posts vertical returns posts only.",
       "parser": "search",
-      "args": {"search_type": "posts"},
+      "args": {
+        "search_type": "posts"
+      },
       "body_lines": [
-        {"data": {"serpResponse": {"results": {"edges": [
-          {"node": {"__typename": "Story", "feedback": {"id": "SF2"}, "creation_time": 1767225600, "message": {"text": "only posts here"}}},
-          {"rendering_strategy": {"view_model": {"profile": {"__typename": "User", "id": "520", "name": "Not In Posts", "url": "https://www.facebook.com/np"}}}}
-        ], "page_info": {"has_next_page": false, "end_cursor": null}}}}}
+        {
+          "data": {
+            "serpResponse": {
+              "results": {
+                "edges": [
+                  {
+                    "node": {
+                      "__typename": "Story",
+                      "feedback": {
+                        "id": "SF2"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "only posts here"
+                      }
+                    }
+                  },
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "520",
+                          "name": "Not In Posts",
+                          "url": "https://www.facebook.com/np"
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
       ],
       "expected": {
-        "records": [{"id": "SF2", "text": "only posts here"}],
+        "records": [
+          {
+            "id": "SF2",
+            "text": "only posts here"
+          }
+        ],
         "issues": []
       }
     },
@@ -106,10 +428,50 @@
       "parser": "about_collections",
       "args": {},
       "body_lines": [
-        {"data": {"user": {"about_app_sections": {"nodes": [{"all_collections": {"nodes": [{"name": "Work and education", "id": "COL_WORK"}, {"name": "Places lived", "id": "COL_PLACES"}, {"name": "Broken", "id": 5}, {"name": "Work and education", "id": "COL_WORK"}]}}]}}}}
+        {
+          "data": {
+            "user": {
+              "about_app_sections": {
+                "nodes": [
+                  {
+                    "all_collections": {
+                      "nodes": [
+                        {
+                          "name": "Work and education",
+                          "id": "COL_WORK"
+                        },
+                        {
+                          "name": "Places lived",
+                          "id": "COL_PLACES"
+                        },
+                        {
+                          "name": "Broken",
+                          "id": 5
+                        },
+                        {
+                          "name": "Work and education",
+                          "id": "COL_WORK"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
       ],
       "expected": {
-        "collections": [{"name": "Work and education", "id": "COL_WORK"}, {"name": "Places lived", "id": "COL_PLACES"}]
+        "collections": [
+          {
+            "name": "Work and education",
+            "id": "COL_WORK"
+          },
+          {
+            "name": "Places lived",
+            "id": "COL_PLACES"
+          }
+        ]
       }
     },
     {
@@ -117,21 +479,145 @@
       "item": "44",
       "fact": "Fields are profile_fields.nodes[] of a node carrying field_section_type (locale-independent): title.text, field_type, link_url. They dedupe on (section, text); the same text in another section is kept. collection is the viewer-language name of the tab it came from, null for the overview.",
       "parser": "about",
-      "args": {"profile_id": "4", "collection_names": [null, "Work and education"]},
+      "args": {
+        "profile_id": "4",
+        "collection_names": [
+          null,
+          "Work and education"
+        ]
+      },
       "bodies": [
         [
-          {"data": {"user": {"about_app_sections": {"nodes": [{"activeCollections": {"nodes": [{"style_renderer": {"profile_field_sections": [{"field_section_type": "overview", "profile_fields": {"nodes": [{"title": {"text": "Works at Example Co"}, "field_type": "work", "link_url": "https://www.facebook.com/exampleco"}, {"title": {"text": "Lives in Example City"}, "field_type": "current_city"}, {"title": null}]}}]}}]}}]}}}}
+          {
+            "data": {
+              "user": {
+                "about_app_sections": {
+                  "nodes": [
+                    {
+                      "activeCollections": {
+                        "nodes": [
+                          {
+                            "style_renderer": {
+                              "profile_field_sections": [
+                                {
+                                  "field_section_type": "overview",
+                                  "profile_fields": {
+                                    "nodes": [
+                                      {
+                                        "title": {
+                                          "text": "Works at Example Co"
+                                        },
+                                        "field_type": "work",
+                                        "link_url": "https://www.facebook.com/exampleco"
+                                      },
+                                      {
+                                        "title": {
+                                          "text": "Lives in Example City"
+                                        },
+                                        "field_type": "current_city"
+                                      },
+                                      {
+                                        "title": null
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
         ],
         [
-          {"data": {"user": {"about_app_sections": {"nodes": [{"activeCollections": {"nodes": [{"style_renderer": {"profile_field_sections": [{"field_section_type": "work", "profile_fields": {"nodes": [{"title": {"text": "Works at Example Co"}, "field_type": "work"}, {"title": {"text": "Works at Example Co"}, "field_type": "work"}, {"title": {"text": "Studied at Example School"}, "field_type": "education", "link_url": 7}]}}]}}]}}]}}}}
+          {
+            "data": {
+              "user": {
+                "about_app_sections": {
+                  "nodes": [
+                    {
+                      "activeCollections": {
+                        "nodes": [
+                          {
+                            "style_renderer": {
+                              "profile_field_sections": [
+                                {
+                                  "field_section_type": "work",
+                                  "profile_fields": {
+                                    "nodes": [
+                                      {
+                                        "title": {
+                                          "text": "Works at Example Co"
+                                        },
+                                        "field_type": "work"
+                                      },
+                                      {
+                                        "title": {
+                                          "text": "Works at Example Co"
+                                        },
+                                        "field_type": "work"
+                                      },
+                                      {
+                                        "title": {
+                                          "text": "Studied at Example School"
+                                        },
+                                        "field_type": "education",
+                                        "link_url": 7
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
         ]
       ],
       "expected": {
         "records": [
-          {"profile_id": "4", "section": "overview", "collection": null, "field_type": "work", "text": "Works at Example Co", "url": "https://www.facebook.com/exampleco"},
-          {"profile_id": "4", "section": "overview", "collection": null, "field_type": "current_city", "text": "Lives in Example City", "url": null},
-          {"profile_id": "4", "section": "work", "collection": "Work and education", "text": "Works at Example Co", "url": null},
-          {"profile_id": "4", "section": "work", "collection": "Work and education", "field_type": "education", "text": "Studied at Example School", "url": null}
+          {
+            "profile_id": "4",
+            "section": "overview",
+            "collection": null,
+            "field_type": "work",
+            "text": "Works at Example Co",
+            "url": "https://www.facebook.com/exampleco"
+          },
+          {
+            "profile_id": "4",
+            "section": "overview",
+            "collection": null,
+            "field_type": "current_city",
+            "text": "Lives in Example City",
+            "url": null
+          },
+          {
+            "profile_id": "4",
+            "section": "work",
+            "collection": "Work and education",
+            "text": "Works at Example Co",
+            "url": null
+          },
+          {
+            "profile_id": "4",
+            "section": "work",
+            "collection": "Work and education",
+            "field_type": "education",
+            "text": "Studied at Example School",
+            "url": null
+          }
         ],
         "issues": []
       }
@@ -141,16 +627,76 @@
       "item": "44",
       "fact": "About reads every part of its response, so any error or any path patch in it is an issue.",
       "parser": "about",
-      "args": {"profile_id": "4", "collection_names": [null]},
+      "args": {
+        "profile_id": "4",
+        "collection_names": [
+          null
+        ]
+      },
       "bodies": [
         [
-          {"data": {"user": {"about_app_sections": {"nodes": [{"x": {"field_section_type": "overview", "profile_fields": {"nodes": [{"title": {"text": "Visible field"}}]}}}]}}}, "errors": [{"message": "a section failed", "path": ["user", "about_app_sections", "nodes", 0, "y"]}]},
-          {"path": ["user", "about_app_sections", "nodes", 0], "data": {"z": {"unread": 1}}}
+          {
+            "data": {
+              "user": {
+                "about_app_sections": {
+                  "nodes": [
+                    {
+                      "x": {
+                        "field_section_type": "overview",
+                        "profile_fields": {
+                          "nodes": [
+                            {
+                              "title": {
+                                "text": "Visible field"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "errors": [
+              {
+                "message": "a section failed",
+                "path": [
+                  "user",
+                  "about_app_sections",
+                  "nodes",
+                  0,
+                  "y"
+                ]
+              }
+            ]
+          },
+          {
+            "path": [
+              "user",
+              "about_app_sections",
+              "nodes",
+              0
+            ],
+            "data": {
+              "z": {
+                "unread": 1
+              }
+            }
+          }
         ]
       ],
       "expected": {
-        "records": [{"section": "overview", "text": "Visible field"}],
-        "issues": ["graphql_errors", "unsupported_path_patch"]
+        "records": [
+          {
+            "section": "overview",
+            "text": "Visible field"
+          }
+        ],
+        "issues": [
+          "graphql_errors",
+          "unsupported_path_patch"
+        ]
       }
     }
   ]

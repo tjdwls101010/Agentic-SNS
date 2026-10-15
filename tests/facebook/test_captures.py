@@ -67,3 +67,14 @@ def test_real_reply_batches_and_their_cursor():
     if second:
         more = graphql.replies_page(decode(second[0]['body']), post_id='P', parent_id=target['id'], captured_at=NOW)
         assert len(more.records) == 10 and not {r['id'] for r in more.records} & {r['id'] for r in batch.records}
+
+
+@pytest.mark.skipif(observed('r4_search') is None, reason='no local captures')
+def test_real_search_pages():
+    posts_recent, posts_dated, groups = observed('r4_search')
+    for response in (posts_recent, posts_dated):
+        page = graphql.search_page(decode(response['body']), vertical='posts', captured_at=NOW)
+        assert page.records and all('kind' not in r and r['created_at'] for r in page.records)
+        assert page.issues == [] and isinstance(page.page_info, dict)
+    page = graphql.search_page(decode(groups['body']), vertical='groups', captured_at=NOW)
+    assert page.records and {r['kind'] for r in page.records} == {'group'} and page.issues == []
