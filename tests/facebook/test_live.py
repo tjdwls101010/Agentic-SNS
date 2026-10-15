@@ -79,21 +79,23 @@ def test_replies_batches():
         assert not {r['id'] for r in second['results']} & {r['id'] for r in first['results']}
 
 
+@pytest.mark.skipif(not os.environ.get('FACEBOOK_LIVE_GROUP'), reason='needs FACEBOOK_LIVE_GROUP (a public group id)')
 def test_search_filters_and_inside_a_group():
     code, recent = cli('search', 'AI', '--type', 'posts', '--recent', '--limit', '3', cap=2)
     assert code == 0 and recent['results'] and all('kind' not in r for r in recent['results'])
-    code, scoped = cli('search', 'pandas', '--type', 'posts', '--in-group', os.environ.get('FACEBOOK_LIVE_GROUP', '2968116436545420'),
+    code, scoped = cli('search', 'pandas', '--type', 'posts', '--in-group', os.environ['FACEBOOK_LIVE_GROUP'],
                        '--limit', '3', cap=3)
     assert code == 0, scoped
-    group = os.environ.get('FACEBOOK_LIVE_GROUP', '2968116436545420')
     for record in scoped['results']:
         assert record['url'] is None or '/groups/' in record['url'], record['url']
 
 
+@pytest.mark.skipif(not (os.environ.get('FACEBOOK_LIVE_PAGE') and os.environ.get('FACEBOOK_LIVE_GROUP')),
+                    reason='needs FACEBOOK_LIVE_PAGE and FACEBOOK_LIVE_GROUP')
 def test_page_about_and_group_card():
-    code, page = cli('about', os.environ.get('FACEBOOK_LIVE_PAGE', '100064620046507'), '--section', 'directory_bio', cap=3)
+    code, page = cli('about', os.environ['FACEBOOK_LIVE_PAGE'], '--section', 'directory_bio', cap=3)
     assert code == 0 and page['results'] and all(f['section'] == 'directory_bio' for f in page['results'])
-    code, card = cli('about', 'https://www.facebook.com/groups/' + os.environ.get('FACEBOOK_LIVE_GROUP', '2968116436545420') + '/',
+    code, card = cli('about', 'https://www.facebook.com/groups/' + os.environ['FACEBOOK_LIVE_GROUP'] + '/',
                      cap=3)
     assert code == 0, card
     [group] = card['results']
