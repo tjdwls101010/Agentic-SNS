@@ -102,3 +102,22 @@ def test_a_budget_stop_keeps_the_cursor_of_the_unread_page():
     result = paging.paginate(fetch)
     assert [r['id'] for r in result['results']] == ['A']
     assert result['failure'].code == 8 and result['state']['cursor'] == 'C1'
+
+
+def test_pages_that_bring_nothing_new_stop_the_reading():
+    """P6 contrast run: Depth2 replies kept answering 'more' with a new cursor but no new reply, spending the budget."""
+    def fetch(cursor):
+        index = int(cursor or 0)
+        return [{'id': 'A'}], {'has_next_page': True, 'end_cursor': str(index + 1)}, True
+    calls = []
+    result = paging.paginate(lambda c: calls.append(c) or fetch(c))
+    assert [r['id'] for r in result['results']] == ['A']
+    assert result['failure'] is not None and result['failure'].reason == 'pagination'
+    assert len(calls) == 3  # the first page, then two pages with nothing new
+
+
+def test_one_empty_page_with_more_is_tolerated():
+    pages = iter([([], {'has_next_page': True, 'end_cursor': 'C1'}, False),
+                  ([{'id': 'A'}], {'has_next_page': False, 'end_cursor': None}, True)])
+    result = paging.paginate(lambda cursor: next(pages))
+    assert [r['id'] for r in result['results']] == ['A'] and result['failure'] is None

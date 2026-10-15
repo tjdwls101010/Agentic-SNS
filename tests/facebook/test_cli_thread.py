@@ -61,7 +61,7 @@ def test_post_shows_full_text_parents_and_reply_handles(browser, data_dir):
     saved = json.loads((data_dir / 'handles' / f'{handles["c1"]}.json').read_text())
     assert saved['context'] == {'command': 'replies', 'target': None, 'account_id': '1000123'}
     assert saved['state'] == {'feedback_id': 'FC1', 'expansion_token': 'tok-C1', 'parent_id': 'C1', 'post_id': 'P1',
-                              'post_url': URL, 'depth': 1, 'cursor': None}
+                              'post_url': URL, 'depth': 1, 'cursor': None, 'reported': 2, 'shown': 0}
 
 
 def test_post_without_more_comments_is_exhausted_and_has_no_more(browser, data_dir):

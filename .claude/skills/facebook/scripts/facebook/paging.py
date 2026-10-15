@@ -25,6 +25,7 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
     cursor, waiting = state.get('cursor'), list(state.get('pending') or [])
     seen, closed = set(state.get('seen') or []), bool(state.get('closed'))
     results, skipped, visited, pages, served = [], [], set(), 0, 0
+    idle = 0  # consecutive fetched pages that brought no record not seen before
 
     def snapshot():
         if cursor == END and not waiting:
@@ -81,6 +82,13 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
             if keep is None or keep(record):
                 page.append(record)
         skipped += page_skipped
+        if fetched:
+            fresh_ids = len(page) + len(page_skipped) + sum(1 for r in records if r.get('id') is None)
+            idle = 0 if fresh_ids or cursor == END else idle + 1
+            if idle >= 2:
+                results.extend(page)
+                return outcome(None, FacebookError(6, 'Facebook kept sending pages with nothing new, so reading '
+                                                      'stopped there.', _RETRY, reason='pagination'))
         full = limit is not None and len(results) + len(page) >= limit
         if full and not whole_pages:
             room = limit - len(results)

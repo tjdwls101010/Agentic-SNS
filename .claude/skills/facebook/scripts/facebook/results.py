@@ -115,8 +115,8 @@ def finish(reading, *, command, requests, budget, identity=None, out=None, setup
         kind = 'complete'
     elif command in ('doctor', 'schema'):
         kind = 'maintenance'
-    elif records or (out is not None and reading.get('count')):
-        kind = 'records'
+    elif records or (out is not None and reading.get('count')) or continuable:
+        kind = 'records'  # nothing shown yet is not an empty result while a continuation exists
     else:
         kind = 'empty'
     envelope = {'ok': KINDS[kind][1], 'command': command, **(identity or {}), 'stop_reason': stop_reason}

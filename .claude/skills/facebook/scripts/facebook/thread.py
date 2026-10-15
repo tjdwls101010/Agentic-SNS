@@ -75,7 +75,7 @@ def _replies(connection, options, start, out):
                 record['replies_handle'] = handles.save(context, {
                     'feedback_id': handle['feedback_id'], 'expansion_token': handle['expansion_token'],
                     'parent_id': record['id'], 'post_id': start['post_id'], 'post_url': start['post_url'], 'depth': 2,
-                    'cursor': None})
+                    'cursor': None, 'reported': record['reply_count'], 'shown': 0})
         return page.records, page.page_info, page.has_items
 
     def commit(records, page_state, reason, skipped):
@@ -94,11 +94,16 @@ def _replies(connection, options, start, out):
     one_batch = limit is None and out is None
     result = paginate(fetch, limit=limit, state=state, max_pages=1 if one_batch else None,
                       commit=commit if out is not None else None, whole_pages=out is not None)
+    shown = (start.get('shown') or 0) + len(result['results'])
     reading = {'results': [] if out is not None else result['results'], 'stop_reason': result['stop_reason'],
                'failure': result['failure'], 'issues': issues, 'words': [], 'partial': bool(result['results']),
                'detail': True}
+    reported = start.get('reported')
+    if (result['state'] is None or result['failure'] is not None) and isinstance(reported, int) and shown < reported:
+        reading['coverage'] = [f'Facebook reports {reported} replies under this comment (deeper ones included); '
+                               f'{shown} were sent']
     if result['state'] is not None and out is None:
-        number = handles.save(context, {**start, 'cursor': result['state']['cursor'],
+        number = handles.save(context, {**start, 'cursor': result['state']['cursor'], 'shown': shown,
                                         'pending': result['state']['pending'], 'seen': result['state']['seen']})
         reading['next'] = connect.words('replies', str(number), [], options)
         reading['continuable'] = True
@@ -121,7 +126,8 @@ def _parents(connection, options, target, sort, feedback_id, state, *, out=None,
             if handle.get('expandable'):
                 record['replies_handle'] = handles.save(reply_context, {
                     'feedback_id': handle['feedback_id'], 'expansion_token': handle['expansion_token'],
-                    'parent_id': record['id'], 'post_id': feedback_id, 'post_url': target, 'depth': 1, 'cursor': None})
+                    'parent_id': record['id'], 'post_id': feedback_id, 'post_url': target, 'depth': 1, 'cursor': None,
+                    'reported': record['reply_count'], 'shown': 0})
         return page.records, page.page_info, page.has_items
 
     def commit(records, page_state, reason, skipped):

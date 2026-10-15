@@ -79,3 +79,27 @@ def test_a_feed_handle_is_not_a_replies_handle(browser, data_dir):
 def test_replies_handle_must_be_a_number(browser, data_dir):
     code, out, _ = run_cli(browser, 'replies', '../x')
     assert code == 2 and browser.calls() == []
+
+
+def test_fewer_replies_than_facebook_reports_is_said(browser, data_dir):
+    script_post(browser, data_dir, [comment('C1', replies=26)], has_next=False)
+    code, out, _ = run_cli(browser, 'post', URL)
+    first = handle_of(out, 'c1')
+    browser.respond('state', STATE_OK)
+    browser.respond('query', query_result(replies_body('C1', [comment('R1', replies=0, depth=1, parent='C1')],
+                                                       has_next=False)), name='Depth1CommentsListPaginationQuery')
+    code, out, _ = run_cli(browser, 'replies', first)
+    assert code == 0
+    assert 'coverage: Facebook reports 26 replies under this comment (deeper ones included); 1 were sent' in out
+
+
+def test_an_empty_batch_that_says_more_is_not_an_empty_result(browser, data_dir):
+    script_post(browser, data_dir, [comment('C1', replies=3)], has_next=False)
+    code, out, _ = run_cli(browser, 'post', URL)
+    first = handle_of(out, 'c1')
+    browser.respond('state', STATE_OK)
+    browser.respond('query', query_result(replies_body('C1', [], has_next=True, cursor='RC9')),
+                    name='Depth1CommentsListPaginationQuery')
+    code, out, _ = run_cli(browser, 'replies', first, '--json')
+    result = json.loads(out)
+    assert code == 0 and result['ok'] is True and 'error' not in result and result['next']
