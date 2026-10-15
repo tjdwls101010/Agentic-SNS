@@ -61,3 +61,41 @@ def test_doctor_feed_post():
     assert first['url'] and 'kind' not in first
     comments = [r for r in post['results'][1:] if 'post_id' in r]
     assert all(c['post_id'] == first['id'] and c['depth'] == 0 for c in comments)
+
+
+@pytest.mark.skipif(not os.environ.get('FACEBOOK_LIVE_REPLIES_POST'), reason='needs FACEBOOK_LIVE_REPLIES_POST')
+def test_replies_batches():
+    code, post = cli('post', os.environ['FACEBOOK_LIVE_REPLIES_POST'], cap=4)
+    assert code == 0, post
+    with_replies = [c for c in post['results'][1:] if c.get('replies_handle')]
+    assert with_replies, 'no comment with replies on the first page'
+    target = max(with_replies, key=lambda c: c['reply_count'] or 0)
+    code, first = cli('replies', str(target['replies_handle']), cap=2)
+    assert code == 0 and first['results'] and first['thread']['parent_id'] == target['id']
+    assert all(r['depth'] == 1 and r['parent_id'] == target['id'] for r in first['results'])
+    if first.get('next'):
+        code, second = cli(*[w for w in shlex.split(first['next'])[3:] if w != '--json'], cap=2)
+        assert code == 0 and second['results']
+        assert not {r['id'] for r in second['results']} & {r['id'] for r in first['results']}
+
+
+def test_search_filters_and_inside_a_group():
+    code, recent = cli('search', 'AI', '--type', 'posts', '--recent', '--limit', '3', cap=2)
+    assert code == 0 and recent['results'] and all('kind' not in r for r in recent['results'])
+    code, scoped = cli('search', 'pandas', '--type', 'posts', '--in-group', os.environ.get('FACEBOOK_LIVE_GROUP', '2968116436545420'),
+                       '--limit', '3', cap=3)
+    assert code == 0, scoped
+    group = os.environ.get('FACEBOOK_LIVE_GROUP', '2968116436545420')
+    for record in scoped['results']:
+        assert record['url'] is None or '/groups/' in record['url'], record['url']
+
+
+def test_page_about_and_group_card():
+    code, page = cli('about', os.environ.get('FACEBOOK_LIVE_PAGE', '100064620046507'), '--section', 'directory_bio', cap=3)
+    assert code == 0 and page['results'] and all(f['section'] == 'directory_bio' for f in page['results'])
+    code, card = cli('about', 'https://www.facebook.com/groups/' + os.environ.get('FACEBOOK_LIVE_GROUP', '2968116436545420') + '/',
+                     cap=3)
+    assert code == 0, card
+    [group] = card['results']
+    assert group['kind'] == 'group' and group['name'] and group['privacy'] and group['member_count_text']
+    assert isinstance(group['rules'], list)
