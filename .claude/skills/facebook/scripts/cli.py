@@ -167,9 +167,11 @@ COMMANDS = {
         'arguments': [(('target',), {'metavar': 'TEXT', 'help': 'What to search for'}),
                       (('--type',), {'choices': ['top', 'posts', 'people', 'pages', 'groups'], 'default': 'top', 'help': 'top mixes posts with people, pages and groups in Facebook\'s order'}),
                       (('--recent',), {'action': 'store_true', 'help': 'Posts only (top, posts): Facebook\'s "recent posts" filter'}),
-                      'since', 'until'] + list(LIST),
+                      'since', 'until',
+                      (('--in-group',), {'metavar': 'GROUP', 'help': 'Search the posts of one group (its URL, vanity name or numeric id), as the group\'s own search box does'})] + list(LIST),
         'epilog': ['Results are in Facebook\'s order for this account; people and pages with the same name are different results (compare url and verified).',
                    '--recent, --since and --until are Facebook\'s post filters (top and posts only): Facebook applies the dates, so reaching the end closes the window as far as search returns posts; results stay in Facebook\'s order, not by date.',
+                   '--in-group searches one group\'s posts (top or posts): requests: 1 to find the group id (none for a numeric id), then 1 per page.',
                    'requests: 1 per page of about 5 results.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
@@ -233,7 +235,7 @@ def parser():
 
 
 def validate(options):
-    for key in ('target', 'section', 'out'):
+    for key in ('target', 'section', 'out', 'in_group'):
         value = options.get(key)
         if isinstance(value, str) and any(ord(c) < 32 or ord(c) == 127 for c in value):
             raise FacebookError(2, f'The {key} contains a line break or another control character.', 'Pass it on one line.')
@@ -245,9 +247,9 @@ def validate(options):
     if options['command'] == 'replies' and not (options['target'].isascii() and options['target'].isdigit()):
         raise FacebookError(2, 'A replies handle is the number printed after "replies".', 'Copy the whole replies line.')
     if options['command'] == 'search' and options['type'] not in ('top', 'posts') and (
-            options.get('recent') or options.get('since') or options.get('until')):
-        raise FacebookError(2, '--recent, --since and --until filter posts; use them with --type top or posts.',
-                            'Drop the filter, or search --type posts.')
+            options.get('recent') or options.get('since') or options.get('until') or options.get('in_group')):
+        raise FacebookError(2, '--recent, --since, --until and --in-group are for posts; use them with --type top or '
+                               'posts.', 'Drop the option, or search --type posts.')
     if options['command'] == 'search' and not options['target'].strip():
         raise FacebookError(2, 'Search text must not be empty.', 'Pass the words to search for.')
 

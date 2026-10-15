@@ -306,7 +306,17 @@
   },
   "group_root": {
    "name": "CometGroupRootQuery",
-   "doc_id": null,
+   "doc_id": "28847195208215631",
+   "variables": {
+    "scale": 2
+   },
+   "expected_key": "group",
+   "kind": "object",
+   "cursor_var": null
+  },
+  "group_about": {
+   "name": "CometGroupAboutRootQuery",
+   "doc_id": "28729876439996579",
    "variables": {
     "scale": 2
    },

@@ -92,3 +92,21 @@ def test_post_filters_need_a_post_vertical(browser, data_dir):
         code, out, _ = run_cli(browser, 'search', 'x', *args)
         assert code == 2 and 'posts' in json.loads(out)['message']
     assert browser.calls() == []
+
+
+def test_search_inside_one_group(browser, data_dir):
+    known_tab(browser, data_dir)
+    browser.respond('page', {'status': 200, 'url': 'https://www.facebook.com/groups/examplegroup/',
+                             'body': '<script>{"groupID":"700"}</script>', 'explicit': 1, 'resources': 1})
+    browser.respond('query', query_result(results_body([{'node': {**story('G1'), '__typename': 'Story'}}], has_next=False)))
+    code, out, _ = run_cli(browser, 'search', 'pandas', '--in-group', 'examplegroup', '--json')
+    result = json.loads(out)
+    assert code == 0 and [r['id'] for r in result['results']] == ['G1'] and result['request_count'] == 2
+    args = [c for c in browser.calls() if c['op'] == 'query'][0]['args']['variables']
+    assert args['args']['callsite'] == 'comet:scoped:group' and args['renderLocation'] == 'group_serp'
+    assert args['args']['experience']['type'] == 'GROUPS_SCOPED' and args['args']['experience']['fbid'] == '700'
+
+
+def test_in_group_search_is_for_posts(browser, data_dir):
+    code, out, _ = run_cli(browser, 'search', 'x', '--type', 'people', '--in-group', '700')
+    assert code == 2 and browser.calls() == []

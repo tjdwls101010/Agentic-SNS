@@ -254,13 +254,22 @@ class Client:
         chunks = self.query('replies' if depth <= 1 else 'replies_deep', variables, route=url)
         return replies_page(chunks, post_id=post_id, parent_id=parent_id, captured_at=_now())
 
-    def search(self, text, vertical, cursor, *, recent=False, since=None, until=None):
-        """One page of search results; recent, since and until are Facebook's post filters."""
+    def search(self, text, vertical, cursor, *, recent=False, since=None, until=None, group_id=None, group_url=None):
+        """One page of search results; recent, since and until are Facebook's post filters; group_id searches inside
+        one group the way the group's own search box does (observed: scoped callsite and experience)."""
         base = QUERIES['search']['variables']['args']
-        args = {**base, 'text': text, 'experience': {**base['experience'], 'type': VERTICALS[vertical]},
+        experience = {**base['experience'], 'type': VERTICALS[vertical]}
+        variables = {'cursor': cursor}
+        if group_id:
+            experience.update(type='GROUPS_SCOPED', fbid=group_id)
+            variables['renderLocation'] = 'group_serp'
+        args = {**base, 'text': text, 'experience': experience,
                 'filters': search_filters(recent=recent, since=since, until=until, today=_now().date().isoformat())}
-        chunks = self.query('search', {'args': args, 'cursor': cursor},
-                            route=HOME + 'search/' + vertical + '/?q=' + quote(text))
+        if group_id:
+            args['callsite'] = 'comet:scoped:group'
+        route = (group_url.rstrip('/') + '/search/?q=' + quote(text)) if group_id else \
+            HOME + 'search/' + vertical + '/?q=' + quote(text)
+        chunks = self.query('search', {'args': args, **variables}, route=route)
         return search_page(chunks, vertical=vertical, captured_at=_now())
 
     def about(self, profile_id, collection, *, url):

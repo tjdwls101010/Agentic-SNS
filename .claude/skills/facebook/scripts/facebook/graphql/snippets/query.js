@@ -5,7 +5,8 @@ async (args) => {
     'CometNewsFeedPaginationQuery', 'ProfileCometTimelineFeedRefetchQuery', 'ProfileCometAboutAppSectionQuery',
     'GroupsCometFeedRegularStoriesPaginationQuery', 'SearchCometResultsPaginatedResultsQuery',
     'CometSinglePostDialogContentQuery', 'CommentListComponentsRootQuery', 'CommentsListComponentsPaginationQuery',
-    'Depth1CommentsListPaginationQuery', 'Depth2CommentsListPaginationQuery', 'CometGroupRootQuery'];
+    'Depth1CommentsListPaginationQuery', 'Depth2CommentsListPaginationQuery', 'CometGroupRootQuery',
+    'CometGroupAboutRootQuery'];
   if (!READ_QUERIES.includes(args.name) || !args.variables || typeof args.variables !== 'object') {
     return {refused: 'not a read query', explicit: 0, resources: 0};
   }
