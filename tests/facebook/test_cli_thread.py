@@ -2,7 +2,7 @@
 import json
 import re
 
-from conftest import STATE_OK, known_tab, query_result, run_cli, story
+from conftest import command_of, STATE_OK, known_tab, query_result, run_cli, story
 
 URL = 'https://www.facebook.com/some.page/posts/pfbid0abc'
 
@@ -91,7 +91,7 @@ def test_limit_keeps_the_unshown_parents_for_comments(browser, data_dir):
     assert out.splitlines()[0] == 'comments · sort=all · 2 shown · stopped=limit_reached · requests=0/25'
     assert 'Person C2' in out and 'Person C3' in out
     browser.respond('state', STATE_OK)
-    code, out, _ = run_cli(browser, *out.splitlines()[-1].split('cli.py" ', 1)[1].split())
+    code, out, _ = run_cli(browser, *command_of(out.splitlines()[-1]))
     assert 'Person C4' in out and 'stopped=exhausted' in out
     page = [c for c in browser.calls() if c['op'] == 'query'][-1]['args']['variables']
     assert page['commentsAfterCursor'] == 'CC1' and page['id'] == 'P1'

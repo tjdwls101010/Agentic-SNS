@@ -117,3 +117,9 @@ def query_result(body, status=200, source='live', doc_id='111', resources=1):
     return {'status': status, 'url': 'https://www.facebook.com/api/graphql/', 'body': body,
             'used': {'source': source, 'doc_id': doc_id, 'flags': {'__relay_internal__pv__Xrelayprovider': True}
                      if source == 'live' else None}, 'explicit': 1, 'resources': resources}
+
+
+def command_of(line):
+    """The arguments of a printed `more:`/`detail:` command line, parsed the way a shell would."""
+    import shlex
+    return shlex.split(line.split(' ', 1)[1])[3:]  # drop: uv run "<cli.py>"

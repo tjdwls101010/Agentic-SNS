@@ -2,7 +2,7 @@
 import json
 import re
 
-from conftest import fixture, graphql_body, known_tab, query_result, run_cli, story
+from conftest import command_of, fixture, graphql_body, known_tab, query_result, run_cli, story
 
 FEED = ['viewer', 'news_feed']
 
@@ -30,7 +30,7 @@ def test_text_page_contract_and_continuation(browser, data_dir):
     # the continuation shows the unshown tail first, then requests the next page from the saved cursor
     browser.respond('state', {'location': 'https://www.facebook.com/', 'user_id': '1000123', 'runtime': True, 'resources': 0})
     browser.respond('query', page([story('D'), story('E')], has_next=False))
-    code, out, _ = run_cli(browser, *more.split('cli.py" ', 1)[1].split())
+    code, out, _ = run_cli(browser, *command_of(more))
     assert code == 0, out
     assert out.splitlines()[0] == 'feed · sort=top · 2 shown · stopped=limit_reached · requests=1/25'
     assert [line.split(' ')[1] for line in out.splitlines() if line.startswith('[p')] == ['Author', 'Author']
