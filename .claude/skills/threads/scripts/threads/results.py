@@ -56,6 +56,7 @@ COVERAGE = (
     ('any order', 'limit_reached or budget', 'no failure', 'open — more: continues'),
     ('newest first (following feed, threads and replies tabs)', 'window_reached or exhausted', 'no failure',
      'closed (as served)'),
+    ('a finite list in no date order (reposts and media tabs)', 'exhausted', 'no failure', 'closed (read to the end)'),
     ('filtered by Threads (search dates)', 'exhausted', 'no failure', 'closed (server-filtered)'),
 )
 
@@ -70,6 +71,8 @@ def window_state(order, stop_reason, failure):
         return 'open — more: continues'
     if order == 'newest_first' and stop_reason in ('window_reached', 'exhausted'):
         return 'closed (as served)'
+    if order == 'finite' and stop_reason == 'exhausted':
+        return 'closed (read to the end)'
     if order == 'server' and stop_reason == 'exhausted':
         return 'closed (server-filtered)'
     return 'open'

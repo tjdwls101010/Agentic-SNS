@@ -1,4 +1,4 @@
-"""The dense text page: a header naming scope and cost, the window, records, coverage, detail:, more:.
+"""The dense text page: a header naming scope and cost, the window, records, coverage, more:.
 
 All clipping, labels and local-time formatting live here; the records themselves are never shortened.
 """
@@ -35,134 +35,147 @@ def _time(value):
 
 
 def _text(record, chars):
-    """text[N of M chars shown, complete|truncated]: "…" — and whether --chars cut it."""
+    """text[N of M chars shown]: "…" """
     text = record.get('text') or ''
     shown = text if not chars else text[:chars]
-    state = 'truncated' if record.get('text_truncated') else 'complete'
     suffix = '…' if len(shown) < len(text) else ''
-    return f'text[{len(shown)} of {len(text)} chars shown, {state}]: {_quote(shown + suffix)}', len(shown) < len(text)
+    return f'text[{len(shown)} of {len(text)} chars shown]: {_quote(shown + suffix)}'
+
+
+def _who(account):
+    if not account:
+        return 'unavailable'
+    parts = ['@' + _line(account.get('username') or '?')]
+    if account.get('full_name'):
+        parts[0] += f' ({_line(account["full_name"])})'
+    if account.get('is_verified'):
+        parts.append('verified')
+    if account.get('private'):
+        parts.append('private')
+    return ' · '.join(parts)
 
 
 def _media(record):
     parts = []
     for item in record.get('media') or []:
-        part = item.get('kind', 'image')
-        if item.get('alt'):
-            part += ' alt=' + _quote(item['alt'])
+        part = item.get('kind', 'photo')
+        if item.get('alt_text'):
+            part += ' alt=' + _quote(item['alt_text'])
         parts.append(part)
     return ' · '.join(parts)
 
 
-def post(record, index, chars):
-    labels = [_line(record.get('author_name') or 'unavailable')]
-    if record.get('created_at') or not record.get('sponsored'):
-        labels.append(_time(record.get('created_at')))
-    labels += [flag for flag in ('sponsored', 'pinned', 'incomplete') if record.get(flag)]
-    labels += [record.get('type', 'unknown'), f'reactions={_count(record.get("reaction_count"))} '
-                                              f'comments={_count(record.get("comment_count"))} '
-                                              f'shares={_count(record.get("share_count"))}']
-    lines = [f'[p{index}] ' + ' · '.join(labels), '     ' + _text(record, chars)[0]]
-    shared, depth, seen = record.get('shared_post'), 1, {id(record)}
-    while shared is not None and id(shared) not in seen:
-        seen.add(id(shared))
-        label = 'shared-from' if depth == 1 else f'shared-from[{depth}]'
-        state = ' · incomplete' if shared.get('incomplete') else ''
-        lines.append(f'     {label}: {_line(shared.get("author_name") or "unavailable")} · {_time(shared.get("created_at"))}'
-                     f'{state} · url: {_handle(shared.get("url"))} · author: {_handle(shared.get("author_url"))} · '
-                     f'{_text(shared, chars)[0]}')
-        shared, depth = shared.get('shared_post'), depth + 1
+def _nested(label, record, chars):
+    if record.get('unavailable'):
+        return f'     {label}: unavailable — {_line(record.get("unavailable_reason") or "")}'
+    return (f'     {label}: {_who(record.get("author"))} · {_time(record.get("created_at"))} · {_text(record, chars)} · '
+            f'url: {_handle(record.get("url"))}')
+
+
+def post(record, label, labels, chars):
+    """One post, reply or parent; `labels` maps ids already shown on this page to their labels."""
+    indent = '  ' * min(max(record.get('depth') or 0, 0), 10)
+    if record.get('unavailable'):
+        return f'{indent}[{label}] unavailable — {_line(record.get("unavailable_reason") or "")}'
+    flags = [_who(record.get('author')), _time(record.get('created_at')), record.get('media_type', 'text'),
+             f'likes={_count(record.get("like_count"))} replies={_count(record.get("reply_count"))} '
+             f'reposts={_count(record.get("repost_count"))} quotes={_count(record.get("quote_count"))}']
+    if record.get('role') == 'parent':
+        flags.append('parent')
+    relation = record.get('relation')
+    if relation:
+        target = labels.get(relation.get('to'), '?')
+        flags.append(f'continuation of {target}' if relation.get('kind') == 'continuation' else f'reply-to={target}')
+    elif record.get('is_reply') and record.get('role') != 'reply':
+        flags.append('a reply')
+    if record.get('is_pinned'):
+        flags.append('pinned')
+    lines = [f'{indent}[{label}] ' + ' · '.join(flags), f'{indent}     {_text(record, chars)}']
+    if record.get('quoted_post'):
+        lines.append(indent + _nested('quoting', record['quoted_post'], chars))
+    if record.get('reposted_post'):
+        lines.append(indent + _nested('repost of', record['reposted_post'], chars))
     if record.get('media'):
-        lines.append('     media: ' + _media(record))
-    lines.append(f'     url: {_handle(record.get("url"))}   author: {_handle(record.get("author_url"))}')
-    return '\n'.join(lines), False
+        lines.append(f'{indent}     media: ' + _media(record))
+    link = record.get('link_preview')
+    if link:
+        lines.append(f'{indent}     link: {_quote(link.get("title") or "")} ({_line(link.get("url") or "")})')
+    tail = f'{indent}     url: {_handle(record.get("url"))}   author: {_handle((record.get("author") or {}).get("username"))}'
+    if record.get('replies_handle'):
+        tail += f'   replies {record["replies_handle"]}'
+    lines.append(tail)
+    return '\n'.join(lines)
 
 
-def comment(record, index, parent_label, chars):
-    depth = record.get('depth') or 0
-    indent = '  ' * min(max(depth, 0), 10)
-    parent = f' reply-to={parent_label}' if depth and parent_label else ''
-    kinds = ','.join(_line(a.get('kind')) for a in record.get('attachments') or [])
-    text, cut = _text(record, chars)
-    tail = f'   replies {record["replies_handle"]}' if record.get('replies_handle') else ''
-    return (f'{indent}[c{index}{parent}] {_line(record.get("author_name") or "unavailable")} · '
-            f'{_time(record.get("created_at"))} · reactions={_count(record.get("reaction_count"))} '
-            f'replies={_count(record.get("reply_count"))}\n'
-            f'{indent}     {text}' + (f' · attachment={kinds}' if kinds else '') + '\n'
-            f'{indent}     author: {_handle(record.get("author_url"))}{tail}'), cut
+def account(record, label):
+    parts = [_who(record)]
+    counts = record.get('counts')
+    if counts:
+        parts.append(' '.join(f'{key}={_count(counts.get(key))}' for key in ('followers', 'following', 'mutuals')))
+    elif record.get('follower_count') is not None:
+        parts.append(f'followers={record["follower_count"]}')
+    lines = [f'[{label}] ' + ' · '.join(parts)]
+    if record.get('bio'):
+        lines.append('     bio: ' + _quote(record['bio']))
+    if record.get('bio_links'):
+        lines.append('     links: ' + ', '.join(_line(link) for link in record['bio_links']))
+    lines.append(f'     url: {_handle(record.get("url"))}   author: {_handle(record.get("username"))}')
+    return '\n'.join(lines)
 
 
-def entity(record, index):
-    if 'privacy' in record:  # a group card
-        parts = [_line(record.get('name') or 'unavailable')] + [_line(record[key]) for key in ('privacy', 'member_count_text')
-                                                                 if record.get(key)]
-        if record.get('join_state'):
-            parts.append('you: ' + _line(record['join_state']))
-        if record.get('membership_questions'):
-            parts.append('membership questions')
-        lines = [f'[e{index}] group id={_line(record["id"])} · ' + ' · '.join(parts) + f' · url: {_handle(record.get("url"))}']
-        if record.get('description'):
-            lines.append('     description: ' + _quote(record['description']))
-        activity = [f'{record["posts_last_day"]} posts in the last day' if record.get('posts_last_day') is not None else None,
-                    f'{record["posts_last_month"]} in the last month' if record.get('posts_last_month') is not None else None,
-                    f'created {record["created_at"][:10]}' if record.get('created_at') else None]
-        if any(activity):
-            lines.append('     activity: ' + ' · '.join(a for a in activity if a))
-        for number, rule in enumerate(record.get('rules') or [], 1):
-            lines.append(f'     rule {number}: {_quote(rule["title"])}'
-                         + (f' — {_quote(rule["description"])}' if rule.get('description') else ''))
-        return '\n'.join(lines), False
-    verified = {True: 'verified', False: 'unverified', None: 'verified=?'}[record.get('verified')]
-    return (f'[e{index}] {_line(record["kind"])} id={_line(record["id"])} · {_line(record.get("name") or "unavailable")} '
-            f'· {verified} · url: {_handle(record.get("url"))}'), False
+def _replies_line(replies):
+    reported = '?' if replies.get('reported_direct') is None else replies['reported_direct']
+    unfetched = (f'≈{replies["unfetched"]} never received (estimate)' if replies.get('unfetched') is not None
+                 else 'never received: unknown')
+    return (f'replies: {replies.get("received_direct", 0)} of {reported} direct received · {unfetched} · '
+            f'{replies.get("shown_direct", 0)} shown · +{replies.get("shown_descendants", 0)} nested · '
+            f'{replies.get("unshown_received", 0)} received but not shown · {replies.get("unavailable", 0)} unavailable')
 
 
-def about(record):
-    return f'{_line(record["section"])}: {_line(record["text"])}' + (f' ({_quote(record["url"])})' if record.get('url') else ''), False
+def _header(envelope, command, shown):
+    header = [_line(envelope.get('command') or command or '')]
+    header += [f'{key}={_line(envelope[key])}' for key in ('feed', 'sort', 'tab', 'type', 'relation', 'collection')
+               if envelope.get(key) is not None]
+    if shown is not None:
+        header.append(f'{shown} shown')
+    tab = envelope.get('tab_opened_requests') or 0
+    header += [f'stopped={_line(envelope.get("stop_reason"))}',
+               f'requests={envelope.get("request_count", 0) - tab}/{envelope.get("max_requests", 0)}']
+    if tab:
+        header.append(f'tab opened (+{tab} requests)')
+    if envelope.get('unwatched_requests'):
+        header.append(f'unwatched={envelope["unwatched_requests"]}')
+    return header
 
 
 def render_page(envelope, *, chars=None, command=None):
     """The text page of one result. chars None: the default; 0: everything received."""
     limit = DEFAULT_CHARS if chars is None else (None if chars == 0 else chars)
     results = envelope.get('results') or []
-    header = [_line(envelope.get('command') or command or '')]
-    header += [f'{key}={_line(envelope[key])}' for key in ('sort', 'type') if envelope.get(key) is not None]
-    header.append(f'{len(results)} shown')
-    if envelope.get('sponsored_skipped'):
-        header.append(f'sponsored_skipped={envelope["sponsored_skipped"]}')
-    tab = envelope.get('tab_opened_requests') or 0
-    header += [f'stopped={_line(envelope.get("stop_reason"))}',
-               f'requests={envelope.get("request_count", 0) - tab}/{envelope.get("max_requests", 0)}']
-    if tab:
-        header.append(f'tab opened (+{tab} requests)')
-    lines = [' · '.join(header)]
-    thread = envelope.get('thread')
-    if thread:
-        lines.append(f'thread: post {_handle(thread.get("post_url"))} · replies to comment {_line(thread.get("parent_id"))}')
+    lines = [' · '.join(_header(envelope, command, len(results)))]
     window = envelope.get('window')
     if window:
         lines.append(f'window {window.get("since") or ""}..{window.get("until") or ""} · {_line(window["coverage"])}')
-    labels = {r['id']: f'c{i}' for i, r in enumerate((r for r in results if 'post_id' in r), 1)}
-    counts, cut = {'p': 0, 'c': 0, 'e': 0}, False
+    if envelope.get('replies'):
+        lines.append(_replies_line(envelope['replies']))
+    if envelope.get('reported_total') is not None:
+        lines.append(f'reported_total={envelope["reported_total"]} · Threads\' own sample, not the whole list')
+    labels, counts = {}, {'p': 0, 'r': 0, 'a': 0}
     for record in results:
-        if 'post_id' in record:
-            counts['c'] += 1
-            text, was_cut = comment(record, counts['c'], labels.get(record.get('parent_id')), limit)
-            cut |= was_cut
-        elif 'section' in record:
-            text, _ = about(record)
-        elif record.get('kind') in ('person', 'page', 'group'):
-            counts['e'] += 1
-            text, _ = entity(record, counts['e'])
-        else:
-            counts['p'] += 1
-            post_limit = None if command == 'post' else limit
-            text, _ = post(record, counts['p'], post_limit)
-        lines.append(text)
+        if 'username' in record and 'code' not in record:
+            counts['a'] += 1
+            lines.append(account(record, f'a{counts["a"]}'))
+            continue
+        prefix = 'r' if record.get('role') == 'reply' else 'p'
+        counts[prefix] += 1
+        label = f'{prefix}{counts[prefix]}'
+        whole = command == 'post' and record.get('role') == 'post'
+        lines.append(post(record, label, labels, None if whole else limit))
+        if record.get('id'):
+            labels[record['id']] = label
     lines += ['coverage: ' + _line(note) for note in envelope.get('coverage') or []]
     if envelope.get('error'):
         lines.append(f'coverage: incomplete — {_line(envelope.get("message"))} fix: {_line(envelope.get("fix"))}')
-    if cut and envelope.get('detail'):
-        lines.append('detail: ' + envelope['detail'])
     if envelope.get('next'):
         lines.append('more: ' + envelope['next'])
     return '\n'.join(lines)
@@ -170,14 +183,8 @@ def render_page(envelope, *, chars=None, command=None):
 
 def render_summary(envelope):
     """The one line --out prints."""
-    parts = [_line(envelope.get('command') or ''), f'{envelope.get("count", 0)} saved to {json.dumps(envelope.get("out"), ensure_ascii=False)}']
-    if 'sponsored_skipped' in envelope:
-        parts.append(f'sponsored_skipped={envelope["sponsored_skipped"]}')
-    tab = envelope.get('tab_opened_requests') or 0
-    parts += [f'stopped={envelope.get("stop_reason")}',
-              f'requests={envelope.get("request_count", 0) - tab}/{envelope.get("max_requests", 0)}']
-    if tab:
-        parts.append(f'tab opened (+{tab} requests)')
+    parts = _header(envelope, None, None)
+    parts.insert(1, f'{envelope.get("count", 0)} saved to {json.dumps(envelope.get("out"), ensure_ascii=False)}')
     if envelope.get('already_complete'):
         parts.append('already complete')
     if envelope.get('window'):

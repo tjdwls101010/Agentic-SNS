@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date
 
-from threads import maintenance
+from threads import listing, maintenance
 from threads.errors import ThreadsError
 from threads.render import render_page, render_summary
 from threads.results import failure_envelope
@@ -97,6 +97,18 @@ OPTIONS = {
 LIST = ('limit', 'chars', 'after', 'out', 'json', 'max_requests')
 
 COMMANDS = {
+    'feed': {
+        'help': 'Read your home feed, a page at a time.',
+        'run': listing.feed,
+        'arguments': [(('--feed',), {'choices': ['foryou', 'following'], 'default': 'foryou', 'help': 'foryou: the posts Threads ranks for this account; following: the accounts it follows, newest first'}),
+                      'since', 'until'] + list(LIST),
+        'epilog': ['foryou is what Threads chose to show this account, not everything; following holds only the accounts it follows.',
+                   'A window keeps the dated posts written on its local days (posts without a date are left out and counted). Only --feed following can close a --since window (it stops at the first page wholly older than --since, while the feed stays newest first); foryou is a sample of the window.',
+                   'A feed entry can carry several posts (a post and a reply to it, or an author continuing a post): they are shown together, and the later ones say reply-to= or continuation of.',
+                   'Without --limit, a window or --out it reads one page; more: continues.',
+                   'requests: 1 per page of about 5-10 posts.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8),
+    },
     'doctor': {
         'help': 'Check Aside, the browser tab, login and account protection; always JSON.',
         'run': maintenance.doctor,
@@ -115,7 +127,7 @@ COMMANDS = {
         'exits': (0, 2),
     },
 }
-READS = ()
+READS = ('feed',)
 HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 
