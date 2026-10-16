@@ -73,10 +73,13 @@ def sandbox_settings(root, data_dir):
 
 
 def blank_tab(data_dir):
-    """Navigate the skill's recorded dedicated tab to about:blank (no request), so its background polling stops."""
-    # 성진: wired to the skill's session/aside unit interfaces once P3 defines them; until then a budget stop leaves
-    # the tab open and says so.
-    raise NotImplementedError('blank the dedicated tab by hand: the skill\'s tab interface is not built yet')
+    """Empty the skill's dedicated tab (about:blank, no request) through its idle blanker, so its background polling
+    stops; the stopped run never released the tab, hence --token any."""
+    done = subprocess.run(['uv', 'run', str(SKILL / 'scripts/cli.py'), 'idle', '--token', 'any', '--after', '0'],
+                          capture_output=True, text=True, timeout=120, env={**os.environ, 'THREADS_DATA_DIR': str(data_dir)})
+    outcome = json.loads(done.stdout or '{}').get('outcome')
+    if outcome != 'blanked':
+        raise RuntimeError(f'the idle blanker answered {outcome!r}: {done.stderr[-300:]}')
 
 
 def _try(function, *args):

@@ -199,6 +199,15 @@ def test_the_idle_blanker_leaves_a_tab_a_newer_command_uses(browser, data_dir):
     assert 'blank' not in browser.ops()
 
 
+def test_any_token_empties_the_tab_whoever_released_it_last(browser, data_dir):
+    # what a maintainer job uses after stopping a run: the stopped command never released the tab
+    known_tab(browser, data_dir).respond('modules', MODULES)
+    assert doctor(browser)[0] == 0
+    browser.respond('blank', {'blanked': True, 'resources': 0, 'statuses': [], 'signals': [], 'location': START})
+    code, out, _ = run_cli(browser, 'idle', '--token', 'any', '--after', '0')
+    assert code == 0 and json.loads(out)['outcome'] == 'blanked'
+
+
 # --- review findings (shared contracts) ---
 
 RATE_BODY = json.dumps({'error': {'code': 4, 'message': 'Please wait a few minutes before you try again later.'}})

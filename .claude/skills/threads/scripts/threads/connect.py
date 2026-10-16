@@ -71,8 +71,9 @@ BUSY_CHECKS = 12
 
 def idle(token, after):
     """Empty the dedicated tab after `after` seconds when no command is using it and the last one released was the
-    one that left `token`, or when an earlier attempt to empty it failed. While a command still runs, it waits and
-    looks again, so a command that dies without releasing does not leave the tab polling."""
+    one that left `token` (`any`: whichever did, for a job that stopped a command), or when an earlier attempt to empty
+    it failed. While a command still runs, it waits and looks again, so a command that dies without releasing does not
+    leave the tab polling."""
     browser = Aside()
     memory = Session(browser.account_key)
     client = Client(browser, protection.Guard(1), memory)
@@ -82,7 +83,7 @@ def idle(token, after):
             memory.reload()
             if memory.active:
                 continue  # a command still running uses the tab
-            if not memory.tab or (memory.released != token and not memory.dirty):
+            if not memory.tab or (token not in ('any', memory.released) and not memory.dirty):
                 return 'newer command'
             client.tab = memory.tab
             try:
