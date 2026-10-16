@@ -174,22 +174,17 @@ def next_batch(data, post_id, seen):
 
 
 def branch_batch(data, parent_id):
-    """The replies under one reply (the inline expansion query's response), placed under it."""
+    """The replies under one reply (the inline expansion query's response): units like a post's direct replies, placed
+    under the reply they answer."""
     expansion = find(data, 'inline_expansion')
-    holder = expansion.get('posts') if isinstance(expansion, dict) and isinstance(expansion.get('posts'), dict) else expansion
-    if not isinstance(holder, dict) or not isinstance(holder.get('edges'), list):
+    if not isinstance(expansion, dict) or not isinstance(expansion.get('edges'), list):
         raise _changed('The response holds no replies under this reply.')
-    found = []
-    for edge in holder['edges']:
-        record = post_record(edge.get('node') if isinstance(edge, dict) else None)
-        if record is None:
-            continue
-        record['role'] = 'reply'
-        found.append(record)
-    relate([{'id': parent_id, 'author': None, 'depth': 0}] + found)
+    counts = new_counts()
+    found, branches = reply_batch(expansion, parent_id, {parent_id}, limit=None, counts=counts)
     for record in found:
-        if not record.get('relation') and record.get('reply_to_id') == parent_id:
-            record['relation'], record['depth'] = {'kind': 'reply', 'to': parent_id}, 1
-    info = holder.get('page_info')
+        record['depth'] = record.get('depth', 0) + 1
+        if not record.get('relation'):
+            record['relation'] = {'kind': 'reply', 'to': parent_id}
+    info = expansion.get('page_info')
     cursor = info.get('end_cursor') if isinstance(info, dict) and info.get('has_next_page') is True else None
-    return Batch(found, cursor, {})
+    return Batch(found, cursor, branches)

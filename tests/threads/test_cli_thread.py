@@ -87,18 +87,20 @@ def test_a_branch_handle_opens_the_replies_under_one_reply(browser, data_dir):
     scripted_post(browser, data_dir)
     code, out, _ = run_cli(browser, 'post', URL, '--json')
     reply = next(r for r in json.loads(out)['results'] if r.get('replies_handle'))
-    under = {'data': {'media': {'text_post_app_info': {'inline_expansion': {'posts': {'edges': [
-        {'node': {'pk': '3000000000000000281', 'code': 'Cr281', 'caption': {'text': 'deeper'}, 'user': THREAD['users']['A'],
-                  'text_post_app_info': {'is_reply': True, 'reply_to_id': reply['id']}}}],
-        'page_info': {'has_next_page': False, 'end_cursor': None}}}}}}}
+    under = {'data': {'media': {'text_post_app_info': {'inline_expansion': {'edges': [
+        {'node': {'posts': {'edges': [{'node': {'pk': '3000000000000000281', 'code': 'Cr281', 'caption': {'text': 'deeper'},
+                                                'user': THREAD['users']['A'],
+                                                'text_post_app_info': {'is_reply': True, 'reply_to_id': reply['id']}}}]}}}],
+        'page_info': {'has_next_page': True, 'end_cursor': 'EXP2'}}}}}}
     browser.respond('state', state()).respond('query', query_result(under))
     code, out, _ = run_cli(browser, 'replies', str(reply['replies_handle']))
     assert code == 0, out
     call = [c['args'] for c in browser.calls() if c['op'] == 'query'][-1]
     assert call['name'] == 'BarcelonaPostPageThreadViewSectionInlineExpansionQuery'
+    # as the app does: the first expansion starts from the beginning of the branch
     assert call['variables'] == {**call['variables'], 'postID': reply['id'], 'permalinkPostID': CASE['post_id'],
-                                 'after': 'SUBCUR1'}
-    assert 'deeper' in out and 'reply-to=' in out
+                                 'after': None}
+    assert 'deeper' in out and 'more: ' in out
 
 
 def test_recent_sort_asks_threads_for_newest_first(browser, data_dir):

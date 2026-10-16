@@ -20,9 +20,10 @@ def post(options):
         for record in records:
             branch = page.branches.get(record.get('id'))
             if branch and record.get('role') == 'reply':
+                # the app opens a branch from its start (after: null); the reply's own cursor only says there is more
                 record['replies_handle'] = handles.save(context, {
                     'kind': 'branch', 'post_id': target.post_id, 'path': target.path, 'sort': sort,
-                    'parent_id': record['id'], 'cursor': branch['cursor'], 'seen': [], 'pending': []})
+                    'parent_id': record['id'], 'cursor': None, 'seen': [], 'pending': []})
         reading = {'results': records, 'stop_reason': 'exhausted', 'details': {'replies': page.coverage},
                    'coverage': _coverage(page.coverage)}
         if page.replies_cursor:
@@ -66,10 +67,10 @@ def _replies(connection, options, start, out):
                                        seen=set(start.get('seen') or []))
         for record in batch.records:
             more = batch.branches.get(record.get('id'))
-            if more and not branch:
+            if more:
                 record['replies_handle'] = handles.save(context, {
                     'kind': 'branch', 'post_id': start['post_id'], 'path': start['path'], 'sort': start['sort'],
-                    'parent_id': record['id'], 'cursor': more['cursor'], 'seen': [], 'pending': []})
+                    'parent_id': record['id'], 'cursor': None, 'seen': [], 'pending': []})
         return batch.records, {'has_next_page': bool(batch.cursor), 'end_cursor': batch.cursor}, bool(batch.records)
 
     def commit(records, page_state, reason, skipped):
