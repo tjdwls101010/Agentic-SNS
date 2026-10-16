@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date
 
-from threads import about, listing, maintenance, thread
+from threads import about, listing, maintenance, search, thread
 from threads.errors import ThreadsError
 from threads.render import render_page, render_summary
 from threads.results import failure_envelope
@@ -148,6 +148,17 @@ COMMANDS = {
                    'requests: 1.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
+    'search': {
+        'help': 'Search posts, tags or accounts.',
+        'run': search.search,
+        'arguments': [(('target',), {'metavar': 'TEXT', 'help': 'What to search for (a tag without #)'}),
+                      (('--type',), {'choices': ['posts', 'tags', 'accounts'], 'default': 'posts', 'help': 'posts (by words), tags (posts under a tag) or accounts (one batch of profiles)'}),
+                      (('--sort',), {'choices': ['top', 'recent'], 'default': 'top', 'help': 'Posts and tags: top (Threads ranks them) or recent (newest first)'})] + list(LIST),
+        'epilog': ['Results are in Threads\' order for this account: top is a ranking, not a sample of opinion; recent is newest first. Accounts with the same or similar names are different results (compare url and verified).',
+                   'Without --limit or --out it reads one page; more: continues (accounts are one batch).',
+                   'requests: 1 per page of about 10 posts; accounts 1.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8),
+    },
     'post': {
         'help': 'Read one post in full with its parent chain and first batch of replies.',
         'run': thread.post,
@@ -189,7 +200,7 @@ COMMANDS = {
         'exits': (0, 2),
     },
 }
-READS = ('feed', 'profile', 'about', 'graph', 'me', 'post', 'replies')
+READS = ('feed', 'profile', 'about', 'graph', 'me', 'search', 'post', 'replies')
 HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 
@@ -236,6 +247,12 @@ def validate(options):
     if options['command'] == 'replies' and not (options['target'].isascii() and options['target'].isdigit()):
         raise ThreadsError(2, 'A replies handle is the number printed after "replies" or in a more: line.',
                            'Copy the whole replies or more: line.')
+    if options['command'] == 'search':
+        if not options['target'].strip():
+            raise ThreadsError(2, 'Search text must not be empty.', 'Pass the words to search for.')
+        if options['type'] == 'accounts' and options.get('sort') == 'recent':
+            raise ThreadsError(2, '--sort applies to posts and tags; account search is one batch in Threads\' order.',
+                               'Drop --sort.')
     if options.get('after') and options.get('out'):
         raise ThreadsError(2, '--after and --out cannot be combined; --out resumes its own file.',
                            'Rerun the same command with the same --out path.')
