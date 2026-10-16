@@ -130,6 +130,24 @@ COMMANDS = {
                    'requests: 2 (find the profile, read its card).'],
         'exits': (0, 2, 3, 4, 5, 6, 9),
     },
+    'graph': {
+        'help': 'Read the accounts that follow a profile, or that it follows.',
+        'run': listing.graph,
+        'arguments': [(('target',), {'help': 'Threads @handle or profile URL'}),
+                      (('relation',), {'choices': ['followers', 'following'], 'help': 'followers or following'})] + list(LIST),
+        'epilog': ['followers: Threads may send its own sample rather than the whole list (stopped=server_capped); reported_total is the count the profile reports. following pages on.',
+                   'Without --limit or --out it reads one page; more: continues.',
+                   'requests: 1 to find the profile, then 1 per page of about 10-20 accounts. The first next page of following in a while may read the profile screen once to learn its query (outside --max-requests).'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
+    },
+    'me': {
+        'help': 'Read the posts you liked or saved (one batch).',
+        'run': listing.me,
+        'arguments': [(('collection',), {'choices': ['liked', 'saved'], 'help': 'liked or saved'})] + list(LIST),
+        'epilog': ['One batch, as Threads sends it (stopped=not_paginable): not your whole history.',
+                   'requests: 1.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8),
+    },
     'post': {
         'help': 'Read one post in full with its parent chain and first batch of replies.',
         'run': thread.post,
@@ -171,7 +189,7 @@ COMMANDS = {
         'exits': (0, 2),
     },
 }
-READS = ('feed', 'profile', 'about', 'post', 'replies')
+READS = ('feed', 'profile', 'about', 'graph', 'me', 'post', 'replies')
 HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 

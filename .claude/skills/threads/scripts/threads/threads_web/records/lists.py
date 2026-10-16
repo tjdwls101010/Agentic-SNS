@@ -22,6 +22,18 @@ SURFACES = {
     'saved': ('xdt_text_app_viewer.saved_media', 'thread_items', SINGLE),
 }
 _CHANGED = 'Threads changed this response; the skill needs an update.'
+RELATIONS = ('followers', 'following', 'following_more')
+
+
+def _count(value, key):
+    if isinstance(value, dict):
+        if type(value.get(key)) is int:
+            return value[key]
+        for child in value.values():
+            found = _count(child, key)
+            if found is not None:
+                return found
+    return None
 
 
 @dataclass
@@ -60,10 +72,27 @@ def relate(group):
     return group
 
 
+def _find(value, key):
+    if isinstance(value, dict):
+        if isinstance(value.get(key), dict) and 'edges' in value[key]:
+            return value[key]
+        for child in value.values():
+            found = _find(child, key)
+            if found is not None:
+                return found
+    return None
+
+
 def connection_page(data, surface):
     """One page of `surface` from a response's data: records grouped by unit, and how it continues."""
     root, items, policy = SURFACES[surface]
-    connection = _at(data, root)
+    try:
+        connection = _at(data, root)
+    except ThreadsError:
+        # a relation list moves between queries (user.followers, fetch__XDTUserDict.followers): find it by name
+        connection = _find(data, root.split('.')[-1]) if surface in RELATIONS else None
+        if connection is None:
+            raise
     if not isinstance(connection, dict) or not isinstance(connection.get('edges'), list):
         raise _changed('A list response has no explicit edges.')
     page = Page(stop={CAPPED: 'server_capped', SINGLE: 'not_paginable'}.get(policy, 'exhausted'))
@@ -78,7 +107,11 @@ def connection_page(data, surface):
             raise _changed('A following page cursor is not an offset.')
     if policy == CAPPED:
         counts = data.get('counts') if isinstance(data.get('counts'), dict) else {}
-        page.reported_total = counts.get('followers') if type(counts.get('followers')) is int else None
+        total = counts.get('followers')
+        if total is None:
+            total = _count(data, 'follower_count')
+        page.reported_total = total if type(total) is int else None
+        # Followers are read as the one sample Threads sends (decision T5), even when the reply offers a cursor.
     for edge in connection['edges']:
         node = edge.get('node') if isinstance(edge, dict) else None
         if not isinstance(node, dict):

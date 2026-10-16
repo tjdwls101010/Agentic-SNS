@@ -129,14 +129,53 @@ def profile(options):
                        window=_window(options, order))
 
 
-def _read(options, identity, state, out, *, order, fetch, command, target, extra=None):
+def graph(options):
+    target = parse_user(options['target'])
+    relation = options['relation']
+    identity = {'relation': relation}
+
+    def read(connection, state, out):
+        client = connection.client
+        saved = (state or {}) if out is None else (out.state or {})
+        user_id = saved.get('user_id') or client.profile_id(target.username)[0]
+        totals = {}
+
+        def fetch(cursor):
+            page = client.relation(relation, user_id, target.username, cursor)
+            if page.reported_total is not None:
+                totals['reported'] = page.reported_total
+            return page
+        reading = _read(options, identity, state, out, order=None, command='graph', target=target.url,
+                        extra={'user_id': user_id}, fetch=fetch, words=[relation], stops=True)
+        if 'reported' in totals:
+            reading['details'] = {'reported_total': totals['reported']}
+        return reading
+
+    return connect.run(options, command='graph', target=target.url, identity=identity, reader=read)
+
+
+def me(options):
+    collection = options['collection']
+    identity = {'collection': collection}
+
+    def read(connection, state, out):
+        return _read(options, identity, state, out, order=None, command='me', target=None, words=[collection],
+                     fetch=lambda cursor: connection.client.mine(collection), stops=True)
+
+    return connect.run(options, command='me', target=None, identity=identity, reader=read)
+
+
+def _read(options, identity, state, out, *, order, fetch, command, target, extra=None, words=None, stops=False):
     start = dict(out.state or {}) if out is not None else dict(state or {})
     window = Window(options.get('since'), options.get('until'), order, start.pop('window', None))
     for key in (extra or {}):
         start.pop(key, None)
 
+    natural = {}
+
     def fetch_page(cursor):
         page = fetch(cursor)
+        natural['stop'] = page.stop  # server_capped or not_paginable when the list itself says so
         return page.records, {'has_next_page': page.has_next, 'end_cursor': page.cursor}, bool(page.records)
 
     def commit(records, page_state, reason, skipped):
@@ -156,18 +195,21 @@ def _read(options, identity, state, out, *, order, fetch, command, target, extra
     result = paginate(fetch_page, limit=limit, state=start, keep=window.keep, closes=closes,
                       commit=commit if out is not None else None, whole_pages=out is not None,
                       max_pages=1 if one_page else None)
-    reading = {'results': [] if out is not None else result['results'], 'stop_reason': result['stop_reason'],
-               'failure': result['failure'], 'coverage': window.report(), 'words': _words(identity),
+    stop = result['stop_reason']
+    if stops and stop == 'exhausted' and natural.get('stop') in ('server_capped', 'not_paginable'):
+        stop = natural['stop']
+    reading = {'results': [] if out is not None else result['results'], 'stop_reason': stop,
+               'failure': result['failure'], 'coverage': window.report(), 'words': _words(identity, words),
                'partial': bool(result['results'])}
     if result['state'] is not None:
         reading['continuation'] = {'command': command, 'target': target, 'identity': identity,
-                                   'words': _words(identity),
+                                   'words': _words(identity, words),
                                    'state': {**result['state'], 'window': window.state(), **(extra or {})}}
     return reading
 
 
-def _words(identity):
-    words = []
+def _words(identity, positional=None):
+    words = list(positional or [])
     for key in ('feed', 'tab', 'sort'):
         if identity.get(key):
             words += ['--' + key, identity[key]]

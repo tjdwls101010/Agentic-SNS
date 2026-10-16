@@ -110,3 +110,19 @@ def test_about_refuses_a_card_about_someone_else(browser, data_dir):
     known_tab(browser, data_dir).respond('query', by_name()).respond('query', query_result({'data': {'user': OTHER}}))
     code, out, _ = run_cli(browser, 'about', '@example.author')
     assert code == 6
+
+
+def test_a_learned_reposts_query_must_return_this_profiles_reposts(browser, data_dir):
+    original = item('3000000000000000511', author=USER, taken_at=1760000000)
+    someone_elses_repost = item('3000000000000000512', author=OTHER, share_info={'reposted_post': original})
+    known_tab(browser, data_dir).respond('query', by_name()).respond('page', repost_screen())
+    browser.respond('query', query_result(tab_body([someone_elses_repost])))
+    code, out, _ = run_cli(browser, 'profile', '@example.author', '--tab', 'reposts', '--json')
+    assert code == 6 and Session('default').renamed('profile_reposts') is None
+
+
+def test_an_empty_answer_proves_nothing_about_a_learned_query(browser, data_dir):
+    known_tab(browser, data_dir).respond('query', by_name()).respond('page', repost_screen())
+    browser.respond('query', query_result(tab_body([])))
+    code, out, _ = run_cli(browser, 'profile', '@example.author', '--tab', 'reposts', '--json')
+    assert code == 7 and Session('default').renamed('profile_reposts') is None

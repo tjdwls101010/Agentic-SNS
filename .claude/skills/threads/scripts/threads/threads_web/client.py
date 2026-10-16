@@ -506,12 +506,16 @@ class Client:
         def parse():
             page = records.connection_page(payload['data'], 'profile_tab')
             # A query learned this command must show what this tab is: this profile's own posts, or its reposts.
-            if key in self.provisional and not all(
-                    any(r.get('reposted_post') for r in group) if tab == 'reposts'
-                    else any((r.get('author') or {}).get('id') == user_id for r in group) for group in page.groups):
-                self.provisional.pop(key)
-                raise ThreadsError(6, f'The query found for the {tab} tab did not return this profile\'s {tab}.',
-                                   'Tell the user the Threads reader needs an update.', reason='stale')
+            if key in self.provisional:
+                def fits(group):
+                    mine = any((r.get('author') or {}).get('id') == user_id for r in group)
+                    return mine and (tab != 'reposts' or any(r.get('reposted_post') for r in group))
+                if not all(fits(group) for group in page.groups):
+                    self.provisional.pop(key)
+                    raise ThreadsError(6, f'The query found for the {tab} tab did not return this profile\'s {tab}.',
+                                       'Tell the user the Threads reader needs an update.', reason='stale')
+                if not page.groups:
+                    self.provisional.pop(key)  # an empty answer proves nothing: used now, not remembered
             return page
         return self._read(key, parse)
 
@@ -521,6 +525,20 @@ class Client:
         data = payload.get('data') or {}
         user = data.get('user') or data.get('xdt_text_app_user') or fallback
         return self._read('profile_card', lambda: records.profile_card(user, username))
+
+    def relation(self, relation, user_id, username, cursor):
+        """One page of a profile's followers or following."""
+        if cursor is None:
+            key, variables, surface = relation, {'userID': user_id}, relation
+        else:
+            key, variables, surface = 'following_next', {'id': user_id, 'after': cursor}, 'following_more'
+        payload = self.query(key, variables, route={'username': username})
+        return self._read(key, lambda: records.connection_page(payload['data'], surface))
+
+    def mine(self, collection):
+        """The viewer's liked or saved posts (one batch)."""
+        payload = self.query(collection, {}, route={})
+        return self._read(collection, lambda: records.connection_page(payload['data'], collection))
 
     def search_posts(self, text, *, recent, tag, cursor):
         variables = {'query': text, 'recent': 1 if recent else 0, 'search_surface': 'tags' if tag else 'default'}

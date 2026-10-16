@@ -916,6 +916,20 @@
    },
    "learn_pattern": "ProfileMediaTab",
    "args": null
+  },
+  "following_next": {
+   "name": "BarcelonaFriendshipsFollowingTabRefetchableQuery",
+   "doc_id": null,
+   "endpoint": "/api/graphql/",
+   "root": null,
+   "providers": [],
+   "route": "/@{username}",
+   "variables": {
+    "id": null,
+    "first": 10,
+    "after": null
+   },
+   "args": null
   }
  }
 }
