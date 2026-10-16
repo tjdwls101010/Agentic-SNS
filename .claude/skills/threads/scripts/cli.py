@@ -153,9 +153,12 @@ COMMANDS = {
         'run': search.search,
         'arguments': [(('target',), {'metavar': 'TEXT', 'help': 'What to search for (a tag without #)'}),
                       (('--type',), {'choices': ['posts', 'tags', 'accounts'], 'default': 'posts', 'help': 'posts (by words), tags (posts under a tag) or accounts (one batch of profiles)'}),
-                      (('--sort',), {'choices': ['top', 'recent'], 'default': 'top', 'help': 'Posts and tags: top (Threads ranks them) or recent (newest first)'})] + list(LIST),
+                      (('--sort',), {'choices': ['top', 'recent'], 'default': 'top', 'help': 'Posts and tags: top (Threads ranks them) or recent (newest first)'}),
+                      'since', 'until',
+                      (('--from',), {'metavar': 'HANDLE', 'help': 'Posts and tags: only posts by this @handle'})] + list(LIST),
         'epilog': ['Results are in Threads\' order for this account: top is a ranking, not a sample of opinion; recent is newest first. Accounts with the same or similar names are different results (compare url and verified).',
-                   'Without --limit or --out it reads one page; more: continues (accounts are one batch).',
+                   '--since, --until and --from are filters Threads applies itself (posts and tags), so a filtered search read to the end (stopped=exhausted) covers its window in either order: window ... closed (server-filtered); stopped by --limit or the budget, it is still open.',
+                   'Without --limit, a date or --out it reads one page; more: continues (accounts are one batch).',
                    'requests: 1 per page of about 10 posts; accounts 1.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
@@ -250,6 +253,9 @@ def validate(options):
     if options['command'] == 'search':
         if not options['target'].strip():
             raise ThreadsError(2, 'Search text must not be empty.', 'Pass the words to search for.')
+        if options['type'] == 'accounts' and any(options.get(k) for k in ('since', 'until', 'from')):
+            raise ThreadsError(2, '--since, --until and --from filter posts and tags, not accounts.',
+                               'Drop them, or search posts.')
         if options['type'] == 'accounts' and options.get('sort') == 'recent':
             raise ThreadsError(2, '--sort applies to posts and tags; account search is one batch in Threads\' order.',
                                'Drop --sort.')

@@ -540,8 +540,9 @@ class Client:
         payload = self.query(collection, {}, route={})
         return self._read(collection, lambda: records.connection_page(payload['data'], collection))
 
-    def search_posts(self, text, *, recent, tag, cursor):
-        variables = {'query': text, 'recent': 1 if recent else 0, 'search_surface': 'tags' if tag else 'default'}
+    def search_posts(self, text, *, recent, tag, cursor, filters=None):
+        variables = {'query': text, 'recent': 1 if recent else 0, 'search_surface': 'tags' if tag else 'default',
+                     **({'power_search_info': filters} if filters else {})}
         route = {'query': quote(text)}
         key = 'search_posts' if cursor is None else 'search_posts_next'
         payload = self.query(key, variables if cursor is None else {**variables, 'after': cursor}, route=route)
