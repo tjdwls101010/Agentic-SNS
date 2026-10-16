@@ -10,5 +10,7 @@ try {
   user = current.NON_FACEBOOK_USER_ID === undefined || current.NON_FACEBOOK_USER_ID === null ? null : String(current.NON_FACEBOOK_USER_ID);
   appId = current.APP_ID === undefined ? null : String(current.APP_ID);
 } catch (_) { /* not a logged-in Threads page */ }
-const document_html = args.document ? document.documentElement.outerHTML.slice(0, 3000000) : null;
-return {user_id: user, app_id: appId, runtime, document: document_html, ...(await kit.report(0))};
+const html = document.documentElement ? document.documentElement.outerHTML : '';
+const document_html = args.document ? html.slice(0, 3000000) : null;
+// the block and login markers the current document carries, matched by the skill's own patterns
+return {user_id: user, app_id: appId, runtime, document: document_html, markers: kit.found(html), ...(await kit.report(0))};

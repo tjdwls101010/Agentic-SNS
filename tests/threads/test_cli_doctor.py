@@ -1,5 +1,6 @@
 """doctor through the real CLI and a scripted Aside: the dedicated tab, request counting, and account protection."""
 import json
+import os
 import subprocess
 import sys
 import time
@@ -75,7 +76,7 @@ def test_a_saved_block_stops_before_the_browser_is_touched(browser, data_dir):
 
 
 def test_a_checkpoint_body_the_tab_kept_blocks_and_empties_the_tab(browser, data_dir):
-    signal = {'url': 'https://www.threads.com/graphql/query', 'status': 200, 'body': CHECKPOINT_BODY, 'at': 1792148826874}
+    signal = {'url': 'https://www.threads.com/graphql/query', 'status': 200, 'summary': CHECKPOINT_BODY, 'at': 1792148826874}
     known_tab(browser, data_dir, signals=[signal])
     code, result, _ = doctor(browser)
     assert code == 5 and result['error'] == 'blocked' and 'checkpoint' in result['message']
@@ -86,7 +87,7 @@ def test_a_checkpoint_body_the_tab_kept_blocks_and_empties_the_tab(browser, data
 
 def test_an_ordinary_signal_is_acknowledged_without_a_block(browser, data_dir):
     signal = {'url': 'https://www.threads.com/graphql/query', 'status': 200, 'at': 55,
-              'body': '{"data":{"media":{"caption":{"text":"a challenge for you"}}}}'}
+              'summary': '{"errors": [{"message": "A field could not be resolved", "severity": "WARNING"}]}'}
     known_tab(browser, data_dir, signals=[signal]).respond('modules', MODULES)
     code, result, _ = doctor(browser)
     assert code == 0, result
@@ -195,3 +196,106 @@ def test_the_idle_blanker_leaves_a_tab_a_newer_command_uses(browser, data_dir):
     code, out, _ = run_cli(browser, 'idle', '--token', 'an-older-token', '--after', '0')
     assert code == 0 and json.loads(out)['outcome'] == 'newer command'
     assert 'blank' not in browser.ops()
+
+
+# --- review findings (shared contracts) ---
+
+RATE_BODY = json.dumps({'error': {'code': 4, 'message': 'Please wait a few minutes before you try again later.'}})
+LOGIN_BODY = json.dumps({'errors': [{'message': 'login_required'}]})
+
+
+def page_result(body, url=START, status=200, **extra):
+    return {'status': status, 'url': url, 'body': body, 'explicit': 1, 'resources': 1, 'statuses': [200],
+            'signals': [], 'location': START, **extra}
+
+
+def test_unblock_keeps_a_checkpoint_when_the_check_returns_a_rate_limit_body(browser, data_dir):
+    block_file(data_dir, CHECKPOINT)
+    known_tab(browser, data_dir).respond('page', page_result(RATE_BODY))
+    code, result, _ = doctor(browser, '--unblock')
+    assert code == 5 and block_file(data_dir)['reason'] == 'checkpoint'
+
+
+def test_unblock_keeps_the_block_when_the_check_proves_nothing(browser, data_dir):
+    block_file(data_dir, CHECKPOINT)
+    known_tab(browser, data_dir).respond('page', page_result(''))
+    code, result, _ = doctor(browser, '--unblock')
+    assert code != 0 and block_file(data_dir)['reason'] == 'checkpoint'
+
+
+def test_the_strongest_signal_wins_and_is_recorded_before_acknowledging(browser, data_dir):
+    signals = [{'url': 'https://www.threads.com/graphql/query', 'status': 200, 'summary': LOGIN_BODY, 'at': 10},
+               {'url': 'https://www.threads.com/graphql/query', 'status': 200, 'summary': RATE_BODY, 'at': 11}]
+    known_tab(browser, data_dir, signals=signals)
+    code, result, _ = doctor(browser)
+    assert code == 5 and block_file(data_dir)['reason'] == 'rate_limit'
+    assert 'blank' in browser.ops()
+    assert json.loads((data_dir / 'session/default.json').read_text())['ack'] == 11
+
+
+def test_a_429_seen_while_the_tab_was_still_loading_is_recorded(browser, data_dir):
+    browser.respond('open', {'tab': {'id': 'NEW1', 'url': START}})
+    browser.respond('state', state(resources=25, statuses=[200, 429], runtime=False, user_id=None))
+    browser.respond('state', state(resources=8, document=LOGGED_IN_DOCUMENT))
+    code, result, _ = doctor(browser)
+    assert code == 5 and block_file(data_dir)['reason'] == 'rate_limit'
+    assert result['tab_opened_requests'] == 40  # 34 seen over two looks, within the reservation
+
+
+def test_a_429_in_any_report_is_recorded(browser, data_dir):
+    known_tab(browser, data_dir).respond('modules', {**MODULES, 'resources': 1, 'statuses': [429]})
+    code, result, _ = doctor(browser)
+    assert code == 5 and block_file(data_dir)['reason'] == 'rate_limit'
+
+
+def test_a_reused_tab_showing_a_checkpoint_form_is_a_checkpoint(browser, data_dir):
+    known_tab(browser, data_dir, markers=['<form method="post" action="/challenge/'])
+    code, result, _ = doctor(browser)
+    assert code == 5 and block_file(data_dir)['reason'] == 'checkpoint'
+
+
+def test_the_idle_blanker_empties_the_tab_even_while_a_block_stands(browser, data_dir):
+    known_tab(browser, data_dir).respond('modules', MODULES)
+    code, _, _ = doctor(browser)
+    block_file(data_dir, CHECKPOINT)
+    token = json.loads((data_dir / 'session/default.json').read_text())['token']
+    browser.respond('blank', {'blanked': True, 'resources': 0, 'statuses': [], 'signals': [], 'location': START})
+    code, out, _ = run_cli(browser, 'idle', '--token', token, '--after', '0')
+    assert json.loads(out)['outcome'] == 'blanked' and 'blank' in browser.ops()
+
+
+def test_the_idle_blanker_waits_while_another_command_is_still_running(browser, data_dir):
+    known_tab(browser, data_dir).respond('modules', MODULES)
+    code, _, _ = doctor(browser)
+    session = json.loads((data_dir / 'session/default.json').read_text())
+    session['active'] = {'a-long-command': os.getpid()}  # this test process stands for a command still running
+    (data_dir / 'session/default.json').write_text(json.dumps(session))
+    code, out, _ = run_cli(browser, 'idle', '--token', session['token'], '--after', '0')
+    assert json.loads(out)['outcome'] == 'busy' and 'blank' not in browser.ops()
+
+
+def test_a_blank_that_fails_once_is_retried_and_confirmed(browser, data_dir):
+    signal = {'url': 'https://www.threads.com/graphql/query', 'status': 200, 'summary': RATE_BODY, 'at': 5}
+    known_tab(browser, data_dir, signals=[signal])
+    browser.respond('blank', {'__raw_stdout': '{"kind": "error", "error": "evaluate_failed", "message": "x"}\n'})
+    browser.respond('blank', {'blanked': True, 'resources': 0, 'statuses': [], 'signals': [], 'location': START})
+    code, result, _ = doctor(browser)
+    assert code == 5 and browser.ops().count('blank') == 2
+
+
+def test_unblock_and_a_starting_command_take_the_locks_in_one_order(browser, data_dir):
+    block_file(data_dir, CHECKPOINT)
+    known_tab(browser, data_dir).respond('page', page_result(LOGGED_IN_DOCUMENT)).respond('modules', MODULES)
+    browser.write()
+    holder = subprocess.Popen([sys.executable, '-c', (
+        'import time\nfrom threads.session import Session\nfrom threads import guard\ns = Session("default")\n'
+        'with s.opening():\n    print("in", flush=True)\n    time.sleep(1.5)\n'
+        '    try:\n        with guard.Guard(1).observe():\n            pass\n    except Exception:\n        pass\n'
+        'print("done", flush=True)\n')], env={**environment(browser), 'PYTHONPATH': str(CLI.parent)},
+        stdout=subprocess.PIPE, text=True)
+    assert holder.stdout.readline().strip() == 'in'
+    unblock = subprocess.Popen([sys.executable, str(CLI), 'doctor', '--unblock'], env=environment(browser),
+                               stdout=subprocess.PIPE, text=True)
+    out, _ = unblock.communicate(timeout=30)  # a deadlock would time out here
+    assert holder.communicate(timeout=30)[0].strip() == 'done'
+    assert json.loads(out)['ok'] is True and block_file(data_dir) is None

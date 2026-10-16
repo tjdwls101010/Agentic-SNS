@@ -45,9 +45,11 @@ class Connection:
                 'session_reset': self.client.session_reset}
 
     def release(self):
-        """Leave the idle blanker behind: it empties the tab after IDLE_SECONDS unless a newer command used it."""
+        """Give the tab back, and leave the idle blanker behind: it empties the tab after IDLE_SECONDS unless another
+        command is still using it or was released after this one."""
         if not self.client.token or not self.client.tab:
             return
+        self.memory.release(self.client.token)
         seconds = os.environ.get('THREADS_IDLE_SECONDS')
         if seconds == 'off':
             return  # a person who wants the tab left open
@@ -68,7 +70,9 @@ def idle(token, after):
     client = Client(browser, protection.Guard(1), memory)
     with memory.opening():
         memory.reload()
-        if memory.token != token or not memory.tab:
+        if memory.active:
+            return 'busy'  # a command still running uses the tab; its own release starts another blanker
+        if memory.released != token or not memory.tab:
             return 'newer command'
         client.tab = memory.tab
         try:

@@ -20,12 +20,15 @@ LOGIN_FIX = 'Log in to Threads in the Aside browser, then run doctor.'
 CHANGED_FIX = 'Threads changed this response; the skill needs an update. Tell the user which read failed.'
 REJECTED_FIX = 'Retry the command once (it learns the current query); if it fails again, the skill needs an update.'
 RETRY_FIX = 'Retry later; run doctor if it keeps failing.'
-# Unescaped JSON keys or a form action: a key inside post text is escaped (\") and does not match.
-_CHECKPOINT_MARKERS = re.compile(
-    r'<form\b[^>]*action=["\'][^"\']*/(?:challenge|checkpoint)(?:[/"\'?])'
-    r'|(?<!\\)"(?:checkpoint_required|challenge_required)"\s*:\s*true'
-    r'|(?<!\\)"checkpoint_url"\s*:\s*"[^"\s]+"', re.I)
-_LOGIN_FORM = re.compile(r'<form\b[^>]*action=["\'][^"\']*/accounts/login', re.I)
+# The markers a document or a body carries for a block or a login: unescaped JSON keys or a form action (a key inside
+# post text is escaped (\") and does not match). The tab runs the same patterns (case-insensitive) to keep what it saw.
+CHECKPOINT_PATTERNS = [r'<form\b[^>]*action=["\'][^"\']*/(?:challenge|checkpoint)(?:[/"\'?])',
+                       r'(?<!\\)"(?:checkpoint_required|challenge_required)"\s*:\s*true',
+                       r'(?<!\\)"checkpoint_url"\s*:\s*"[^"\s]+"']
+LOGIN_PATTERNS = [r'<form\b[^>]*action=["\'][^"\']*/accounts/login']
+SIGNAL_MARKERS = CHECKPOINT_PATTERNS + LOGIN_PATTERNS
+_CHECKPOINT_MARKERS = re.compile('|'.join(CHECKPOINT_PATTERNS), re.I)
+_LOGIN_FORM = re.compile('|'.join(LOGIN_PATTERNS), re.I)
 
 
 @dataclass
@@ -104,7 +107,7 @@ def response(envelope, *, mode):
     """The verdict on one response {status, url, body, location?}; mode is graphql (a query) or page (a document)."""
     status, body = envelope.get('status'), envelope.get('body') or ''
     path = urlsplit(envelope.get('location') or envelope.get('url') or '').path.lower()
-    payload = _decode(body) if mode == 'graphql' else None
+    payload = _decode(body) if mode == 'graphql' or body.lstrip()[:1] in ('{', '[') else None
     message, codes = _signals(payload)
     if (re.match(r'^/(challenge|checkpoint)(/|$)', path) or codes & CHECKPOINT_CODES or _CHECKPOINT_MARKERS.search(body)
             or any(word in message for word in ('checkpoint', 'challenge', 'consent_required'))):
@@ -133,6 +136,15 @@ def response(envelope, *, mode):
             return _failed('rejected_query', 'Threads no longer runs this query as sent.', REJECTED_FIX)
         return _failed('shape_changed', 'The query did not return its expected data.', CHANGED_FIX)
     return Verdict('ok', payload=payload)
+
+
+def signal(kept):
+    """The verdict on one response the tab kept: its error-field summary (JSON), its marker excerpt (a document), or
+    only its status and address."""
+    status, url = kept.get('status'), kept.get('url') or ''
+    if kept.get('summary'):
+        return response({'status': status, 'url': url, 'body': kept['summary']}, mode='graphql')
+    return response({'status': status, 'url': url, 'body': kept.get('excerpt') or ''}, mode='page')
 
 
 def _field(html, name):

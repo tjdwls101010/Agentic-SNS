@@ -21,13 +21,14 @@ class Session:
     def __init__(self, account_key):
         self.account_key = account_key
         self.reset = False
+        self._depth = 0  # opening() is re-entrant within one process: the lock order is always session, then guard
         self._data = self._load()
 
     def _path(self):
         return state_dir('session') / f'{self.account_key}.json'
 
     def _load(self):
-        empty = {'tab': None, 'token': None, 'ack': 0, 'renames': {}, 'queries': {}}
+        empty = {'tab': None, 'token': None, 'ack': 0, 'renames': {}, 'active': {}, 'released': None, 'queries': {}}
         try:
             data = json.loads(self._path().read_text())
         except FileNotFoundError:
@@ -44,6 +45,8 @@ class Session:
                 'token': data.get('token') if isinstance(data.get('token'), str) else None,
                 'ack': data.get('ack') if type(data.get('ack')) in (int, float) else 0,
                 'renames': data.get('renames') if isinstance(data.get('renames'), dict) else {},
+                'active': data.get('active') if isinstance(data.get('active'), dict) else {},
+                'released': data.get('released') if isinstance(data.get('released'), str) else None,
                 'queries': data.get('queries', {})}
 
     def reload(self):
@@ -68,6 +71,13 @@ class Session:
     def opening(self):
         """The per-account lock under which the dedicated tab is found, re-checked, opened and recorded, and under
         which an idle tab is blanked."""
+        if self._depth:
+            self._depth += 1
+            try:
+                yield
+            finally:
+                self._depth -= 1
+            return
         try:
             lock = open(state_dir('session') / f'{self.account_key}.lock', 'a')
         except OSError:
@@ -75,8 +85,10 @@ class Session:
             return
         try:
             fcntl.flock(lock, fcntl.LOCK_EX)
+            self._depth = 1
             yield
         finally:
+            self._depth = 0
             fcntl.flock(lock, fcntl.LOCK_UN)
             lock.close()
 
@@ -93,11 +105,41 @@ class Session:
         self._save()
 
     def touch(self):
-        """Mark a new use of the tab; returns its token. An idle blanker only blanks if the token is still its own."""
+        """Mark a new use of the tab by this process; returns its token. While a command holds a token it is active,
+        and no idle blanker empties the tab."""
         token = f'{time.time():.3f}-{secrets.token_hex(4)}'
-        self._data = {**self._load(), 'token': token}
+        current = self._load()
+        current['active'] = {**self._alive(current['active']), token: os.getpid()}
+        self._data = {**current, 'token': token}
         self._save()
         return token
+
+    def release(self, token):
+        """The command that holds `token` is done with the tab: it is no longer active and is the last one released."""
+        current = self._load()
+        current['active'] = {k: v for k, v in self._alive(current['active']).items() if k != token}
+        self._data = {**current, 'released': token}
+        self._save()
+
+    @staticmethod
+    def _alive(active):
+        alive = {}
+        for token, pid in active.items():
+            try:
+                os.kill(int(pid), 0)
+                alive[token] = pid
+            except (OSError, ValueError, TypeError):
+                pass  # a command that died without releasing does not hold the tab
+        return alive
+
+    @property
+    def active(self):
+        """Tokens of commands still running that use the tab."""
+        return self._alive(self._data['active'])
+
+    @property
+    def released(self):
+        return self._data['released']
 
     @property
     def ack(self):

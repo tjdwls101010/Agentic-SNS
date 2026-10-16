@@ -127,6 +127,8 @@ def successor(lost, catalog, claimed):
     """The one query in `catalog` that fits lost {args, root} and no claimed name does; None when not exactly one.
 
     Fits: a query (never a mutation), named …Query, same root field, and its argument names are the lost query's."""
+    if not lost.get('root') or not lost.get('args'):
+        return None  # without a root field and argument names to match, no candidate is certain
     fits = [name for name, entry in catalog.items()
             if name not in claimed and re.fullmatch(r'[A-Za-z0-9_]+Query', name) and 'Mutation' not in name
             and entry.get('kind') == 'query' and entry.get('doc_id') and entry.get('root') == lost.get('root')

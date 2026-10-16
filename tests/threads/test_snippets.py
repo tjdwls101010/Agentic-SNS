@@ -139,8 +139,8 @@ def test_an_app_response_with_a_checkpoint_body_is_kept_and_stops_the_next_query
                          {'snippet': 'query', 'args': query_args(), 'app': app}], page())
     assert out['fetches'] == []
     [signal] = out['results'][1]['signals']
-    assert signal['status'] == 200 and 'checkpoint_required' in signal['body']
-    assert json.loads(out['storage']['threadsSkillSignals'])[0]['body'] == signal['body']
+    assert signal['status'] == 200 and 'checkpoint_required' in signal['summary']
+    assert json.loads(out['storage']['threadsSkillSignals'])[0]['summary'] == signal['summary']
 
 
 def test_ordinary_app_responses_are_not_kept(tmp_path):
@@ -200,3 +200,73 @@ def test_blank_empties_the_tab_after_reporting(tmp_path):
 def test_navigate_goes_only_to_a_start_screen(tmp_path):
     out = run(tmp_path, [{'snippet': 'navigate', 'args': {'url': 'https://evil.example/'}}], page())
     assert out['results'][0]['refused']
+
+
+# --- review findings (shared contracts): what the tab keeps must stay classifiable, and nothing is sent from a page
+# --- that shows a block; the harness models the browser's single fetch (window.fetch is fetch) ---
+
+MARKERS = threads_web.SIGNAL_MARKERS
+
+
+def test_a_long_json_error_body_is_kept_as_a_classifiable_summary(tmp_path):
+    body = json.dumps({'error': {'code': 4, 'message': 'Please wait'}, 'padding': 'x' * 6000})
+    app = [{'url': 'https://www.threads.com/graphql/query', 'status': 200, 'body': body}]
+    out = run(tmp_path, [{'snippet': 'state', 'args': {'__markers': MARKERS}},
+                         {'snippet': 'state', 'args': {'__markers': MARKERS}, 'app': app}], page())
+    [signal] = out['results'][1]['signals']
+    assert threads_web.classify_signal(signal).block == 'rate_limit'
+
+
+def test_post_text_with_alarming_words_is_not_kept(tmp_path):
+    body = json.dumps({'data': {'media': {'caption': {'text': 'checkpoint challenge rate limit login_required csrf'}}}})
+    app = [{'url': 'https://www.threads.com/graphql/query', 'status': 200, 'body': body}]
+    out = run(tmp_path, [{'snippet': 'state', 'args': {'__markers': MARKERS}},
+                         {'snippet': 'state', 'args': {'__markers': MARKERS}, 'app': app}], page())
+    assert out['results'][1]['signals'] == []
+
+
+def test_a_document_with_a_checkpoint_form_is_kept_by_its_marker(tmp_path):
+    body = '<html>' + 'x' * 30000 + '<form method="post" action="/challenge/action/"></form></html>'
+    app = [{'url': 'https://www.threads.com/', 'status': 200, 'body': body}]
+    out = run(tmp_path, [{'snippet': 'state', 'args': {'__markers': MARKERS}},
+                         {'snippet': 'state', 'args': {'__markers': MARKERS}, 'app': app}], page())
+    [signal] = out['results'][1]['signals']
+    assert threads_web.classify_signal(signal).block == 'checkpoint'
+
+
+def test_state_reports_block_markers_in_the_current_document(tmp_path):
+    out = run(tmp_path, [{'snippet': 'state', 'args': {'__markers': MARKERS}}],
+              page(html='<html><form action="/challenge/x/"></form></html>'))
+    assert out['results'][0]['markers'] == ['<form action="/challenge/']
+
+
+@pytest.mark.parametrize('location', ['https://www.threads.com/challenge/', 'https://www.threads.com/accounts/login/'])
+def test_nothing_is_sent_from_a_page_that_shows_a_block_or_a_login(tmp_path, location):
+    out = run(tmp_path, [{'snippet': 'query', 'args': query_args()}, {'snippet': 'page', 'args': {'path': '/'}}],
+              page(location=location))
+    assert out['fetches'] == []
+    assert [r['stopped'] for r in out['results']] == ['location', 'location']
+
+
+def test_requests_finished_while_waiting_are_charged_to_the_call(tmp_path):
+    waiting = [{'url': 'https://www.threads.com/ajax/bz', 'status': 200}] * 5
+    out = run(tmp_path, [{'snippet': 'state', 'args': {}},
+                         {'snippet': 'query', 'args': query_args(), 'before': waiting,
+                          'during': [{'url': 'https://www.threads.com/api/graphql/', 'status': 200}]}],
+              page(fetch=[{'status': 200, 'body': '{}'}]))
+    assert out['results'][1]['resources'] == 6 and out['results'][1]['explicit'] == 1
+
+
+def test_blank_actually_empties_the_tab(tmp_path):
+    out = run(tmp_path, [{'snippet': 'blank', 'args': {}}], page())
+    assert out['locations'][-1] == 'about:blank'
+
+
+def test_our_own_suspect_response_is_seen_through_the_hooked_fetch(tmp_path):
+    body = json.dumps({'errors': [{'code': 368, 'message': 'checkpoint'}]})
+    out = run(tmp_path, [{'snippet': 'state', 'args': {'__markers': MARKERS}},
+                         {'snippet': 'query', 'args': query_args(__markers=MARKERS)},
+                         {'snippet': 'state', 'args': {'__markers': MARKERS}}],
+              page(fetch=[{'status': 200, 'url': 'https://www.threads.com/api/graphql/', 'body': body}]))
+    assert len(out['fetches']) == 1
+    assert out['results'][2]['signals'] and out['results'][2]['signals'][0]['status'] == 200

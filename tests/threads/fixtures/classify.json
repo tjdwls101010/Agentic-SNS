@@ -97,6 +97,9 @@
     {"name": "not-json", "item": "5", "fact": "A body that is neither JSON nor an app shell is an incomplete response.",
      "mode": "graphql", "envelope": {"status": 200, "url": "https://www.threads.com/graphql/query", "body": "{\"data\": {\"user\""},
      "outcome": {"outcome": "failed", "kind": "non_json"}},
+    {"name": "rate-limit-json-on-a-document-read", "item": "2", "fact": "A document read answered with a JSON error body is classified by its error fields too: the account signal does not depend on what was requested.",
+     "mode": "page", "envelope": {"status": 200, "url": "https://www.threads.com/search", "json": {"error": {"code": 4, "message": "rate limit"}}},
+     "outcome": {"outcome": "blocked", "reason": "rate_limit"}},
     {"name": "page-ok", "item": "4", "fact": "A 200 route document with no block or login signal is a document to read.",
      "mode": "page", "envelope": {"status": 200, "url": "https://www.threads.com/@example.user", "body": "<html>profile</html>"},
      "outcome": {"outcome": "ok"}}

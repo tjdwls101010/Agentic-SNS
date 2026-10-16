@@ -67,6 +67,7 @@ class Client:
         self.token = None
         self.prepaid = {'setup': 0, 'budget': 0}
         self.recovery = {'learn': 0, 'reload': 0}
+        self.provisional = {}  # key → (name, doc_id, flags) found this command; saved only once a read validates it
 
     # --- the tab ---------------------------------------------------------------------------------------------
 
@@ -83,7 +84,8 @@ class Client:
                     state = self._state()
                     self.unwatched = _int(state.get('resources'))
                     self.guard.log_unwatched(self.unwatched)  # made between commands: logged, not charged
-                    self._check(state, slot)
+                    self._consume(state, slot)
+                    self._check(state)
             elif entry and not _host(entry['url']):
                 self.tab = known
                 self._load(navigate=True)  # the tab this skill emptied earlier: send it back to Threads
@@ -92,8 +94,11 @@ class Client:
             self.token = self.memory.touch()
         return self.account_id
 
+    def _args(self, args):
+        return {**args, '__ack': self.memory.ack, '__markers': classify.SIGNAL_MARKERS}
+
     def _state(self, document=False):
-        state = self.browser.evaluate(self.tab, SNIPPETS['state'], {'document': document, '__ack': self.memory.ack})
+        state = self.browser.evaluate(self.tab, SNIPPETS['state'], self._args({'document': document}))
         if not isinstance(state, dict) or not isinstance(state.get('location'), str):
             raise ThreadsError(3, 'The Threads tab answered invalidly.', 'Run doctor.')
         return state
@@ -115,14 +120,14 @@ class Client:
         """Load Threads in the known tab again (it was emptied, or its app was refused): counted like opening."""
         with self.guard.request(reserve=OPEN_RESERVE, budgeted=False, kind='tab_open') as slot:
             if navigate:
-                self.browser.evaluate(self.tab, SNIPPETS['navigate'], {'url': START})
+                self.browser.evaluate(self.tab, SNIPPETS['navigate'], self._args({'url': START}))
             self.opened_now = self.reopened = True
             self._settle_load(slot)
 
     def _settle_load(self, slot):
         """Wait for the loaded app, then check the new page before any query: where it is, what loading it answered
         (a 429), and the document's own checkpoint and login markers."""
-        deadline = time.monotonic() + LOAD_WAIT
+        deadline, seen = time.monotonic() + LOAD_WAIT, 1
         while True:
             try:
                 state = self._state(document=True)
@@ -132,13 +137,12 @@ class Client:
                     raise
                 time.sleep(1)
                 continue
+            seen += _int(state.get('resources'))  # every look's requests count, and every look is checked
+            slot.charge(seen)
+            self._consume(state, slot)
             if state.get('runtime') and state.get('user_id') or time.monotonic() > deadline:
                 break
-            if urlsplit(state['location']).path.startswith(('/challenge', '/checkpoint', '/accounts/login', '/login')):
-                break
             time.sleep(1)
-        seen = 1 + _int(state.get('resources'))
-        slot.charge(seen)
         self.prepaid['setup'] = max(0, slot.reserved - seen)
         if state.get('document'):
             verdict = classify.document(state['document'])
@@ -146,21 +150,11 @@ class Client:
                 self._stop(slot, verdict)
             if verdict.kind == 'login':
                 raise verdict.error
-        self._check(state, slot)
+        self._check(state)
 
-    def _check(self, state, slot):
-        """Raise for what the tab shows: a block among its signals, its requests or its location (recorded in `slot`
-        and the tab emptied first), a logout, a broken page, or another account."""
-        self._signals(state, slot)
-        if 429 in (state.get('statuses') or []):
-            self._stop(slot, classify.response({'status': 429, 'url': state['location'], 'body': ''}, mode='graphql'))
-        path = urlsplit(state['location']).path.lower()
-        located = classify.response({'status': 200, 'url': state['location'], 'body': ''}, mode='page')
-        if located.block:
-            self._stop(slot, located)
-        if located.kind == 'login' or path.startswith(('/accounts/login', '/login')):
-            raise classify.response({'status': 200, 'url': 'https://www.threads.com/accounts/login/', 'body': ''},
-                                    mode='page').error
+    def _check(self, state):
+        """Raise for a page that is not a working, logged-in Threads page of this command's account (blocks and
+        login pages were already handled by _consume)."""
         if not state.get('runtime') or _host(state['location']) != 'www.threads.com':
             raise ThreadsError(3, 'The Threads tab is not a working Threads page.', 'Run doctor; close the tab if it '
                                                                                    'keeps failing.')
@@ -173,46 +167,78 @@ class Client:
                                reason='account_changed')
         self.account_id = state['user_id']
 
-    def _signals(self, result, slot):
-        """Classify the app responses the tab kept; a block is recorded and the tab emptied before anything else, and
-        the signals are acknowledged only after that, so the tab drops them only once protection holds them."""
-        signals = [s for s in result.get('signals') or [] if isinstance(s, dict)]
-        worst = None
-        for signal in signals:
-            mode = 'graphql' if '/graphql' in str(signal.get('url')) or '/api/' in str(signal.get('url')) else 'page'
-            verdict = classify.response({'status': signal.get('status'), 'url': signal.get('url') or '',
-                                         'body': signal.get('body') or ''}, mode=mode)
-            if verdict.block == 'checkpoint' or (verdict.block and worst is None) or (
-                    verdict.kind == 'login' and worst is None):
-                worst = verdict
-        if worst is not None and worst.block:
-            self._stop(slot, worst, acknowledge=signals)
-        if signals:
-            self.memory.acknowledge(max(s.get('at', 0) for s in signals if type(s.get('at')) in (int, float)))
-        if worst is not None and worst.kind == 'login':
-            raise worst.error
+    def _consume(self, report, slot):
+        """Judge everything one browser call reported, strongest first: a checkpoint, then a rate limit, then a login
+        page. A block is recorded and the tab emptied before the signals are acknowledged, so the tab drops them only
+        once protection holds them; then the block or login is raised."""
+        if not isinstance(report, dict):
+            return
+        verdicts = []
+        if 429 in (report.get('statuses') or []):
+            verdicts.append(classify.response({'status': 429, 'url': '', 'body': ''}, mode='graphql'))
+        signals = [s for s in report.get('signals') or [] if isinstance(s, dict)]
+        verdicts += [classify.signal(s) for s in signals]
+        if isinstance(report.get('location'), str) and report['location'].startswith('http'):
+            verdicts.append(classify.response({'status': 200, 'url': report['location'], 'body': ''}, mode='page'))
+        if report.get('markers'):
+            verdicts.append(classify.response({'status': 200, 'url': START, 'body': '\n'.join(map(str, report['markers']))},
+                                              mode='page'))
+        rank = {'checkpoint': 3, 'rate_limit': 2}
+        strongest = max((v for v in verdicts if v.block or v.kind == 'login'),
+                        key=lambda v: rank.get(v.block, 1), default=None)
+        moments = [s['at'] for s in signals if type(s.get('at')) in (int, float)]
+        if strongest is not None and strongest.block:
+            self._stop(slot, strongest, moments)
+        if moments:
+            self.memory.acknowledge(max(moments))
+        if strongest is not None:
+            raise strongest.error
 
-    def _stop(self, slot, verdict, acknowledge=()):
-        """Record a block, empty the tab so the app stops polling, then raise."""
-        slot.block(verdict.block)
-        if acknowledge:
-            self.memory.acknowledge(max(s.get('at', 0) for s in acknowledge if type(s.get('at')) in (int, float)))
+    def _stop(self, slot, verdict, moments=()):
+        """Record a block, empty the tab so the app stops polling (even if the block could not be saved), acknowledge
+        the signals it came from, then raise."""
         try:
-            self.browser.evaluate(self.tab, SNIPPETS['blank'], {'__ack': self.memory.ack})
-        except ThreadsError:
-            pass  # a tab that is already gone polls nothing
+            slot.block(verdict.block)
+        finally:
+            self._empty()
+        if moments:
+            self.memory.acknowledge(max(moments))
         raise verdict.error
 
+    def _empty(self):
+        """Navigate the tab to about:blank and confirm it there; a failed attempt is retried once. Makes no request."""
+        for attempt in range(2):
+            try:
+                self.browser.evaluate(self.tab, SNIPPETS['blank'], self._args({}))
+            except ThreadsError as error:
+                if error.reason == 'tab_missing':
+                    return True  # a tab that is gone polls nothing
+                continue
+            for _ in range(10):
+                tab = next((t for t in self.browser.tabs() if t['target_id'] == self.tab), None)
+                if tab is None or not _host(tab['url']):
+                    return True
+                time.sleep(0.3)
+        return False
+
     def blank(self):
-        """Empty the dedicated tab (about:blank, no request) after taking in what it saw."""
+        """Empty the dedicated tab after taking in what it saw; allowed while a block stands (it sends nothing)."""
         if not self.tab:
             return False
-        with self.guard.observe() as slot:
-            report = self.browser.evaluate(self.tab, SNIPPETS['blank'], {'__ack': self.memory.ack})
+        with self.guard.quiet() as slot:
+            try:
+                report = self.browser.evaluate(self.tab, SNIPPETS['blank'], self._args({}))
+            except ThreadsError as error:
+                if error.reason == 'tab_missing':
+                    return True
+                return self._empty()
             if isinstance(report, dict):
                 self.guard.log_unwatched(_int(report.get('resources')))
-                self._signals(report, slot)
-        return True
+                try:
+                    self._consume(report, slot)
+                except ThreadsError:
+                    pass  # recorded; the tab is being emptied anyway
+            return self._empty()
 
     # --- requests --------------------------------------------------------------------------------------------
 
@@ -223,7 +249,7 @@ class Client:
             try:
                 with self.guard.request(budgeted=budgeted, kind=kind) as slot:
                     try:
-                        result = self.browser.evaluate(self.tab, SNIPPETS[name], {**args, '__ack': self.memory.ack})
+                        result = self.browser.evaluate(self.tab, SNIPPETS[name], self._args(args))
                     except ThreadsError as error:
                         if error.reason == 'tab_missing':
                             slot.cancel()  # the program never reached a page, so nothing went to Threads
@@ -237,9 +263,9 @@ class Client:
                     if self.verbose:
                         diagnostic('request', label=label, count=self.guard.count, status=result.get('status'),
                                    source=(result.get('used') or {}).get('source'))
-                    self._signals(result, slot)
-                    if 429 in (result.get('statuses') or []):
-                        self._stop(slot, classify.response({'status': 429, 'url': '', 'body': ''}, mode='graphql'))
+                    self._consume(result, slot)
+                    if result.get('stopped') and not attempt:
+                        continue  # what stopped it was benign and is acknowledged now: send it once more
                     if result.get('refused'):
                         raise ThreadsError(2, 'The browser refused a request this skill must not make: '
                                               + str(result['refused']) + '.', 'Report this as a skill bug.')
@@ -253,9 +279,11 @@ class Client:
             except ThreadsError as error:
                 if error.reason != 'tab_missing' or attempt:
                     raise
+                continue
             with self.memory.opening():
                 self._open()
-        raise AssertionError('unreachable')
+        raise ThreadsError(6, 'The tab kept holding signals this skill could not clear, so nothing was sent.',
+                           'Run doctor; close the tab if it keeps happening.', reason='stuck')
 
     def _charge(self, slot, result):
         """Charge what the call sent and what the tab finished meanwhile; late requests use up a reservation first."""
@@ -269,14 +297,25 @@ class Client:
 
     def _allowed(self):
         names = {spec['name'] for spec in QUERIES.values() if spec['name']}
-        return sorted(names | {self.memory.renamed(key) for key in QUERIES if self.memory.renamed(key)})
+        names |= {self.memory.renamed(key) for key in QUERIES if self.memory.renamed(key)}
+        return sorted(names | {name for name, _, _ in self.provisional.values()})
 
     def _spec(self, key):
         spec = dict(QUERIES[key])
+        if key in self.provisional:
+            spec['name'], spec['doc_id'], spec['flags'] = self.provisional[key]
+            return spec
         renamed = self.memory.renamed(key)
         if renamed:
             spec['name'], spec['doc_id'] = renamed, None
         return spec
+
+    def _confirm(self, key):
+        """A read under a name found this command came back and was read into records: remember the name."""
+        if key in self.provisional:
+            name, doc_id, flags = self.provisional.pop(key)
+            self.memory.rename(key, name)
+            self.memory.learn(name, doc_id, flags)
 
     def query(self, key, variables, *, route=None):
         """The decoded payload of one read query; a refused one is learned again once (see the module docstring)."""
@@ -287,6 +326,8 @@ class Client:
                 spec = self._spec(key)
                 continue
             learned = self.memory.query(spec['name']) or {}
+            if key in self.provisional:
+                learned = {'doc_id': spec['doc_id'], 'flags': spec.get('flags')}
             args = {'name': spec['name'], 'allowed': self._allowed(), 'asbd_id': SNAPSHOT['asbd_id'],
                     'variables': {**spec['variables'], **variables}, 'endpoint': spec.get('endpoint'),
                     'root': spec.get('root'),
@@ -343,8 +384,8 @@ class Client:
             if len(names) != 1:
                 raise ThreadsError(6, f'The {path} screen does not name one query for this read.',
                                    'Tell the user the Threads reader needs an update.', reason='stale')
-            self.memory.rename(key, names[0])
-            self.memory.learn(names[0], found[names[0]]['doc_id'], learn.provider_values(found[names[0]]['variables']))
+            self.provisional[key] = (names[0], found[names[0]]['doc_id'],
+                                     learn.provider_values(found[names[0]]['variables']))
             return
         if spec['name'] in found:
             self.memory.learn(spec['name'], found[spec['name']]['doc_id'],
@@ -359,9 +400,9 @@ class Client:
         if entry is None and spec.get('args') is not None:
             new = learn.successor({'args': spec['args'], 'root': spec.get('root')}, catalog, set(self._allowed()))
             if new:
-                self.memory.rename(key, new)
                 wanted = {learn.provider_variable(m) for m in catalog[new].get('providers') or []}
-                self.memory.learn(new, catalog[new]['doc_id'], {k: v for k, v in flags.items() if k in wanted} or None)
+                self.provisional[key] = (new, catalog[new]['doc_id'],
+                                         {k: v for k, v in flags.items() if k in wanted} or None)
                 return
         raise ThreadsError(6, f'Threads no longer serves {spec["name"]} and no single successor was found.',
                            'Tell the user the Threads reader needs an update.', reason='stale')
@@ -387,23 +428,28 @@ class Client:
     def live_queries(self):
         """Which read queries the tab has loaded right now (doctor); makes no request."""
         with self.guard.observe() as slot:
-            result = self.browser.evaluate(self.tab, SNIPPETS['modules'], {'names': self._allowed(),
-                                                                           '__ack': self.memory.ack})
-            if isinstance(result, dict):
-                self._signals(result, slot)
+            result = self.browser.evaluate(self.tab, SNIPPETS['modules'], self._args({'names': self._allowed()}))
+            self._consume(result, slot)
         return (result or {}).get('live') or {}
 
     # --- reads, in the skill's terms ---------------------------------------------------------------------------
 
     def feed(self, variant, cursor):
         source = 'text_post_feed_following' if variant == 'following' else 'text_post_feed_threads'
+        key = 'feed_first' if cursor is None else 'feed_next'
         if cursor is None:
-            payload = self.query('feed_first', {'variant': variant, 'data': {'pagination_source': source,
-                                                                             'reason': 'cold_start_fetch'}})
+            payload = self.query(key, {'variant': variant, 'data': {'pagination_source': source,
+                                                                    'reason': 'cold_start_fetch'}})
         else:
-            payload = self.query('feed_next', {'after': cursor, 'variant': variant, 'data': {
+            payload = self.query(key, {'after': cursor, 'variant': variant, 'data': {
                 'feed_view_info': '[]', 'pagination_source': source, 'reason': 'pagination', 'session_id': None}})
-        return records.connection_page(payload['data'], 'feed')
+        return self._read(key, lambda: records.connection_page(payload['data'], 'feed'))
+
+    def _read(self, key, parse):
+        """Parse a response into records; only then is a query name found this command remembered."""
+        result = parse()
+        self._confirm(key)
+        return result
 
     def post_page(self, target, *, sort, limit):
         """The post, its parents and its first reply batch: three requests, no screen move."""
@@ -412,7 +458,10 @@ class Client:
         responses = [self.query('post_target', {'postID': post_id}, route=route)['data'],
                      self.query('post_parents', {'postID': post_id}, route=route)['data'],
                      self.query('post_replies', {'postID': post_id, 'sortOrder': sort.upper()}, route=route)['data']]
-        return records.post_page(responses, code=target.code, post_id=post_id, limit=limit)
+        page = records.post_page(responses, code=target.code, post_id=post_id, limit=limit)
+        for key in ('post_target', 'post_parents', 'post_replies'):
+            self._confirm(key)
+        return page
 
     def replies(self, post_id, cursor, *, sort, path):
         """One further batch of a post's direct replies."""
@@ -428,6 +477,7 @@ class Client:
         if found is None:
             raise ThreadsError(9, f'Threads has no profile @{username} visible to this account.',
                                'Check the handle; tell the user rather than retrying.', reason='unavailable')
+        self._confirm('profile_by_name')
         return found['id'], user
 
     def profile_tab(self, tab, user_id, username, cursor):
@@ -437,15 +487,15 @@ class Client:
         else:
             key, variables = 'profile_' + tab, {'userID': user_id, **({'after': cursor} if cursor else {})}
         payload = self.query(key, variables, route={'username': username})
-        return records.connection_page(payload['data'], 'profile_tab')
+        return self._read(key, lambda: records.connection_page(payload['data'], 'profile_tab'))
 
     def search_posts(self, text, *, recent, tag, cursor):
         variables = {'query': text, 'recent': 1 if recent else 0, 'search_surface': 'tags' if tag else 'default'}
         route = {'query': quote(text)}
-        payload = (self.query('search_posts', variables, route=route) if cursor is None else
-                   self.query('search_posts_next', {**variables, 'after': cursor}, route=route))
-        return records.connection_page(payload['data'], 'search_posts')
+        key = 'search_posts' if cursor is None else 'search_posts_next'
+        payload = self.query(key, variables if cursor is None else {**variables, 'after': cursor}, route=route)
+        return self._read(key, lambda: records.connection_page(payload['data'], 'search_posts'))
 
     def search_accounts(self, text):
         payload = self.query('search_accounts', {'query': text}, route={'query': quote(text)})
-        return records.connection_page(payload['data'], 'search_accounts')
+        return self._read('search_accounts', lambda: records.connection_page(payload['data'], 'search_accounts'))

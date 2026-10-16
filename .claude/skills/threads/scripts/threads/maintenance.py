@@ -7,7 +7,7 @@ from threads.errors import ThreadsError
 from threads.paths import data_dir
 from threads.results import describe as describe_result
 from threads.results import finish
-from threads.threads_web import SCHEMAS
+from threads.threads_web import SCHEMAS, classify_document
 
 SCHEMA_OBJECTS = ['result', 'out', 'post', 'account']
 
@@ -17,11 +17,16 @@ def doctor(options):
     connection = Connection(protection.MAX_BUDGET, options.get('verbose'))
     try:
         if options.get('unblock'):
-            with connection.guard.verify_unblock() as check:
+            # the lock order everywhere: session, then account protection
+            with connection.memory.opening(), connection.guard.verify_unblock() as check:
                 client = connection.client
                 connection.account_id = client.start()
-                if not client.opened_now:
-                    client.page('/search', budgeted=False, kind='unblock_check')  # what Threads answers now
+                html = client.page('/search', budgeted=False, kind='unblock_check')  # what Threads answers now
+                answer = classify_document(html)
+                if answer.kind != 'ok' or answer.account_id != connection.account_id:
+                    raise answer.error or ThreadsError(6, 'The check did not show this account logged in, so the '
+                                                          'block stays.', 'Check Threads in the Aside browser, then '
+                                                                          'run doctor --unblock again.')
                 check.clear()
         else:
             connection.start()

@@ -258,6 +258,16 @@ class Guard:
             yield Slot(self, 0, False)
 
     @contextmanager
+    def quiet(self):
+        """The critical section of emptying the tab: no request is made in it, so a standing block does not refuse
+        it; a block it sees is still recorded before the lock is released."""
+        if self._held is not None:
+            yield Slot(self, 0, False)
+            return
+        with _locked():
+            yield Slot(self, 0, False)
+
+    @contextmanager
     def verify_unblock(self):
         """The one check request doctor --unblock makes while a block stands, inside the lock: the block is lifted
         only when the caller calls slot.clear() after a clean answer. A failure, an exception or a killed process

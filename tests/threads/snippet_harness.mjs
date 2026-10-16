@@ -11,7 +11,7 @@
 // app: requests the app itself makes before the call (through the page's XHR, so a hook installed earlier sees them).
 // reload: a new window before the call, same sessionStorage (the tab reloaded); lost: a new window and an empty
 // sessionStorage (a new tab). Prints one JSON line: {"results": [...], "fetches": [{url, method, headers, body}],
-// "storage": <the tab's sessionStorage>}.
+// "locations": [the tab's address after each call], "storage": <the tab's sessionStorage>}.
 import fs from 'node:fs';
 import vm from 'node:vm';
 
@@ -65,13 +65,13 @@ function makeWindow() {
     takeRecords() { return pending.splice(0).map(e => ({name: e.url, responseStatus: e.status})); }
     disconnect() {}
   }
-  const window = {require, location, fetch: realFetch, XMLHttpRequest};
   const document = {cookie: pageSpec.cookie || '', documentElement: {outerHTML: pageSpec.html || '<html></html>'}};
-  const context = {window, fetch: realFetch, XMLHttpRequest, PerformanceObserver, location, sessionStorage, document,
+  // As in a browser, the global object is the window: a page that replaces window.fetch replaces fetch.
+  const context = {require, fetch: realFetch, XMLHttpRequest, PerformanceObserver, location, sessionStorage, document,
                    performance: {timeOrigin: Date.now()}, URL, URLSearchParams, AbortController, setTimeout, clearTimeout,
                    JSON, Object, Array, String, Number, Promise, Date, Math, Set, Map, encodeURIComponent,
                    decodeURIComponent, Error, RegExp, Buffer};
-  window.require = require;
+  context.window = context;
   return vm.createContext(context);
 }
 
@@ -85,7 +85,7 @@ async function appRequest(context, request) {
     Object.defineProperty(x, 'responseURL', {value: r.url}); x.send(); })`, context)(request);
 }
 
-const results = [];
+const results = [], locations = [];
 for (const call of spec.calls) {
   if (call.reload) { page = makeWindow(); }
   if (call.lost) { storage = new Map(); page = makeWindow(); }
@@ -95,5 +95,7 @@ for (const call of spec.calls) {
   const fn = vm.runInContext('(' + fs.readFileSync(call.source, 'utf8').trim().replace(/;\s*$/, '') + ')', page);
   results.push(await fn(call.args || {}));
   pending.push(...during.splice(0));
+  await new Promise(resolve => setTimeout(resolve, 20));  // let what the call scheduled (blank, navigate) happen
+  locations.push(vm.runInContext('location.href', page));
 }
-process.stdout.write(JSON.stringify({results, fetches, storage: Object.fromEntries(storage)}) + '\n');
+process.stdout.write(JSON.stringify({results, fetches, locations, storage: Object.fromEntries(storage)}) + '\n');

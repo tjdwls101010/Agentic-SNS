@@ -43,17 +43,16 @@ if (!provided) {
   }
   provided = {...(fallback.flags || {}), ...provided};
 }
-// A block the tab already saw (between calls, or before a reload) stops this call before it sends anything.
-const before = await kit.settle(0);
-if (before.statuses.includes(429) || kit.pending().length) {
-  return {stopped: 'signal', explicit: 0, ...before, signals: kit.pending(), location: location.href};
-}
+// A block or login page, a 429 or a signal the tab already saw stops this call before it sends anything.
+const gate = await kit.gate();
+if (gate.stopped) return gate;
+const before = gate.before;
 let form;
 try {
   form = Object.assign({}, load('getAsyncParams')('POST'));
   if (!form.fb_dtsg || !form.lsd) throw new Error('no token');
 } catch (_) {
-  return {network_error: 'the page has no request parameters', explicit: 0, ...(await kit.report(0))};
+  return {network_error: 'the page has no request parameters', explicit: 0, ...(await kit.report(0, before))};
 }
 const current = load('CurrentUserInitialData');
 Object.assign(form, {av: String(current.NON_FACEBOOK_USER_ID), fb_api_caller_class: 'RelayModern', fb_api_req_friendly_name: args.name,
@@ -70,9 +69,9 @@ try {
   const response = await fetch(endpoint, {method: 'POST', credentials: 'include', body: new URLSearchParams(form).toString(),
                                           headers, signal: controller.signal});
   const text = await response.text();
-  return {status: response.status, url: response.url, body: text.slice(0, args.max_body || 4000000), used, explicit: 1, ...(await kit.report())};
+  return {status: response.status, url: response.url, body: text.slice(0, args.max_body || 4000000), used, explicit: 1, ...(await kit.report(50, before))};
 } catch (error) {
-  return {network_error: String(error).slice(0, 200), used, explicit: 1, ...(await kit.report())};
+  return {network_error: String(error).slice(0, 200), used, explicit: 1, ...(await kit.report(50, before))};
 } finally {
   clearTimeout(timer);
 }
