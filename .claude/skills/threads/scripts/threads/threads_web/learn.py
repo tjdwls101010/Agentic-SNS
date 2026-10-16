@@ -7,9 +7,12 @@ screen can send: `<Name>_threadsRelayOperation` exports the id, `<Name>.threads.
 argument names, the root field and whether it is a query. A renamed query is found among those definitions by what
 stays when Meta renames it (its argument names and root field), and only when exactly one candidate fits.
 """
+import hashlib
 import json
+import os
 import re
 import urllib.request
+from pathlib import Path
 from html.parser import HTMLParser
 
 CDN = re.compile(r'https://static\.cdninstagram\.com/rsrc\.php/[^"\'\s<>]+?\.js[^"\'\s<>]*')
@@ -78,7 +81,11 @@ def bundle_urls(html):
 
 
 def fetch_bundle(url):
-    """One static bundle from the CDN, without cookies."""
+    """One static bundle from the CDN, without cookies. THREADS_CDN_DIR (tests) serves bundles from files named by the
+    SHA-1 of their URL instead."""
+    local = os.environ.get('THREADS_CDN_DIR')
+    if local:
+        return (Path(local) / (hashlib.sha1(url.encode()).hexdigest() + '.js')).read_text(errors='replace')
     request = urllib.request.Request(url, headers={'user-agent': 'Mozilla/5.0', 'accept': '*/*'})
     with urllib.request.urlopen(request, timeout=_TIMEOUT) as response:
         return response.read().decode('utf-8', errors='replace')
