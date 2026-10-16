@@ -102,11 +102,13 @@ def peek(path):
     """(the query context a file was written for, whether it is complete, records saved), reading only; (None, False,
     0) when the file does not exist or is empty. A file that is not a current collection raises like opening it."""
     try:
-        data = Path(path).expanduser().read_bytes()
+        with os.fdopen(os.open(Path(path).expanduser(), os.O_RDONLY | os.O_NOFOLLOW), 'rb') as stream:
+            data = stream.read()
     except FileNotFoundError:
         return None, False, 0
     except OSError:
-        raise ThreadsError(2, 'Cannot read the --out file.', 'Choose a readable path.') from None
+        raise ThreadsError(2, 'Cannot read the --out file (a symbolic link is refused).', 'Choose a regular file '
+                                                                                            'path.') from None
     if not data:
         return None, False, 0
     scan = _scan(data)
@@ -124,7 +126,8 @@ class OutFile:
         self.state, self.complete = None, False
         self.stream = None
         try:
-            self.stream = os.fdopen(os.open(self.path, os.O_RDWR | os.O_CREAT, 0o600), 'r+b')
+            # A symbolic link is refused rather than followed: the file is written where the path says.
+            self.stream = os.fdopen(os.open(self.path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600), 'r+b')
             fcntl.flock(self.stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
             self.close()

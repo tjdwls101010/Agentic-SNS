@@ -19,6 +19,7 @@ from threads.paths import state_dir
 # 성진: 호출당 400회 상한은 실계정 보호용(하루 누적 상한은 두지 않음, D17). 일회용 계정으로 바꾸면 올려도 됨
 MAX_BUDGET = 400
 RATE_LIMIT_SECONDS = 1800
+LOG_SECONDS = 24 * 3600
 PACE_SECONDS = (1.0, 2.0)
 REASONS = ('checkpoint', 'rate_limit')
 
@@ -158,12 +159,27 @@ class Slot:
         self.reserved = 0
 
     def block(self, reason):
-        """Persist a block before the lock is released: checkpoint (until unblocked) or rate_limit (30 minutes)."""
+        """Persist a block before the lock is released: checkpoint (until unblocked) or rate_limit (30 minutes).
+        A rate limit never replaces a checkpoint already recorded: the stricter block stands."""
         if reason not in REASONS:
             raise ValueError(reason)
+        current = _read('blocked.json')
+        if reason == 'rate_limit' and isinstance(current, dict) and current.get('reason') == 'checkpoint':
+            return
         now = time.time()
         _write('blocked.json', {'reason': reason, 'blocked_at': now,
                                 'expires_at': None if reason == 'checkpoint' else now + RATE_LIMIT_SECONDS})
+
+
+class CheckSlot(Slot):
+    """The one request doctor --unblock may make while a block stands; clear() lifts the block inside the lock."""
+
+    def clear(self):
+        try:
+            (_directory() / 'blocked.json').unlink(missing_ok=True)
+        except OSError:
+            raise ThreadsError(5, 'The account block could not be cleared.', 'Make the skill\'s data/ directory '
+                                                                             'writable, then retry.') from None
 
 
 class Guard:
@@ -175,6 +191,7 @@ class Guard:
         self.budget = budget
         self.used = 0    # requests charged to the budget
         self.setup = 0   # requests outside it: opening the dedicated tab
+        self.checked = False  # whether this invocation already made its one unblock check
 
     @property
     def remaining(self):
@@ -192,7 +209,7 @@ class Guard:
             raise _blocked_error(record)
 
     @contextmanager
-    def request(self, reserve=1, budgeted=True):
+    def request(self, reserve=1, budgeted=True, kind=None):
         """The critical section of one request: block check, budget, pacing, then the caller's request.
 
         budgeted=False is for opening the dedicated tab: counted in `count`, not charged to the budget.
@@ -211,10 +228,12 @@ class Guard:
                 self.used += reserve
             else:
                 self.setup += reserve
+            slot = Slot(self, reserve, budgeted)
             try:
-                yield Slot(self, reserve, budgeted)
+                yield slot
             finally:
                 _reserve_pace()
+                _log(kind or ('query' if budgeted else 'tab_open'), slot.reserved)
 
     @contextmanager
     def observe(self):
@@ -224,6 +243,41 @@ class Guard:
             self.check()
             yield Slot(self, 0, False)
 
+    @contextmanager
+    def verify_unblock(self):
+        """The one check request doctor --unblock makes while a block stands, inside the lock: the block is lifted
+        only when the caller calls slot.clear() after a clean answer. A failure, an exception or a killed process
+        leaves the block exactly as it was. One per invocation."""
+        with _locked():
+            if self.checked:
+                raise ThreadsError(5, 'This invocation already made its one unblock check.', _UNBLOCK)
+            self.checked = True
+            _active_block()  # unreadable protection state fails closed here too
+            gap = _next_allowed() - time.time()
+            if gap > 0:
+                time.sleep(gap)
+            _reserve_pace()
+            self.setup += 1
+            slot = CheckSlot(self, 1, False)
+            try:
+                yield slot
+            finally:
+                _reserve_pace()
+                _log('unblock_check', slot.reserved)
+
+    def log_unwatched(self, count):
+        """Requests the tab made while no command watched it (between commands): logged, never charged."""
+        _log('unwatched', count)
+
+    def recent(self):
+        """Requests logged in the last hour and the last day, every invocation of this account together."""
+        now, hour, day = time.time(), 0, 0
+        for entry in _log_entries():
+            if now - entry['at'] < 3600:
+                hour += entry['n']
+            day += entry['n']
+        return {'last_hour': hour, 'last_day': day}
+
     def state(self):
         """What doctor reports: the active block, if any, and when the next request may start."""
         record = _active_block()
@@ -232,11 +286,43 @@ class Guard:
                 'next_request_at': max(_next_allowed(), time.time())}
 
 
-def unblock():
-    """Clear a persisted block (a person has checked Threads); pacing is kept."""
-    with _locked():
+def _log_entries():
+    """The logged requests of the last day; lines that do not parse are skipped (the log is never a gate)."""
+    try:
+        lines = (_directory() / 'requests.jsonl').read_text().splitlines()
+    except OSError:
+        return []
+    entries, cutoff = [], time.time() - LOG_SECONDS
+    for line in lines:
         try:
-            (_directory() / 'blocked.json').unlink(missing_ok=True)
-        except OSError:
-            raise ThreadsError(5, 'The account block could not be cleared.', 'Make the skill\'s data/ directory '
-                                                                              'writable, then retry.') from None
+            entry = json.loads(line)
+        except ValueError:
+            continue
+        if (isinstance(entry, dict) and type(entry.get('at')) in (int, float) and type(entry.get('n')) is int
+                and entry['at'] >= cutoff):
+            entries.append(entry)
+    return entries
+
+
+def _log(kind, count):
+    """Append one charged request batch; once a line is a day old the file is rewritten without it. Observation
+    only: a log that cannot be written never stops a request."""
+    if type(count) is not int or count <= 0:
+        return
+    try:
+        path = _directory() / 'requests.jsonl'
+        line = json.dumps({'at': time.time(), 'kind': kind, 'n': count}) + '\n'
+        with open(path, 'a') as stream:
+            stream.write(line)
+        first = path.open().readline()
+        try:
+            stale = json.loads(first).get('at', 0) < time.time() - LOG_SECONDS
+        except (ValueError, AttributeError):
+            stale = True
+        if stale:
+            kept = ''.join(json.dumps(entry) + '\n' for entry in _log_entries())
+            temporary = path.with_name('.requests.jsonl.tmp')
+            temporary.write_text(kept)
+            os.replace(temporary, path)
+    except OSError:
+        pass
