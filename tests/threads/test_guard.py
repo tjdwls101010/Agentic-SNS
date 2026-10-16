@@ -241,3 +241,16 @@ def test_the_log_keeps_one_day_and_never_enforces(data_dir):
 def test_an_unreadable_log_never_blocks(data_dir):
     write(data_dir, 'requests.jsonl', 'not json\n{"at": "x"}\n')
     assert request().used == 1
+
+
+def test_requests_inside_the_unblock_check_share_its_critical_section(data_dir):
+    write(data_dir, 'blocked.json', CHECKPOINT)
+    g = guard.Guard(1)
+    with g.verify_unblock() as check:
+        with g.request(reserve=40, budgeted=False, kind='tab_open') as slot:  # would deadlock or refuse otherwise
+            slot.charge(34)
+        with g.observe():
+            pass
+        check.clear()
+    assert g.used == 0 and g.count == 1 + 40
+    assert not (data_dir / 'protection/blocked.json').exists()

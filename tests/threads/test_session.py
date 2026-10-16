@@ -59,3 +59,14 @@ def test_use_tokens_tell_the_latest_command(data_dir):
     assert first != second
     assert Session('u0').token == second
     assert json.loads((data_dir / 'session/u0.json').read_text())['token'] == second
+
+
+def test_acknowledged_signals_and_renames_persist(data_dir):
+    s = Session('u0')
+    s.acknowledge(1792148826874)
+    s.acknowledge(5)  # never moves back
+    s.rename('profile_replies', 'BarcelonaProfileRepliesTabDirectQuery')
+    again = Session('u0')
+    assert again.ack == 1792148826874
+    assert again.renamed('profile_replies') == 'BarcelonaProfileRepliesTabDirectQuery'
+    assert again.renamed('feed_next') is None

@@ -192,6 +192,7 @@ class Guard:
         self.used = 0    # requests charged to the budget
         self.setup = 0   # requests outside it: opening the dedicated tab
         self.checked = False  # whether this invocation already made its one unblock check
+        self._held = None     # the unblock check in progress: what runs inside it shares its critical section
 
     @property
     def remaining(self):
@@ -213,7 +214,17 @@ class Guard:
         """The critical section of one request: block check, budget, pacing, then the caller's request.
 
         budgeted=False is for opening the dedicated tab: counted in `count`, not charged to the budget.
+        Inside an unblock check the request is part of that check: same critical section, the block standing, counted
+        outside the budget.
         """
+        if self._held is not None:
+            self.setup += reserve
+            slot = Slot(self, reserve, False)
+            try:
+                yield slot
+            finally:
+                _log(kind or 'unblock_check', slot.reserved)
+            return
         with _locked():
             self.check()
             if budgeted and self.used + reserve > self.budget:
@@ -239,6 +250,9 @@ class Guard:
     def observe(self):
         """The critical section of looking at the tab without a request (its state, its loaded modules): a saved
         block stops it, and a block it sees is recorded before the lock is released."""
+        if self._held is not None:
+            yield Slot(self, 0, False)
+            return
         with _locked():
             self.check()
             yield Slot(self, 0, False)
@@ -259,9 +273,11 @@ class Guard:
             _reserve_pace()
             self.setup += 1
             slot = CheckSlot(self, 1, False)
+            self._held = slot
             try:
                 yield slot
             finally:
+                self._held = None
                 _reserve_pace()
                 _log('unblock_check', slot.reserved)
 

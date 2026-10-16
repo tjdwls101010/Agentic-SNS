@@ -27,7 +27,7 @@ class Session:
         return state_dir('session') / f'{self.account_key}.json'
 
     def _load(self):
-        empty = {'tab': None, 'token': None, 'queries': {}}
+        empty = {'tab': None, 'token': None, 'ack': 0, 'renames': {}, 'queries': {}}
         try:
             data = json.loads(self._path().read_text())
         except FileNotFoundError:
@@ -42,6 +42,8 @@ class Session:
         self.reset = False
         return {'tab': data.get('tab') if isinstance(data.get('tab'), str) else None,
                 'token': data.get('token') if isinstance(data.get('token'), str) else None,
+                'ack': data.get('ack') if type(data.get('ack')) in (int, float) else 0,
+                'renames': data.get('renames') if isinstance(data.get('renames'), dict) else {},
                 'queries': data.get('queries', {})}
 
     def reload(self):
@@ -96,6 +98,27 @@ class Session:
         self._data = {**self._load(), 'token': token}
         self._save()
         return token
+
+    @property
+    def ack(self):
+        """The time of the last tab signal already moved into account protection; the tab drops signals up to it."""
+        return self._data['ack']
+
+    def acknowledge(self, moment):
+        if type(moment) in (int, float) and moment > self._data['ack']:
+            self._data = {**self._load(), 'ack': moment}
+            self._save()
+
+    def renamed(self, key):
+        """The current name a renamed query was found under, or None."""
+        value = self._data['renames'].get(key)
+        return value if isinstance(value, str) else None
+
+    def rename(self, key, name):
+        current = self._load()
+        current['renames'][key] = name
+        self._data = current
+        self._save()
 
     def query(self, name):
         """The query id (and provider values) learned for `name`, or None."""

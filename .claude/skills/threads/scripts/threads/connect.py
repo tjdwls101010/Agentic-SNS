@@ -1,12 +1,24 @@
-"""Shared wiring of the reading commands: a guarded connection, handles, --out files, and the finished result."""
+"""Shared wiring of the reading commands: a guarded connection, handles, --out files, the finished result, and the
+idle blanker that empties the dedicated tab once nobody uses it."""
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
 from threads import guard as protection
 from threads import handles
 from threads.aside import Aside
 from threads.collection import OutFile, peek
 from threads.errors import ThreadsError
-from threads.threads_web import Client
 from threads.results import finish
 from threads.session import Session
+from threads.threads_web import Client
+
+# 성진: 마지막 명령 뒤 약 5분 동안 쓰지 않으면 전용 탭을 비운다(T14) — 열린 탭은 31초마다 알림 배지, 5분마다 앱의 사용
+# 시간 기록을 보낸다. 대화형 사용의 명령 간격이 실측으로 더 길거나 짧으면 조정한다
+IDLE_SECONDS = 300
+CLI = Path(__file__).resolve().parents[1] / 'cli.py'
 
 
 class Connection:
@@ -27,6 +39,44 @@ class Connection:
         self.account_id = self.client.start()
         return self
 
+    def report(self):
+        """What finish() needs to know about the requests and the session."""
+        return {'requests': self.guard.count, 'setup': self.guard.setup, 'unwatched': self.client.unwatched,
+                'session_reset': self.client.session_reset}
+
+    def release(self):
+        """Leave the idle blanker behind: it empties the tab after IDLE_SECONDS unless a newer command used it."""
+        if not self.client.token or not self.client.tab:
+            return
+        seconds = os.environ.get('THREADS_IDLE_SECONDS')
+        if seconds == 'off':
+            return  # a person who wants the tab left open
+        delay = int(seconds) if seconds and seconds.isdigit() else IDLE_SECONDS
+        try:
+            subprocess.Popen([sys.executable, str(CLI), 'idle', '--token', self.client.token, '--after', str(delay)],
+                             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             start_new_session=True, env=os.environ.copy())
+        except OSError:
+            pass  # without it the tab stays open until the next command or a person closes it
+
+
+def idle(token, after):
+    """Empty the dedicated tab after `after` seconds when the latest command is still the one that left `token`."""
+    time.sleep(after)
+    browser = Aside()
+    memory = Session(browser.account_key)
+    client = Client(browser, protection.Guard(1), memory)
+    with memory.opening():
+        memory.reload()
+        if memory.token != token or not memory.tab:
+            return 'newer command'
+        client.tab = memory.tab
+        try:
+            client.blank()
+        except ThreadsError as error:
+            return error.reason or 'failed'
+    return 'blanked'
+
 
 def run(options, *, command, target, identity, reader, window=None):
     """Run one reading command and finish it into (kind, envelope).
@@ -46,11 +96,14 @@ def run(options, *, command, target, identity, reader, window=None):
     except ThreadsError as error:
         reading = {**(reading or {}), 'failure': error}
         reading.setdefault('results', [])
+    finally:
+        if connection is not None:
+            connection.release()
     if window:
         reading['window'] = window
-    return finish(reading, command=command, requests=connection.guard.count if connection else 0,
-                  budget=options['max_requests'], identity=_public(identity), out=out_path,
-                  setup=connection.guard.setup if connection else 0)
+    report = connection.report() if connection else {'requests': 0, 'setup': 0, 'unwatched': 0, 'session_reset': False}
+    return finish(reading, command=command, budget=options['max_requests'], identity=_public(identity), out=out_path,
+                  **report)
 
 
 def _settled_file(path, context):
@@ -61,7 +114,7 @@ def _settled_file(path, context):
         return None
     if {k: v for k, v in saved.items() if k != 'account_id'} != {k: v for k, v in context.items() if k != 'account_id'}:
         raise ThreadsError(2, 'The --out file belongs to another command, target, order or account.',
-                            'Use a new --out path, or rerun the command that started this file.')
+                           'Use a new --out path, or rerun the command that started this file.')
     if complete:
         return {'results': [], 'stop_reason': 'exhausted', 'already_complete': True, 'count': count}
     return None
@@ -81,24 +134,21 @@ def _read(connection, options, command, target, identity, reader, out_path):
             reading['count'] = out.count
             reading['continuable'] = out.state is not None and not out.complete
             failure = reading.get('failure')
-            stopped = isinstance(failure, ThreadsError) and failure.code in (4, 5)
+            stopped = isinstance(failure, ThreadsError) and failure.code in (4, 5, 9)
             if not stopped and (reading.get('stop_reason') == 'budget' or isinstance(failure, ThreadsError)):
                 reading['next'] = words(command, target, reading.get('words', []), options, out=out_path)
     finally:
         if out is not None:
             out.close()
     _continue(reading, options, connection.account_id)
-    if reading.pop('detail', None):
-        reading['detail'] = words(command, target, reading.get('words', []), options, after=options.get('after'),
-                                  chars=0)
     return reading
 
 
 def _continue(reading, options, account_id):
     continuation = reading.pop('continuation', None)
     failure = reading.get('failure')
-    if not continuation or options.get('out') or (isinstance(failure, ThreadsError) and failure.code in (4, 5)):
-        return  # after a block or a logout, a continuation would only invite another request
+    if not continuation or options.get('out') or (isinstance(failure, ThreadsError) and failure.code in (4, 5, 9)):
+        return  # after a block, a logout or an unreadable target, a continuation would only invite another request
     context = _context(continuation['command'], continuation['target'], continuation['identity'], account_id)
     try:
         number = handles.save(context, continuation['state'])
@@ -143,5 +193,6 @@ def _context(command, target, identity, account_id):
 
 
 def _public(identity):
-    """The identity options a result names in its header (sort, type)."""
-    return {key: value for key, value in identity.items() if key in ('sort', 'type') and value is not None}
+    """The identity options a result names in its header."""
+    return {key: value for key, value in identity.items()
+            if key in ('sort', 'feed', 'tab', 'type', 'relation', 'collection') and value is not None}

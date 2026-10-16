@@ -11,6 +11,9 @@ STOP_REASONS = {
     'exhausted': ('Nothing more to read in the requested range: the source ended, or the command reads one thing.',
                   'Nothing.'),
     'window_reached': ('A newest-first read passed --since; everything up to that boundary was delivered.', 'Nothing.'),
+    'not_paginable': ('This surface is one batch (account search, liked, saved).', 'Nothing.'),
+    'server_capped': ('Threads returned its own sample (followers), not the whole list; reported_total is larger.',
+                      'Nothing more can be read here.'),
     'budget': ('--max-requests was spent.', 'Run more: (or rerun the same --out command); raise --max-requests if '
                                             'one invocation should read further.'),
     'blocked': ('Threads showed a checkpoint or a rate limit, or a saved block is still active.',
@@ -31,7 +34,9 @@ KINDS = {
     'login': ('Threads login is required in the Aside browser.', False),
     'blocked': ('A checkpoint or rate limit, now or saved from an earlier invocation; or unreadable protection state.',
                 False),
-    'failed': ('A request failed before any record was read.', False),
+    'unavailable': ('The target cannot be read by this account: deleted, private and not followed, or a post that '
+                    'redirected away. Retrying does not change it.', False),
+    'failed': ('A request failed before any record was read (including a query Threads no longer accepts).', False),
     'empty': ('Threads explicitly returned nothing, or nothing fell inside the window.', False),
     'partial': ('Records were read, then a request failed; or the budget ran out with nothing to continue from.',
                 False),
@@ -43,20 +48,15 @@ FIXES = {
     'empty': 'Try another target, order or window; an explicitly empty result is not a failure to read.',
 }
 
-# Response-level issue → the coverage line it becomes.
-ISSUES = {
-    'unsupported_path_patch': 'part of a response could not be placed on any record; some records may lack fields',
-    'graphql_errors': 'Threads reported errors for part of a response; some records may lack fields',
-    'cyclic_shared_story': 'a chain of shares looped back on itself and was cut there',
-}
-
 # The window line of a dated read: the first row that matches wins.
 COVERAGE = (
     ('any order', 'any stop', 'a failure', 'open — <failure>'),
-    ('ranked (feed top, group top or activity)', 'any stop', 'no failure', 'sample (ranked order)'),
+    ('not by writing time (for you feed, search, reposts and media tabs)', 'any stop', 'no failure',
+     'sample (not in date order)'),
     ('any order', 'limit_reached or budget', 'no failure', 'open — more: continues'),
-    ('newest first (feed or group --sort recent)', 'window_reached or exhausted', 'no failure', 'closed (as served)'),
-    ('filtered by Threads (profile)', 'exhausted', 'no failure', 'closed (server-filtered)'),
+    ('newest first (following feed, threads and replies tabs)', 'window_reached or exhausted', 'no failure',
+     'closed (as served)'),
+    ('filtered by Threads (search dates)', 'exhausted', 'no failure', 'closed (server-filtered)'),
 )
 
 
@@ -64,8 +64,8 @@ def window_state(order, stop_reason, failure):
     """The coverage label of a date window (see COVERAGE)."""
     if failure is not None:
         return 'open — ' + failure.message.rstrip('.')
-    if order == 'ranked':
-        return 'sample (ranked order)'
+    if order == 'unordered':
+        return 'sample (not in date order)'
     if stop_reason in ('limit_reached', 'budget'):
         return 'open — more: continues'
     if order == 'newest_first' and stop_reason in ('window_reached', 'exhausted'):
@@ -75,9 +75,24 @@ def window_state(order, stop_reason, failure):
     return 'open'
 
 
+def _failure_kind(error, has_records):
+    """A failure's kind: blocked (5) > login (4) > unavailable (9) > the rest."""
+    if error.code == 5:
+        return 'blocked'
+    if error.code == 4:
+        return 'login'
+    if error.code == 9:
+        return 'unavailable'
+    if error.code == 2:
+        return 'argument'
+    if has_records:
+        return 'partial'
+    return {3: 'aside', 7: 'empty', 8: 'partial'}.get(error.code, 'failed')
+
+
 def failure_envelope(error, command=None):
     """The envelope of an invocation that ended before any reading: always ok false, with error, message, fix."""
-    kind = {2: 'argument', 3: 'aside', 4: 'login', 5: 'blocked', 7: 'empty', 8: 'partial'}.get(error.code, 'failed')
+    kind = _failure_kind(error, False)
     envelope = {'ok': False}
     if command:
         envelope['command'] = command
@@ -87,30 +102,23 @@ def failure_envelope(error, command=None):
     return kind, envelope
 
 
-def finish(reading, *, command, requests, budget, identity=None, out=None, setup=0):
+def finish(reading, *, command, requests, budget, identity=None, out=None, setup=0, unwatched=0, session_reset=False):
     """(kind, envelope) of one reading.
 
     `reading` holds results, stop_reason (the natural stop when nothing failed), failure (ThreadsError or None),
-    coverage notes, issues, window ({order, since, until}), details for JSON, and continuable: whether a saved
-    handle or committed --out pages let a later invocation continue.
+    coverage notes, window ({order, since, until}), details for JSON, and continuable: whether a saved handle or
+    committed --out pages let a later invocation continue.
     """
     records = reading.get('results') or []
     failure = reading.get('failure')
     stop_reason = reading.get('stop_reason') or 'exhausted'
     continuable = bool(reading.get('continuable'))
     if isinstance(failure, ThreadsError):
-        if failure.code == 5:
-            kind, stop_reason = 'blocked', 'blocked'
-        elif failure.code == 8:
+        if failure.code == 8:
             kind, stop_reason = ('resumable' if continuable else 'partial'), 'budget'
-        elif failure.code == 4:
-            kind, stop_reason = 'login', 'query_failure'
-        elif failure.code == 2:
-            kind, stop_reason = 'argument', 'query_failure'
         else:
-            partial = bool(records) or bool(reading.get('partial'))
-            kind = 'partial' if partial else ('aside' if failure.code == 3 else 'empty' if failure.code == 7 else 'failed')
-            stop_reason = 'exhausted' if kind == 'empty' else 'query_failure'
+            kind = _failure_kind(failure, bool(records) or bool(reading.get('partial')))
+            stop_reason = {'blocked': 'blocked', 'empty': 'exhausted'}.get(kind, 'query_failure')
     elif reading.get('already_complete'):
         kind = 'complete'
     elif command in ('doctor', 'schema'):
@@ -125,11 +133,13 @@ def finish(reading, *, command, requests, budget, identity=None, out=None, setup
         envelope['window'] = {'since': window.get('since'), 'until': window.get('until'),
                               'coverage': window_state(window['order'], stop_reason,
                                                        failure if kind not in ('resumable', 'empty') else None)}
-    if 'sponsored_skipped' in reading:
-        envelope['sponsored_skipped'] = reading['sponsored_skipped']
     envelope['request_count'] = requests
     if setup:
         envelope['tab_opened_requests'] = setup
+    if unwatched:
+        envelope['unwatched_requests'] = unwatched
+    if session_reset:
+        envelope['session_reset'] = True
     envelope['max_requests'] = budget
     if kind == 'empty':
         message = failure.message if isinstance(failure, ThreadsError) else 'This query returned no results.'
@@ -142,13 +152,11 @@ def finish(reading, *, command, requests, budget, identity=None, out=None, setup
         envelope.update(error=kind, message=failure.message, fix=failure.fix)
     elif kind == 'resumable':
         envelope['fix'] = FIXES['budget_resume']
-    coverage = list(dict.fromkeys(list(reading.get('coverage') or [])
-                                  + [ISSUES.get(issue, issue) for issue in reading.get('issues') or []]))
+    coverage = list(dict.fromkeys(reading.get('coverage') or []))
     if coverage:
         envelope['coverage'] = coverage
-    for key in ('next', 'detail'):
-        if reading.get(key):
-            envelope[key] = reading[key]
+    if reading.get('next'):
+        envelope['next'] = reading['next']
     envelope.update(reading.get('details') or {})
     if out is not None:
         envelope.update(out=out, count=reading.get('count', 0))
@@ -172,66 +180,69 @@ def describe(exit_codes):
                             for order, stopped, failure, label in COVERAGE],
         'requests': REQUESTS,
         'text': TEXT,
-        'detail': 'Every detail path (post <url>, a detail: line, a replies handle) is a new live request; it does not '
-                  'replay an earlier response, so what it shows can differ from what was shown before.',
+        'detail': 'Every record carries post <url>, which opens that one post live; it does not replay an earlier '
+                  'response, so what it shows can differ from what was shown before.',
     }
 
 
-REQUESTS = ('request_count counts what this invocation sent to threads.com (each GraphQL query, page fetch, retry) and every '
-            'threads.com request the dedicated tab finished while it ran. What the page itself loads cannot be '
-            'bounded or attributed exactly, so it is prepaid: opening the tab is reserved at 30 (tab_opened_requests, '
-            'not charged to max_requests) and moving it to another screen at 10, the excess is charged when the page '
-            'loads more, and requests finishing after the call that caused them use up those reservations first. '
-            'request_count can therefore exceed max_requests by a navigation\'s excess; nothing more is sent after. '
-            'An action that timed out keeps its reservation. Requests the tab made between commands or on a reload '
-            'the skill did not cause are not counted, but their statuses are checked: a 429 anywhere records a rate '
-            'limit before anything else is sent, and a checkpoint stays a checkpoint. fbcdn.net static files are not '
-            'counted. All invocations share one cross-process lock and pacing (1-2 s between requests).')
+REQUESTS = ('request_count counts what this invocation sent to Threads (each GraphQL query, document read, retry) '
+            'and every Threads request (threads.com, threads.net, instagram.com, facebook.com) the dedicated tab '
+            'finished while it ran; static CDN files (cdninstagram.com, fbcdn.net) are not counted. What the page '
+            'itself loads is prepaid: opening the tab, or loading it again after it was emptied or its app was '
+            'refused, is reserved at 40 (tab_opened_requests, not charged to max_requests), and requests the page '
+            'finishes later in the same command use up that reservation first. Learning a refused query reads one '
+            'document per try, also outside max_requests; one command learns at most 3 times and reloads at most '
+            'once. Requests the open tab made between commands (its notification and screen-time polling, impression '
+            'logs) are reported as unwatched_requests and logged, not charged; their statuses and suspect bodies are '
+            'still checked, so a block seen there stops the next command before it sends anything. The tab is '
+            'emptied about 5 minutes after the last command, which ends that polling; a block empties it at once. '
+            'All invocations share one cross-process lock and 1-2 s pacing for the account.')
 
 ENVELOPE = {
     'ok': 'boolean — false only for the kinds whose ok is false (see kinds)',
     'command': 'string — the command that ran',
-    'sort, type': 'string — the order or vertical that makes this query what it is, when the command has one',
+    'sort, feed, tab, type, relation': 'string — the order or surface that makes this query what it is, when the '
+                                       'command has one',
     'stop_reason': 'string — why reading stopped; see stop_reasons (absent for argument errors)',
     'window': 'object — dated reads only: {since, until, coverage}; coverage follows window_coverage',
-    'sponsored_skipped': 'integer — feed only: advertisements left out of results and --limit',
     'request_count': 'integer — requests this invocation made (see requests)',
-    'tab_opened_requests': 'integer — of request_count, the requests of opening the dedicated tab (not charged to '
-                           'max_requests); absent when the tab was already open',
+    'tab_opened_requests': 'integer — of request_count, the requests of opening or reloading the dedicated tab (not '
+                           'charged to max_requests); absent when the tab was already open',
+    'unwatched_requests': 'integer — requests the open tab made between commands (not in request_count)',
+    'session_reset': 'boolean — the saved session was unreadable and was started over (a new tab was opened)',
     'max_requests': 'integer — the budget it had',
     'error': 'string — the kind of failure (see kinds); absent on success',
     'message': 'string — what failed',
     'fix': 'string — what to do next; a resumable budget stop carries one too',
     'coverage': 'array<string> — what this result does not cover: unread parts, response issues',
     'next': 'string — the command that continues this reading; run it as it is (text prints it as more:)',
+    'replies': 'object — post and replies: the reply coverage (reported_direct, received_direct, shown_direct, '
+               'shown_descendants, unshown_received, unavailable, unfetched, unfetched_is_estimate)',
+    'reported_total': 'integer — graph followers: the total Threads reports; the sample holds fewer',
     'out': 'string — the --out file',
     'count': 'integer — records saved in the --out file so far',
     'already_complete': 'boolean — the --out file was complete before this run; nothing was read',
-    'failed_sections': 'array<object> — about: collections that failed to load',
-    'thread': 'object — replies only: {post_url, parent_id, depth}; the replies shown answer the comment parent_id',
-    'results': 'array<object> — post, comment, entity, about or group records (see schema <object>); doctor returns '
-               'its checks, schema its documents',
+    'results': 'array<object> — post or account records (see schema post, account); doctor returns its checks, '
+               'schema its documents',
 }
 
 TEXT = {
-    'header': '<command>[ · sort=…][ · type=…] · <n> shown[ · sponsored_skipped=<n>] · stopped=<stop_reason> · '
-              'requests=<charged>/<budget>[ · tab opened (+<n> requests)]',
+    'header': '<command>[ · feed=…][ · sort=…][ · tab=…] · <n> shown · stopped=<stop_reason> · '
+              'requests=<charged>/<budget>[ · tab opened (+<n> requests)][ · unwatched=<n>]',
     'window': 'dated reads add a second line: window <since>..<until> · <coverage>',
-    'records': '[p<n>] posts, [c<n>] comments and replies, [e<n>] people, pages and groups, then about fields; each '
-               'record ends with the arguments of the next command: url (post), author (profile, about), '
-               'replies <handle> (a comment\'s replies)',
-    'text': 'text[N of M chars shown, complete|truncated]: N characters of the M received are shown (--chars); '
-            'truncated means Threads marked the received body itself as cut, so the rest is unknown even with '
-            '--chars 0',
-    'markers': {'?': 'a count Threads did not send', 'unavailable': 'a name or URL that was not sent (no handle to '
-                'follow there)', 'pinned': 'pinned to the top, so it can be old', 'undated': 'no creation time was '
-                'sent', 'incomplete': 'a piece of this record could not be merged; fields may be missing',
-                'sponsored': 'an advertisement', 'attachment=': 'what a comment carries besides text',
-                'reply-to=cN': 'a reply to the comment labelled cN on this page; replies shows a thread: line naming the '
-                               'comment its replies answer', 'shared-from': 'the post this one '
-                'shares, nested once per level', 'alt=': 'Threads\'s automatic description of a photo; generated by '
-                'Threads and can be wrong'},
-    'tail': 'coverage: <note> lines, then detail: <command> when --chars cut a comment, then more: <command> when '
-            'reading can continue. With --out the whole result is one line: <command> · <n> saved to "<path>" · '
-            'stopped=… · requests=… [· resume: <command>] [· error=<kind> fix=<fix>]',
+    'records': '[p<n>] posts, [r<n>] replies, [a<n>] accounts; each record ends with the arguments of the next '
+               'command: url (post <url> opens that one post), author (profile, about), replies <handle> (more '
+               'replies under it)',
+    'text': 'text[N of M chars shown]: N characters of the M received are shown (--chars); Threads sends whole '
+            'texts, so --chars 0 shows everything received',
+    'markers': {'?': 'a count Threads did not send (or the author hid)', 'unavailable': 'a post that was deleted or '
+                'is not visible to this account', 'pinned': 'pinned to the top of a profile, so it can be old',
+                'undated': 'no writing time was sent', 'reply-to=<label>': 'answers that record',
+                'continuation': 'the author continuing their own post', 'quoting': 'the post this one quotes: '
+                'its words are its own author\'s', 'repost of': 'the post this one shares: it adds no words, and '
+                'the date is the original\'s', 'alt=': 'Threads\' description of a photo; often generated '
+                'automatically and can be wrong'},
+    'tail': 'coverage: <note> lines, then more: <command> when reading can continue. With --out the whole result '
+            'is one line: <command> · <n> saved to "<path>" · stopped=… · requests=… [· resume: <command>] '
+            '[· error=<kind> fix=<fix>]',
 }
