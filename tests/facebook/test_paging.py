@@ -121,3 +121,12 @@ def test_one_empty_page_with_more_is_tolerated():
                   ([{'id': 'A'}], {'has_next_page': False, 'end_cursor': None}, True)])
     result = paging.paginate(lambda cursor: next(pages))
     assert [r['id'] for r in result['results']] == ['A'] and result['failure'] is None
+
+
+def test_new_records_left_out_by_the_window_still_count_as_progress():
+    """Codex round 5: pages of new posts that are all outside a date window are progress, not idle pages."""
+    pages = iter([([{'id': 'A', 'day': 12}], {'has_next_page': True, 'end_cursor': 'C1'}, True),
+                  ([{'id': 'B', 'day': 11}], {'has_next_page': True, 'end_cursor': 'C2'}, True),
+                  ([{'id': 'C', 'day': 10}], {'has_next_page': False, 'end_cursor': None}, True)])
+    result = paging.paginate(lambda cursor: next(pages), keep=lambda r: r['day'] <= 10)
+    assert [r['id'] for r in result['results']] == ['C'] and result['failure'] is None

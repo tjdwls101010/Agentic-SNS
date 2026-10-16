@@ -94,7 +94,7 @@ def _replies(connection, options, start, out):
     one_batch = limit is None and out is None
     result = paginate(fetch, limit=limit, state=state, max_pages=1 if one_batch else None,
                       commit=commit if out is not None else None, whole_pages=out is not None)
-    shown = (start.get('shown') or 0) + len(result['results'])
+    shown = (start.get('shown') or 0) + (out.count if out is not None else len(result['results']))
     reading = {'results': [] if out is not None else result['results'], 'stop_reason': result['stop_reason'],
                'failure': result['failure'], 'issues': issues, 'words': [], 'partial': bool(result['results']),
                'detail': True}

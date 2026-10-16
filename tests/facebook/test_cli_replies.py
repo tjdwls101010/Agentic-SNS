@@ -103,3 +103,25 @@ def test_an_empty_batch_that_says_more_is_not_an_empty_result(browser, data_dir)
     code, out, _ = run_cli(browser, 'replies', first, '--json')
     result = json.loads(out)
     assert code == 0 and result['ok'] is True and 'error' not in result and result['next']
+
+
+def test_reply_coverage_counts_what_an_earlier_out_run_saved(browser, data_dir, tmp_path):
+    """Codex round 5: a resumed --out reading counts the replies already in the file."""
+    script_post(browser, data_dir, [comment('C1', replies=4)], has_next=False)
+    code, out, _ = run_cli(browser, 'post', URL)
+    first = handle_of(out, 'c1')
+    target = str(tmp_path / 'replies.ndjson')
+    browser.respond('state', STATE_OK)
+    browser.respond('query', query_result(replies_body('C1', [comment(f'R{i}', replies=0, depth=1, parent='C1')
+                                                              for i in (1, 2)], cursor='RC1')),
+                    name='Depth1CommentsListPaginationQuery')
+    code, out, _ = run_cli(browser, 'replies', first, '--out', target, '--max-requests', '1', '--json')
+    assert code == 0, out
+    browser.respond('state', STATE_OK)
+    browser.respond('query', query_result(replies_body('C1', [comment(f'R{i}', replies=0, depth=1, parent='C1')
+                                                              for i in (3, 4)], has_next=False)),
+                    name='Depth1CommentsListPaginationQuery')
+    code, out, _ = run_cli(browser, 'replies', first, '--out', target, '--json')
+    result = json.loads(out)
+    assert code == 0 and result['count'] == 4
+    assert not any('were sent' in line for line in result.get('coverage', []))

@@ -69,13 +69,14 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
             if closes and closes(records):
                 cursor, closed, damaged = END, True, False
         served += 1
-        page, page_skipped = [], []
+        page, page_skipped, fresh = [], [], 0
         for record in records:
             identity = record.get('id')
             if fetched and identity is not None:
                 if identity in seen:
                     continue
                 seen.add(identity)
+            fresh += 1  # new to this reading, whether or not the window keeps it
             if skip and skip(record):
                 page_skipped.append(identity)
                 continue
@@ -83,8 +84,7 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
                 page.append(record)
         skipped += page_skipped
         if fetched:
-            fresh_ids = len(page) + len(page_skipped) + sum(1 for r in records if r.get('id') is None)
-            idle = 0 if fresh_ids or cursor == END else idle + 1
+            idle = 0 if fresh or cursor == END else idle + 1
             if idle >= 2:
                 results.extend(page)
                 return outcome(None, FacebookError(6, 'Facebook kept sending pages with nothing new, so reading '
