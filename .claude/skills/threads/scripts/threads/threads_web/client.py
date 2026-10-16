@@ -498,11 +498,29 @@ class Client:
     def profile_tab(self, tab, user_id, username, cursor):
         if tab == 'threads':
             key = 'profile_threads' if cursor is None else 'profile_threads_next'
-            variables = {'userID': user_id, **({'after': cursor} if cursor else {})}
         else:
-            key, variables = 'profile_' + tab, {'userID': user_id, **({'after': cursor} if cursor else {})}
+            key = 'profile_' + tab
+        variables = {'userID': user_id, **({'after': cursor} if cursor else {})}
         payload = self.query(key, variables, route={'username': username})
-        return self._read(key, lambda: records.connection_page(payload['data'], 'profile_tab'))
+
+        def parse():
+            page = records.connection_page(payload['data'], 'profile_tab')
+            # A query learned this command must show what this tab is: this profile's own posts, or its reposts.
+            if key in self.provisional and not all(
+                    any(r.get('reposted_post') for r in group) if tab == 'reposts'
+                    else any((r.get('author') or {}).get('id') == user_id for r in group) for group in page.groups):
+                self.provisional.pop(key)
+                raise ThreadsError(6, f'The query found for the {tab} tab did not return this profile\'s {tab}.',
+                                   'Tell the user the Threads reader needs an update.', reason='stale')
+            return page
+        return self._read(key, parse)
+
+    def profile_card(self, user_id, username, *, fallback=None):
+        """The profile's card (one request); the user object from the id lookup stands in if the card has none."""
+        payload = self.query('profile_card', {'userID': user_id}, route={'username': username})
+        data = payload.get('data') or {}
+        user = data.get('user') or data.get('xdt_text_app_user') or fallback
+        return self._read('profile_card', lambda: records.profile_card(user, username))
 
     def search_posts(self, text, *, recent, tag, cursor):
         variables = {'query': text, 'recent': 1 if recent else 0, 'search_surface': 'tags' if tag else 'default'}

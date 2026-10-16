@@ -6,6 +6,7 @@ import sys
 import time
 
 from conftest import (ACCOUNT, CLI, LOGGED_IN_DOCUMENT, START, environment, known_tab, opening, run_cli, state)
+from threads.session import Session
 
 CHECKPOINT_BODY = json.dumps({'message': 'checkpoint_required', 'checkpoint_url': 'https://www.threads.com/challenge/x/',
                               'status': 'fail'})
@@ -82,7 +83,7 @@ def test_a_checkpoint_body_the_tab_kept_blocks_and_empties_the_tab(browser, data
     assert code == 5 and result['error'] == 'blocked' and 'checkpoint' in result['message']
     assert block_file(data_dir)['reason'] == 'checkpoint'
     assert 'blank' in browser.ops() and 'modules' not in browser.ops()
-    assert json.loads((data_dir / 'session/default.json').read_text())['ack'] == 1792148826874
+    assert Session('default').ack == 1792148826874
 
 
 def test_an_ordinary_signal_is_acknowledged_without_a_block(browser, data_dir):
@@ -92,7 +93,7 @@ def test_an_ordinary_signal_is_acknowledged_without_a_block(browser, data_dir):
     code, result, _ = doctor(browser)
     assert code == 0, result
     assert block_file(data_dir) is None
-    assert json.loads((data_dir / 'session/default.json').read_text())['ack'] == 55
+    assert Session('default').ack == 55
 
 
 def test_a_tab_on_the_challenge_page_is_a_checkpoint(browser, data_dir):
@@ -230,7 +231,7 @@ def test_the_strongest_signal_wins_and_is_recorded_before_acknowledging(browser,
     code, result, _ = doctor(browser)
     assert code == 5 and block_file(data_dir)['reason'] == 'rate_limit'
     assert 'blank' in browser.ops()
-    assert json.loads((data_dir / 'session/default.json').read_text())['ack'] == 11
+    assert Session('default').ack == 11
 
 
 def test_a_429_seen_while_the_tab_was_still_loading_is_recorded(browser, data_dir):
@@ -334,11 +335,11 @@ def test_a_tab_that_could_not_be_emptied_is_emptied_later(browser, data_dir):
     browser.respond('blank', failing).respond('blank', failing)
     code, result, _ = doctor(browser)
     assert code == 5
-    assert json.loads((data_dir / 'session/default.json').read_text())['dirty'] is True
+    assert Session('default').dirty is True
     browser.respond('blank', {'blanked': True, 'resources': 0, 'statuses': [], 'signals': [], 'location': START})
     code, out, _ = run_cli(browser, 'idle', '--token', 'whatever', '--after', '0')
     assert json.loads(out)['outcome'] == 'blanked'
-    assert json.loads((data_dir / 'session/default.json').read_text())['dirty'] is False
+    assert Session('default').dirty is False
 
 
 def test_a_busy_idle_blanker_waits_for_the_running_command_to_end(browser, data_dir):

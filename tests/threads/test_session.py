@@ -87,3 +87,21 @@ def test_lease_updates_wait_for_the_session_lock(data_dir):
     assert waited >= 0.5
     assert len(Session('u0').active) == 0 or token not in Session('u0').active
     assert Session('u0').released == token
+
+
+def test_what_is_written_inside_account_protection_never_waits_for_the_session_lock(data_dir):
+    holder = subprocess.Popen([sys.executable, '-c', (
+        'import time\nfrom threads.session import Session\ns = Session("u0")\n'
+        'with s.opening():\n    print("in", flush=True)\n    time.sleep(2.0)\n')],
+        env={**os.environ, 'PYTHONPATH': str(SKILL / 'scripts')}, stdout=subprocess.PIPE, text=True)
+    assert holder.stdout.readline().strip() == 'in'
+    s = Session('u0')
+    started = time.monotonic()
+    s.acknowledge(42)
+    s.set_dirty(True)
+    s.learn('BarcelonaFeedDirectQuery', '9')
+    s.rename('profile_media', 'BarcelonaProfileMediaTabDirectQuery')
+    assert time.monotonic() - started < 0.5  # waiting here could deadlock against a starting command
+    holder.wait(timeout=10)
+    again = Session('u0')
+    assert again.ack == 42 and again.dirty and again.query('BarcelonaFeedDirectQuery')['doc_id'] == '9'

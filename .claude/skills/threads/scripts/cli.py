@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date
 
-from threads import listing, maintenance, thread
+from threads import about, listing, maintenance, thread
 from threads.errors import ThreadsError
 from threads.render import render_page, render_summary
 from threads.results import failure_envelope
@@ -109,6 +109,27 @@ COMMANDS = {
                    'requests: 1 per page of about 5-10 posts.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
+    'profile': {
+        'help': 'Read a profile\'s tab: threads, replies, reposts or media.',
+        'run': listing.profile,
+        'arguments': [(('target',), {'help': 'Threads @handle or profile URL; a tab URL such as /@name/replies reads that tab'}),
+                      (('--tab',), {'choices': ['threads', 'replies', 'reposts', 'media'], 'help': 'The tab (default: the URL\'s tab, else threads)'}),
+                      'since', 'until'] + list(LIST),
+        'epilog': ['threads and replies are newest first, so a --since window closes at the first page wholly older than it (a pinned post sits first whatever its date and does not close it). reposts and media are in no date order: a window covers them only when read to the end. A repost carries the original post\'s date, not when it was reposted.',
+                   'A private profile this account does not follow is unavailable (exit 9), which is not the same as empty.',
+                   'Without --limit, a window or --out it reads one page; more: continues.',
+                   'requests: 1 to find the profile, then 1 per page (about 10 posts on threads). The first read of the replies, reposts or media tab in a while also reads that tab\'s screen once to learn its query (outside --max-requests).'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
+    },
+    'about': {
+        'help': 'Read a profile\'s card: name, bio, links, verification, privacy, follower count.',
+        'run': about.about,
+        'arguments': [(('target',), {'help': 'Threads @handle or profile URL'}), 'json', 'max_requests'],
+        'epilog': ['Threads publishes a follower count but no following or mutual count: those are shown as ? (unknown); graph following lists the accounts.',
+                   'A verified badge and a bio are what the account claims about itself.',
+                   'requests: 2 (find the profile, read its card).'],
+        'exits': (0, 2, 3, 4, 5, 6, 9),
+    },
     'post': {
         'help': 'Read one post in full with its parent chain and first batch of replies.',
         'run': thread.post,
@@ -150,7 +171,7 @@ COMMANDS = {
         'exits': (0, 2),
     },
 }
-READS = ('feed', 'post', 'replies')
+READS = ('feed', 'profile', 'about', 'post', 'replies')
 HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 

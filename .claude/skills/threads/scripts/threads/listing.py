@@ -9,9 +9,12 @@ finite list in no date order (reposts, media) covers the window only when read t
 from datetime import date, datetime
 
 from threads import connect
+from threads.errors import ThreadsError
 from threads.paging import paginate
+from threads.threads_web import parse_user
 
 FEEDS = {'foryou': ('for_you', 'unordered'), 'following': ('following', 'newest_first')}
+TABS = {'threads': 'newest_first', 'replies': 'newest_first', 'reposts': 'finite', 'media': 'finite'}
 
 
 def _local_day(stamp):
@@ -91,6 +94,38 @@ def feed(options):
                      fetch=lambda cursor: connection.client.feed(variant, cursor))
 
     return connect.run(options, command='feed', target=None, identity=identity, reader=read,
+                       window=_window(options, order))
+
+
+def profile(options):
+    target = parse_user(options['target'])
+    tab = options.get('tab')
+    if tab and target.tab and tab != target.tab:
+        raise ThreadsError(2, f'The URL is the {target.tab} tab but --tab asks for {tab}.', 'Give one of them.')
+    tab = tab or target.tab or 'threads'
+    order = TABS[tab]
+    identity = {'tab': tab, 'since': options.get('since'), 'until': options.get('until')}
+
+    def read(connection, state, out):
+        client = connection.client
+        saved = (state or {}) if out is None else (out.state or {})
+        user_id = saved.get('user_id')
+        user = None
+        if not user_id:
+            user_id, user = client.profile_id(target.username)
+        extra = {'user_id': user_id}
+        reading = _read(options, identity, state, out, order=order, command='profile', target=target.url, extra=extra,
+                        fetch=lambda cursor: client.profile_tab(tab, user_id, target.username, cursor))
+        if user is not None and not reading['results'] and not reading.get('failure') and not reading.get('continuation') \
+                and (out is None or not out.count):
+            friendship = user.get('friendship_status') if isinstance(user.get('friendship_status'), dict) else {}
+            if user.get('text_post_app_is_private') and friendship.get('following') is False:
+                reading['failure'] = ThreadsError(9, f'@{target.username} is private and this account does not follow '
+                                                     'it.', 'Tell the user; only accepted followers can read it.',
+                                                  reason='unavailable')
+        return reading
+
+    return connect.run(options, command='profile', target=target.url, identity=identity, reader=read,
                        window=_window(options, order))
 
 
