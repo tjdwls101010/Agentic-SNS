@@ -299,3 +299,59 @@ def test_unblock_and_a_starting_command_take_the_locks_in_one_order(browser, dat
     out, _ = unblock.communicate(timeout=30)  # a deadlock would time out here
     assert holder.communicate(timeout=30)[0].strip() == 'done'
     assert json.loads(out)['ok'] is True and block_file(data_dir) is None
+
+
+# --- second review round ---
+
+def test_a_stopped_call_still_charges_what_the_tab_finished(browser, data_dir):
+    from conftest import query_result
+    benign = {'url': 'https://www.threads.com/graphql/query', 'status': 200, 'at': 7,
+              'summary': '{"errors": [{"message": "A field could not be resolved", "severity": "WARNING"}]}'}
+    known_tab(browser, data_dir)
+    browser.respond('query', {'stopped': 'signal', 'explicit': 0, 'resources': 5, 'statuses': [200] * 5,
+                              'signals': [benign], 'location': START})
+    browser.respond('query', query_result({'data': {'feedData': {'edges': [], 'page_info': {'has_next_page': False,
+                                                                                          'end_cursor': None}}}}))
+    code, out, _ = run_cli(browser, 'feed', '--json')
+    result = json.loads(out)
+    assert browser.ops().count('query') == 2 and result['request_count'] >= 6
+
+
+def test_a_tab_that_vanishes_before_a_query_is_reopened_once(browser, data_dir):
+    from conftest import opening, query_result
+    known_tab(browser, data_dir).vanish_after_state('T1')
+    opening(browser)
+    browser.respond('query', query_result({'data': {'feedData': {'edges': [], 'page_info': {'has_next_page': False,
+                                                                                          'end_cursor': None}}}}))
+    code, out, _ = run_cli(browser, 'feed', '--json')
+    assert browser.ops().count('open') == 1 and json.loads(out)['tab_opened_requests'] == 40
+
+
+def test_a_tab_that_could_not_be_emptied_is_emptied_later(browser, data_dir):
+    signal = {'url': 'https://www.threads.com/graphql/query', 'status': 200, 'summary': RATE_BODY, 'at': 5}
+    known_tab(browser, data_dir, signals=[signal])
+    failing = {'__raw_stdout': '{"kind": "error", "error": "evaluate_failed", "message": "x"}\n'}
+    browser.respond('blank', failing).respond('blank', failing)
+    code, result, _ = doctor(browser)
+    assert code == 5
+    assert json.loads((data_dir / 'session/default.json').read_text())['dirty'] is True
+    browser.respond('blank', {'blanked': True, 'resources': 0, 'statuses': [], 'signals': [], 'location': START})
+    code, out, _ = run_cli(browser, 'idle', '--token', 'whatever', '--after', '0')
+    assert json.loads(out)['outcome'] == 'blanked'
+    assert json.loads((data_dir / 'session/default.json').read_text())['dirty'] is False
+
+
+def test_a_busy_idle_blanker_waits_for_the_running_command_to_end(browser, data_dir):
+    known_tab(browser, data_dir).respond('modules', MODULES)
+    code, _, _ = doctor(browser)
+    session = json.loads((data_dir / 'session/default.json').read_text())
+    worker = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(1.5)'])
+    import threading
+    threading.Thread(target=worker.wait, daemon=True).start()  # reaped as a shell reaps a command that ends
+    session['active'] = {'a-command-that-dies': worker.pid}
+    (data_dir / 'session/default.json').write_text(json.dumps(session))
+    browser.respond('blank', {'blanked': True, 'resources': 0, 'statuses': [], 'signals': [], 'location': START})
+    started = time.time()
+    code, out, _ = run_cli(browser, 'idle', '--token', session['released'], '--after', '1')
+    worker.wait()
+    assert json.loads(out)['outcome'] == 'blanked' and time.time() - started >= 1.5

@@ -183,9 +183,7 @@ class Client:
         if report.get('markers'):
             verdicts.append(classify.response({'status': 200, 'url': START, 'body': '\n'.join(map(str, report['markers']))},
                                               mode='page'))
-        rank = {'checkpoint': 3, 'rate_limit': 2}
-        strongest = max((v for v in verdicts if v.block or v.kind == 'login'),
-                        key=lambda v: rank.get(v.block, 1), default=None)
+        strongest = classify.strongest(verdicts)
         moments = [s['at'] for s in signals if type(s.get('at')) in (int, float)]
         if strongest is not None and strongest.block:
             self._stop(slot, strongest, moments)
@@ -200,25 +198,29 @@ class Client:
         try:
             slot.block(verdict.block)
         finally:
-            self._empty()
+            if not self._empty():
+                self.memory.set_dirty(True)  # the idle blanker keeps trying; the tab must not keep polling
         if moments:
             self.memory.acknowledge(max(moments))
         raise verdict.error
 
-    def _empty(self):
-        """Navigate the tab to about:blank and confirm it there; a failed attempt is retried once. Makes no request."""
-        for attempt in range(2):
-            try:
-                self.browser.evaluate(self.tab, SNIPPETS['blank'], self._args({}))
-            except ThreadsError as error:
-                if error.reason == 'tab_missing':
-                    return True  # a tab that is gone polls nothing
-                continue
+    def _empty(self, sent=False):
+        """Navigate the tab to about:blank and confirm it there (sent: already asked once); a failed attempt is
+        retried. Makes no request."""
+        for attempt in range(3):
+            if attempt or not sent:
+                try:
+                    self.browser.evaluate(self.tab, SNIPPETS['blank'], self._args({}))
+                except ThreadsError as error:
+                    if error.reason == 'tab_missing':
+                        return True  # a tab that is gone polls nothing
+                    continue
             for _ in range(10):
                 tab = next((t for t in self.browser.tabs() if t['target_id'] == self.tab), None)
                 if tab is None or not _host(tab['url']):
                     return True
                 time.sleep(0.3)
+            sent = False
         return False
 
     def blank(self):
@@ -238,7 +240,9 @@ class Client:
                     self._consume(report, slot)
                 except ThreadsError:
                     pass  # recorded; the tab is being emptied anyway
-            return self._empty()
+            emptied = self._empty(sent=True)
+            self.memory.set_dirty(not emptied)
+            return emptied
 
     # --- requests --------------------------------------------------------------------------------------------
 
@@ -257,7 +261,8 @@ class Client:
                     if not isinstance(result, dict):
                         raise ThreadsError(3, 'The Threads tab answered invalidly.', 'Run doctor.')
                     if result.get('stopped') or result.get('refused') or result.get('missing'):
-                        slot.cancel()  # nothing was sent
+                        slot.cancel()  # our request was not sent; what the tab finished meanwhile still counts
+                        self._charge(slot, {**result, 'explicit': 0})
                     else:
                         self._charge(slot, result)
                     if self.verbose:
@@ -279,15 +284,15 @@ class Client:
             except ThreadsError as error:
                 if error.reason != 'tab_missing' or attempt:
                     raise
-                continue
-            with self.memory.opening():
-                self._open()
+                with self.memory.opening():
+                    self._open()
         raise ThreadsError(6, 'The tab kept holding signals this skill could not clear, so nothing was sent.',
                            'Run doctor; close the tab if it keeps happening.', reason='stuck')
 
     def _charge(self, slot, result):
         """Charge what the call sent and what the tab finished meanwhile; late requests use up a reservation first."""
         explicit, seen = _int(result.get('explicit'), 1), _int(result.get('resources'))
+        seen = max(seen, explicit)
         extra = max(0, seen - explicit)
         for bucket in ('setup', 'budget'):
             used = min(extra, self.prepaid[bucket])

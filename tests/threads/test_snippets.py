@@ -270,3 +270,27 @@ def test_our_own_suspect_response_is_seen_through_the_hooked_fetch(tmp_path):
               page(fetch=[{'status': 200, 'url': 'https://www.threads.com/api/graphql/', 'body': body}]))
     assert len(out['fetches']) == 1
     assert out['results'][2]['signals'] and out['results'][2]['signals'][0]['status'] == 200
+
+
+# --- second review round ---
+
+def test_nothing_is_sent_while_the_document_shows_a_checkpoint_form(tmp_path):
+    out = run(tmp_path, [{'snippet': 'query', 'args': query_args(__markers=MARKERS)}],
+              page(html='<html><form action="/challenge/x/"></form></html>'))
+    assert out['fetches'] == [] and out['results'][0]['stopped'] == 'markers'
+    assert out['results'][0]['markers'] == ['<form action="/challenge/']
+
+
+def test_a_checkpoint_marker_deep_inside_a_json_answer_is_kept(tmp_path):
+    body = json.dumps({'data': None, 'extensions': {'checkpoint_required': True}})
+    app = [{'url': 'https://www.threads.com/graphql/query', 'status': 200, 'body': body}]
+    out = run(tmp_path, [{'snippet': 'state', 'args': {'__markers': MARKERS}},
+                         {'snippet': 'state', 'args': {'__markers': MARKERS}, 'app': app}], page())
+    [signal] = out['results'][1]['signals']
+    assert threads_web.classify_signal(signal).block == 'checkpoint'
+
+
+def test_a_signal_kept_in_the_earlier_format_is_still_classified():
+    legacy = {'url': 'https://www.threads.com/graphql/query', 'status': 200, 'at': 1,
+              'body': json.dumps({'message': 'checkpoint_required', 'checkpoint_url': 'https://www.threads.com/challenge/'})}
+    assert threads_web.classify_signal(legacy).block == 'checkpoint'

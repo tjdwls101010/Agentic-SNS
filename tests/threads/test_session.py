@@ -70,3 +70,20 @@ def test_acknowledged_signals_and_renames_persist(data_dir):
     assert again.ack == 1792148826874
     assert again.renamed('profile_replies') == 'BarcelonaProfileRepliesTabDirectQuery'
     assert again.renamed('feed_next') is None
+
+
+def test_lease_updates_wait_for_the_session_lock(data_dir):
+    s = Session('u0')
+    token = s.touch()
+    holder = subprocess.Popen([sys.executable, '-c', (
+        'import time\nfrom threads.session import Session\ns = Session("u0")\n'
+        'with s.opening():\n    print("in", flush=True)\n    time.sleep(1.0)\n    s.touch()\n')],
+        env={**os.environ, 'PYTHONPATH': str(SKILL / 'scripts')}, stdout=subprocess.PIPE, text=True)
+    assert holder.stdout.readline().strip() == 'in'
+    started = time.monotonic()
+    s.release(token)  # must not overwrite the other process's lease with an older snapshot
+    waited = time.monotonic() - started
+    holder.wait(timeout=10)
+    assert waited >= 0.5
+    assert len(Session('u0').active) == 0 or token not in Session('u0').active
+    assert Session('u0').released == token

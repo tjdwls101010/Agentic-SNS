@@ -34,7 +34,7 @@
     };
     const remember = (url, status, text) => {
       const summary = summarize(text);
-      const excerpt = summary === undefined ? kit.found(text).join('\n') : '';
+      const excerpt = kit.found(text).join('\n');  // markers anywhere, in a document or deep inside a JSON answer
       if (status !== 429 && !MOVED.test(pathOf(url)) && !summary && !excerpt) return;
       const signal = {url: String(url).slice(0, 200), status, summary: summary || null, excerpt: excerpt || null, at: Date.now()};
       kit.signals.push(signal);
@@ -89,10 +89,13 @@
     return {resources: earlier.resources + after.resources, statuses: earlier.statuses.concat(after.statuses),
             signals: kit.pending(), location: location.href};
   };
-  // What a call may not do: send while the tab shows a block or login page, or holds an unclassified signal or a 429.
+  // What a call may not do: send while the tab shows a block or login page (its address or its document), or holds an
+  // unclassified signal or a 429.
   kit.gate = async () => {
     const before = await kit.settle(0);
     if (kit.moved()) return {stopped: 'location', explicit: 0, ...(await kit.report(0, before))};
+    const markers = kit.found(document.documentElement ? document.documentElement.outerHTML : '');
+    if (markers.length) return {stopped: 'markers', explicit: 0, markers, ...(await kit.report(0, before))};
     if (before.statuses.includes(429) || kit.pending().length) return {stopped: 'signal', explicit: 0, ...(await kit.report(0, before))};
     return {before};
   };

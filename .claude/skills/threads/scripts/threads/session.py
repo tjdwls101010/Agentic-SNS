@@ -28,7 +28,8 @@ class Session:
         return state_dir('session') / f'{self.account_key}.json'
 
     def _load(self):
-        empty = {'tab': None, 'token': None, 'ack': 0, 'renames': {}, 'active': {}, 'released': None, 'queries': {}}
+        empty = {'tab': None, 'token': None, 'ack': 0, 'renames': {}, 'active': {}, 'released': None, 'dirty': False,
+                 'queries': {}}
         try:
             data = json.loads(self._path().read_text())
         except FileNotFoundError:
@@ -47,6 +48,7 @@ class Session:
                 'renames': data.get('renames') if isinstance(data.get('renames'), dict) else {},
                 'active': data.get('active') if isinstance(data.get('active'), dict) else {},
                 'released': data.get('released') if isinstance(data.get('released'), str) else None,
+                'dirty': data.get('dirty') is True,
                 'queries': data.get('queries', {})}
 
     def reload(self):
@@ -108,18 +110,30 @@ class Session:
         """Mark a new use of the tab by this process; returns its token. While a command holds a token it is active,
         and no idle blanker empties the tab."""
         token = f'{time.time():.3f}-{secrets.token_hex(4)}'
-        current = self._load()
-        current['active'] = {**self._alive(current['active']), token: os.getpid()}
-        self._data = {**current, 'token': token}
-        self._save()
+        with self.opening():
+            current = self._load()
+            current['active'] = {**self._alive(current['active']), token: os.getpid()}
+            self._data = {**current, 'token': token}
+            self._save()
         return token
 
     def release(self, token):
         """The command that holds `token` is done with the tab: it is no longer active and is the last one released."""
-        current = self._load()
-        current['active'] = {k: v for k, v in self._alive(current['active']).items() if k != token}
-        self._data = {**current, 'released': token}
-        self._save()
+        with self.opening():
+            current = self._load()
+            current['active'] = {k: v for k, v in self._alive(current['active']).items() if k != token}
+            self._data = {**current, 'released': token}
+            self._save()
+
+    @property
+    def dirty(self):
+        """The tab should have been emptied (a block was recorded) and could not be: the idle blanker keeps trying."""
+        return self._data['dirty']
+
+    def set_dirty(self, value):
+        with self.opening():
+            self._data = {**self._load(), 'dirty': bool(value)}
+            self._save()
 
     @staticmethod
     def _alive(active):

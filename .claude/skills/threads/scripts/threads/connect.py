@@ -47,39 +47,49 @@ class Connection:
     def release(self):
         """Give the tab back, and leave the idle blanker behind: it empties the tab after IDLE_SECONDS unless another
         command is still using it or was released after this one."""
-        if not self.client.token or not self.client.tab:
+        if not self.client.tab:
             return
-        self.memory.release(self.client.token)
+        if self.client.token:
+            self.memory.release(self.client.token)
+        elif not self.memory.reload().dirty:
+            return  # the command never used the tab, and nothing is left to empty
         seconds = os.environ.get('THREADS_IDLE_SECONDS')
         if seconds == 'off':
             return  # a person who wants the tab left open
         delay = int(seconds) if seconds and seconds.isdigit() else IDLE_SECONDS
         try:
-            subprocess.Popen([sys.executable, str(CLI), 'idle', '--token', self.client.token, '--after', str(delay)],
+            subprocess.Popen([sys.executable, str(CLI), 'idle', '--token', self.client.token or '-', '--after', str(delay)],
                              stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                              start_new_session=True, env=os.environ.copy())
         except OSError:
             pass  # without it the tab stays open until the next command or a person closes it
 
 
+# 성진: 바쁜 탭은 IDLE_SECONDS 간격으로 12번까지 다시 본다 — 그보다 오래 도는 명령은 끝날 때 자기 비우기를 남긴다
+BUSY_CHECKS = 12
+
+
 def idle(token, after):
-    """Empty the dedicated tab after `after` seconds when the latest command is still the one that left `token`."""
-    time.sleep(after)
+    """Empty the dedicated tab after `after` seconds when no command is using it and the last one released was the
+    one that left `token`, or when an earlier attempt to empty it failed. While a command still runs, it waits and
+    looks again, so a command that dies without releasing does not leave the tab polling."""
     browser = Aside()
     memory = Session(browser.account_key)
     client = Client(browser, protection.Guard(1), memory)
-    with memory.opening():
-        memory.reload()
-        if memory.active:
-            return 'busy'  # a command still running uses the tab; its own release starts another blanker
-        if memory.released != token or not memory.tab:
-            return 'newer command'
-        client.tab = memory.tab
-        try:
-            client.blank()
-        except ThreadsError as error:
-            return error.reason or 'failed'
-    return 'blanked'
+    for _ in range(BUSY_CHECKS):
+        time.sleep(max(after, 1) if _ else after)
+        with memory.opening():
+            memory.reload()
+            if memory.active:
+                continue  # a command still running uses the tab
+            if not memory.tab or (memory.released != token and not memory.dirty):
+                return 'newer command'
+            client.tab = memory.tab
+            try:
+                return 'blanked' if client.blank() else 'not blanked'
+            except ThreadsError as error:
+                return error.reason or 'failed'
+    return 'busy'
 
 
 def run(options, *, command, target, identity, reader, window=None):

@@ -139,12 +139,23 @@ def response(envelope, *, mode):
 
 
 def signal(kept):
-    """The verdict on one response the tab kept: its error-field summary (JSON), its marker excerpt (a document), or
-    only its status and address."""
+    """The verdict on one response the tab kept: the strongest of its error-field summary (JSON), its marker excerpt,
+    a body kept in the earlier format, and its status and address."""
     status, url = kept.get('status'), kept.get('url') or ''
+    verdicts = [response({'status': status, 'url': url, 'body': kept.get('excerpt') or ''}, mode='page')]
     if kept.get('summary'):
-        return response({'status': status, 'url': url, 'body': kept['summary']}, mode='graphql')
-    return response({'status': status, 'url': url, 'body': kept.get('excerpt') or ''}, mode='page')
+        verdicts.append(response({'status': status, 'url': url, 'body': kept['summary']}, mode='graphql'))
+    if kept.get('body'):
+        mode = 'graphql' if str(kept['body']).lstrip()[:1] in ('{', '[') else 'page'
+        verdicts.append(response({'status': status, 'url': url, 'body': kept['body']}, mode=mode))
+    return strongest(verdicts) or verdicts[-1]
+
+
+def strongest(verdicts):
+    """The verdict that weighs most: a checkpoint, then a rate limit, then a login page; None when none is any."""
+    rank = {'checkpoint': 3, 'rate_limit': 2}
+    found = [v for v in verdicts if v.block or v.kind == 'login']
+    return max(found, key=lambda v: rank.get(v.block, 1)) if found else None
 
 
 def _field(html, name):
