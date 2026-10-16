@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date
 
-from threads import listing, maintenance
+from threads import listing, maintenance, thread
 from threads.errors import ThreadsError
 from threads.render import render_page, render_summary
 from threads.results import failure_envelope
@@ -109,6 +109,29 @@ COMMANDS = {
                    'requests: 1 per page of about 5-10 posts.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
+    'post': {
+        'help': 'Read one post in full with its parent chain and first batch of replies.',
+        'run': thread.post,
+        'arguments': [(('target',), {'metavar': 'URL', 'help': 'Threads post URL (/@name/post/<code> or /t/<code>) or its shortcode'}),
+                      (('--sort',), {'choices': ['top', 'recent'], 'default': 'top', 'help': 'Reply order: top (Threads ranks them) or recent (newest first)'}),
+                      (('--limit',), {'type': positive, 'help': 'Direct replies to show from the first batch (each with what hangs under it)'}),
+                      (('--chars',), {'type': chars, 'help': 'Characters of each parent and reply to show (default 180; 0 = all); the post itself is always shown in full'}),
+                      'json', 'max_requests'],
+        'epilog': ['The post is shown in full, after the posts it answers (parent). Its first batch of direct replies follows, each with what hangs under it: replies to it (reply-to=) and the replier continuing (continuation of). A reply with more under it ends with replies <handle>, which opens that branch; more: reads the next batch of direct replies. A replies line says how many direct replies Threads reports, how many arrived and an estimate of those never received.',
+                   'Every record\'s url opens that one post with post <url> (a reply is a post too).',
+                   'requests: 3 (the post, its parents, its first replies); no screen is opened.'],
+        'exits': (0, 2, 3, 4, 5, 6, 8, 9),
+    },
+    'replies': {
+        'help': 'Read the next batch of a post\'s replies, or the replies under one reply, by the handle post printed.',
+        'run': thread.replies,
+        'arguments': [(('target',), {'metavar': 'HANDLE', 'help': 'The number after "replies" (a branch) or in a more: line (the next batch)'}),
+                      (('--limit',), {'type': positive, 'help': 'Replies to show; omitted: one batch, or every batch with --out. With --out it counts replies saved'}),
+                      'chars', 'out', 'json', 'max_requests'],
+        'epilog': ['A handle names a batch: the next batch of a post\'s direct replies, or the replies under one reply. Running it again reads the same batch again, live; it is not a replay. more: prints the handle of the batch after.',
+                   'requests: 1 per batch of about 10 replies.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8),
+    },
     'doctor': {
         'help': 'Check Aside, the browser tab, login and account protection; always JSON.',
         'run': maintenance.doctor,
@@ -127,7 +150,7 @@ COMMANDS = {
         'exits': (0, 2),
     },
 }
-READS = ('feed',)
+READS = ('feed', 'post', 'replies')
 HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 
@@ -171,6 +194,9 @@ def validate(options):
             raise ThreadsError(2, f'The {key} contains a line break or another control character.', 'Pass it on one line.')
     if options.get('since') and options.get('until') and options['since'] > options['until']:
         raise ThreadsError(2, '--since must not be later than --until.', 'Swap the two dates.')
+    if options['command'] == 'replies' and not (options['target'].isascii() and options['target'].isdigit()):
+        raise ThreadsError(2, 'A replies handle is the number printed after "replies" or in a more: line.',
+                           'Copy the whole replies or more: line.')
     if options.get('after') and options.get('out'):
         raise ThreadsError(2, '--after and --out cannot be combined; --out resumes its own file.',
                            'Rerun the same command with the same --out path.')

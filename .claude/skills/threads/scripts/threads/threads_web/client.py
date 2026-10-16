@@ -317,7 +317,7 @@ class Client:
             self.memory.rename(key, name)
             self.memory.learn(name, doc_id, flags)
 
-    def query(self, key, variables, *, route=None):
+    def query(self, key, variables, *, route=None, missing=None):
         """The decoded payload of one read query; a refused one is learned again once (see the module docstring)."""
         spec = self._spec(key)
         for attempt in range(2):
@@ -344,6 +344,8 @@ class Client:
                     self._learn(key, spec, route)
                 spec = self._spec(key)
                 continue
+            if missing is not None and verdict.reason == 'shape_changed':
+                raise missing  # this read's empty answer means its target is not there
             if verdict.error:
                 raise verdict.error
             if verdict.kind != 'ok':
@@ -455,7 +457,9 @@ class Client:
         """The post, its parents and its first reply batch: three requests, no screen move."""
         route = {'post_path': target.path}
         post_id = target.post_id
-        responses = [self.query('post_target', {'postID': post_id}, route=route)['data'],
+        gone = ThreadsError(9, 'This post is unavailable: deleted, or not visible to this account.',
+                            'Tell the user; retrying will not change it.', reason='unavailable')
+        responses = [self.query('post_target', {'postID': post_id}, route=route, missing=gone)['data'],
                      self.query('post_parents', {'postID': post_id}, route=route)['data'],
                      self.query('post_replies', {'postID': post_id, 'sortOrder': sort.upper()}, route=route)['data']]
         page = records.post_page(responses, code=target.code, post_id=post_id, limit=limit)
@@ -463,11 +467,17 @@ class Client:
             self._confirm(key)
         return page
 
-    def replies(self, post_id, cursor, *, sort, path):
+    def reply_batch(self, post_id, cursor, *, sort, path, seen):
         """One further batch of a post's direct replies."""
         payload = self.query('replies_next', {'postID': post_id, 'after': cursor, 'sortOrder': sort.upper()},
                              route={'post_path': path})
-        return payload['data']
+        return self._read('replies_next', lambda: records.next_batch(payload['data'], post_id, seen))
+
+    def branch(self, post_id, parent_id, cursor, *, path):
+        """One batch of the replies under one reply."""
+        payload = self.query('sub_replies', {'postID': parent_id, 'permalinkPostID': post_id, 'after': cursor},
+                             route={'post_path': path})
+        return self._read('sub_replies', lambda: records.branch_batch(payload['data'], parent_id))
 
     def profile_id(self, username):
         """The numeric id of a handle, and its user object (one request)."""

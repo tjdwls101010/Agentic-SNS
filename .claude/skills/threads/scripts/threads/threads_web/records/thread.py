@@ -14,6 +14,13 @@ _CHANGED = 'Threads changed this response; the skill needs an update.'
 
 
 @dataclass
+class Batch:
+    records: list
+    cursor: str | None = None                       # the next batch, when Threads has more
+    branches: dict = field(default_factory=dict)    # reply id → {cursor} of replies under it not yet sent
+
+
+@dataclass
 class PostPage:
     records: list
     coverage: dict
@@ -135,3 +142,54 @@ def post_page(responses, *, code, post_id, limit):
     info = (replies_info.get('direct_replies') or {}).get('page_info')
     cursor = info.get('end_cursor') if isinstance(info, dict) and info.get('has_next_page') is True else None
     return PostPage(records, coverage(post['reply_count'], counts), cursor, branches)
+
+
+def find(value, key):
+    """The first value under `key` anywhere in a response (its place moves between queries)."""
+    if isinstance(value, dict):
+        if key in value:
+            return value[key]
+        for child in value.values():
+            found = find(child, key)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = find(child, key)
+            if found is not None:
+                return found
+    return None
+
+
+def next_batch(data, post_id, seen):
+    """A further batch of a post's direct replies (the refetch query's response)."""
+    direct = find(data, 'direct_replies')
+    if not isinstance(direct, dict):
+        raise _changed('The replies response has no direct_replies.')
+    counts = new_counts()
+    found, branches = reply_batch(direct, post_id, seen, limit=None, counts=counts)
+    info = direct.get('page_info')
+    cursor = info.get('end_cursor') if isinstance(info, dict) and info.get('has_next_page') is True else None
+    return Batch(found, cursor, branches)
+
+
+def branch_batch(data, parent_id):
+    """The replies under one reply (the inline expansion query's response), placed under it."""
+    expansion = find(data, 'inline_expansion')
+    holder = expansion.get('posts') if isinstance(expansion, dict) and isinstance(expansion.get('posts'), dict) else expansion
+    if not isinstance(holder, dict) or not isinstance(holder.get('edges'), list):
+        raise _changed('The response holds no replies under this reply.')
+    found = []
+    for edge in holder['edges']:
+        record = post_record(edge.get('node') if isinstance(edge, dict) else None)
+        if record is None:
+            continue
+        record['role'] = 'reply'
+        found.append(record)
+    relate([{'id': parent_id, 'author': None, 'depth': 0}] + found)
+    for record in found:
+        if not record.get('relation') and record.get('reply_to_id') == parent_id:
+            record['relation'], record['depth'] = {'kind': 'reply', 'to': parent_id}, 1
+    info = holder.get('page_info')
+    cursor = info.get('end_cursor') if isinstance(info, dict) and info.get('has_next_page') is True else None
+    return Batch(found, cursor, {})
