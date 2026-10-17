@@ -58,7 +58,7 @@
      "data": {"user": {"followers": {"edges": [{"node": {"$user": "B"}}, {"node": {"$user": "C"}}], "page_info": {"has_next_page": true, "end_cursor": "IGNORED"}}}, "counts": {"followers": 5000}},
      "expected": {"ids": ["1000000002", "1000000003"], "stop": "server_capped", "reported_total": 5000}},
     {"name": "following-offset-cursor", "item": "24",
-     "fact": "Following pages by a numeric offset cursor; the next page comes from the refetchable following query.",
+     "fact": "Following pages by a numeric offset cursor; the next page is the same tab query with that offset as after.",
      "surface": "following", "policy": "offset",
      "data": {"user": {"following": {"edges": [{"node": {"$user": "B"}}], "page_info": {"has_next_page": true, "end_cursor": "20"}}}},
      "expected": {"ids": ["1000000002"], "has_next": true, "cursor": "20"}},
