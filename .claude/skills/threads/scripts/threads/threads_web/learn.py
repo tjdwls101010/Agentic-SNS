@@ -4,7 +4,8 @@ The cheapest path, measured: one GET of the screen that uses the query. Its docu
 queries (id and variables, provider values included) and names the JavaScript bundles of the screen; those come from
 the static CDN (static.cdninstagram.com, cookie-less, not a Threads request) and define every query module the
 screen can send: `<Name>_threadsRelayOperation` exports the id, `<Name>.threads.graphql` names the providers, the
-argument names, the root field and whether it is a query. A renamed query is found among those definitions by what
+argument names, the root field and whether it is a query, and a preloadable query may have only
+`<Name>$Parameters.threads` (its id, kind and providers). A renamed query is found among those definitions by what
 stays when Meta renames it (its argument names and root field), and only when exactly one candidate fits.
 """
 import hashlib
@@ -111,6 +112,18 @@ def definitions(text):
         entry['root'] = root[1] if root else None
         kind = re.search(r'operationKind:"([a-z]+)"', segment)
         entry['kind'] = kind[1] if kind else None
+    # A preloadable query can be defined only by its parameters: id, kind and providers, no arguments or root field.
+    for match in re.finditer(r'__d\("([A-Za-z0-9_]+)\$Parameters\.threads",', text):
+        end = text.find('__d("', match.start() + 10)
+        segment = text[match.start():end if end > 0 else None]
+        doc_id = re.search(r'params:\{id:"(\d+)"', segment)
+        kind = re.search(r'operationKind:"([a-z]+)"', segment)
+        if not doc_id or not kind:
+            continue
+        entry = found.setdefault(match[1], {})
+        entry.setdefault('doc_id', doc_id[1])
+        entry.setdefault('kind', kind[1])
+        entry.setdefault('providers', sorted(set(re.findall(r':n\("([A-Za-z0-9_]+\.relayprovider)"\)', segment))))
     return found
 
 

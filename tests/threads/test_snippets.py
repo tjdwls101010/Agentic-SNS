@@ -91,6 +91,19 @@ def test_a_live_id_without_its_module_uses_the_relay_operation(tmp_path):
     assert out['results'][0]['used']['source'] == 'live_id'
 
 
+def test_a_preloadable_query_sends_its_own_providers_new_ones_included(tmp_path):
+    # Observed 2026-10-17: the feed query's live id and providers sat only in <Name>$Parameters.threads, with a
+    # provider the stored list lacked; sending the live id without it made Threads fail the query.
+    new = '__relay_internal__pv__BarcelonaHasMWRLocationConsumptionrelayprovider'
+    live = {'BarcelonaFeedPaginationDirectQuery$Parameters.threads': {'params': {
+                'id': '888', 'operationKind': 'query', 'providedVariables': {PROVIDER: True, new: False}}},
+            'BarcelonaFeedPaginationDirectQuery_threadsRelayOperation': '888'}
+    out = run(tmp_path, [{'snippet': 'query', 'args': query_args()}], page(modules=live, fetch=[{'status': 200, 'body': '{}'}]))
+    form = form_of(out['fetches'][0])
+    assert form['doc_id'] == '888' and json.loads(form['variables'])[new] is False
+    assert out['results'][0]['used']['source'] == 'live' and out['results'][0]['used']['flags'][new] is False
+
+
 @pytest.mark.parametrize('name, allowed', [
     ('BarcelonaLikeMutation', ['BarcelonaLikeMutation']),
     ('BarcelonaMutationProbeQuery', ['BarcelonaMutationProbeQuery']),

@@ -5,7 +5,7 @@
  "queries": {
   "feed_first": {
    "name": "BarcelonaFeedDirectQuery",
-   "doc_id": "28677005895254098",
+   "doc_id": "29002859219310926",
    "endpoint": "/api/graphql/",
    "root": null,
    "providers": [
@@ -24,6 +24,7 @@
     "BarcelonaHasGhostPostEmojiActivation.relayprovider",
     "BarcelonaHasGhostPostProduction.relayprovider",
     "BarcelonaHasMessaging.relayprovider",
+    "BarcelonaHasMWRLocationConsumption.relayprovider",
     "BarcelonaHasMetaAiContentAttachments.relayprovider",
     "BarcelonaHasNewsletterLinkPreview.relayprovider",
     "BarcelonaHasNewspaperLinkStyle.relayprovider",

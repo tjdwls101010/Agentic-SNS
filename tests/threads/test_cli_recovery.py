@@ -76,6 +76,19 @@ def test_a_query_missing_from_the_preloaders_is_learned_from_its_bundle(browser,
     assert sent(browser)[1]['fallback']['doc_id'] == '9002'
 
 
+def test_a_query_defined_only_as_preloadable_parameters_is_learned_from_its_bundle(browser, data_dir, tmp_path):
+    # the format Threads used for the feed query on 2026-10-17: an id and providers, no full definition
+    text = ('__d("BarcelonaFeedDirectQuery$Parameters.threads",["BarcelonaIsLoggedIn.relayprovider"],(function(t,n,r,o,a,i)'
+            '{"use strict";var e={kind:"PreloadableConcreteRequest",params:{id:"9003",metadata:{},name:"BarcelonaFeedDirectQuery",'
+            'operationKind:"query",text:null,providedVariables:{__relay_internal__pv__BarcelonaIsLoggedInrelayprovider:'
+            'n("BarcelonaIsLoggedIn.relayprovider")}}};a.exports=e}),null);\n')
+    known_tab(browser, data_dir).respond('query', refused())
+    browser.respond('page', screen(bundles=[BUNDLE])).respond('query', feed_page(['A']))
+    code, out, _ = run_cli(browser, 'feed', '--json', env=cdn(tmp_path, text))
+    assert code == 0, out
+    assert sent(browser)[1]['fallback']['doc_id'] == '9003'
+
+
 def test_a_refused_live_module_reloads_the_tab_once(browser, data_dir):
     known_tab(browser, data_dir).respond('query', refused(source='live'))
     browser.respond('navigate', {'navigating': True, 'explicit': 0, 'resources': 0, 'statuses': [], 'signals': [],

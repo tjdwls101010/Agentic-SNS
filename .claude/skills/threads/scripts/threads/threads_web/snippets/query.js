@@ -9,7 +9,8 @@ if (!Array.isArray(args.allowed) || !args.allowed.includes(args.name) || !/^[A-Z
 }
 if (location.origin !== 'https://www.threads.com') return refuse('not the Threads origin');
 let doc = null, flags = null, source = null;
-for (const suffix of ['.threads.graphql', '.graphql']) {
+// <Name>$Parameters.threads holds a preloadable query's id and providers when its full definition is not loaded
+for (const suffix of ['.threads.graphql', '.graphql', '$Parameters.threads']) {
   try {
     const module = load(args.name + suffix);
     const params = module && module.params;
