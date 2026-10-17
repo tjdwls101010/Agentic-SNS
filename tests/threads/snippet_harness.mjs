@@ -33,7 +33,9 @@ function makeWindow() {
       return {...value, params: {...value.params, providedVariables: provided}};
     }
     if (value && typeof value === 'object' && value.__function) return () => value.__function;
-    if (value && typeof value === 'object' && '__provider' in value) return {get: () => value.__provider};
+    if (value && typeof value === 'object' && '__provider' in value) {
+      return {get: () => { if (value.__provider && value.__provider.__throws) throw new Error('provider failed'); return value.__provider; }};
+    }
     return value;
   };
   const require = (name) => {

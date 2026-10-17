@@ -111,6 +111,14 @@ def test_a_live_module_whose_provider_cannot_be_read_sends_nothing(tmp_path):
     assert out['fetches'] == [] and out['results'][0]['missing']
 
 
+def test_a_stored_or_live_id_without_every_provider_value_sends_nothing(tmp_path):
+    broken = {'BarcelonaIsLoggedIn.relayprovider': {'__provider': {'__throws': True}}}
+    for extra in ({}, {'BarcelonaFeedPaginationDirectQuery_threadsRelayOperation': '777'}):
+        out = run(tmp_path, [{'snippet': 'query', 'args': query_args()}],
+                  page(modules={**broken, **extra}, fetch=[{'status': 200, 'body': '{}'}]))
+        assert out['fetches'] == [] and out['results'][0]['missing'], extra
+
+
 @pytest.mark.parametrize('name, allowed', [
     ('BarcelonaLikeMutation', ['BarcelonaLikeMutation']),
     ('BarcelonaMutationProbeQuery', ['BarcelonaMutationProbeQuery']),

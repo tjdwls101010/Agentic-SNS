@@ -46,6 +46,9 @@ if (!provided) {
     try { const p = load(module); provided[name] = typeof p.get === 'function' ? p.get() : p; } catch (_) { /* not loaded */ }
   }
   provided = {...(fallback.flags || {}), ...provided};
+  // a query sent without one of its provider values fails at Threads: send nothing, so the id is learned again
+  const unknown = (fallback.providers || []).map(([name]) => name).filter(name => !(name in provided));
+  if (unknown.length) return {missing: 'no value for ' + unknown.slice(0, 3).join(', '), used: {source: 'none'}, explicit: 0, ...(await kit.report(0))};
 }
 // A block or login page, a 429 or a signal the tab already saw stops this call before it sends anything.
 const gate = await kit.gate();

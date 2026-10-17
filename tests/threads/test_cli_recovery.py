@@ -3,6 +3,8 @@ real CLI, a scripted Aside and a local stand-in for the static CDN (THREADS_CDN_
 import hashlib
 import json
 
+import pytest
+
 from conftest import LOGGED_IN_DOCUMENT, START, known_tab, query_result, run_cli, state
 from test_cli_feed import feed_body, post
 from threads.session import Session
@@ -100,6 +102,25 @@ def test_a_full_definition_in_a_later_bundle_wins_over_parameters_only_in_an_ear
     (folder / (hashlib.sha1(BUNDLE.encode()).hexdigest() + '.js')).write_text(definition('BarcelonaFeedDirectQuery', '222'))
     known_tab(browser, data_dir).respond('query', refused())
     browser.respond('page', screen(bundles=[older, BUNDLE])).respond('query', feed_page(['A']))
+    code, out, _ = run_cli(browser, 'feed', '--json', env={'THREADS_CDN_DIR': str(folder)})
+    assert code == 0, out
+    assert sent(browser)[1]['fallback']['doc_id'] == '222'
+
+
+@pytest.mark.parametrize('first', ['parameters', 'id'])
+def test_an_id_and_its_parameters_in_separate_bundles_are_learned_together(browser, data_dir, tmp_path, first):
+    other = 'https://static.cdninstagram.com/rsrc.php/v4/yA/r/other.js'
+    folder = tmp_path / 'cdn'
+    folder.mkdir()
+    parameters = ('__d("BarcelonaFeedDirectQuery$Parameters.threads",[],(function(t,n,r,o,a,i){var e={params:{id:"222",'
+                  'metadata:{},name:"BarcelonaFeedDirectQuery",operationKind:"query",text:null,providedVariables:{}}};'
+                  'a.exports=e}),null);\n')
+    relay = '__d("BarcelonaFeedDirectQuery_threadsRelayOperation",[],(function(t,n,r,o,a,i){a.exports="222"}),null);\n'
+    texts = [parameters, relay] if first == 'parameters' else [relay, parameters]
+    for url, text in zip([other, BUNDLE], texts):
+        (folder / (hashlib.sha1(url.encode()).hexdigest() + '.js')).write_text(text)
+    known_tab(browser, data_dir).respond('query', refused())
+    browser.respond('page', screen(bundles=[other, BUNDLE])).respond('query', feed_page(['A']))
     code, out, _ = run_cli(browser, 'feed', '--json', env={'THREADS_CDN_DIR': str(folder)})
     assert code == 0, out
     assert sent(browser)[1]['fallback']['doc_id'] == '222'

@@ -142,15 +142,22 @@ def search(html, names, *, fetch=fetch_bundle, stop_when=None):
         except OSError:
             continue
         for name, entry in found.items():
-            known = catalog.get(name, {})
-            if entry.get('parameters_only'):
-                if not known or known.get('parameters_only'):
-                    catalog[name] = entry  # a fallback until a full definition turns up in any bundle
-            else:
-                catalog[name] = {**({} if known.get('parameters_only') else known), **entry}
-        # parameters alone do not end the search: a later bundle may define the query in full, with its current id
+            known = catalog.setdefault(name, {})
+            weak = set(known.pop('weak', []))  # fields only a parameters-only definition gave: any full one wins
+            for key, value in entry.items():
+                if key == 'parameters_only':
+                    continue
+                if not entry.get('parameters_only'):
+                    known[key] = value
+                    weak.discard(key)
+                elif key not in known or key in weak:
+                    known[key] = value
+                    weak.add(key)
+            if weak:
+                known['weak'] = sorted(weak)
+        # an id from parameters alone does not end the search: a later bundle may define the query with its current id
         done = all(catalog.get(name, {}).get('doc_id') and catalog.get(name, {}).get('kind')
-                   and not catalog.get(name, {}).get('parameters_only') for name in names)
+                   and 'doc_id' not in catalog.get(name, {}).get('weak', ()) for name in names)
         if done and (stop_when is None or stop_when(catalog)):
             break
     return catalog
