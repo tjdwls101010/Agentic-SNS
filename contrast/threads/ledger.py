@@ -22,7 +22,8 @@ import time
 from datetime import date
 from pathlib import Path
 
-DAY_TARGET = 300
+# 성진: 하루 목표 300(T9). THREADS_DAY_TARGET은 성진이 그날 목표를 바꿀 때만 쓴다(T17)
+DAY_TARGET = int(os.environ.get('THREADS_DAY_TARGET') or 300)
 RECON_TARGET = 100
 # Measured in the planning session (opening a tab 38, a screen move 22, an idle minute a few, one direct read 1-3).
 RESERVATIONS = {'tab_open': 40, 'navigation': 30, 'direct': 3, 'idle': 5}
