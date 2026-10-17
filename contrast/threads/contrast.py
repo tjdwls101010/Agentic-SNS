@@ -4,7 +4,8 @@ only this skill's CLI, inside the OS sandbox, watched against the day's request 
   python3 contrast.py RUN VARIANT TASK [--fake SCENARIO] [--data-template DIR]
 
 VARIANT: A (CLI only: the invocation line), B (the draft), C:<heading> (the draft without the section whose heading
-starts with <heading>). TASK is a file under tasks/ (or a path); ${NAME} in it is filled from the environment, so real
+starts with <heading>). A --fake run's shell is held by the OS sandbox; a live run only by the permission rules (aside
+cannot sign its daemon challenge inside the sandbox). TASK is a file under tasks/ (or a path); ${NAME} in it is filled from the environment, so real
 accounts and post URLs never live in the repository. --fake runs against tests/threads/fake_aside.py with SCENARIO and
 a throwaway data directory (copied from --data-template when given, e.g. one holding a recorded block); nothing then
 reaches the real browser. Without --fake the run shares the skill's real data/ (one protection state, one tab).
@@ -130,7 +131,10 @@ def main():
     settings.write_text(json.dumps(sandbox_settings(scratch, data_dir), indent=1))
     prompt = (f'먼저 {copy}/SKILL.md를 읽고 따르세요. {copy}/scripts 아래 파일은 읽지 말고, 도구는 --help와 schema 명령, '
               f'그리고 출력으로 익히세요.\n\n과제: {task}')
-    command = ['claude', '-p', '--safe-mode', '--restricted', '--no-session-persistence', '--settings', str(settings),
+    # 성진(T18): a live run has no OS sandbox — inside it aside cannot sign its daemon challenge with the keychain key;
+    # only the permission rules hold it (the skill's CLI is the one command it may run), and summary lists its --out files
+    sandbox = ['--settings', str(settings)] if args.fake else []
+    command = ['claude', '-p', '--safe-mode', '--restricted', '--no-session-persistence', *sandbox,
                '--tools', 'Bash,Read,Grep,Glob', '--allowedTools', f'Bash(uv run "{cli}" *)',
                '--model', MODEL, '--output-format', 'stream-json', '--verbose', prompt]
     started, blanked = time.time(), []
@@ -146,6 +150,8 @@ def main():
     shutil.rmtree(scratch, ignore_errors=True)
     summary = summarize(root / 'events.jsonl')
     logged = 0 if args.fake else ledger.logged(data_dir / 'protection/requests.jsonl', started)
+    summary['out_files'] = sorted({m for c in summary['commands'] if c['tool'] == 'Bash'
+                                   for m in re.findall(r'--out[= ](\S+)', c['input'])})
     summary.update(run=args.run, variant=args.variant, task=task, exit=child.returncode, fake=bool(args.fake),
                    watch=watched['outcome'], logged_requests=logged, tab_blanked=blanked,
                    stderr=(root / 'stderr.txt').read_text()[-2000:])
