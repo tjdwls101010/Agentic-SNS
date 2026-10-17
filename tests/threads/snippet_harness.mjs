@@ -27,7 +27,9 @@ function makeWindow() {
   const hydrate = (value) => {
     if (value && typeof value === 'object' && value.params && value.params.providedVariables) {
       const provided = {};
-      for (const [k, v] of Object.entries(value.params.providedVariables)) provided[k] = {get: () => v};
+      for (const [k, v] of Object.entries(value.params.providedVariables)) {
+        provided[k] = {get: () => { if (v && v.__throws) throw new Error('provider failed'); return v; }};
+      }
       return {...value, params: {...value.params, providedVariables: provided}};
     }
     if (value && typeof value === 'object' && value.__function) return () => value.__function;

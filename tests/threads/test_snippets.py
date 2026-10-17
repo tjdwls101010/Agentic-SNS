@@ -104,6 +104,13 @@ def test_a_preloadable_query_sends_its_own_providers_new_ones_included(tmp_path)
     assert out['results'][0]['used']['source'] == 'live' and out['results'][0]['used']['flags'][new] is False
 
 
+def test_a_live_module_whose_provider_cannot_be_read_sends_nothing(tmp_path):
+    live = {'BarcelonaFeedPaginationDirectQuery$Parameters.threads': {'params': {
+        'id': '888', 'operationKind': 'query', 'providedVariables': {PROVIDER: True, 'broken': {'__throws': True}}}}}
+    out = run(tmp_path, [{'snippet': 'query', 'args': query_args()}], page(modules=live, fetch=[{'status': 200, 'body': '{}'}]))
+    assert out['fetches'] == [] and out['results'][0]['missing']
+
+
 @pytest.mark.parametrize('name, allowed', [
     ('BarcelonaLikeMutation', ['BarcelonaLikeMutation']),
     ('BarcelonaMutationProbeQuery', ['BarcelonaMutationProbeQuery']),

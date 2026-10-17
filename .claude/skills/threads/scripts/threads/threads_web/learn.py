@@ -120,10 +120,14 @@ def definitions(text):
         kind = re.search(r'operationKind:"([a-z]+)"', segment)
         if not doc_id or not kind:
             continue
-        entry = found.setdefault(match[1], {})
-        entry.setdefault('doc_id', doc_id[1])
-        entry.setdefault('kind', kind[1])
-        entry.setdefault('providers', sorted(set(re.findall(r':n\("([A-Za-z0-9_]+\.relayprovider)"\)', segment))))
+        providers = sorted(set(re.findall(r':n\("([A-Za-z0-9_]+\.relayprovider)"\)', segment)))
+        if match[1] in found:  # this bundle also defines it in full or by its id: those win, this fills the gaps
+            entry = found[match[1]]
+            entry.setdefault('doc_id', doc_id[1])
+            entry.setdefault('kind', kind[1])
+            entry.setdefault('providers', providers)
+        else:
+            found[match[1]] = {'doc_id': doc_id[1], 'kind': kind[1], 'providers': providers, 'parameters_only': True}
     return found
 
 
@@ -134,10 +138,19 @@ def search(html, names, *, fetch=fetch_bundle, stop_when=None):
     catalog = {}
     for url in bundle_urls(html):
         try:
-            catalog.update({k: {**catalog.get(k, {}), **v} for k, v in definitions(fetch(url)).items()})
+            found = definitions(fetch(url))
         except OSError:
             continue
-        done = all(catalog.get(name, {}).get('doc_id') and catalog.get(name, {}).get('kind') for name in names)
+        for name, entry in found.items():
+            known = catalog.get(name, {})
+            if entry.get('parameters_only'):
+                if not known or known.get('parameters_only'):
+                    catalog[name] = entry  # a fallback until a full definition turns up in any bundle
+            else:
+                catalog[name] = {**({} if known.get('parameters_only') else known), **entry}
+        # parameters alone do not end the search: a later bundle may define the query in full, with its current id
+        done = all(catalog.get(name, {}).get('doc_id') and catalog.get(name, {}).get('kind')
+                   and not catalog.get(name, {}).get('parameters_only') for name in names)
         if done and (stop_when is None or stop_when(catalog)):
             break
     return catalog

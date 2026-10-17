@@ -11,18 +11,21 @@ if (location.origin !== 'https://www.threads.com') return refuse('not the Thread
 let doc = null, flags = null, source = null;
 // <Name>$Parameters.threads holds a preloadable query's id and providers when its full definition is not loaded
 for (const suffix of ['.threads.graphql', '.graphql', '$Parameters.threads']) {
+  let params = null;
+  try { const module = load(args.name + suffix); params = module && module.params; } catch (_) { /* not loaded */ }
+  if (!params || !/^\d+$/.test(String(params.id))) continue;
+  if (params.operationKind !== 'query') return refuse('the live module is not a query');
+  const values = {};
   try {
-    const module = load(args.name + suffix);
-    const params = module && module.params;
-    if (params && /^\d+$/.test(String(params.id))) {
-      if (params.operationKind !== 'query') return refuse('the live module is not a query');
-      doc = String(params.id);
-      flags = {};
-      for (const [name, provider] of Object.entries(params.providedVariables || {})) flags[name] = provider.get();
-      source = 'live';
-      break;
-    }
-  } catch (_) { /* not loaded */ }
+    for (const [name, provider] of Object.entries(params.providedVariables || {})) values[name] = provider.get();
+  } catch (_) {
+    // without every provider value Threads fails the query: send nothing, so the id is learned again
+    return {missing: 'a provider of the live module could not be read', used: {source: 'none'}, explicit: 0, ...(await kit.report(0))};
+  }
+  doc = String(params.id);
+  flags = values;
+  source = 'live';
+  break;
 }
 if (!doc) {
   try {

@@ -89,6 +89,22 @@ def test_a_query_defined_only_as_preloadable_parameters_is_learned_from_its_bund
     assert sent(browser)[1]['fallback']['doc_id'] == '9003'
 
 
+def test_a_full_definition_in_a_later_bundle_wins_over_parameters_only_in_an_earlier_one(browser, data_dir, tmp_path):
+    older = 'https://static.cdninstagram.com/rsrc.php/v4/yA/r/older.js'
+    folder = tmp_path / 'cdn'
+    folder.mkdir()
+    stale = ('__d("BarcelonaFeedDirectQuery$Parameters.threads",[],(function(t,n,r,o,a,i){var e={params:{id:"111",'
+             'metadata:{},name:"BarcelonaFeedDirectQuery",operationKind:"query",text:null,providedVariables:{}}};'
+             'a.exports=e}),null);\n')
+    (folder / (hashlib.sha1(older.encode()).hexdigest() + '.js')).write_text(stale)
+    (folder / (hashlib.sha1(BUNDLE.encode()).hexdigest() + '.js')).write_text(definition('BarcelonaFeedDirectQuery', '222'))
+    known_tab(browser, data_dir).respond('query', refused())
+    browser.respond('page', screen(bundles=[older, BUNDLE])).respond('query', feed_page(['A']))
+    code, out, _ = run_cli(browser, 'feed', '--json', env={'THREADS_CDN_DIR': str(folder)})
+    assert code == 0, out
+    assert sent(browser)[1]['fallback']['doc_id'] == '222'
+
+
 def test_a_refused_live_module_reloads_the_tab_once(browser, data_dir):
     known_tab(browser, data_dir).respond('query', refused(source='live'))
     browser.respond('navigate', {'navigating': True, 'explicit': 0, 'resources': 0, 'statuses': [], 'signals': [],
