@@ -83,24 +83,40 @@ def test_more_reads_the_next_batch_of_direct_replies(browser, data_dir):
     assert 'next' not in result and result['coverage'][0].startswith('Threads reports 5 direct replies')
 
 
-def test_a_branch_handle_opens_the_replies_under_one_reply(browser, data_dir):
+def branch_batch(reply_id, pk, text, cursor):
+    """The replies response about one reply, as its own post page returns it."""
+    return {'data': {'media': {'pk': reply_id, 'text_post_app_info': {'direct_replies': {'edges': [
+        {'node': {'posts': {'edges': [{'node': {'pk': pk, 'code': 'Cr' + pk[-3:], 'caption': {'text': text},
+                                                'user': THREAD['users']['A'],
+                                                'text_post_app_info': {'is_reply': True, 'reply_level': 2}}}]}}}],
+        'page_info': {'has_next_page': bool(cursor), 'end_cursor': cursor}}}}}}
+
+
+def test_a_branch_handle_reads_all_the_replies_under_one_reply_from_its_own_page(browser, data_dir):
     scripted_post(browser, data_dir)
     code, out, _ = run_cli(browser, 'post', URL, '--json')
     reply = next(r for r in json.loads(out)['results'] if r.get('replies_handle'))
-    under = {'data': {'media': {'text_post_app_info': {'inline_expansion': {'edges': [
-        {'node': {'posts': {'edges': [{'node': {'pk': '3000000000000000281', 'code': 'Cr281', 'caption': {'text': 'deeper'},
-                                                'user': THREAD['users']['A'],
-                                                'text_post_app_info': {'is_reply': True, 'reply_to_id': reply['id']}}}]}}}],
-        'page_info': {'has_next_page': True, 'end_cursor': 'EXP2'}}}}}}
-    browser.respond('state', state()).respond('query', query_result(under))
-    code, out, _ = run_cli(browser, 'replies', str(reply['replies_handle']))
-    assert code == 0, out
+    browser.respond('state', state()).respond('query', query_result(branch_batch(reply['id'], '3000000000000000281',
+                                                                               'deeper', 'BR2')))
+    code, out, _ = run_cli(browser, 'replies', str(reply['replies_handle']), '--json')
+    result = json.loads(out)
+    assert code == 0, result
     call = [c['args'] for c in browser.calls() if c['op'] == 'query'][-1]
-    assert call['name'] == 'BarcelonaPostPageThreadViewSectionInlineExpansionQuery'
-    # as the app does: the first expansion starts from the beginning of the branch
-    assert call['variables'] == {**call['variables'], 'postID': reply['id'], 'permalinkPostID': CASE['post_id'],
-                                 'after': None}
-    assert 'deeper' in out and 'more: ' in out
+    # the reply's own page lists every reply under it, where the thread view's inline expansion shows a few
+    assert call['name'] == 'BarcelonaPostPageDownwardQuery'
+    assert call['variables']['postID'] == reply['id'] and call['variables']['sortOrder'] == 'TOP'
+    under = result['results'][0]
+    assert under['relation'] == {'kind': 'reply', 'to': reply['id']} and under['depth'] == 1
+    assert result['thread']['under'] == reply['id'] and result.get('next')
+    browser.respond('state', state()).respond('query', query_result(branch_batch(reply['id'], '3000000000000000282',
+                                                                               'deepest', None)))
+    code, out, _ = run_cli(browser, *command_of('more: ' + result['next']), '--json')
+    result = json.loads(out)
+    assert code == 0, result
+    call = [c['args'] for c in browser.calls() if c['op'] == 'query'][-1]
+    assert call['name'] == 'BarcelonaPostPageDirectRepliesRefetchQuery'
+    assert call['variables']['postID'] == reply['id'] and call['variables']['after'] == 'BR2'
+    assert [r['id'] for r in result['results']] == ['3000000000000000282'] and 'next' not in result
 
 
 def test_recent_sort_asks_threads_for_newest_first(browser, data_dir):
@@ -133,3 +149,18 @@ def test_a_bad_or_foreign_handle_is_an_argument_error(browser, data_dir):
     assert code == 2
     code, out, _ = run_cli(browser, 'replies', '99')
     assert code == 2 and 'does not exist' in json.loads(out)['message']
+
+
+def test_a_null_reply_in_a_batch_is_marked_unavailable_not_a_crash(browser, data_dir):
+    scripted_post(browser, data_dir)
+    code, out, _ = run_cli(browser, 'post', URL, '--json')
+    reply = next(r for r in json.loads(out)['results'] if r.get('replies_handle'))
+    batch = branch_batch(reply['id'], '3000000000000000283', 'readable', None)
+    edges = batch['data']['media']['text_post_app_info']['direct_replies']['edges']
+    edges.insert(0, {'node': {'posts': {'edges': [{'node': None}]}}})
+    browser.respond('state', state()).respond('query', query_result(batch))
+    code, out, _ = run_cli(browser, 'replies', str(reply['replies_handle']), '--json')
+    result = json.loads(out)
+    assert code == 0, result
+    assert [r.get('unavailable') for r in result['results']] == [True, False]
+    assert result['results'][1]['id'] == '3000000000000000283'

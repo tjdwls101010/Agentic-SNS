@@ -1,6 +1,8 @@
 """profile and about through the real CLI and a scripted Aside."""
 import json
 
+import pytest
+
 from conftest import START, known_tab, query_result, run_cli
 from threads.session import Session
 
@@ -92,10 +94,12 @@ def test_an_empty_tab_of_a_followed_private_profile_is_empty(browser, data_dir):
     assert code == 7
 
 
-def test_an_unknown_handle_is_unavailable(browser, data_dir):
+@pytest.mark.parametrize('words', [['profile', '@nobody.here'], ['about', '@nobody.here'],
+                                   ['graph', '@nobody.here', 'followers']])
+def test_an_unknown_handle_is_unavailable(browser, data_dir, words):
     known_tab(browser, data_dir).respond('query', query_result({'data': {'xdt_text_app_user_by_username': None}}))
-    code, out, _ = run_cli(browser, 'profile', '@nobody.here')
-    assert code in (6, 9)
+    code, out, _ = run_cli(browser, *words)
+    assert code == 9 and json.loads(out)['error'] == 'unavailable'
 
 
 def test_about_shows_the_card_with_unpublished_counts_unknown(browser, data_dir):

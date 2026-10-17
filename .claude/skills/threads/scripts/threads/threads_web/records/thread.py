@@ -67,8 +67,8 @@ def reply_batch(direct_replies, post_id, seen, *, limit, counts):
             counts['unavailable'] += 1
             continue
         group = [post_record(item.get('node') if isinstance(item, dict) else None) for item in posts]
-        first = group[0]
-        missing = first is None or first['unavailable']
+        first = group[0] = group[0] or post_record({})  # a null first post: an unavailable marker in its place
+        missing = first['unavailable']
         if missing:
             counts['unavailable'] += 1
         elif first['id'] in seen:
@@ -173,18 +173,14 @@ def next_batch(data, post_id, seen):
     return Batch(found, cursor, branches)
 
 
-def branch_batch(data, parent_id):
-    """The replies under one reply (the inline expansion query's response): units like a post's direct replies, placed
-    under the reply they answer."""
-    expansion = find(data, 'inline_expansion')
-    if not isinstance(expansion, dict) or not isinstance(expansion.get('edges'), list):
-        raise _changed('The response holds no replies under this reply.')
-    counts = new_counts()
-    found, branches = reply_batch(expansion, parent_id, {parent_id}, limit=None, counts=counts)
-    for record in found:
+def branch_batch(data, parent, seen):
+    """The replies under one reply (its own replies response): units like a post's direct replies, placed under the
+    reply they answer. `parent` is {id, author_id, reply_level}: a unit's first post, one level under it, answers it."""
+    batch = next_batch(data, parent['id'], seen)
+    below = parent['reply_level'] + 1 if isinstance(parent.get('reply_level'), int) else None
+    for record in batch.records:
         record['depth'] = record.get('depth', 0) + 1
-        if not record.get('relation'):
-            record['relation'] = {'kind': 'reply', 'to': parent_id}
-    info = expansion.get('page_info')
-    cursor = info.get('end_cursor') if isinstance(info, dict) and info.get('has_next_page') is True else None
-    return Batch(found, cursor, branches)
+        if not record.get('relation') and (below is None or record.get('reply_level') in (None, below)):
+            same = (record.get('author') or {}).get('id') == parent.get('author_id') is not None
+            record['relation'] = {'kind': 'continuation' if same else 'reply', 'to': parent['id']}
+    return batch

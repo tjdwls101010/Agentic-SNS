@@ -59,10 +59,21 @@ def _at(value, path):
 
 
 def relate(group):
-    """Give each later post of a unit its relation to the earlier post it answers, and its depth under it."""
-    seen = {}
+    """Give each later post of a unit its relation to the earlier post it answers, and its depth under it.
+
+    The post it answers is the one reply_to_id names when Threads sends it; otherwise (what Threads sends now) the
+    nearest earlier post of the unit one reply_level up, and only when that post's author is the reply_to_author the
+    reply names. A reply that fits neither stays unplaced rather than guessed."""
+    seen, earlier = {}, []
     for record in group:
         target = seen.get(record.get('reply_to_id')) if record.get('id') != record.get('reply_to_id') else None
+        level = record.get('reply_level')
+        if target is None and not record.get('reply_to_id') and isinstance(level, int) and level > 0:
+            target = next((r for r in reversed(earlier) if r.get('reply_level') == level - 1), None)
+            named = (record.get('reply_to_author') or '').lower()
+            if target is not None and named and named != ((target.get('author') or {}).get('username') or '').lower():
+                target = None
+        earlier.append(record)
         if target is not None:
             same = (record.get('author') or {}).get('id') == (target.get('author') or {}).get('id') is not None
             record['relation'] = {'kind': 'continuation' if same else 'reply', 'to': target['id']}

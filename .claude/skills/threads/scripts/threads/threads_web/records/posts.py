@@ -162,6 +162,8 @@ def post_record(raw, ancestors=()):
             'link_preview': _link(info),
             'is_reply': bool(info.get('is_reply', info.get('reply_to_author') is not None)),
             'reply_to_id': _identifier(info.get('reply_to_id')), 'root_post_id': _identifier(info.get('root_post_id')),
+            'reply_level': _integer(info.get('reply_level')),
+            'reply_to_author': (user_record(info.get('reply_to_author')) or {}).get('username') or None,
             'quoted_post': post_record(share.get('quoted_post'), nested),
             'reposted_post': post_record(share.get('reposted_post'), nested),
             'is_pinned': bool(pinned.get('is_pinned_to_profile')), 'unavailable': False, 'role': 'post', 'depth': 0,

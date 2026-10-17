@@ -10,7 +10,7 @@ import os
 import re
 import shlex
 import sys
-from datetime import date
+from datetime import date, datetime, time, timedelta
 
 from threads import about, listing, maintenance, search, thread
 from threads.errors import ThreadsError
@@ -49,7 +49,9 @@ JSON_OUTPUT = ('--json: one JSON envelope instead (ok, command, stop_reason, req
 OUT_OUTPUT = ('--out FILE: records go to an NDJSON file a whole page at a time and stdout gets one summary line (one '
               'JSON object with --json); rerun the same command with the same file to resume. --out cannot be '
               'combined with --after. The file holds other people\'s posts: keep it outside the repository.')
-FAILURE = 'failure: one JSON envelope (ok false, error, message, fix, and results read before the failure).'
+FAILURE = ('failure: one JSON envelope (ok false, error, message, fix) when nothing was read; records read before a '
+           'failure print as usual, followed by a "coverage: incomplete — <message> fix: <fix>" line (with --json, in '
+           'the envelope\'s results).')
 
 
 class Parser(argparse.ArgumentParser):
@@ -79,13 +81,18 @@ def budget(value):
 
 def day(value):
     try:
-        return date.fromisoformat(value).isoformat()
+        found = date.fromisoformat(value)
+        for edge in (found, found + timedelta(days=1)):  # a window's bounds are local midnights, the day after included
+            datetime.combine(edge, time()).astimezone().timestamp()
+        return found.isoformat()
     except ValueError:
         raise argparse.ArgumentTypeError('expected a date as YYYY-MM-DD') from None
+    except (OverflowError, OSError):
+        raise argparse.ArgumentTypeError('expected a date this computer can turn into a local time') from None
 
 
 OPTIONS = {
-    'limit': (('--limit',), {'type': positive, 'help': 'Records to show; omitted: until the source ends or the request budget is spent'}),
+    'limit': (('--limit',), {'type': positive, 'help': 'Records to show; omitted: the default the description below gives (one page for most reads)'}),
     'since': (('--since',), {'type': day, 'metavar': 'DAY', 'help': 'First local day to include, YYYY-MM-DD'}),
     'until': (('--until',), {'type': day, 'metavar': 'DAY', 'help': 'Last local day to include, YYYY-MM-DD'}),
     'chars': (('--chars',), {'type': chars, 'help': 'Characters of each text to show (default 180; 0 = all received); --json and --out keep all'}),
@@ -128,7 +135,7 @@ COMMANDS = {
         'epilog': ['Threads publishes a follower count but no following or mutual count: those are shown as ? (unknown); graph following lists the accounts.',
                    'A verified badge and a bio are what the account claims about itself.',
                    'requests: 2 (find the profile, read its card).'],
-        'exits': (0, 2, 3, 4, 5, 6, 9),
+        'exits': (0, 2, 3, 4, 5, 6, 8, 9),
     },
     'graph': {
         'help': 'Read the accounts that follow a profile, or that it follows.',
@@ -181,7 +188,7 @@ COMMANDS = {
         'arguments': [(('target',), {'metavar': 'HANDLE', 'help': 'The number after "replies" (a branch) or in a more: line (the next batch)'}),
                       (('--limit',), {'type': positive, 'help': 'Replies to show; omitted: one batch, or every batch with --out. With --out it counts replies saved'}),
                       'chars', 'out', 'json', 'max_requests'],
-        'epilog': ['A handle names a batch: the next batch of a post\'s direct replies, or the replies under one reply. Running it again reads the same batch again, live; it is not a replay. more: prints the handle of the batch after.',
+        'epilog': ['A handle names a batch: the next batch of a post\'s direct replies, or the replies under one reply (every reply that reply\'s own page lists, batch by batch, each with what hangs under it). Running it again reads the same batch again, live; it is not a replay. more: prints the handle of the batch after.',
                    'requests: 1 per batch of about 10 replies.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
@@ -192,8 +199,8 @@ COMMANDS = {
         'epilog': ['It opens the dedicated www.threads.com tab if none is open (about 34 requests the page makes itself, prepaid at 40) and otherwise makes no request.',
                    'output: one JSON envelope; results[0] holds aside, tab {target_id, opened_now, reopened}, login, account_id (the Threads account in use), blocked and block_reason, requests_last_hour and requests_last_day (every command of this account, logged), queries (which read queries are live in the tab), idle_blank_seconds, data_dir, protection_state and holds_personal_data. A saved block is reported as exit 5 without touching the browser.',
                    'The tab is emptied (about:blank) about 5 minutes after the last command, which stops the app\'s own polling; set THREADS_IDLE_SECONDS to change the delay, or to off to leave the tab open. THREADS_ASIDE_ACCOUNT picks the Aside account (default: Aside\'s own).',
-                   '--unblock keeps the block while it checks: the tab\'s state, and one document read when the tab was already open. Only a clean answer lifts it; a checkpoint, a login page, a lost tab or an interrupted run leaves it. It means nothing unless a person has looked at Threads in the Aside browser first.'],
-        'exits': (0, 2, 3, 4, 5),
+                   '--unblock keeps the block while it checks: the tab\'s state and one document read (one request, outside any budget). Only a clean answer lifts it; a checkpoint, a login page, a lost tab or an interrupted run leaves it. It means nothing unless a person has looked at Threads in the Aside browser first.'],
+        'exits': (0, 2, 3, 4, 5, 6),
     },
     'schema': {
         'help': 'Describe results, files and record fields; always JSON, no request.',

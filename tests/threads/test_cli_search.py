@@ -104,3 +104,10 @@ def test_a_dated_search_reads_on_until_threads_has_no_more(browser, data_dir):
     code, out, _ = run_cli(browser, 'search', 'words', '--since', '2026-10-01', '--json', env={'TZ': 'Asia/Seoul'})
     result = json.loads(out)
     assert code == 0 and len(result['results']) == 3 and result['window']['coverage'] == 'closed (server-filtered)'
+
+
+def test_a_date_no_local_time_can_reach_is_an_argument_error(browser, data_dir):
+    for words in (['search', 'words', '--until', '9999-12-31'], ['feed', '--since', '0001-01-01']):
+        code, out, err = run_cli(browser, *words)
+        assert code == 2, (words, out, err)
+    assert browser.calls() == []

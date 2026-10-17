@@ -151,3 +151,13 @@ def test_json_keeps_whole_texts_and_variables_follow_the_feed(browser, data_dir)
     assert call['args']['name'] == 'BarcelonaFeedDirectQuery'
     assert call['args']['variables']['variant'] == 'following'
     assert call['args']['variables']['data']['pagination_source'] == 'text_post_feed_following'
+
+
+def test_records_read_before_a_failure_print_as_text_and_the_help_says_so(browser, data_dir):
+    scripted(browser, data_dir, [{'groups': [[{'id': 'A', 'created_at': '2026-10-08T03:00:00Z'}]], 'has_next': True,
+                                  'cursor': 'CUR1'}, {'error': 'failed'}])
+    code, out, _ = run_cli(browser, 'feed', '--limit', '10')
+    assert code == 8
+    assert out.startswith('feed · ') and '[p1]' in out and 'coverage: incomplete — ' in out
+    _, help_text, _ = run_cli(browser, 'feed', '--help')
+    assert 'records read before a failure print as usual' in ' '.join(help_text.split())

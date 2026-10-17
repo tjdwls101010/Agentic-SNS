@@ -4,6 +4,8 @@ post reads the post in full, its parents and the first batch of direct replies (
 it); more: continues the direct replies as a replies command, and each direct reply with more under it carries a
 replies handle that opens that branch.
 """
+from urllib.parse import urlsplit
+
 from threads import connect, handles
 from threads.paging import paginate
 from threads.threads_web import parse_post
@@ -20,10 +22,7 @@ def post(options):
         for record in records:
             branch = page.branches.get(record.get('id'))
             if branch and record.get('role') == 'reply':
-                # the app opens a branch from its start (after: null); the reply's own cursor only says there is more
-                record['replies_handle'] = handles.save(context, {
-                    'kind': 'branch', 'post_id': target.post_id, 'path': target.path, 'sort': sort,
-                    'parent_id': record['id'], 'cursor': None, 'seen': [], 'pending': []})
+                record['replies_handle'] = handles.save(context, _branch(target.post_id, target.path, sort, record))
         reading = {'results': records, 'stop_reason': 'exhausted', 'details': {'replies': page.coverage},
                    'coverage': _coverage(page.coverage)}
         if page.replies_cursor:
@@ -50,6 +49,17 @@ def replies(options):
     return connect.run(options, command='replies', target=number, identity={}, reader=read)
 
 
+def _branch(post_id, path, sort, record):
+    """A handle to the replies under one reply: read from that reply's own page (its path when it has one), from its
+    start; the reply's own cursor in the thread view only says there is more."""
+    own = urlsplit(record.get('url') or '').path
+    return {'kind': 'branch', 'post_id': post_id, 'path': path, 'branch_path': own if '/post/' in own else path,
+            'sort': sort, 'parent_id': record['id'], 'cursor': None, 'seen': [], 'pending': [],
+            'parent': {'id': record['id'], 'author_id': (record.get('author') or {}).get('id'),
+                       'reply_level': record.get('reply_level')},
+            'reported': record.get('reply_count'), 'shown': 0}
+
+
 def _reply_context(connection):
     return {'command': 'replies', 'target': None, 'account_id': connection.account_id}
 
@@ -61,16 +71,16 @@ def _replies(connection, options, start, out):
 
     def fetch(cursor):
         if branch:
-            batch = client.branch(start['post_id'], start['parent_id'], cursor, path=start['path'])
+            batch = client.branch(start['parent'], cursor, sort=start['sort'], path=start['branch_path'],
+                                  seen=set(start.get('seen') or []))
         else:
             batch = client.reply_batch(start['post_id'], cursor, sort=start['sort'], path=start['path'],
                                        seen=set(start.get('seen') or []))
         for record in batch.records:
             more = batch.branches.get(record.get('id'))
             if more:
-                record['replies_handle'] = handles.save(context, {
-                    'kind': 'branch', 'post_id': start['post_id'], 'path': start['path'], 'sort': start['sort'],
-                    'parent_id': record['id'], 'cursor': None, 'seen': [], 'pending': []})
+                record['replies_handle'] = handles.save(context, _branch(start['post_id'], start['path'], start['sort'],
+                                                                         record))
         return batch.records, {'has_next_page': bool(batch.cursor), 'end_cursor': batch.cursor}, bool(batch.records)
 
     def commit(records, page_state, reason, skipped):
@@ -94,9 +104,9 @@ def _replies(connection, options, start, out):
                'details': {'thread': {'post_id': start['post_id'], 'url': 'https://www.threads.com' + start['path'],
                                       'under': start.get('parent_id') if branch else None}}}
     reported = start.get('reported')
-    if not branch and result['state'] is None and isinstance(reported, int) and shown < reported:
-        reading['coverage'] = [f'Threads reports {reported} direct replies to this post; {shown} were sent (some can be '
-                               'hidden, deleted or not visible to this account)']
+    if result['state'] is None and isinstance(reported, int) and shown < reported:
+        reading['coverage'] = [f'Threads reports {reported} direct replies to this {"reply" if branch else "post"}; '
+                               f'{shown} were sent (some can be hidden, deleted or not visible to this account)']
     if result['state'] is not None and out is None:
         nxt = handles.save(context, {**start, 'cursor': result['state']['cursor'], 'shown': shown,
                                      'pending': result['state']['pending'], 'seen': result['state']['seen']})

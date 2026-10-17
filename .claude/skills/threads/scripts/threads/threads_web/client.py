@@ -478,20 +478,25 @@ class Client:
                              route={'post_path': path})
         return self._read('replies_next', lambda: records.next_batch(payload['data'], post_id, seen))
 
-    def branch(self, post_id, parent_id, cursor, *, path):
-        """One batch of the replies under one reply."""
-        payload = self.query('sub_replies', {'postID': parent_id, 'permalinkPostID': post_id, 'after': cursor},
-                             route={'post_path': path})
-        return self._read('sub_replies', lambda: records.branch_batch(payload['data'], parent_id))
+    def branch(self, parent, cursor, *, sort, path, seen):
+        """One batch of the replies under one reply, read as that reply's own post page lists them (the thread view's
+        inline expansion shows only a few): its first batch, then the next ones by cursor."""
+        if cursor is None:
+            key, variables = 'post_replies', {'postID': parent['id'], 'sortOrder': sort.upper()}
+        else:
+            key, variables = 'replies_next', {'postID': parent['id'], 'after': cursor, 'sortOrder': sort.upper()}
+        payload = self.query(key, variables, route={'post_path': path})
+        return self._read(key, lambda: records.branch_batch(payload['data'], parent, seen))
 
     def profile_id(self, username):
         """The numeric id of a handle, and its user object (one request)."""
-        payload = self.query('profile_by_name', {'username': username}, route={'username': username})
+        gone = ThreadsError(9, f'Threads has no profile @{username} visible to this account.',
+                            'Check the handle; tell the user rather than retrying.', reason='unavailable')
+        payload = self.query('profile_by_name', {'username': username}, route={'username': username}, missing=gone)
         user = (payload.get('data') or {}).get('xdt_text_app_user_by_username') or (payload.get('data') or {}).get('user')
         found = records.user_record(user) if isinstance(user, dict) else None
         if found is None:
-            raise ThreadsError(9, f'Threads has no profile @{username} visible to this account.',
-                               'Check the handle; tell the user rather than retrying.', reason='unavailable')
+            raise gone
         self._confirm('profile_by_name')
         return found['id'], user
 

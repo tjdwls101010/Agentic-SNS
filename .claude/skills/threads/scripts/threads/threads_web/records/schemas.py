@@ -22,6 +22,8 @@ POST = {
         'is_reply': 'boolean — the post answers another post',
         'reply_to_id': 'string|null — the post this one answers, only when Threads says so',
         'root_post_id': 'string|null — the first post of the thread this one belongs to',
+        'reply_level': 'integer|null — how deep Threads places this reply in its thread: 1 answers the thread\'s first post',
+        'reply_to_author': 'string|null — the handle of the author this reply answers, as Threads names it',
         'quoted_post': 'object|null — the post this one quotes: two voices, the quoter\'s text and the quoted '
                        'author\'s own',
         'reposted_post': 'object|null — the post this one shares; a repost adds no words',
