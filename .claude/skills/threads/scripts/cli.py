@@ -144,7 +144,7 @@ COMMANDS = {
                       (('relation',), {'choices': ['followers', 'following'], 'help': 'followers or following'})] + list(LIST),
         'epilog': ['followers: Threads may send its own sample rather than the whole list (stopped=server_capped); reported_total is the count the profile reports. following pages on.',
                    'Without --limit or --out it reads one page; more: continues.',
-                   'requests: 1 to find the profile, then 1 per page of about 10-20 accounts. The first next page of following in a while may read the profile screen once to learn its query (outside --max-requests).'],
+                   'requests: 1 to find the profile, then 1 per page of about 20 accounts.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
     },
     'me': {

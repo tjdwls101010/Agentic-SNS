@@ -568,12 +568,9 @@ class Client:
 
     def relation(self, relation, user_id, username, cursor):
         """One page of a profile's followers or following."""
-        if cursor is None:
-            key, variables, surface = relation, {'userID': user_id}, relation
-        else:
-            key, variables, surface = 'following_next', {'id': user_id, 'after': cursor}, 'following_more'
-        payload = self.query(key, variables, route={'username': username})
-        return self._read(key, lambda: records.connection_page(payload['data'], surface))
+        variables = {'userID': user_id, **({'after': cursor} if cursor is not None else {})}
+        payload = self.query(relation, variables, route={'username': username})
+        return self._read(relation, lambda: records.connection_page(payload['data'], relation))
 
     def mine(self, collection):
         """The viewer's liked or saved posts (one batch)."""

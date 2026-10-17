@@ -587,9 +587,14 @@
   "following": {
    "name": "BarcelonaFriendshipsFollowingTabQuery",
    "doc_id": "29264976413094450",
-   "endpoint": "/api/graphql/",
-   "root": null,
-   "providers": [],
+   "endpoint": "/graphql/query",
+   "root": "fetch__XDTUserDict",
+   "providers": [
+    "BarcelonaIsCrawler.relayprovider",
+    "BarcelonaIsInternalUser.relayprovider",
+    "BarcelonaIsLoggedIn.relayprovider",
+    "BarcelonaShouldShowFediverseLists.relayprovider"
+   ],
    "route": "/@{username}",
    "variables": {
     "userID": null,
@@ -875,20 +880,6 @@
     "after": null
    },
    "learn_pattern": "ProfileMediaTab",
-   "args": null
-  },
-  "following_next": {
-   "name": "BarcelonaFriendshipsFollowingTabRefetchableQuery",
-   "doc_id": null,
-   "endpoint": "/api/graphql/",
-   "root": null,
-   "providers": [],
-   "route": "/@{username}",
-   "variables": {
-    "id": null,
-    "first": 10,
-    "after": null
-   },
    "args": null
   }
  }

@@ -19,12 +19,11 @@ SURFACES = {
     'search_accounts': ('xdt_api__v1__users__search_connection', None, SINGLE),
     'followers': ('user.followers', None, CAPPED),
     'following': ('user.following', None, OFFSET),
-    'following_more': ('fetch__XDTUserDict.following', None, OFFSET),
     'liked': ('xdt_text_app_viewer.liked_media', 'thread_items', SINGLE),
     'saved': ('xdt_text_app_viewer.saved_media', 'thread_items', SINGLE),
 }
 _CHANGED = 'Threads changed this response; the skill needs an update.'
-RELATIONS = ('followers', 'following', 'following_more')
+RELATIONS = ('followers', 'following')
 
 
 def _count(value, key):

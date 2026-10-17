@@ -45,16 +45,20 @@ def test_following_pages_by_offset_and_more_continues_with_the_profiles_id(brows
     assert code == 0 and '[a1] @c.three' in out
     more = next(line for line in out.splitlines() if line.startswith('more: '))
     assert command_of(more)[:3] == ['graph', 'https://www.threads.com/@example.author', 'following']
-    nxt = {'data': {'fetch__XDTUserDict': {'following': {'edges': accounts(['d.four'])[0:1],
-                                                         'page_info': {'has_next_page': False, 'end_cursor': None}}}}}
-    nxt['data']['fetch__XDTUserDict']['following']['edges'][0]['node']['pk'] = '2000000077'
+    nxt = {'data': {'user': {'following': {'edges': accounts(['d.four'])[0:1],
+                                           'page_info': {'has_next_page': False, 'end_cursor': None}}}}}
+    nxt['data']['user']['following']['edges'][0]['node']['pk'] = '2000000077'
     browser.respond('state', state()).respond('query', query_result(nxt, doc_id='777'))
     code, out, _ = run_cli(browser, *command_of(more))
     assert code == 0 and '@d.four' in out
     calls = [c['args'] for c in browser.calls() if c['op'] == 'query']
     assert len(calls) == 3  # the continuation needs no new id lookup
-    assert calls[2]['name'] == 'BarcelonaFriendshipsFollowingTabRefetchableQuery'
-    assert calls[2]['variables']['id'] == '1000000001' and calls[2]['variables']['after'] == '20'
+    # observed 2026-10-17: without its providers Threads answers missing_required_variable_value
+    assert calls[1]['endpoint'] == '/graphql/query' and calls[1]['root'] == 'fetch__XDTUserDict'
+    assert '__relay_internal__pv__BarcelonaIsLoggedInrelayprovider' in dict(calls[1]['fallback']['providers'])
+    # observed 2026-10-17: the tab query itself takes the offset; its refetchable twin is not on the profile screen
+    assert calls[2]['name'] == 'BarcelonaFriendshipsFollowingTabQuery'
+    assert calls[2]['variables']['userID'] == '1000000001' and calls[2]['variables']['after'] == '20'
 
 
 def test_liked_is_one_batch(browser, data_dir):

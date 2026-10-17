@@ -38,8 +38,8 @@
      "fact": "Followers are asked with {userID, first 20}.",
      "surface": "followers", "input": {"user_id": "1000000001"}, "expected": {"userID": "1000000001", "first": 20}},
     {"name": "following-next-page", "item": "24",
-     "fact": "Following's next page is the refetchable query with {id, first 10, after: <offset>}.",
-     "surface": "following_more", "input": {"user_id": "1000000001", "after": "20"}, "expected": {"id": "1000000001", "first": 10, "after": "20"}}
+     "fact": "Following's next page is the same tab query with {userID, first 20, after: <offset>}; observed 2026-10-17, its refetchable twin is not defined on the profile screen.",
+     "surface": "following", "input": {"user_id": "1000000001", "after": "20"}, "expected": {"userID": "1000000001", "first": 20, "after": "20"}}
   ],
   "headers": {
     "item": "plan-recon",
