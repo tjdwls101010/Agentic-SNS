@@ -30,7 +30,15 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 SKILL = REPO / '.claude/skills/threads'
 DATA = SKILL / 'data'
-WORK = Path(os.environ.get('THREADS_WORK', Path.home() / '.claude/projects/-Users-seongjin-Coding-Agentic-SNS/threads-rebuild'))
+def _project_dir():
+    """Claude Code's folder for the main checkout of this repository (a worktree shares it)."""
+    common = subprocess.run(['git', '-C', str(HERE), 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+                            capture_output=True, text=True).stdout.strip()
+    main = Path(common).parent if common else REPO
+    return Path.home() / '.claude/projects' / re.sub(r'[^A-Za-z0-9]', '-', str(main))
+
+
+WORK = Path(os.environ.get('THREADS_WORK') or _project_dir() / 'threads-rebuild')
 LEDGER = WORK / 'budget-ledger.tsv'
 DRAFT = WORK / 'drafts/SKILL.md'
 MODEL = 'claude-opus-5-5'

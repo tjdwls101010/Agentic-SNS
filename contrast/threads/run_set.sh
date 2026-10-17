@@ -1,7 +1,7 @@
 #!/bin/zsh
 # usage: run_set.sh RUNPREFIX VARIANT t1 t2 …  — runs tasks in order; stops before a task whose reservation no longer fits today's ledger
 cd "$(dirname "$0")"
-work=${THREADS_WORK:-$HOME/.claude/projects/-Users-seongjin-Coding-Agentic-SNS/threads-rebuild}
+work=$(python3 -c "import contrast; print(contrast.WORK)")
 prefix=$1 variant=$2; shift 2
 for t in "$@"; do
   if ! python3 ledger.py check "$work/budget-ledger.tsv" tab_open --stage P6 > /dev/null; then
