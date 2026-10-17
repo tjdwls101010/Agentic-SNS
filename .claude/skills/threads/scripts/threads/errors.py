@@ -1,40 +1,58 @@
-"""Public errors: a kind, a message, and the fix that says what to do next."""
+"""The one public error type, and the single scrub path for optional diagnostics."""
+import json
+import re
+import sys
+from urllib.parse import urlsplit, urlunsplit
 
-_FIXES = {
-    2: 'Run this command with --help.',
-    3: 'Check that Aside is running, then run `{cli} doctor`.',
-    4: 'Log in to Threads in Aside, then run `{cli} doctor`.',
-    5: 'Stop requests. Check Threads in Aside, then run `{cli} doctor --unblock`.',
-    6: 'Wait briefly before retrying; no automatic retry was made.',
-    7: 'Try another target or date window; this is an explicitly empty result.',
-    8: 'Run more: later, or rerun the same --out command.',
-    9: 'This account cannot read it (deleted, private and not followed, or redirected away); tell the user rather '
-       'than retrying.',
-}
-ROTATED = 'Run `{cli} refresh`, then retry this command.'
-CAPTURE = ('Ask the user first: it opens a Threads tab in their browser, where the app itself may record views; then run '
-           '`{cli} refresh --capture --post <public post URL>` with a real post URL, and retry this command.')
-# The CLI fills in {cli} (its own invocation, as more: writes it) and {command} (the command that failed).
-CHANGED = "Threads changed this response's shape; refresh cannot repair it. Tell the user the {command} reader needs an update."
+# Exit code → the error kind it reports. cli.py owns the codes; every unit raises with one of them.
+KINDS = {2: 'argument', 3: 'aside', 4: 'login', 5: 'blocked', 6: 'failed', 7: 'empty', 8: 'budget', 9: 'unavailable'}
+
+_SENSITIVE = {'fb_dtsg', 'lsd', 'jazoest', 'csrftoken', 'sessionid', 'ds_user_id', 'mid', 'x-csrftoken', 'x-fb-lsd', 'token',
+              'access_token', 'cookie', 'cookies', 'authorization', '__hs', '__hsi', '__dyn', '__csr', '__spin_t', '__s',
+              '__hsdp', '__hblp', '__sjsp', '__crn'}
+_KEYS = '|'.join(re.escape(key) for key in sorted(_SENSITIVE, key=len, reverse=True))
+_JSON_SECRET = re.compile(r'"(' + _KEYS + r')"\s*:\s*"(?:\\.|[^"\\])*"', re.I)
+_FORM_SECRET = re.compile(r'(?<![A-Za-z0-9_])(' + _KEYS + r')\s*[:=]\s*[^\s;&"\']+', re.I)
 
 
 class ThreadsError(Exception):
-    def __init__(self, code, message, fix=None, error=None):
+    """A failure every caller can report: an exit code (see KINDS), what happened, and what to do next."""
+
+    def __init__(self, code, message, fix, reason=None):
         super().__init__(message)
         self.code = code
-        self.error = error or {2: "arguments", 3: "aside", 4: "login", 5: "blocked", 6: "transient", 7: "empty", 8: "partial", 9: "unavailable"}.get(code, "failure")
         self.message = message
-        self.fix = fix or _FIXES.get(code, 'Check the command with --help.')
+        self.fix = fix
+        self.reason = reason  # a finer cause a caller may act on, e.g. 'tab_missing', 'stale', 'checkpoint'
 
-    def as_dict(self):
-        return {'ok': False, 'error': self.error, 'code': self.code, 'message': self.message, 'fix': self.fix}
-
-
-def rotated(message, capture=False):
-    """A query Threads no longer answers under its registered id or name: refresh can find the new one."""
-    return ThreadsError(6, message, CAPTURE if capture else ROTATED, error='operation_rotated')
+    @property
+    def kind(self):
+        return KINDS.get(self.code, 'failed')
 
 
-def changed(message):
-    """A response that arrived without what its declaration reads: only a new version of the reader can fix it."""
-    return ThreadsError(6, message, CHANGED, error='shape_changed')
+def scrub(value):
+    """A copy with cookie and token fields redacted and signed CDN query strings removed."""
+    if isinstance(value, dict):
+        return {key: '[REDACTED]' if str(key).lower() in _SENSITIVE else scrub(child) for key, child in value.items()}
+    if isinstance(value, list):
+        return [scrub(child) for child in value]
+    if not isinstance(value, str):
+        return value
+    value = _JSON_SECRET.sub(lambda m: '"' + m[1] + '":"[REDACTED]"', value)
+    value = _FORM_SECRET.sub(lambda m: m[1] + '=[REDACTED]', value)
+
+    def url(match):
+        try:
+            parts = urlsplit(match[0])
+            host = (parts.hostname or '').lower()
+            if any(host == cdn or host.endswith('.' + cdn) for cdn in ('cdninstagram.com', 'fbcdn.net')):
+                return urlunsplit((parts.scheme, parts.netloc, parts.path, '', ''))
+        except ValueError:
+            return '[INVALID URL]'
+        return match[0]
+    return re.sub(r'https?://[^\s"\'<>]+', url, value)
+
+
+def diagnostic(stage, **details):
+    """Write caller-chosen request metadata to stderr, scrubbed; never page source, bodies or tokens."""
+    print(json.dumps(scrub({'stage': stage, **details}), ensure_ascii=False), file=sys.stderr)
