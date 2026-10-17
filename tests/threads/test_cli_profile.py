@@ -130,3 +130,10 @@ def test_an_empty_answer_proves_nothing_about_a_learned_query(browser, data_dir)
     browser.respond('query', query_result(tab_body([])))
     code, out, _ = run_cli(browser, 'profile', '@example.author', '--tab', 'reposts', '--json')
     assert code == 7 and Session('default').renamed('profile_reposts') is None
+
+
+def test_a_server_error_on_the_lookup_is_a_failure_not_a_missing_profile(browser, data_dir):
+    error = {'data': None, 'errors': [{'message': 'Internal server error', 'extensions': {'code': 'INTERNAL_SERVER_ERROR'}}]}
+    known_tab(browser, data_dir).respond('query', query_result(error))
+    code, out, _ = run_cli(browser, 'about', '@example.author')
+    assert code == 6, out

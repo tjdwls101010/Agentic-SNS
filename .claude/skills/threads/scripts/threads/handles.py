@@ -12,7 +12,7 @@ import time
 from threads.errors import ThreadsError
 from threads.paths import data_dir, state_dir
 
-FORMAT = 1
+FORMAT = 2  # 2: branch handles read the reply's own page (parent, branch_path)
 TTL_SECONDS = 24 * 3600
 
 _RESTART = 'Rerun the original command without --after (or the command that printed this handle).'

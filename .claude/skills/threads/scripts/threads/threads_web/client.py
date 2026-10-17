@@ -42,6 +42,18 @@ def _int(value, default=0):
     return value if type(value) is int and value >= 0 else default
 
 
+def _explicit_null(body):
+    """Whether a response names its data fields and answers each with null, without errors: the target is not there
+    (a server error or a missing data object is a failure, not an answer)."""
+    try:
+        payload = json.loads((body or '').replace('for (;;);', '', 1))
+    except ValueError:
+        return False
+    data = payload.get('data') if isinstance(payload, dict) else None
+    return (isinstance(data, dict) and bool(data) and all(value is None for value in data.values())
+            and not payload.get('errors'))
+
+
 def _host(url):
     try:
         return urlsplit(url or '').hostname or ''
@@ -86,11 +98,11 @@ class Client:
                     self.guard.log_unwatched(self.unwatched)  # made between commands: logged, not charged
                     self._consume(state, slot)
                     self._check(state)
-            elif entry and not _host(entry['url']):
-                self.tab = known
-                self._load(navigate=True)  # the tab this skill emptied earlier: send it back to Threads
             else:
+                # A tab this skill emptied earlier is not sent back to Threads: Aside drops an emptied tab once
+                # nothing holds it, even mid-load, and a query would then open another one.
                 self._open()
+                self.reopened = bool(entry)
             self.token = self.memory.touch()
         return self.account_id
 
@@ -125,32 +137,41 @@ class Client:
             self._settle_load(slot)
 
     def _settle_load(self, slot):
-        """Wait for the loaded app, then check the new page before any query: where it is, what loading it answered
-        (a 429), and the document's own checkpoint and login markers."""
-        deadline, seen = time.monotonic() + LOAD_WAIT, 1
+        """Wait for the loaded app and then for the page to go quiet, so what loading it costs is charged here (prepaid)
+        and not to the next read; then check the new page before any query: where it is, what loading it answered (a
+        429), and the document's own checkpoint and login markers."""
+        deadline, seen, state = time.monotonic() + LOAD_WAIT, 1, None
         while True:
             try:
-                state = self._state(document=True)
+                look = self._state(document=state is None)
             except ThreadsError as error:
                 # the page is replacing its document; a vanished tab or the time limit ends the wait
                 if error.reason == 'tab_missing' or time.monotonic() > deadline:
                     raise
                 time.sleep(1)
                 continue
-            seen += _int(state.get('resources'))  # every look's requests count, and every look is checked
+            new = _int(look.get('resources'))
+            seen += new  # every look's requests count, and every look is checked
             slot.charge(seen)
-            self._consume(state, slot)
-            if state.get('runtime') and state.get('user_id') or time.monotonic() > deadline:
+            self._consume(look, slot)
+            if state is not None and not new:
+                break  # quiet: what the page sends from now on is its own polling
+            if state is None and (look.get('runtime') and look.get('user_id') or time.monotonic() > deadline):
+                state = look
+                self._check_document(state, slot)  # a checkpoint or login page stops at once, not once quiet
+            if time.monotonic() > deadline:
                 break
             time.sleep(1)
         self.prepaid['setup'] = max(0, slot.reserved - seen)
+        self._check(state)
+
+    def _check_document(self, state, slot):
         if state.get('document'):
             verdict = classify.document(state['document'])
             if verdict.block:
                 self._stop(slot, verdict)
             if verdict.kind == 'login':
                 raise verdict.error
-        self._check(state)
 
     def _check(self, state):
         """Raise for a page that is not a working, logged-in Threads page of this command's account (blocks and
@@ -349,7 +370,7 @@ class Client:
                     self._learn(key, spec, route)
                 spec = self._spec(key)
                 continue
-            if missing is not None and verdict.reason == 'shape_changed':
+            if missing is not None and verdict.reason == 'shape_changed' and _explicit_null(result.get('body')):
                 raise missing  # this read's empty answer means its target is not there
             if verdict.error:
                 raise verdict.error

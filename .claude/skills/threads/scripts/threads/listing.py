@@ -65,18 +65,9 @@ def graph(options):
         client = connection.client
         saved = (state or {}) if out is None else (out.state or {})
         user_id = saved.get('user_id') or client.profile_id(target.username)[0]
-        totals = {}
-
-        def fetch(cursor):
-            page = client.relation(relation, user_id, target.username, cursor)
-            if page.reported_total is not None:
-                totals['reported'] = page.reported_total
-            return page
-        reading = _read(options, identity, state, out, order=None, command='graph', target=target.url,
-                        extra={'user_id': user_id}, fetch=fetch, words=[relation], stops=True)
-        if 'reported' in totals:
-            reading['details'] = {'reported_total': totals['reported']}
-        return reading
+        return _read(options, identity, state, out, order=None, command='graph', target=target.url,
+                     extra={'user_id': user_id}, words=[relation], stops=True,
+                     fetch=lambda cursor: client.relation(relation, user_id, target.username, cursor))
 
     return connect.run(options, command='graph', target=target.url, identity=identity, reader=read)
 
@@ -87,17 +78,8 @@ def activity(options):
     tab = {'quotes': 'quote', 'reposts': 'repost'}[options['command']]
 
     def read(connection, state, out):
-        totals = {}
-
-        def fetch(cursor):
-            page = connection.client.activity(target, tab)
-            totals['reported'] = page.reported_total
-            return page
-        reading = _read(options, {}, state, out, order=None, command=options['command'], target=target.url,
-                        fetch=fetch, stops=True)
-        if totals.get('reported') is not None:
-            reading['details'] = {'reported_total': totals['reported']}
-        return reading
+        return _read(options, {}, state, out, order=None, command=options['command'], target=target.url,
+                     fetch=lambda cursor: connection.client.activity(target, tab), stops=True)
 
     return connect.run(options, command=options['command'], target=target.url, identity={}, reader=read)
 
@@ -118,17 +100,20 @@ def _read(options, identity, state, out, *, order, fetch, command, target, extra
     window = Window(options.get('since'), options.get('until'), order, start.pop('window', None))
     for key in (extra or {}):
         start.pop(key, None)
-
-    natural = {}
+    # what the list itself said (server_capped or not_paginable, the total it reports), kept for a continuation that
+    # reads only the tail it already received
+    natural = start.pop('natural', None) or {}
 
     def fetch_page(cursor):
         page = fetch(cursor)
-        natural['stop'] = page.stop  # server_capped or not_paginable when the list itself says so
+        natural['stop'] = page.stop
+        if page.reported_total is not None:
+            natural['reported'] = page.reported_total
         return page.records, {'has_next_page': page.has_next, 'end_cursor': page.cursor}, bool(page.records)
 
     def commit(records, page_state, reason, skipped):
-        out.commit(records, {**page_state, 'window': window.state(), **(extra or {})} if page_state else None, reason,
-                   skipped, window.report())
+        out.commit(records, {**page_state, 'window': window.state(), 'natural': dict(natural), **(extra or {})}
+                   if page_state else None, reason, skipped, window.report())
 
     if out is not None:
         start.update(seen=sorted(out.ids, key=str), pending=[])
@@ -149,10 +134,13 @@ def _read(options, identity, state, out, *, order, fetch, command, target, extra
     reading = {'results': [] if out is not None else result['results'], 'stop_reason': stop,
                'failure': result['failure'], 'coverage': window.report(), 'words': _words(identity, words),
                'partial': bool(result['results'])}
+    if natural.get('reported') is not None:
+        reading['details'] = {'reported_total': natural['reported']}
     if result['state'] is not None:
         reading['continuation'] = {'command': command, 'target': target, 'identity': identity,
                                    'words': _words(identity, words),
-                                   'state': {**result['state'], 'window': window.state(), **(extra or {})}}
+                                   'state': {**result['state'], 'window': window.state(), 'natural': dict(natural),
+                                             **(extra or {})}}
     return reading
 
 

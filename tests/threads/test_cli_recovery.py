@@ -81,7 +81,7 @@ def test_a_refused_live_module_reloads_the_tab_once(browser, data_dir):
     browser.respond('navigate', {'navigating': True, 'explicit': 0, 'resources': 0, 'statuses': [], 'signals': [],
                                  'location': START})
     browser.respond('state', state(resources=30, document='<script>{"csrf_token":"t","NON_FACEBOOK_USER_ID":"1000000009","username":"v"}</script>'))
-    browser.respond('query', feed_page(['A']))
+    browser.respond('state', state()).respond('query', feed_page(['A']))
     code, out, _ = run_cli(browser, 'feed', '--json')
     result = json.loads(out)
     assert code == 0, result

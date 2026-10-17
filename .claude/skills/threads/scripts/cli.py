@@ -196,7 +196,7 @@ COMMANDS = {
         'help': 'Read the posts that quote one post (one batch).',
         'run': listing.activity,
         'arguments': [(('target',), {'help': 'Post URL or shortcode'})] + list(LIST),
-        'epilog': ['Each quote is its own post ([p] label, role quote), shown with its author and full text; post <url> opens it with its media and replies. Threads sends one batch of up to about 100, in its own order: when it reports more (reported_total), the rest cannot be asked for (stopped=server_capped).',
+        'epilog': ['Each quote is its own post ([p] label, role quote), shown with its author and its text as the activity list gives it (--chars sets how much is shown); post <url> opens it with its media and replies. Threads sends one batch of up to about 100, in its own order: when it reports more (reported_total), the rest cannot be asked for (stopped=server_capped).',
                    'requests: 1.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },

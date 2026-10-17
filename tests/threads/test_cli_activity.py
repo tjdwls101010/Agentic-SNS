@@ -8,7 +8,7 @@ context is its display name; a quote's destination is media?id=<quote id>_<autho
 """
 import json
 
-from conftest import known_tab, query_result, run_cli
+from conftest import command_of, known_tab, query_result, run_cli, state
 
 URL = 'https://www.threads.com/@example.author/post/DThr_201'
 POST_ID = '14535981231413'
@@ -79,3 +79,19 @@ def test_no_quotes_is_an_explicit_empty_answer(browser, data_dir):
     known_tab(browser, data_dir).respond('query', query_result(activity([], 0)))
     code, out, _ = run_cli(browser, 'quotes', URL, '--json')
     assert code == 7 and json.loads(out)['results'] == []
+
+
+def test_a_continuation_keeps_what_threads_said_about_the_rest(browser, data_dir):
+    body = activity([item('quote', '3000000000000000331', 'someone.else', '1000000002', text='one'),
+                     item('quote', '3000000000000000332', 'third.person', '1000000003', text='two')], 5)
+    known_tab(browser, data_dir).respond('query', query_result(body))
+    code, out, _ = run_cli(browser, 'quotes', URL, '--limit', '1', '--json')
+    first = json.loads(out)
+    assert code == 0 and first['reported_total'] == 5 and first.get('next'), first
+    browser.respond('state', state())
+    code, out, _ = run_cli(browser, *command_of('more: ' + first['next']))
+    rest = json.loads(out)
+    assert code == 0, rest
+    assert [r['id'] for r in rest['results']] == ['3000000000000000332'] and browser.ops().count('query') == 1
+    # the kept tail ends the batch Threads sent: the other three stay out of reach
+    assert rest['stop_reason'] == 'server_capped' and rest['reported_total'] == 5

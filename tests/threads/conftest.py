@@ -114,6 +114,7 @@ def opening(browser, target='NEW1', resources=33, **extra):
     """Aside opens a new tab on the start screen, which loads logged in."""
     browser.respond('open', {'tab': {'id': target, 'url': START}})
     browser.respond('state', state(resources=resources, document=LOGGED_IN_DOCUMENT, **extra))
+    browser.respond('state', state(resources=0, **{k: v for k, v in extra.items() if k != 'resources'}))  # quiet
     return browser
 
 

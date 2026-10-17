@@ -93,14 +93,14 @@
      ],
      "expected": {"outcome": "failed", "kind": "shape_changed"}},
     {"name": "replies-placed-by-level", "item": "18,19",
-     "fact": "Observed 2026-10-17: Threads sends no reply_to_id on replies; each carries reply_level (1 answers the post) and reply_to_author. A reply answers the nearest earlier post of its unit one level up, and only when that post's author is the one it names; otherwise it stays unplaced rather than guessed.",
+     "fact": "Observed 2026-10-17: Threads sends no reply_to_id on replies; each carries reply_level (1 answers the post) and reply_to_author. A reply answers the nearest earlier post of its unit one level up, and only when that post's author is the one it names; a reply naming no author, or another one, stays unplaced rather than guessed.",
      "code": "DThr_201", "post_id": "14535981231413", "limit": 10,
      "responses": [
        {"media": {"pk": "14535981231413", "code": "DThr_201", "caption": {"text": "The post"}, "user": {"$user": "A"}, "text_post_app_info": {"direct_reply_count": 2}}},
        {"media": {"pk": "14535981231413", "text_post_app_info": {"containing_thread": {"posts": {"edges": []}}}}},
        {"media": {"pk": "14535981231413", "text_post_app_info": {"direct_replies": {"edges": [
          {"node": {"posts": {"edges": [{"node": {"pk": "3000000000000000231", "caption": {"text": "First answer"}, "user": {"$user": "B"}, "text_post_app_info": {"is_reply": true, "reply_level": 1, "reply_to_author": {"$user": "A"}}}}, {"node": {"pk": "3000000000000000232", "caption": {"text": "Author replies"}, "user": {"$user": "A"}, "text_post_app_info": {"is_reply": true, "reply_level": 2, "reply_to_author": {"$user": "B"}}}}, {"node": {"pk": "3000000000000000233", "caption": {"text": "Another answer to B"}, "user": {"$user": "C"}, "text_post_app_info": {"is_reply": true, "reply_level": 2, "reply_to_author": {"$user": "B"}}}}, {"node": {"pk": "3000000000000000234", "caption": {"text": "B answers C"}, "user": {"$user": "B"}, "text_post_app_info": {"is_reply": true, "reply_level": 3, "reply_to_author": {"$user": "C"}}}}]}}},
-         {"node": {"posts": {"edges": [{"node": {"pk": "3000000000000000241", "caption": {"text": "Second answer"}, "user": {"$user": "C"}, "text_post_app_info": {"is_reply": true, "reply_level": 1, "reply_to_author": {"$user": "A"}}}}, {"node": {"pk": "3000000000000000242", "caption": {"text": "C continues"}, "user": {"$user": "C"}, "text_post_app_info": {"is_reply": true, "reply_level": 2, "reply_to_author": {"$user": "C"}}}}, {"node": {"pk": "3000000000000000243", "caption": {"text": "Names someone the unit does not hold"}, "user": {"$user": "B"}, "text_post_app_info": {"is_reply": true, "reply_level": 2, "reply_to_author": {"$user": "A"}}}}]}}}]}}}}
+         {"node": {"posts": {"edges": [{"node": {"pk": "3000000000000000241", "caption": {"text": "Second answer"}, "user": {"$user": "C"}, "text_post_app_info": {"is_reply": true, "reply_level": 1, "reply_to_author": {"$user": "A"}}}}, {"node": {"pk": "3000000000000000242", "caption": {"text": "C continues"}, "user": {"$user": "C"}, "text_post_app_info": {"is_reply": true, "reply_level": 2, "reply_to_author": {"$user": "C"}}}}, {"node": {"pk": "3000000000000000243", "caption": {"text": "Names someone the unit does not hold"}, "user": {"$user": "B"}, "text_post_app_info": {"is_reply": true, "reply_level": 2, "reply_to_author": {"$user": "A"}}}}, {"node": {"pk": "3000000000000000244", "caption": {"text": "Names nobody"}, "user": {"$user": "B"}, "text_post_app_info": {"is_reply": true, "reply_level": 2}}}]}}}]}}}}
      ],
      "expected": {"records": [{"id": "14535981231413", "role": "post"},
                               {"id": "3000000000000000231", "depth": 0, "relation": null, "reply_level": 1, "reply_to_author": "example.author"},
@@ -109,7 +109,8 @@
                               {"id": "3000000000000000234", "depth": 2, "relation": {"kind": "reply", "to": "3000000000000000233"}},
                               {"id": "3000000000000000241", "depth": 0, "relation": null},
                               {"id": "3000000000000000242", "depth": 1, "relation": {"kind": "continuation", "to": "3000000000000000241"}},
-                              {"id": "3000000000000000243", "depth": 0, "relation": null}]}},
+                              {"id": "3000000000000000243", "depth": 0, "relation": null},
+                              {"id": "3000000000000000244", "depth": 0, "relation": null}]}},
     {"name": "post-unavailable", "item": "4,18",
      "fact": "When the post itself is a tombstone the target is unavailable (exit 9).",
      "code": "DThr_203", "post_id": "14535981231415", "limit": 10,

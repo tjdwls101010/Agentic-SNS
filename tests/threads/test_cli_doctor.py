@@ -55,18 +55,27 @@ def test_reuses_the_known_tab_and_reports_what_it_did_between_commands(browser, 
     assert [(line['kind'], line['n']) for line in log(data_dir)] == [('unwatched', 7)]
 
 
-def test_a_tab_emptied_earlier_is_loaded_again_and_counted_like_opening(browser, data_dir):
+def test_a_tab_emptied_earlier_is_replaced_by_a_new_one_counted_like_opening(browser, data_dir):
+    # Aside drops an emptied tab once nothing holds it, even while it is being sent back to Threads: open a new one
     browser.tab('T1', url='about:blank')
     (data_dir / 'session').mkdir(parents=True)
     (data_dir / 'session/default.json').write_text(json.dumps({'tab': 'T1', 'queries': {}}))
-    browser.respond('navigate', {'navigating': True, 'explicit': 0, 'resources': 0, 'statuses': [], 'signals': [],
-                                 'location': 'about:blank'})
-    browser.respond('state', state(resources=30, document=LOGGED_IN_DOCUMENT)).respond('modules', MODULES)
+    opening(browser).respond('modules', MODULES)
     code, result, _ = doctor(browser)
     assert code == 0, result
-    assert result['results'][0]['tab'] == {'target_id': 'T1', 'opened_now': True, 'reopened': True}
-    assert result['tab_opened_requests'] == 40 and 'open' not in browser.ops()
-    assert [c['args']['url'] for c in browser.calls() if c['op'] == 'navigate'] == [START]
+    assert result['results'][0]['tab'] == {'target_id': 'NEW1', 'opened_now': True, 'reopened': True}
+    assert result['tab_opened_requests'] == 40 and 'navigate' not in browser.ops()
+    assert [c['url'] for c in browser.calls() if c['op'] == 'open'] == [START]
+
+
+def test_opening_waits_until_the_page_is_quiet_so_its_load_is_not_charged_to_the_next_read(browser, data_dir):
+    browser.respond('open', {'tab': {'id': 'NEW1', 'url': START}})
+    browser.respond('state', state(resources=20, document=LOGGED_IN_DOCUMENT))
+    browser.respond('state', state(resources=12)).respond('state', state(resources=0)).respond('modules', MODULES)
+    code, result, _ = doctor(browser)
+    assert code == 0, result
+    assert [op for op in browser.ops() if op == 'state'] == ['state'] * 3
+    assert result['request_count'] == 40 and [(line['kind'], line['n']) for line in log(data_dir)] == [('tab_open', 40)]
 
 
 def test_a_saved_block_stops_before_the_browser_is_touched(browser, data_dir):
@@ -154,8 +163,8 @@ def test_unblock_keeps_the_block_when_the_tab_cannot_be_opened(browser, data_dir
 
 def test_two_commands_starting_together_open_one_tab(browser, data_dir):
     browser.respond('open', {'tab': {'id': 'NEW1', 'url': START}, '__sleep': 1.5})
-    browser.respond('state', state(resources=30, document=LOGGED_IN_DOCUMENT)).respond('modules', MODULES)
-    browser.respond('state', state()).respond('modules', MODULES)
+    browser.respond('state', state(resources=30, document=LOGGED_IN_DOCUMENT)).respond('state', state())
+    browser.respond('modules', MODULES).respond('state', state()).respond('modules', MODULES)
     browser.write()
     first = subprocess.Popen([sys.executable, str(CLI), 'doctor'], env=environment(browser), stdout=subprocess.PIPE,
                              text=True)
