@@ -51,7 +51,7 @@ def _explicit_null(body):
         return False
     data = payload.get('data') if isinstance(payload, dict) else None
     return (isinstance(data, dict) and bool(data) and all(value is None for value in data.values())
-            and not payload.get('errors'))
+            and not payload.get('errors') and not payload.get('error'))
 
 
 def _host(url):
@@ -154,8 +154,10 @@ class Client:
             seen += new  # every look's requests count, and every look is checked
             slot.charge(seen)
             self._consume(look, slot)
-            if state is not None and not new:
-                break  # quiet: what the page sends from now on is its own polling
+            if state is not None:
+                self._check(look)  # still a working page of the same logged-in account
+                if not new:
+                    break  # quiet: what the page sends from now on is its own polling
             if state is None and (look.get('runtime') and look.get('user_id') or time.monotonic() > deadline):
                 state = look
                 self._check_document(state, slot)  # a checkpoint or login page stops at once, not once quiet
@@ -391,10 +393,16 @@ class Client:
         self.recovery[kind] += 1
 
     def _reload(self):
-        """The tab's own module was refused (the app in the tab is older than Threads): load it again, once."""
+        """The tab's own module was refused (the app in the tab is older than Threads): load it again, once; a tab
+        emptied or lost meanwhile is replaced by a new one, never sent back to Threads."""
         self._recover('reload')
         with self.memory.opening():
-            self._load(navigate=True)
+            entry = next((t for t in self.browser.tabs() if t['target_id'] == self.tab), None)
+            if entry and _host(entry['url']) == 'www.threads.com':
+                self._load(navigate=True)
+            else:
+                self._open()
+                self.reopened = True
 
     def _learn(self, key, spec, route):
         """Learn `key`'s current id from the screen that uses it: its preloaders, then its bundles, then a renamed

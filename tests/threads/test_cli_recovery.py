@@ -3,7 +3,7 @@ real CLI, a scripted Aside and a local stand-in for the static CDN (THREADS_CDN_
 import hashlib
 import json
 
-from conftest import START, known_tab, query_result, run_cli, state
+from conftest import LOGGED_IN_DOCUMENT, START, known_tab, query_result, run_cli, state
 from test_cli_feed import feed_body, post
 from threads.session import Session
 
@@ -134,3 +134,13 @@ def test_a_lost_aside_connection_is_exit_3(browser, data_dir):
     known_tab(browser, data_dir).respond('query', {'__raw_stdout': '', '__exit': 1})
     code, out, err = run_cli(browser, 'feed')
     assert code == 3 and json.loads(out)['error'] == 'aside'
+
+
+def test_a_refused_live_module_in_a_tab_emptied_meanwhile_gets_a_new_tab_not_a_reload(browser, data_dir):
+    known_tab(browser, data_dir).respond('query', {**refused(source='live'), '__blank_after': True})
+    browser.respond('open', {'tab': {'id': 'NEW1', 'url': START}})
+    browser.respond('state', state(resources=30, document=LOGGED_IN_DOCUMENT)).respond('state', state())
+    browser.respond('query', feed_page(['A']))
+    code, out, _ = run_cli(browser, 'feed', '--json')
+    assert code == 0, out
+    assert 'navigate' not in browser.ops() and browser.ops().count('open') == 1

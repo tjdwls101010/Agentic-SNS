@@ -105,6 +105,12 @@ def main(argv):
         return 1
     if '__sleep' in response:
         time.sleep(response['__sleep'])
+    if response.get('__blank_after'):  # the tab is emptied right after this answer (an idle blanker got there first)
+        scenario = load()
+        for t in scenario['tabs']:
+            if t['id'] == aside.get('tab'):
+                t['url'] = 'about:blank'
+        save(scenario)
     if '__raw_stdout' in response:
         sys.stdout.write(response['__raw_stdout'])
         return response.get('__exit', 0)

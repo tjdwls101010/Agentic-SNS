@@ -374,3 +374,11 @@ def test_a_busy_idle_blanker_waits_for_the_running_command_to_end(browser, data_
     code, out, _ = run_cli(browser, 'idle', '--token', session['released'], '--after', '1')
     worker.wait()
     assert json.loads(out)['outcome'] == 'blanked' and time.time() - started >= 1.5
+
+
+def test_a_logout_seen_while_waiting_for_the_page_to_go_quiet_is_a_login_failure(browser, data_dir):
+    browser.respond('open', {'tab': {'id': 'NEW1', 'url': START}})
+    browser.respond('state', state(resources=20, document=LOGGED_IN_DOCUMENT))
+    browser.respond('state', state(resources=0, user_id='0')).respond('modules', MODULES)
+    code, result, _ = doctor(browser)
+    assert code == 4, result

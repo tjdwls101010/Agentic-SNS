@@ -137,3 +137,10 @@ def test_a_server_error_on_the_lookup_is_a_failure_not_a_missing_profile(browser
     known_tab(browser, data_dir).respond('query', query_result(error))
     code, out, _ = run_cli(browser, 'about', '@example.author')
     assert code == 6, out
+
+
+def test_a_null_lookup_that_comes_with_an_error_is_a_failure(browser, data_dir):
+    body = {'data': {'xdt_text_app_user_by_username': None}, 'error': {'message': 'Internal server error', 'code': 1}}
+    known_tab(browser, data_dir).respond('query', query_result(body))
+    code, out, _ = run_cli(browser, 'about', '@example.author')
+    assert code == 6, out

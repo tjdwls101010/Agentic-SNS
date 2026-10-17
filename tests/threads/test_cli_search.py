@@ -111,3 +111,17 @@ def test_a_date_no_local_time_can_reach_is_an_argument_error(browser, data_dir):
         code, out, err = run_cli(browser, *words)
         assert code == 2, (words, out, err)
     assert browser.calls() == []
+
+
+def test_an_account_search_continuation_keeps_its_one_batch_stop(browser, data_dir):
+    body = {'data': {'xdt_api__v1__users__search_connection': {'edges': [
+        {'node': {'pk': '1000000001', 'username': 'example.author'}},
+        {'node': {'pk': '1000000005', 'username': 'example.author2'}}]}}}
+    known_tab(browser, data_dir).respond('query', query_result(body))
+    code, out, _ = run_cli(browser, 'search', 'example', '--type', 'accounts', '--limit', '1', '--json')
+    first = json.loads(out)
+    assert code == 0 and first.get('next'), first
+    browser.respond('state', state())
+    code, out, _ = run_cli(browser, *command_of('more: ' + first['next']))
+    rest = json.loads(out)
+    assert code == 0 and rest['stop_reason'] == 'not_paginable' and browser.ops().count('query') == 1, rest

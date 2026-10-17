@@ -52,9 +52,9 @@ def _midnight(day):
 
 
 def _read(options, identity, state, out, *, fetch, text):
-    natural = {}
     start = dict(out.state or {}) if out is not None else dict(state or {})
     window = Window(identity['since'], identity['until'], 'server', start.pop('window', None))
+    natural = start.pop('natural', None) or {}  # what the list said, kept for a continuation that reads only its tail
 
     def fetch_page(cursor):
         page = fetch(cursor)
@@ -62,8 +62,8 @@ def _read(options, identity, state, out, *, fetch, text):
         return page.records, {'has_next_page': page.has_next, 'end_cursor': page.cursor}, bool(page.records)
 
     def commit(records, page_state, reason, skipped):
-        out.commit(records, {**page_state, 'window': window.state()} if page_state else None, reason, skipped,
-                   window.report())
+        out.commit(records, {**page_state, 'window': window.state(), 'natural': dict(natural)} if page_state else None,
+                   reason, skipped, window.report())
 
     limit = options.get('limit')
     if out is not None:
@@ -84,7 +84,8 @@ def _read(options, identity, state, out, *, fetch, text):
                'partial': bool(result['results'])}
     if result['state'] is not None:
         reading['continuation'] = {'command': 'search', 'target': text, 'identity': identity,
-                                   'words': _words(identity), 'state': {**result['state'], 'window': window.state()}}
+                                   'words': _words(identity), 'state': {**result['state'], 'window': window.state(),
+                                                                       'natural': dict(natural)}}
     return reading
 
 
