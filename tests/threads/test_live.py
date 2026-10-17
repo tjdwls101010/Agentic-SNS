@@ -55,5 +55,23 @@ def test_doctor_feed_two_pages_post_and_more_replies():
     branch = next((r for r in page['results'] if r.get('replies_handle')), None)
     if branch:
         code, under = cli('replies', str(branch['replies_handle']), '--json')
-        print(json.dumps({'branch': code, 'shown': len(under.get('results', []))}), file=sys.stderr)
+        assert code == 0, under
+        first = [r for r in under['results'] if r['depth'] == 1]
+        assert first and all(r['relation']['to'] == branch['id'] for r in first)
+        assert under.get('next') or len(under['results']) >= min(branch['reply_count'] or 0, 5)
+    nested = [r for r in page['results'] if (r.get('reply_level') or 0) >= 2]
+    assert all(r['relation'] for r in nested), 'a nested reply was not placed'
+    print(json.dumps({'spent': SPENT}), file=sys.stderr)
+
+
+def test_quotes_and_reposts_of_the_live_post():
+    url = os.environ['THREADS_LIVE_POST']
+    for command, kind in (('quotes', 'quote'), ('reposts', None)):
+        code, result = cli(command, url, '--json', '--max-requests', '3')
+        assert code == 0, result
+        assert result['results'] and result['request_count'] - result.get('tab_opened_requests', 0) <= 5
+        assert result['stop_reason'] in ('exhausted', 'server_capped') and result.get('reported_total')
+        for record in result['results']:
+            assert record['id'] and (record.get('role') == kind if kind else record.get('reposted_at'))
+            assert record['url'] and (record['author']['username'] if kind else record['username'])
     print(json.dumps({'spent': SPENT}), file=sys.stderr)

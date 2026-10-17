@@ -813,6 +813,24 @@
     "should_fetch_mention_restriction"
    ]
   },
+  "post_activity": {
+   "name": "BarcelonaFeedbackHubTabQuery",
+   "doc_id": "30425086740417731",
+   "endpoint": "/graphql/query",
+   "root": "xdt_api__v1__text_feed__post_id__feedback_hub_tab__connection",
+   "providers": [],
+   "route": "{post_path}",
+   "variables": {
+    "post_id": null,
+    "sort_type": "default",
+    "tab_type": null
+   },
+   "args": [
+    "post_id",
+    "sort_type",
+    "tab_type"
+   ]
+  },
   "profile_replies": {
    "name": null,
    "doc_id": null,

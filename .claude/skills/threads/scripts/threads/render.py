@@ -114,6 +114,8 @@ def account(record, label):
         parts.append(' '.join(f'{key}={_count(counts.get(key))}' for key in ('followers', 'following', 'mutuals')))
     elif record.get('follower_count') is not None:
         parts.append(f'followers={record["follower_count"]}')
+    if record.get('reposted_at'):
+        parts.append('reposted ' + _time(record['reposted_at']))
     lines = [f'[{label}] ' + ' · '.join(parts)]
     if record.get('bio'):
         lines.append('     bio: ' + _quote(record['bio']))

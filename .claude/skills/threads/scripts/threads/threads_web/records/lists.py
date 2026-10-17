@@ -3,10 +3,12 @@
 A unit (one edge) can carry several posts: a post and a reply to it, or an author continuing their own post. They stay
 one group, and each later post says what it is to the post it answers, so it never reads as an unrelated post.
 """
+import re
 from dataclasses import dataclass, field
+from urllib.parse import parse_qs, urlsplit
 
 from threads.errors import ThreadsError
-from threads.threads_web.records.posts import post_record, user_record
+from threads.threads_web.records.posts import _time, post_record, user_record
 
 RELAY, OFFSET, CAPPED, SINGLE = 'relay', 'offset', 'capped', 'single_batch'
 # surface → (path from data to the connection, path from an edge node to its thread items or None for users, policy)
@@ -149,3 +151,53 @@ def connection_page(data, surface):
         page.groups.append(group)
         page.records.extend(group)
     return page
+
+
+# {username|color|1|user?id=<id>|verified or none}: how the activity list names an account
+_TITLE = re.compile(r'\{([A-Za-z0-9._]+)\|[^|{}]*\|[^|{}]*\|user\?id=(\d+)\|([a-z_]*)\}')
+
+
+def activity_page(data, tab, post_id):
+    """The quotes (tab 'quote') or reposts ('repost') of post_id from the post activity tab response: one batch, with
+    the count Threads reports. A quote becomes a post record, a repost an account record with reposted_at."""
+    items = data.get('feedback_hub_tab_items') if isinstance(data, dict) else None
+    hub = data.get('feedback_hub') if isinstance(data, dict) else None
+    if not isinstance(items, dict) or not isinstance(items.get('edges'), list) or not isinstance(hub, dict):
+        raise _changed('The activity response has no feedback_hub_tab_items.edges list.')
+    about = str((hub.get('post') or {}).get('strong_id__') or '')
+    if about.split('_')[0] != post_id:
+        raise _changed('The activity response is about another post.')
+    page = Page(reported_total=hub.get('num_activity') if type(hub.get('num_activity')) is int else None)
+    for edge in items['edges']:
+        node = edge.get('node') if isinstance(edge, dict) else None
+        extra = node.get('extra') if isinstance(node, dict) else None
+        if not isinstance(extra, dict) or extra.get('icon_name') != tab:
+            raise _changed(f'The activity response holds something other than {tab}s.')
+        record = _activity_record(node, extra, tab)
+        page.groups.append([record])
+        page.records.append(record)
+    # Threads sends one batch (about 100) with no way to ask for more: fewer than it reports is its own sample.
+    total = page.reported_total
+    page.stop = 'server_capped' if total is not None and len(page.records) < total else 'exhausted'
+    return page
+
+
+def _activity_record(node, extra, tab):
+    title = _TITLE.fullmatch(extra.get('title') or '')
+    actor = (node.get('actor') or {}).get('strong_id__')
+    user = {'pk': title[2] if title else actor, 'username': title[1] if title else '', 'full_name': extra.get('context'),
+            'is_verified': title[3] == 'verified' if title else None}
+    if tab == 'repost':
+        record = user_record(user)
+        if record is None:
+            raise _changed('A repost in the activity list has no account.')
+        record['reposted_at'] = _time(node.get('timestamp'))
+        return record
+    destination = parse_qs(urlsplit('/' + (node.get('destination') or '')).query)
+    record = post_record({'pk': node.get('pk'), 'code': (destination.get('shortcode') or [None])[0],
+                          'taken_at': node.get('timestamp'), 'caption': {'text': extra.get('content') or ''},
+                          'user': user})
+    if record is None or record['unavailable']:
+        raise _changed('A quote in the activity list has no post id.')
+    record['role'] = 'quote'
+    return record

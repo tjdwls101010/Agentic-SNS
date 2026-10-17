@@ -4,7 +4,7 @@
 from threads import connect
 from threads.errors import ThreadsError
 from threads.paging import paginate
-from threads.threads_web import parse_user
+from threads.threads_web import parse_post, parse_user
 from threads.window import Window
 
 FEEDS = {'foryou': ('for_you', 'unordered'), 'following': ('following', 'newest_first')}
@@ -79,6 +79,27 @@ def graph(options):
         return reading
 
     return connect.run(options, command='graph', target=target.url, identity=identity, reader=read)
+
+
+def activity(options):
+    """quotes or reposts of one post: the batch Threads sends, with the count it reports."""
+    target = parse_post(options['target'])
+    tab = {'quotes': 'quote', 'reposts': 'repost'}[options['command']]
+
+    def read(connection, state, out):
+        totals = {}
+
+        def fetch(cursor):
+            page = connection.client.activity(target, tab)
+            totals['reported'] = page.reported_total
+            return page
+        reading = _read(options, {}, state, out, order=None, command=options['command'], target=target.url,
+                        fetch=fetch, stops=True)
+        if totals.get('reported') is not None:
+            reading['details'] = {'reported_total': totals['reported']}
+        return reading
+
+    return connect.run(options, command=options['command'], target=target.url, identity={}, reader=read)
 
 
 def me(options):

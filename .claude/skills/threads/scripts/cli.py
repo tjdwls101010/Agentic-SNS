@@ -192,6 +192,22 @@ COMMANDS = {
                    'requests: 1 per batch of about 10 replies.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
+    'quotes': {
+        'help': 'Read the posts that quote one post (one batch).',
+        'run': listing.activity,
+        'arguments': [(('target',), {'help': 'Post URL or shortcode'})] + list(LIST),
+        'epilog': ['Each quote is its own post ([p] label, role quote), shown with its author and full text; post <url> opens it with its media and replies. Threads sends one batch of up to about 100, in its own order: when it reports more (reported_total), the rest cannot be asked for (stopped=server_capped).',
+                   'requests: 1.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8),
+    },
+    'reposts': {
+        'help': 'Read the accounts that reposted one post (one batch).',
+        'run': listing.activity,
+        'arguments': [(('target',), {'help': 'Post URL or shortcode'})] + list(LIST),
+        'epilog': ['Each account ([a] label) with when it reposted. Threads sends one batch of up to about 100, in its own order: when it reports more (reported_total), the rest cannot be asked for (stopped=server_capped).',
+                   'requests: 1.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8),
+    },
     'doctor': {
         'help': 'Check Aside, the browser tab, login and account protection; always JSON.',
         'run': maintenance.doctor,
@@ -210,7 +226,7 @@ COMMANDS = {
         'exits': (0, 2),
     },
 }
-READS = ('feed', 'profile', 'about', 'graph', 'me', 'search', 'post', 'replies')
+READS = ('feed', 'profile', 'about', 'graph', 'me', 'search', 'post', 'replies', 'quotes', 'reposts')
 HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 

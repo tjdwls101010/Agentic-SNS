@@ -29,7 +29,7 @@ POST = {
         'reposted_post': 'object|null — the post this one shares; a repost adds no words',
         'is_pinned': 'boolean — pinned to its author\'s profile, so it sits first whatever its date',
         'unavailable': 'boolean — a tombstone: deleted, hidden or not visible to this account',
-        'role': 'string — post; in a post read: parent (above the post), post, or reply',
+        'role': 'string — post; in a post read: parent (above the post), post, or reply; in quotes: quote (a post quoting the one asked about, its counts and media unknown until post <url>)',
         'depth': 'integer — nesting under the first post of its unit or reply branch; 0 at the top',
         'relation': 'object|null — what a later post of one unit is to an earlier one: {kind: reply | continuation, '
                     'to: id}; continuation is the author continuing their own post',
@@ -52,6 +52,7 @@ ACCOUNT = {
         'bio_links': 'array<string> — links in the bio',
         'friendship_status': 'object — the logged-in account\'s relation to this one, as Threads sends it',
         'url': 'string|null — the profile URL',
+        'reposted_at': 'string — in reposts only: when the account reposted the post, ISO 8601 UTC',
         'counts': 'object — about only: {followers, following, mutuals}; Threads publishes no following or mutual '
                   'count, so those are null (unknown); graph following lists the accounts',
     },

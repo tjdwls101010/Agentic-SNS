@@ -488,6 +488,12 @@ class Client:
         payload = self.query(key, variables, route={'post_path': path})
         return self._read(key, lambda: records.branch_batch(payload['data'], parent, seen))
 
+    def activity(self, target, tab):
+        """The quotes ('quote') or reposts ('repost') of one post: the one batch Threads sends (one request)."""
+        payload = self.query('post_activity', {'post_id': target.post_id, 'tab_type': tab},
+                             route={'post_path': target.path})
+        return self._read('post_activity', lambda: records.activity_page(payload['data'], tab, target.post_id))
+
     def profile_id(self, username):
         """The numeric id of a handle, and its user object (one request)."""
         gone = ThreadsError(9, f'Threads has no profile @{username} visible to this account.',
