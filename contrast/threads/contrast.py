@@ -106,22 +106,28 @@ def main():
         fits = ledger.check(LEDGER, 'tab_open', stage='P6')
         if not fits['ok']:
             sys.exit(f'today\'s ledger leaves {fits["left_day"]}; a run reserves at least {fits["reservation"]}')
-    copy = root / 'skill'
+    root.mkdir(parents=True)
+    # The child's sandbox cannot write under ~/.claude whatever allowWrite says, so everything it writes (its cwd, the
+    # skill copy, a fake run's data and scenario) lives in a temporary workspace, copied into the run directory after.
+    scratch = Path(tempfile.mkdtemp(prefix=f'threads-contrast-{args.run}-'))
+    copy = scratch / 'skill'
     shutil.copytree(SKILL / 'scripts', copy / 'scripts', ignore=shutil.ignore_patterns('__pycache__'))
     cli = str(copy / 'scripts/cli.py')
     (copy / 'SKILL.md').write_text(variant_text(args.variant, cli))
     env = {k: v for k, v in os.environ.items() if not k.startswith('THREADS_')}
     if args.fake:
-        data_dir = Path(tempfile.mkdtemp(dir=root, prefix='data-'))
+        data_dir = scratch / 'data'
+        data_dir.mkdir()
         if args.data_template:
             shutil.copytree(args.data_template, data_dir, dirs_exist_ok=True)
-        env.update(THREADS_ASIDE_BIN=str(REPO / 'tests/threads/fake_aside.py'), THREADS_FAKE_SCENARIO=args.fake,
-                   THREADS_FAKE_LOG=str(root / 'fake-log.jsonl'))
+        shutil.copy(args.fake, scratch / 'scenario.json')  # the fake marks responses used: never the original
+        env.update(THREADS_ASIDE_BIN=str(REPO / 'tests/threads/fake_aside.py'),
+                   THREADS_FAKE_SCENARIO=str(scratch / 'scenario.json'), THREADS_FAKE_LOG=str(scratch / 'fake-log.jsonl'))
     else:
         data_dir = DATA   # the one authoritative protection state and tab, shared with every other use
     env['THREADS_DATA_DIR'] = str(data_dir)
     settings = root / 'settings.json'
-    settings.write_text(json.dumps(sandbox_settings(root, data_dir), indent=1))
+    settings.write_text(json.dumps(sandbox_settings(scratch, data_dir), indent=1))
     prompt = (f'먼저 {copy}/SKILL.md를 읽고 따르세요. {copy}/scripts 아래 파일은 읽지 말고, 도구는 --help와 schema 명령, '
               f'그리고 출력으로 익히세요.\n\n과제: {task}')
     command = ['claude', '-p', '--safe-mode', '--restricted', '--no-session-persistence', '--settings', str(settings),
@@ -129,13 +135,15 @@ def main():
                '--model', MODEL, '--output-format', 'stream-json', '--verbose', prompt]
     started, blanked = time.time(), []
     with (root / 'events.jsonl').open('w') as events, (root / 'stderr.txt').open('w') as errors:
-        child = subprocess.Popen(command, cwd=root, env=env, stdout=events, stderr=errors, start_new_session=True)
+        child = subprocess.Popen(command, cwd=scratch, env=env, stdout=events, stderr=errors, start_new_session=True)
         if args.fake:
             child.wait(timeout=3600)
             watched = {'outcome': 'finished', 'counted': 0}
         else:
             watched = ledger.watch(child, ledger=LEDGER, log=data_dir / 'protection/requests.jsonl',
                                    started_at=started, limit=DAY_TARGET, on_stop=lambda: blanked.append(_try(blank_tab, data_dir)))
+    shutil.copytree(scratch, root / 'work', dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__'))
+    shutil.rmtree(scratch, ignore_errors=True)
     summary = summarize(root / 'events.jsonl')
     logged = 0 if args.fake else ledger.logged(data_dir / 'protection/requests.jsonl', started)
     summary.update(run=args.run, variant=args.variant, task=task, exit=child.returncode, fake=bool(args.fake),
