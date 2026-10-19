@@ -64,6 +64,17 @@ def test_what_the_page_requests_after_the_load_settles_is_charged_in_the_same_co
     assert result['request_count'] == 11 and result['setup_requests'] == 11  # 6 + the document + 4 seen later
 
 
+def test_what_the_load_requests_after_the_app_is_ready_is_part_of_the_opening(browser, data_dir):
+    """The app keeps loading after it first answers; that tail is setup, not the first read's budget (live: a fresh
+    tab's tail of 10 landed in a --max-requests 2 search)."""
+    opening(browser, resources=13, quiet=False)
+    browser.respond('state', state(resources=4)).respond('state', state()).respond('state', state())
+    browser.respond('modules', MODULES)
+    code, result, _ = doctor(browser)
+    assert code == 0, result
+    assert result['setup_requests'] == 18 and result['request_count'] == 18  # 13 + 4 + the document
+
+
 def test_an_opening_the_kit_saw_too_late_is_charged_the_reserve(browser, data_dir):
     opening(browser, resources=3, early=False).respond('modules', MODULES)
     code, result, _ = doctor(browser)
@@ -76,7 +87,8 @@ def test_an_opening_whose_timing_buffer_was_still_whole_is_measured_even_after_t
     browser.respond('opener', {'tabs': ['NEW1']})
     browser.respond('load:arm', {'installed_at': 478, 'location': START, 'ready_at_install': 'interactive',
                                  'app_at_install': True, 'buffer_intact': True})
-    browser.respond('state', state(resources=13)).respond('modules', MODULES)
+    browser.respond('state', state(resources=13)).respond('state', state()).respond('state', state())
+    browser.respond('modules', MODULES)
     code, result, _ = doctor(browser)
     assert code == 0, result
     assert result['setup_requests'] == 14 and result['results'][0]['tab']['opening_measured'] is True

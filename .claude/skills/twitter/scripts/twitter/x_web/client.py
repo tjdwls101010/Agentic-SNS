@@ -42,6 +42,9 @@ START = 'https://x.com/i/xskill'
 OPEN_RESERVE = 20
 LOAD_WAIT = 20        # seconds a new tab may take until its app, store and login are there
 RELOAD_LIMIT = 1      # tab reloads one command may spend recovering a refused read
+# 성진: 앱이 처음 답한 뒤에도 로드 꼬리가 이어진다(라이브: 10건) — 새것 없는 look 2번 연속이나 이 초까지 기다려 열기에 넣는다.
+# 꼬리가 더 길게 이어지는 게 보이면(첫 읽기의 배경 요청이 계속 크면) 늘린다
+QUIET_LOOKS, QUIET_WAIT = 2, 4.0
 _GONE = 'Run the command again; it opens a new tab.'
 
 
@@ -225,8 +228,10 @@ class Client:
         self._check(state)
 
     def _wait_for_app(self, slot, deadline, seen):
-        """Look at the loading tab until its app, store and login are there (or it is logged out, or time is up)."""
-        sessionless = 0
+        """Look at the loading tab until its app, store and login are there (or it is logged out, or time is up), then
+        until the load has settled (QUIET_LOOKS looks in a row see nothing new, at most QUIET_WAIT seconds), so the
+        load's tail is part of the opening rather than of the first read."""
+        sessionless, ready, quiet, settle_by = 0, None, 0, None
         while True:
             try:
                 look = self._state()
@@ -238,8 +243,16 @@ class Client:
             seen[0] += _int(look.get('resources'))
             self._note(look)
             self._consume(look, slot)
+            if ready is not None:
+                quiet = quiet + 1 if not _int(look.get('resources')) else 0
+                if quiet >= QUIET_LOOKS or time.monotonic() > settle_by or time.monotonic() > deadline:
+                    return look
+                time.sleep(0.5)
+                continue
             if look.get('app') and look.get('store') and look.get('user_id'):
-                return look
+                ready, settle_by = look, time.monotonic() + QUIET_WAIT
+                time.sleep(0.5)
+                continue
             if look.get('app') and look.get('store') and not look.get('user_id'):
                 sessionless += 1
                 if sessionless >= 2:

@@ -83,8 +83,9 @@ def test_two_commands_starting_together_open_one_tab(browser, data_dir):
     browser.respond('opener', {'tabs': ['NEW1'], '__sleep': 1.5})
     browser.respond('load:arm', {'installed_at': 300, 'location': 'https://x.com/i/xskill', 'ready_at_install': 'loading',
                                  'app_at_install': False})
-    browser.respond('state', state(resources=13)).respond('modules', MODULES)
-    browser.respond('state', state()).respond('modules', MODULES)
+    browser.respond('state', state(resources=13)).respond('state', state()).respond('state', state())
+    browser.respond('modules', MODULES)
+    browser.respond('state', state()).respond('modules', MODULES)  # the second command's look at the same tab
     browser.write()
     env = environment(browser)
     first = subprocess.Popen([sys.executable, str(CLI), 'doctor'], env=env, stdout=subprocess.PIPE, text=True)
@@ -102,7 +103,7 @@ def test_a_live_id_x_refuses_reloads_the_tab_once_then_reads(browser, data_dir):
     known_tab(browser, data_dir).respond('query', query_result('{"errors":[{"message":"Query: Unspecified"}]}'))
     browser.respond('load:arm', {'installed_at': 300, 'location': 'https://x.com/i/xskill', 'ready_at_install': 'loading',
                                  'app_at_install': False})
-    browser.respond('state', state(resources=12))
+    browser.respond('state', state(resources=12)).respond('state', state()).respond('state', state())
     browser.respond('query', query_result(home(['1']), headers=RATE))
     code, out, _ = run_cli(browser, 'feed')
     assert code == 0, out
@@ -115,7 +116,8 @@ def test_recovery_is_capped_at_one_reload_a_command(browser, data_dir):
     known_tab(browser, data_dir).respond('query', rotated)
     browser.respond('load:arm', {'installed_at': 300, 'location': 'https://x.com/i/xskill', 'ready_at_install': 'loading',
                                  'app_at_install': False})
-    browser.respond('state', state(resources=12)).respond('query', rotated)
+    browser.respond('state', state(resources=12)).respond('state', state()).respond('state', state())
+    browser.respond('query', rotated)
     code, out, _ = run_cli(browser, 'feed')
     assert code == 6 and 'update' in json.loads(out)['fix']
     assert browser.ops().count('load:arm') == 1

@@ -109,12 +109,15 @@ def known_tab(browser, data_dir, target='T1', **extra):
     return browser
 
 
-def opening(browser, target='NEW1', resources=13, early=True, **extra):
-    """Aside opens a new tab; it loads x.com with the kit installed early (or late) and is logged in."""
+def opening(browser, target='NEW1', resources=13, early=True, quiet=True, **extra):
+    """Aside opens a new tab; it loads x.com with the kit installed early (or late) and is logged in. quiet: the two
+    looks after the app is ready that see nothing new (the load has settled)."""
     browser.respond('opener', {'tabs': [target]})
     browser.respond('load:arm', {'installed_at': 300 if early else 4000, 'location': START,
                                  'ready_at_install': 'loading' if early else 'complete', 'app_at_install': not early})
     browser.respond('state', state(resources=resources, **extra))
+    if quiet and extra.get('user_id', ACCOUNT) and not extra.get('signals'):
+        browser.respond('state', state(**extra)).respond('state', state(**extra))
     return browser
 
 
