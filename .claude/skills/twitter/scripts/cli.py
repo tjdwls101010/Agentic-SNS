@@ -55,7 +55,8 @@ JSON_OUTPUT = ('--json: one JSON envelope instead (ok, command, stop_reason, req
                'coverage, next, error, message, fix, results, with full texts); schema result describes every field.')
 OUT_OUTPUT = ('--out FILE: records go to an NDJSON file a whole page at a time and stdout gets one summary line (one '
               'JSON object with --json); rerun the same command with the same file to resume. --out cannot be '
-              'combined with --after. The file holds other people\'s posts: keep it outside the repository.')
+              'combined with --after. Its directory must already exist (the skill does not create it). The file holds '
+              'other people\'s posts: keep it outside the repository.')
 FAILURE = ('failure: one JSON envelope (ok false, error, message, fix) when nothing was read; records read before a '
            'failure print as usual, followed by a "coverage: incomplete — <message> fix: <fix>" line. Exit 10 (an '
            'operation\'s limit) and exit 5 (a block a person must clear) are different: the first passes by itself '
@@ -161,7 +162,7 @@ COMMANDS = {
         'run': listing.me,
         'arguments': [(('collection',), {'choices': ['bookmarks', 'likes', 'notifications', 'mentions'], 'help': 'bookmarks, likes (nobody else\'s likes are public on X), notifications or mentions'})] + list(LIST),
         'epilog': ['In X\'s order (most recently saved or liked first, as X serves it); each post keeps its own date, not when you saved or liked it.',
-                   'notifications are X\'s notification tab as records (what happened, when, which accounts and posts); "suggested by X" marks X recommending something, which is not anyone\'s act. mentions are the posts that mention you. The skill only sends the read: it never opens X\'s notifications screen, which marks them as read. A notification\'s message names other people.',
+                   'notifications are X\'s notification tab as records (what happened, when, which accounts and posts); "suggested by X" marks X recommending something, which is not anyone\'s act. mentions are the posts that mention you. The skill only sends the read and never opens X\'s notifications screen, which marks them as read; whether X counts the read alone as seen is not known. A notification\'s message names other people.',
                    'Without --limit, a window or --out it reads one page; more: continues.',
                    'requests: 1 per page of about 20 posts.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
