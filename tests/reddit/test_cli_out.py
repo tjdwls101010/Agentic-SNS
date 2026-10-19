@@ -185,3 +185,19 @@ def test_a_damaged_verdict_is_an_integrity_failure(reddit, tmp_path):
     out.write_text('\n'.join(rows) + '\n')
     code, text, _ = run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--out', str(out))
     assert code == 2 and 'integrity' in text
+
+
+def test_a_torn_completion_is_judged_again_even_when_the_limit_was_reached(reddit, tmp_path):
+    # Codex P7 round 3: the --limit early return came before the reading was judged again
+    from test_cli_lists import epoch
+    out = tmp_path / 'sub.ndjson'
+    old = {**post('a')['data'], 'created_utc': epoch('2025-10-09T00:00:00')}
+    args = ['sub', 'r/example', '--sort', 'new', '--since', '2025-01-01', '--limit', '1', '--out', str(out), '--json']
+    reddit.me().json('/r/example/new.json', listing([{'kind': 't3', 'data': old}]))
+    code, _, _ = run_cli(reddit, *args)
+    assert code == 8
+    out.write_bytes(out.read_bytes()[:-20])
+    reddit.me().json('/r/example/new.json', listing([{'kind': 't3', 'data': old}]))
+    code, text, _ = run_cli(reddit, *args)
+    assert code == 8 and json.loads(text)['window']['coverage'].startswith('open')
+    assert [r['id'] for r in lines(out) if r.get('kind') == 'post'] == ['t3_a'], 'nothing saved twice'

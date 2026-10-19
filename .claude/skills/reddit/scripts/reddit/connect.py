@@ -238,9 +238,10 @@ def read_pages(connection, options, identity, state, out, *, request, command, t
         start.update(seen=sorted(out.ids, key=str), pending=[])
     limit = options.get('limit') or (None if out is not None else DISPLAY)
     if out is not None and options.get('limit') is not None:
-        if out.count >= options['limit']:
+        # a file whose listing ended without its completion line is read again and judged, whatever its count
+        if out.count >= options['limit'] and out.state is not None:
             return {'results': [], 'stop_reason': 'limit_reached', 'words': _words(identity, words)}
-        limit -= out.count
+        limit = max(limit - out.count, 0)
     closes = window.closes if window.active and window.bounds['start'] is not None else None
     result = paginate(fetch, limit=limit, state=start, keep=window.keep, closes=closes,
                       commit=commit if out is not None else None, whole_pages=out is not None)
