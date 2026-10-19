@@ -90,3 +90,40 @@ def test_an_opener_that_does_not_answer_in_time_is_refused(tmp_path, monkeypatch
         with Aside().opener(seconds=1):
             pytest.fail('no tab to use')
     assert error.value.code == 3 and 'in time' in error.value.message
+
+
+def node_binary(tmp_path):
+    """A fake `aside repl <program>` that runs the skill's real browser program under Node against a fake tab: after
+    location.replace the old document keeps answering for a few calls before the new one (a new timeOrigin) exists."""
+    prelude = tmp_path / 'prelude.mjs'
+    prelude.write_text("""import vm from 'node:vm';
+let doc = 1, origin = 1000, href = 'https://x.com/i/xskill', pending = 0, next = null;
+const page = () => ({DOC: doc, location: {href, replace: (url) => { next = url; pending = 4; }},
+                     performance: {timeOrigin: origin}});
+globalThis.listBrowserTabs = async () => [{targetId: 'T1', url: href}];
+globalThis.attachBrowserTab = async (id) => id !== 'T1' ? null : {
+  evaluate: async (fn, arg) => {
+    if (pending > 0 && --pending === 0) { doc += 1; origin += 500; href = next; }
+    return vm.runInNewContext('(' + fn.toString() + ')', page())(arg);
+  },
+};
+""")
+    script = tmp_path / 'aside'
+    script.write_text(f"""#!{sys.executable}
+import subprocess, sys
+program = open({str(prelude)!r}).read() + sys.argv[-1]
+path = {str(tmp_path / 'program.mjs')!r}
+open(path, 'w').write(program)
+done = subprocess.run(['node', path], capture_output=True, text=True)
+sys.stdout.write(done.stdout); sys.stderr.write(done.stderr); sys.exit(done.returncode)
+""")
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    return script
+
+
+def test_a_load_answers_only_from_the_new_document(tmp_path, monkeypatch):
+    """The old x.com document is still there for a moment after location.replace; a page function run in it would
+    install nothing new and report the old load (P3 review 2)."""
+    monkeypatch.setenv('TWITTER_ASIDE_BIN', str(node_binary(tmp_path)))
+    answer = Aside().load('T1', 'https://x.com/i/xskill?again', '() => ({doc: DOC, href: location.href})', {}, 20)
+    assert answer == {'doc': 2, 'href': 'https://x.com/i/xskill?again'}

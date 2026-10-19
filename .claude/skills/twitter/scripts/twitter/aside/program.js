@@ -40,13 +40,19 @@ await (async () => {
   }
   if (ASIDE.op === 'load') {
     // Send the tab to ASIDE.url without a history entry, then run the page function again and again until it answers
-    // (it answers null while the old document is still there), so it acts before the new page's own scripts.
+    // (null: not yet), so it acts before the new page's own scripts. The old document stays for a moment after
+    // location.replace, so the function runs only once the document is a new one (a new timeOrigin).
+    const origin = () => target.evaluate(() => performance.timeOrigin);
+    let before = null;
+    try { before = await origin(); } catch (_) { /* no document to compare with */ }
     try { await target.evaluate(url => { location.replace(url); }, ASIDE.url); } catch (_) { /* the page is unloading */ }
     const until = Date.now() + (ASIDE.seconds || 20) * 1000;
     while (Date.now() < until) {
       try {
-        const answer = await target.evaluate(PAGE_FUNCTION, ARGS);
-        if (answer !== null && answer !== undefined) { emit(answer); return; }
+        if (before === null || await origin() !== before) {
+          const answer = await target.evaluate(PAGE_FUNCTION, ARGS);
+          if (answer !== null && answer !== undefined) { emit(answer); return; }
+        }
       } catch (_) { /* between documents */ }
       await new Promise(resolve => setTimeout(resolve, 30));
     }

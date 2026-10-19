@@ -444,7 +444,7 @@
   {
    "name": "reload-is-charged-whole",
    "mode": "fragment",
-   "fact": "A recovery reload (rotation case 2 or 4) is charged the whole reservation again, reported as setup and kept apart from --max-requests.",
+   "fact": "A recovery reload (rotation case 2 or 4) is charged like an opening (P2 R1 decision): measured when the kit was installed before the new document's app ran, otherwise the whole reservation plus what the kit saw; reported as setup and kept apart from --max-requests. This case is the late install with nothing seen after it.",
    "commands": [
     {
      "opened": false,
