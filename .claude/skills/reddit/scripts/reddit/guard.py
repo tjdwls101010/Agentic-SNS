@@ -412,8 +412,10 @@ class Guard:
                 used, remaining, reset = slot._headers
                 current = {'status': 'known', 'used': used, 'remaining': remaining, 'reset_at': now + reset,
                            'observed_at': now, **lasting}
-                if 0 < remaining <= used:
-                    gap = reset / remaining
+            if current['status'] == 'known':
+                current = {k: v for k, v in current.items() if k != 'slow_until'}
+                if 0 < current['remaining'] <= current['used']:  # from the headers, or the reservation they did not
+                    gap = max(0.0, current['reset_at'] - now) / current['remaining']  # replace
                     self.slowest = max(self.slowest, gap)
                     current['slow_until'] = now + gap
             elif current['status'] == 'probe' and slot._reported:

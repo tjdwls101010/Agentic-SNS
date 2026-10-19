@@ -131,3 +131,12 @@ def test_more_is_one_line_the_permission_rule_allows(reddit):
     code, out, _ = run_cli(reddit, 'sub', 'r/example')
     line = [l for l in out.splitlines() if l.startswith('more: ')][0]
     assert line.startswith('more: uv run "') and '/scripts/cli.py" sub r/example --sort hot --after ' in line
+
+
+def test_a_budget_stop_resumes(reddit):
+    reddit.me().json('/r/example/new.json', listing([post('a')], after='t3_a'), query={'limit': '100'})
+    code, out, _ = run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--limit', '3', '--max-requests', '2')
+    assert code == 0 and 'stopped=budget' in out.splitlines()[0]
+    reddit.me().json('/r/example/new.json', listing([post('b')]), query={'after': 't3_a'})
+    code, out, _ = run_cli(reddit, *more_line(out))
+    assert code == 0 and 'title b' in out

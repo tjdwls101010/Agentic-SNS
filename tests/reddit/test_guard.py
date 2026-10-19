@@ -437,3 +437,39 @@ def test_a_request_killed_after_sending_is_still_logged(data_dir):
     env = {**os.environ, 'PYTHONPATH': str(SKILL / 'scripts'), 'REDDIT_DATA_DIR': str(data_dir)}
     assert subprocess.run([sys.executable, '-c', KILL_SHARE, ACCOUNT], env=env).returncode == -signal.SIGKILL
     assert guard.Guard(ACCOUNT, 25).recent() == {'last_hour': 1, 'last_day': 1}
+
+
+def test_a_low_bucket_keeps_slowing_down_when_headers_go_missing(data_dir):
+    write_buckets(data_dir, {'general': known(10, 90, 100)})
+    g = guard.Guard(ACCOUNT, 25)
+    send(g, headers=None)
+    state = buckets(data_dir)['general']
+    assert state['remaining'] == 9 and state['slow_until'] - time.time() > 9, 'still running low: still slowed'
+
+
+def checking(data_dir):
+    challenged_with_wiki_limit(data_dir)
+    return guard.Guard(ACCOUNT, guard.MAX_BUDGET)
+
+
+def test_the_unblock_check_refuses_a_second_general_request(data_dir):
+    g = checking(data_dir)
+    with g.verify_unblock() as check:
+        with g.request('general') as inner:
+            inner.report(H('5', '95', '300'))
+        with pytest.raises(RedditError):
+            with g.request('general'):
+                pass
+        check.clear()
+    assert g.used == 1
+
+
+@pytest.mark.parametrize('bucket, metered', [('wiki', True), ('share', False), ('general', False)])
+def test_the_unblock_check_refuses_any_other_first_request(data_dir, bucket, metered):
+    g = checking(data_dir)
+    with pytest.raises(RedditError):
+        with g.verify_unblock():
+            with g.request(bucket, metered=metered):
+                pass
+    assert g.used == 1 and guard.status(protection(data_dir))['blocked'] is True
+    assert guard.status(protection(data_dir))['buckets']['wiki']['rate_limited_for'] > 200

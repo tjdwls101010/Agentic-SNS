@@ -51,11 +51,11 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
             if key in visited:
                 return outcome(None, RedditError(6, 'Reddit served the same page twice (the same after value).', _RETRY,
                                                    reason='pagination'))
-            visited.add(key)
             try:
                 records, info, has_items = fetch(cursor)
             except RedditError as error:
-                return outcome(None, error)
+                return outcome(None, error)  # a page that never arrived may be asked for again
+            visited.add(key)
             pages, fetched = pages + 1, True
             if not records and has_items:
                 return outcome(None, RedditError(6, 'A page had items this skill could not read; Reddit may have '
