@@ -35,6 +35,7 @@ def search(options):
     def read(connection, state, out):
         client = connection.client
         return connect.read_list(options, identity, state, out, order=order, command='search', target=text,
+                                 kinds=('account',) if kind == 'accounts' else ('post',),
                                  words=['--type', kind] + (['--sort', sort] if kind != 'accounts' else []),
                                  fetch=lambda cursor: client.search(text, product, cursor))
 
@@ -48,7 +49,7 @@ def _in_communities(options, text):
 
     def read(connection, state, out):
         client = connection.client
-        return connect.read_list(options, identity, state, out, order='server' if window else 'unordered',
+        return connect.read_list(options, identity, state, out, order='server' if window else 'unordered', kinds=('post',),
                                  command='search', target=text, words=['--in', 'communities'],
                                  fetch=lambda cursor: client.community_search(text, cursor))
 
@@ -63,6 +64,7 @@ def quotes(options):
     def read(connection, state, out):
         client = connection.client
         return connect.read_list(options, identity, state, out, order='unordered', command='quotes', target=target.url,
+                                 kinds=('post',),
                                  words=['--sort', sort],
                                  fetch=lambda cursor: client.quotes(target.post_id, sort, cursor))
 

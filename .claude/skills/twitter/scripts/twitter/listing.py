@@ -17,7 +17,7 @@ def feed(options):
     identity = {'feed': name, 'since': options.get('since'), 'until': options.get('until')}
 
     def read(connection, state, out):
-        return connect.read_list(options, identity, state, out, order=order, command='feed', target=None,
+        return connect.read_list(options, identity, state, out, order=order, command='feed', target=None, kinds=('post',),
                      fetch=lambda cursor: connection.client.feed(variant, cursor))
 
     return connect.run(options, command='feed', target=None, identity=identity, reader=read,
@@ -51,6 +51,7 @@ def profile(options):
             card = client.user(target.handle)
             user_id = card['id']
         reading = connect.read_list(options, identity, state, out, order=order, command='profile', target=target.url,
+                                    kinds=('list',) if order is None else ('post',),
                         extra={'user_id': user_id},
                         fetch=lambda cursor: client.timeline(operation, {'userId': user_id}, cursor))
         if card is not None and not reading['results'] and not reading.get('failure') and \
@@ -83,7 +84,7 @@ def graph(options):
         # the app asks for similar accounts with the profile as context (P2 R5), every other relation by user id
         variables = ({'context': json.dumps({'contextualUserId': user_id})} if relation == 'similar'
                      else {'userId': user_id})
-        reading = connect.read_list(options, identity, state, out, order=None, command='graph', target=target.url,
+        reading = connect.read_list(options, identity, state, out, order=None, command='graph', target=target.url, kinds=('account',),
                                     extra={'user_id': user_id}, words=[relation], idle_limit=ACCOUNT_IDLE_PAGES,
                                     fetch=lambda cursor: client.timeline(RELATIONS[relation], variables, cursor))
         if relation == 'similar':
@@ -108,6 +109,7 @@ def lists(options):
         if tab == 'about':
             return {'results': [client.x_list(target.list_id)], 'stop_reason': 'not_paginable'}
         return connect.read_list(options, identity, state, out, order='unordered' if tab == 'posts' else None,
+                                 kinds=('post',) if tab == 'posts' else ('account',),
                                  command='list', target=target.url, idle_limit=ACCOUNT_IDLE_PAGES,
                                  fetch=lambda cursor: client.timeline(LIST_TABS[tab], {'listId': target.list_id}, cursor))
 
@@ -132,7 +134,7 @@ def community(options):
         variables = {'communityId': target.community_id}
         if tab == 'posts':
             variables['rankingMode'] = 'Recency' if sort == 'recent' else 'Relevance'
-        return connect.read_list(options, identity, state, out, order='unordered', command='community',
+        return connect.read_list(options, identity, state, out, order='unordered', command='community', kinds=('post',),
                                  target=target.url,
                                  fetch=lambda cursor: client.timeline(COMMUNITY_TABS[tab], variables, cursor))
 
@@ -142,7 +144,7 @@ def community(options):
 def _discovery(options):
     def read(connection, state, out):
         client = connection.client
-        reading = connect.read_list(options, {}, state, out, order=None, command='community',
+        reading = connect.read_list(options, {}, state, out, order=None, command='community', kinds=('community',),
                                     target=None, fetch=lambda cursor: client.timeline('CommunityDiscoveryTimeline', {},
                                                                                      cursor))
         reading['coverage'] = ['communities X suggests to this account, not a ranking of all communities',
@@ -157,7 +159,7 @@ def reposts(options):
 
     def read(connection, state, out):
         client = connection.client
-        return connect.read_list(options, {}, state, out, order=None, command='reposts', target=target.url,
+        return connect.read_list(options, {}, state, out, order=None, command='reposts', target=target.url, kinds=('account',),
                                  idle_limit=ACCOUNT_IDLE_PAGES,
                                  fetch=lambda cursor: client.timeline('Retweeters', {'tweetId': target.post_id}, cursor))
 
@@ -179,6 +181,7 @@ def me(options):
         else:
             fetch = lambda cursor: client.timeline('Bookmarks', {}, cursor)  # noqa: E731
         return connect.read_list(options, identity, state, out, order='unordered', command='me', target=None, words=[collection],
+                                 kinds=('notification', 'post') if collection == 'notifications' else ('post',),
                      fetch=fetch)
 
     return connect.run(options, command='me', target=None, identity=identity, reader=read)

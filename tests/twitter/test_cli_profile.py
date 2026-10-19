@@ -122,3 +122,23 @@ def test_about_several_in_one_request_names_the_unresolved(browser, data_dir):
     assert code == 0 and envelope['unresolved'] == ['gone_one'] and envelope['results'][0]['username'] == 'author_a'
     [query] = [c['args'] for c in browser.calls() if c['op'] == 'query']
     assert query['name'] == 'UsersByScreenNames' and query['variables']['screen_names'] == ['author_a', 'gone_one']
+
+
+def test_accounts_x_suggests_inside_a_posts_tab_are_left_out_and_do_not_break_the_window(browser, data_dir):
+    """Live (P6 t7): X put a who-to-follow module of three accounts, dated by when they joined, among a profile's
+    posts — the window then never closed and the suggestions showed as records of the profile."""
+    since = (date.today() - timedelta(days=3)).isoformat()
+    joined = {**user('2000000001', 'suggested_one'), 'core': {'screen_name': 'suggested_one', 'name': 'S',
+                                                               'created_at': 'Fri Jan 24 23:27:11 +0000 2014'}}
+    who = {'entryId': 'who-to-follow-1', 'content': {'entryType': 'TimelineTimelineModule', 'items': [
+        {'entryId': 'who-to-follow-1-user-2', 'item': {'itemContent': {'itemType': 'TimelineUser', 'user_results': {'result': joined}}}}]}}
+    first = timeline([tweet('51', 0), tweet('52', 1)], bottom='CUR1')
+    body = json.loads(first['body'])
+    body['data']['user']['result']['timeline']['timeline']['instructions'][0]['entries'].insert(1, who)
+    first['body'] = json.dumps(body)
+    known_tab(browser, data_dir).respond('query', by_name(user())).respond('query', first)
+    browser.respond('query', timeline([tweet('53', 5)], bottom='CUR2'))
+    code, out, _ = run_cli(browser, 'profile', 'author_a', '--since', since)
+    assert code == 0, out
+    assert 'suggested_one' not in out and 'stopped=window_reached' in out.splitlines()[0]
+    assert 'other items X mixed in' in out

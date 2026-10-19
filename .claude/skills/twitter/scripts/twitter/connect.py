@@ -233,7 +233,7 @@ def _public(identity):
 
 
 def read_list(options, identity, state, out, *, order, fetch, command, target, extra=None, words=None, stops=False,
-              idle_limit=2):
+              idle_limit=2, kinds=None):
     """Read a list surface by cursor in the server's order with its date-window policy: one page by default (a
     glance costs one request), --limit or a window reads on, --out commits whole pages; the reading carries a
     continuation for the next handle. fetch(cursor) returns a page with records, cursor, has_next, promoted, other."""
@@ -246,6 +246,12 @@ def read_list(options, identity, state, out, *, order, fetch, command, target, e
 
     def fetch_page(cursor):
         page = fetch(cursor)
+        if kinds:
+            # what X mixes into a surface (accounts it suggests among posts, dated by when they joined) is left out
+            # before the window weighs the page's order, and counted
+            kept = [r for r in page.records if r.get('kind') in kinds]
+            page.other += len(page.records) - len(kept)
+            page.records = kept
         skipped['promoted'] += page.promoted
         skipped['other'] += page.other
         skipped['unreadable'] += page.unreadable
