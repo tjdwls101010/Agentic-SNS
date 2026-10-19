@@ -233,8 +233,8 @@ def _thread_line(thread):
             'within each batch, not across batches)'
             + (f' · suggested_sort={thread["suggested_sort"]}' if thread.get('suggested_sort') else '')
             + (' · contest mode: random order, scores hidden' if thread.get('contest_mode') else '')
-            + f' · read {thread.get("observed_at", "?")}'
-            + (f', expanded {thread["expanded_at"]}' if thread.get('expanded_at') else ''))
+            + f' · read {_time(thread.get("observed_at"))}'
+            + (f', expanded {_time(thread["expanded_at"])}' if thread.get('expanded_at') else ''))
 
 
 def render_page(envelope, *, chars=None, command=None):
