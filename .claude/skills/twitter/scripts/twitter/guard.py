@@ -412,6 +412,11 @@ class Guard:
                 self._reserve_pace()
                 _log('unblock_check', slot.reserved, operation, self.clock())
 
+    @property
+    def checking(self):
+        """Whether this invocation is inside its one unblock check (a single request: no retry, no reopening)."""
+        return self._held is not None
+
     def log_unwatched(self, count):
         """Requests the tab made while no command watched it (between commands): logged, never charged."""
         _log('unwatched', count, None, self.clock())

@@ -68,7 +68,8 @@ def test_an_opening_the_kit_saw_too_late_is_charged_the_reserve(browser, data_di
     opening(browser, resources=3, early=False).respond('modules', MODULES)
     code, result, _ = doctor(browser)
     assert code == 0, result
-    assert result['setup_requests'] == 20 and result['results'][0]['tab']['opening_measured'] is False
+    # the reserve stands for what the kit could not see; the 3 it saw after installing come on top, never set off
+    assert result['setup_requests'] == 23 and result['results'][0]['tab']['opening_measured'] is False
 
 
 def test_an_opening_whose_timing_buffer_was_still_whole_is_measured_even_after_the_app_started(browser, data_dir):
@@ -86,6 +87,37 @@ def test_a_tab_that_closes_with_its_opener_is_reported_not_reopened_again_and_ag
     code, result, _ = doctor(browser)
     assert code == 3 and 'behaviour has changed' in result['message']
     assert browser.ops().count('opener') == 1
+    assert result['setup_requests'] == 20  # the page loaded x.com before it closed: charged the reserve, not 1
+
+
+def test_an_opening_stopped_by_a_lock_is_charged_what_it_loaded(browser, data_dir):
+    lock = {'path': '/i/api/graphql/abc/HomeTimeline', 'status': 200, 'codes': [326], 'html': False, 'rate': None,
+            'at': 5}
+    opening(browser, resources=13, signals=[lock])
+    code, result, _ = doctor(browser)
+    assert code == 5 and result['request_count'] == 14 and result['setup_requests'] == 14
+
+
+def test_an_opening_that_ends_logged_out_still_leaves_the_tab_to_the_idle_cleanup(browser, data_dir):
+    opening(browser, user_id=None, ct0=False)
+    browser.respond('state', state(user_id=None, ct0=False))
+    code, result, _ = doctor(browser, env={'TWITTER_IDLE_SECONDS': '1'})
+    assert code == 4
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline and not {'close', 'blank'} & set(browser.ops()):
+        time.sleep(0.3)
+    assert {'close', 'blank'} & set(browser.ops()), browser.ops()
+
+
+def test_unblock_makes_one_request_even_when_x_asks_for_more(browser, data_dir):
+    block_file(data_dir, LOCK)
+    spent = {**RATE, 'x-rate-limit-remaining': '0'}
+    asked = query_result('{"errors":[{"message":"The following features cannot be null: some_flag"}]}', status=400,
+                         headers=spent)
+    known_tab(browser, data_dir).respond('query', asked).respond('query', query_result(VIEWER, headers=RATE))
+    code, result, _ = doctor(browser, '--unblock')
+    assert code == 5 and block_file(data_dir) == LOCK
+    assert browser.ops().count('query') == 1
 
 
 def test_reuses_the_known_tab_and_reports_what_it_did_between_commands(browser, data_dir):
@@ -122,7 +154,7 @@ def test_a_lock_code_the_tab_kept_blocks_for_this_account_and_closes_the_tab(bro
     code, result, _ = doctor(browser)
     assert code == 5 and result['error'] == 'blocked'
     record = block_file(data_dir)
-    assert record['reason'] == 'account_locked' and record['account_id'] is None  # seen before the account was known
+    assert record['reason'] == 'account_locked' and record['account_id'] == ACCOUNT  # the tab's own report names it
     assert 'close' in browser.ops() and 'modules' not in browser.ops()
     assert Session('default').ack == 1792148826874
 

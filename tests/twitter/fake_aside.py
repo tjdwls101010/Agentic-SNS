@@ -11,7 +11,8 @@ It understands the calls the skill makes:
   says "close_fails".
 Responses come from TWITTER_FAKE_SCENARIO: {"tabs": [...], "responses": [{"op", "match", "response"}]}; the first
 unused response whose op and match fit is used. Every call is appended to TWITTER_FAKE_LOG.
-A response may be {"__raw_stdout": "...", "__exit": n} to print exactly that, or {"__sleep": seconds}.
+A response may be {"__raw_stdout": "...", "__exit": n} to print exactly that, or {"__sleep": seconds}; with
+{"__write": {"<path>": "<text>"}} those files are written first (another command changing shared state meanwhile).
 """
 import json
 import os
@@ -119,6 +120,9 @@ def main(argv):
     if response is None:
         print(f'fake aside: no scripted response for {op} {json.dumps(args)[:300]}', file=sys.stderr)
         return 1
+    for path, text in (response.get('__write') or {}).items():
+        with open(path, 'w') as handle:
+            handle.write(text)
     if '__sleep' in response:
         time.sleep(response['__sleep'])
     if '__raw_stdout' in response:

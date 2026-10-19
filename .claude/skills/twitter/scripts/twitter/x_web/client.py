@@ -99,29 +99,63 @@ class Client:
             self.memory.reload()
             self.session_reset = self.memory.reset
             known = self.memory.tab
-            entry = next((t for t in self.browser.tabs(self._seconds()) if known and t['target_id'] == known), None)
+            entry = self._entry(known)
+            try:
+                if entry and _host(entry['url']) == 'x.com':
+                    self.tab = known
+                    self.unwatched = self._take_over()
+                    self.guard.log_unwatched(self.unwatched)  # made between commands: logged, not charged
+                else:
+                    # An emptied tab is not sent back to X: Aside closes an emptied tab once nothing holds it, even
+                    # while it loads, and a query would then open another one.
+                    self._open()
+                    self.reopened = bool(entry)
+            finally:
+                if self.tab:  # a tab that failed to open still polls: the idle cleanup must know of it
+                    self.token = self.memory.touch()
+        return self.account_id
+
+    def _entry(self, target):
+        return next((t for t in self.browser.tabs(self._seconds()) if target and t['target_id'] == target), None)
+
+    def _take_over(self):
+        """Look at the recorded tab before using it (a block or login it shows is judged); returns what the page
+        requested since it was last looked at."""
+        with self.guard.observe() as slot:
+            state = self._state()
+            self._note(state)
+            self._consume(state, slot)
+            self._check(state)
+        return _int(state.get('resources'))
+
+    def _reopen(self):
+        """The tab vanished mid-command: use the one another command opened meanwhile, else open one (once)."""
+        with self.memory.opening():
+            self.memory.reload()
+            known = self.memory.tab
+            entry = self._entry(known) if known != self.tab else None
             if entry and _host(entry['url']) == 'x.com':
                 self.tab = known
-                with self.guard.observe() as slot:
-                    state = self._state()
-                    self.unwatched = _int(state.get('resources'))
-                    self.guard.log_unwatched(self.unwatched)  # made between commands: logged, not charged
-                    self._note(state)
-                    self._consume(state, slot)
-                    self._check(state)
+                self._take_over()  # what it requested was the other command's to count
             else:
-                # An emptied tab is not sent back to X: Aside closes an emptied tab once nothing holds it, even while
-                # it loads, and a query would then open another one.
                 self._open()
-                self.reopened = bool(entry)
-            self.token = self.memory.touch()
-        return self.account_id
+
+    def _aside(self, method, *args):
+        """A browser call; one cut short by the command's own deadline is the time limit, not an Aside failure."""
+        try:
+            return method(*args)
+        except TwitterError as error:
+            if error.reason == 'lost' and self.guard.time_left() <= 1:
+                raise TwitterError(6, 'The command reached its time limit during a browser call; its request may have '
+                                      'been made.', 'Run the command again (or its more: line); nothing is wrong with '
+                                                    'the account.', reason='time_limit') from None
+            raise
 
     def _args(self, args):
         return {**args, '__ack': self.memory.ack}
 
     def _state(self):
-        state = self.browser.evaluate(self.tab, SNIPPETS['state'], self._args({}), self._seconds())
+        state = self._aside(self.browser.evaluate, self.tab, SNIPPETS['state'], self._args({}), self._seconds())
         if not isinstance(state, dict) or not isinstance(state.get('location'), str):
             raise TwitterError(3, 'The X tab answered invalidly.', 'Run doctor.')
         return state
@@ -133,8 +167,10 @@ class Client:
             with self.browser.opener(self._seconds()) as target:
                 self.tab = target
                 self.memory.set_tab(target)
-                armed = self.browser.load(target, START, SNIPPETS['arm'], self._args({}), self._seconds())
+                armed = self._aside(self.browser.load, target, START, SNIPPETS['arm'], self._args({}),
+                                    self._seconds())
             if not any(t['target_id'] == target for t in self.browser.tabs(self._seconds())):
+                slot.charge(OPEN_RESERVE)  # it loaded x.com before Aside closed it, unseen
                 raise TwitterError(3, 'Aside closed the new X tab when the session that opened it ended; Aside\'s '
                                       'behaviour has changed and the skill needs an update.',
                                    'Tell the user the X reader needs an update; retrying opens a tab each time.',
@@ -151,18 +187,29 @@ class Client:
                                reason='recovery_budget')
         self.reloads += 1
         with self.memory.opening(), self.guard.request(reserve=1, budgeted=False, kind='tab_reload') as slot:
-            armed = self.browser.load(self.tab, START, SNIPPETS['arm'], self._args({}), self._seconds())
+            armed = self._aside(self.browser.load, self.tab, START, SNIPPETS['arm'], self._args({}), self._seconds())
             self.reopened = True
             self._settle_load(slot, armed)
 
     def _settle_load(self, slot, armed):
         """Wait for the loaded app, its store and login, checking each look for a block; charge what the load cost:
-        what the tab's observer saw plus the document, or OPEN_RESERVE when the kit came too late to see it all."""
+        what the tab's observer saw plus the document, or, when the kit came too late to see it all, OPEN_RESERVE for
+        what came before it plus everything it saw (never set off against each other). Charged however the wait ends."""
         # measured when the kit came before the app ran, or while X's timing buffer still held the whole load
         early = isinstance(armed, dict) and (armed.get('buffer_intact') is True or
                                              (armed.get('ready_at_install') == 'loading' and not armed.get('app_at_install')))
         deadline = time.monotonic() + min(LOAD_WAIT, max(1.0, self._seconds() - 5))
-        seen, state, sessionless = 1, None, 0   # the document itself is a request too
+        seen = [1]   # the document itself is a request too; counted up as the looks come in, charged however they end
+        try:
+            state = self._wait_for_app(slot, deadline, seen)
+        finally:
+            self.measured_open = early
+            slot.charge(seen[0] if early else OPEN_RESERVE + seen[0] - 1)
+        self._check(state)
+
+    def _wait_for_app(self, slot, deadline, seen):
+        """Look at the loading tab until its app, store and login are there (or it is logged out, or time is up)."""
+        sessionless = 0
         while True:
             try:
                 look = self._state()
@@ -171,24 +218,18 @@ class Client:
                     raise
                 time.sleep(0.5)
                 continue
-            seen += _int(look.get('resources'))
+            seen[0] += _int(look.get('resources'))
             self._note(look)
             self._consume(look, slot)
             if look.get('app') and look.get('store') and look.get('user_id'):
-                state = look
-                break
+                return look
             if look.get('app') and look.get('store') and not look.get('user_id'):
                 sessionless += 1
                 if sessionless >= 2:
-                    state = look  # the app has loaded its store without a session: logged out
-                    break
+                    return look  # the app has loaded its store without a session: logged out
             if time.monotonic() > deadline:
-                state = look
-                break
+                return look
             time.sleep(0.5)
-        self.measured_open = early
-        slot.charge(seen if early else max(OPEN_RESERVE, seen))
-        self._check(state)
 
     def _check(self, state):
         """Raise for a page that is not a working, logged-in x.com page of this command's account (blocks and login
@@ -229,24 +270,25 @@ class Client:
         strongest = classify.strongest(verdicts)
         moments = [s['at'] for s in signals if type(s.get('at')) in (int, float)]
         if strongest is not None and strongest.block:
-            self._stop(slot, strongest, moments)
+            self._stop(slot, strongest, moments, report.get('user_id'))
         if moments:
             self.memory.acknowledge(max(moments))
         if strongest is not None:
             raise strongest.error
 
-    def _stop(self, slot, verdict, moments=()):
-        """Record a block, empty the tab so the app stops polling (even if the block could not be saved), acknowledge
-        the signals it came from, then raise."""
+    def _stop(self, slot, verdict, moments=(), account_id=None):
+        """Record a block for the account the tab showed (else this command's), empty the tab so the app stops polling
+        (even if the block could not be saved), acknowledge the signals it came from, then raise."""
+        account_id = account_id if isinstance(account_id, str) and account_id else self.account_id
         try:
-            slot.block(verdict.block, self.account_id)
+            slot.block(verdict.block, account_id)
         finally:
             if not self._empty():
                 self.memory.set_dirty(True)  # the idle cleanup keeps trying; the tab must not keep polling
         if moments:
             self.memory.acknowledge(max(moments))
         raise TwitterError(verdict.error.code, verdict.error.message, verdict.error.fix, reason=verdict.error.reason,
-                           account_id=self.account_id)
+                           account_id=account_id)
 
     def _gone(self):
         tab = next((t for t in self.browser.tabs(max(5.0, self.guard.time_left())) if t['target_id'] == self.tab), None)
@@ -300,7 +342,8 @@ class Client:
             try:
                 with self.guard.request(operation=operation) as slot:
                     try:
-                        result = self.browser.evaluate(self.tab, SNIPPETS[name], self._args(args), self._seconds())
+                        result = self._aside(self.browser.evaluate, self.tab, SNIPPETS[name], self._args(args),
+                                             self._seconds())
                     except TwitterError as error:
                         if error.reason == 'tab_missing':
                             slot.cancel()  # the program never reached a page, so nothing went to X
@@ -314,6 +357,8 @@ class Client:
                     if sent:
                         self.nonce['sent'] += 1
                     self._note(result)
+                    if sent:  # its own limit is recorded before any signal can stop the command
+                        slot.observe(result.get('status'), result.get('headers'))
                     if self.verbose:
                         diagnostic('request', operation=operation, count=self.guard.count, status=result.get('status'),
                                    source=(result.get('used') or {}).get('source'))
@@ -335,16 +380,14 @@ class Client:
                                            reason='missing')
                     if result.get('network_error'):
                         raise TwitterError(6, 'The request to X did not complete.', classify.RETRY_FIX, reason='network')
-                    slot.observe(result.get('status'), result.get('headers'))
                     verdict = judge(result) if judge else None
                     if verdict is not None and verdict.block:
                         self._stop(slot, verdict)
                     return result, verdict
             except TwitterError as error:
-                if error.reason != 'tab_missing' or attempt:
+                if error.reason != 'tab_missing' or attempt or self.guard.checking:
                     raise
-                with self.memory.opening():
-                    self._open()
+                self._reopen()
         raise TwitterError(6, 'The X tab could not be used.', _GONE)
 
     def _limit(self, operation, message=None):
@@ -378,6 +421,8 @@ class Client:
                 raise missing
             if verdict.kind == 'rate_limited':
                 raise self._limit(operation, verdict.error.message)
+            if self.guard.checking:
+                raise verdict.error  # the unblock check is one request: its answer decides, nothing is retried
             if verdict.kind == 'features_missing' and 'features' not in retried:
                 retried.add('features')
                 args = {**args, 'extra_features': verdict.names}

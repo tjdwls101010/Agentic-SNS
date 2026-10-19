@@ -160,3 +160,46 @@ def test_the_command_map_fits_one_screen_and_every_command_explains_its_exits():
         page = subprocess.run([sys.executable, str(CLI), name, '--help'], capture_output=True, text=True)
         assert page.returncode == 0 and 'exit codes:' in page.stdout, name
         assert 'request' in page.stdout, name  # each says what it costs (schema: no request)
+
+
+# --- the deadline, recorded buckets, a reopened tab (P3 review 1, 6, 7) ------------------------------------------------
+
+def test_a_browser_call_cut_by_the_deadline_before_any_result_is_a_time_limit(browser, data_dir):
+    known_tab(browser, data_dir).respond('query', {**query_result(home(['1']), headers=RATE), '__sleep': 10})
+    started = time.monotonic()
+    code, out, _ = run_cli(browser, 'feed', env={'TWITTER_DEADLINE_SECONDS': '5'})
+    envelope = json.loads(out)
+    assert code == 6 and envelope['stop_reason'] == 'time_limit', envelope
+    assert time.monotonic() - started < 9
+
+
+def test_a_browser_call_cut_by_the_deadline_after_results_is_a_resumable_stop(browser, data_dir):
+    known_tab(browser, data_dir).respond('query', query_result(home(['1']), headers=RATE))
+    browser.respond('query', {**query_result(home(['2'], bottom='C2'), headers=RATE), '__sleep': 12})
+    code, out, _ = run_cli(browser, 'feed', '--limit', '40', env={'TWITTER_DEADLINE_SECONDS': '8'})
+    assert code == 0, out
+    assert 'stopped=time_limit' in out.splitlines()[0] and out.splitlines()[-1].startswith('more: ')
+
+
+def test_the_own_responses_limit_is_recorded_even_when_a_lock_stops_the_command(browser, data_dir):
+    lock = signal('ViewerBadgeCounts', 200, (326,))
+    spent = {**RATE, 'x-rate-limit-remaining': '0'}
+    known_tab(browser, data_dir).respond('query', query_result('{"errors":[{"code":88}]}', status=429, headers=spent,
+                                                               signals=[lock]))
+    code, out, _ = run_cli(browser, 'feed')
+    assert code == 5
+    assert json.loads((data_dir / 'protection/buckets.json').read_text())['HomeTimeline']['remaining'] == 0
+
+
+def test_a_tab_lost_mid_command_is_replaced_by_the_one_another_command_already_opened(browser, data_dir):
+    known_tab(browser, data_dir)
+    browser.tab('T2')
+    session = data_dir / 'session/default.json'
+    lost = json.dumps({'kind': 'error', 'error': 'tab_missing', 'message': 'gone'}) + '\n'
+    browser.respond('query', {'__raw_stdout': lost, '__write': {str(session): json.dumps({'tab': 'T2'})}})
+    browser.respond('state', state()).respond('query', query_result(home(['1']), headers=RATE))
+    code, out, _ = run_cli(browser, 'feed')
+    assert code == 0, out
+    assert 'opener' not in browser.ops()
+    assert [c['tab'] for c in browser.calls() if c['op'] == 'query'] == ['T1', 'T2']
+    assert json.loads(session.read_text())['tab'] == 'T2'
