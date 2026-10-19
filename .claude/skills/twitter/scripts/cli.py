@@ -137,10 +137,11 @@ COMMANDS = {
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
     },
     'about': {
-        'help': 'Read an account\'s card, or several accounts\' cards in one request.',
+        'help': 'Read an account\'s card, several accounts\' cards in one request, or a space\'s card.',
         'run': about.about,
-        'arguments': [(('target',), {'nargs': '+', 'help': 'X @handle or profile URL; several are read together'}), 'json', 'max_requests'],
+        'arguments': [(('target',), {'nargs': '+', 'help': 'X @handle or profile URL, several read together; or one x.com/i/spaces/<id> link'}), 'json', 'max_requests'],
         'epilog': ['A card: name, bio, links, location, join date, counts (followers, following, posts), whether it is protected, its relation to you, and its marks: a paid check is an X subscription, not an identity check; a Business or Government badge is granted by X to an organisation; a declared Parody, Commentary or Fan label is the account\'s own. Several handles: those X did not return are named (unresolved).',
+                   'A space link reads the space: title, live/scheduled/ended, host and speakers, listener counts and whether a replay is kept. A space X no longer keeps is unavailable (exit 9).',
                    'requests: 1.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 9, 10),
     },

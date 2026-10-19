@@ -21,7 +21,8 @@ from urllib.parse import urlsplit
 
 from twitter.errors import TwitterError, diagnostic
 from twitter.x_web import classify
-from twitter.x_web.records import account_record, community_record, list_page, list_record, post_page, post_record
+from twitter.x_web.records import (account_record, community_record, list_page, list_record, post_page, post_record,
+                                   space_record)
 
 _SNIPPETS = Path(__file__).with_name('snippets')
 _KIT = (_SNIPPETS / 'kit.js').read_text(encoding='utf-8').strip()
@@ -583,6 +584,17 @@ class Client:
                             'Check the community id; tell the user rather than retrying.', reason='unavailable')
         root, warnings = self.query('CommunityByRestId', {'communityId': community_id}, missing=gone)
         record = community_record(root)
+        if record is None:
+            raise gone
+        self.confirm()
+        return record
+
+    def space(self, space_id):
+        """One space's card (one request); a space X does not return is unavailable."""
+        gone = TwitterError(9, 'This space is unavailable: it never existed or X no longer keeps it.',
+                            'Check the link; tell the user rather than retrying.', reason='unavailable')
+        root, warnings = self.query('AudioSpaceById', {'id': space_id}, missing=gone)
+        record = space_record(root)
         if record is None:
             raise gone
         self.confirm()

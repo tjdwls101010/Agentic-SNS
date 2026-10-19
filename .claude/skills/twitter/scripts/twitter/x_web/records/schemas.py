@@ -136,4 +136,27 @@ COMMUNITY = {
     },
 }
 
-SCHEMAS = {'post': POST, 'account': ACCOUNT, 'trend': TREND, 'list': LIST, 'community': COMMUNITY}
+SPACE = {
+    'object': 'space',
+    'description': 'An X space: a live audio room, possibly kept as a replay.',
+    'fields': {
+        'kind': 'string — space',
+        'id': 'string',
+        'title': 'string|null',
+        'state': 'string|null — live, scheduled, ended or canceled (X\'s own value, lowercased, when it is another)',
+        'created_at': 'string|null — UTC ISO',
+        'scheduled_start': 'string|null — UTC ISO',
+        'started_at': 'string|null — UTC ISO',
+        'ended_at': 'string|null — UTC ISO',
+        'host': 'object|null — {id, username, name} of the account that made it',
+        'admins': 'array — usernames of its hosts',
+        'speakers': 'array — usernames of those who spoke',
+        'participant_count': 'integer|null — ' + NULL,
+        'live_listener_count': 'integer|null — listening while live; ' + NULL,
+        'replay_view_count': 'integer|null — ' + NULL,
+        'replay_available': 'boolean|null',
+        'url': 'string — x.com/i/spaces/<id>',
+    },
+}
+
+SCHEMAS = {'post': POST, 'account': ACCOUNT, 'trend': TREND, 'list': LIST, 'community': COMMUNITY, 'space': SPACE}

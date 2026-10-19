@@ -229,3 +229,37 @@ def test_a_tab_explore_does_not_name_is_a_shape_change(browser, data_dir):
     known_tab(browser, data_dir).respond('query', explore([]))
     code, out, _ = run_cli(browser, 'trends', '--tab', 'sports')
     assert code == 6 and 'sports' in json.loads(out)['message']
+
+
+# --- spaces ----------------------------------------------------------------------------------------------------------
+
+def space(state='Running', **metadata):
+    return {'data': {'audioSpace': {'is_subscribed': False, 'metadata': {
+        'rest_id': '1AbCdEfGhIjKl', 'title': 'Synthetic space', 'state': state, 'created_at': 1767225600000,
+        'started_at': 1767225660000, 'total_live_listeners': 12, 'total_replay_watched': 0,
+        'is_space_available_for_replay': True, 'creator_results': {'result': OWNER}, **metadata},
+        'participants': {'total': 15, 'admins': [{'twitter_screen_name': 'author_a', 'display_name': 'A'}],
+                         'speakers': [{'twitter_screen_name': 'speaker_b', 'display_name': 'B'}], 'listeners': []}}}}
+
+
+def test_about_a_space_reads_its_card(browser, data_dir):
+    known_tab(browser, data_dir).respond('query', query_result(space(), headers=RATE))
+    code, out, _ = run_cli(browser, 'about', 'https://x.com/i/spaces/1AbCdEfGhIjKl')
+    assert code == 0, out
+    assert '[s1] "Synthetic space" · live · hosted by @author_a · listeners=12 · participants=15' in out
+    assert 'speakers: @speaker_b' in out and 'replay available' in out
+    call = queries(browser)[-1]
+    assert call['name'] == 'AudioSpaceById' and call['variables']['id'] == '1AbCdEfGhIjKl'
+    assert call['chunk_hint'] == 'bundle.AudioSpacePeek'
+
+
+def test_a_space_that_does_not_exist_is_unavailable(browser, data_dir):
+    # measured 2026-10-19: X answers 200 with an audioSpace that has no metadata
+    known_tab(browser, data_dir).respond('query', query_result({'data': {'audioSpace': {'is_subscribed': False}}}, headers=RATE))
+    code, out, _ = run_cli(browser, 'about', 'https://x.com/i/spaces/1AbCdEfGhIjKl')
+    assert code == 9
+
+
+def test_a_space_is_read_on_its_own(browser, data_dir):
+    code, out, _ = run_cli(browser, 'about', 'author_a', 'https://x.com/i/spaces/1AbCdEfGhIjKl')
+    assert code == 2 and 'on its own' in json.loads(out)['message'] and browser.calls() == []

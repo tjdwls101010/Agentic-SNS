@@ -77,3 +77,33 @@ def community_record(node):
             'topic': _str(_dict(node.get('primary_community_topic')).get('topic_name')),
             'rules': [rule for rule in rules if rule], 'creator': _who(node.get('creator_results')),
             'url': f'{ORIGIN}/i/communities/{ident}'}
+
+
+_STATES = {'Running': 'live', 'Ended': 'ended', 'NotStarted': 'scheduled', 'PrePublished': 'scheduled',
+           'Canceled': 'canceled', 'TimedOut': 'ended'}
+
+
+def _names(people):
+    return [p['twitter_screen_name'] for p in people or [] if isinstance(p, dict) and _str(p.get('twitter_screen_name'))]
+
+
+def space_record(node):
+    """One X space (a live audio room): its state, host and speakers, how many listened, and whether a replay is
+    kept; None when X sends no metadata (a space that does not exist, measured)."""
+    node = _dict(node)
+    metadata = _dict(node.get('metadata'))
+    ident = _str(metadata.get('rest_id'))
+    if not ident:
+        return None
+    people = _dict(node.get('participants'))
+    state = _str(metadata.get('state'))
+    replay = metadata.get('is_space_available_for_replay')
+    return {'kind': 'space', 'id': ident, 'title': _str(metadata.get('title')),
+            'state': _STATES.get(state, state.lower() if state else None), 'created_at': _ms(metadata.get('created_at')),
+            'scheduled_start': _ms(metadata.get('scheduled_start')), 'started_at': _ms(metadata.get('started_at')),
+            'ended_at': _ms(metadata.get('ended_at')), 'host': _who(metadata.get('creator_results')),
+            'admins': _names(people.get('admins')), 'speakers': _names(people.get('speakers')),
+            'participant_count': _count(people.get('total')),
+            'live_listener_count': _count(metadata.get('total_live_listeners')),
+            'replay_view_count': _count(metadata.get('total_replay_watched')),
+            'replay_available': replay if isinstance(replay, bool) else None, 'url': f'{ORIGIN}/i/spaces/{ident}'}

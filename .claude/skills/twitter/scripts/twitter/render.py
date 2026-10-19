@@ -257,6 +257,25 @@ def community(record, label):
     return '\n'.join(lines)
 
 
+def space(record, label):
+    parts = [_quote(record.get('title') or ''), _line(record.get('state') or 'state unknown')]
+    if (record.get('host') or {}).get('username'):
+        parts.append(f'hosted by @{record["host"]["username"]}')
+    parts += [f'listeners={_count(record.get("live_listener_count"))}',
+              f'participants={_count(record.get("participant_count"))}']
+    lines = [f'[{label}] ' + ' · '.join(parts)]
+    if record.get('speakers'):
+        lines.append('     speakers: ' + ' '.join('@' + name for name in record['speakers']))
+    when = [f'{key}={_time(record[field])}' for key, field in (('scheduled', 'scheduled_start'), ('started', 'started_at'),
+                                                               ('ended', 'ended_at')) if record.get(field)]
+    if record.get('replay_available') is not None:
+        when.append('replay available' if record['replay_available'] else 'no replay')
+    if when:
+        lines.append('     ' + ' · '.join(when))
+    lines.append(f'     url: {_handle(record.get("url"))}')
+    return '\n'.join(lines)
+
+
 def _replies_line(replies):
     reported = '?' if replies.get('reported') is None else replies['reported']
     return (f'replies: {replies.get("direct_shown", 0)} direct and {replies.get("nested_shown", 0)} nested shown of '
@@ -294,9 +313,13 @@ def render_page(envelope, *, chars=None, command=None):
         lines.append(f'window {window.get("since") or ""}..{window.get("until") or ""} · {_line(window["coverage"])}')
     if envelope.get('replies'):
         lines.append(_replies_line(envelope['replies']))
-    labels, counts = {}, {'p': 0, 'r': 0, 'a': 0, 't': 0, 'l': 0, 'c': 0}
+    labels, counts = {}, {'p': 0, 'r': 0, 'a': 0, 't': 0, 'l': 0, 'c': 0, 's': 0}
     for record in results:
         kind = record.get('kind')
+        if kind == 'space':
+            counts['s'] += 1
+            lines.append(space(record, f's{counts["s"]}'))
+            continue
         if kind == 'community':
             counts['c'] += 1
             lines.append(community(record, f'c{counts["c"]}'))
