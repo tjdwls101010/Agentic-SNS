@@ -3,7 +3,7 @@ paging.json; plan 'stop table', 'operation rotation recovery')."""
 import json
 import time
 
-from conftest import START, command_of, known_tab, query_result, run_cli
+from conftest import START, command_of, known_tab, query_result, run_cli, state
 
 USER = {'__typename': 'User', 'rest_id': '1000000001', 'core': {'screen_name': 'example_author', 'name': 'Example'}}
 
@@ -193,6 +193,18 @@ def test_a_refused_signature_is_retried_with_a_fresh_generator(browser, data_dir
     code, out, _ = feed(browser)
     assert code == 0, out
     assert [c['args'].get('fresh_generator') for c in browser.calls() if c['op'] == 'query'] == [None, True]
+
+
+def test_a_refused_csrf_token_is_retried_once_then_needs_login(browser, data_dir):
+    refused = query_result('{"errors":[{"code":353,"message":"This request requires a matching csrf cookie and header."}]}',
+                           status=403)
+    known_tab(browser, data_dir).respond('query', refused)
+    browser.respond('query', query_result(home([entry(post('1850000000000000001'))]), headers=RATE))
+    code, out, _ = feed(browser)
+    assert code == 0 and [c['op'] for c in browser.calls()].count('query') == 2, out
+    browser.respond('state', state()).respond('query', refused).respond('query', refused)
+    code, out, _ = feed(browser)
+    assert code == 4 and [c['op'] for c in browser.calls()].count('query') == 4
 
 
 def test_variables_x_no_longer_accepts_need_an_update(browser, data_dir):
