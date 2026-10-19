@@ -195,8 +195,8 @@ def records_of(page):
             record = community_record(_dict(entry.node.get('community_results')).get('result'))
         else:
             continue
-        if record is None:
-            page.other += 1
+        if record is None or (not record.get('id') and not record.get('unavailable')):
+            page.other += 1  # nothing to name it by: counted, not shown
             continue
         record['unit'] = entry.module or entry.entry_id
         if entry.pinned and entry.kind == 'post':

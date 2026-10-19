@@ -173,3 +173,12 @@ def test_a_list_record_and_the_stub_x_sends_for_a_list_that_does_not_exist():
     assert record['created_at'] == '2026-01-01T00:00:00+00:00' and record['owner']['username'] == 'author_a'
     assert record['url'] == 'https://x.com/i/lists/15' and record['you_are_member'] is None
     assert list_record({'facepile_urls': [], 'id': 'TGlzdDox', 'id_str': '1'}) is None
+
+
+def test_an_account_entry_without_an_id_is_counted_not_shown():
+    entries = [{'entryId': 'user-x', 'content': {'itemContent': {'itemType': 'TimelineUser', 'user_results': {'result': {
+        '__typename': 'User', 'core': {'screen_name': 'no_id_here'}}}}}},
+        {'entryId': 'user-1', 'content': {'itemContent': {'itemType': 'TimelineUser', 'user_results': {'result': {
+            '__typename': 'User', 'rest_id': '1', 'core': {'screen_name': 'has_id'}}}}}}]
+    page = x_web.list_page([{'type': 'TimelineAddEntries', 'entries': entries}])
+    assert [r['username'] for r in page.records] == ['has_id'] and page.other == 1
