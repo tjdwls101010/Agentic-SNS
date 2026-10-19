@@ -1,0 +1,1 @@
+"""The dense text page."""
