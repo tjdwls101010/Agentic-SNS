@@ -274,3 +274,19 @@ def test_an_id_absent_from_a_cut_answer_is_asked_again_in_smaller_batches():
     first, retry = reddit.requests[0][1], reddit.requests[1][1]
     assert len(first) == 60 and len(reddit.requests) == 2, 'one cut answer (33 fit at 3 things each), one retry'
     assert set(retry) == set(first) - set(retry and first[:33]) and len(retry) <= 50, 'only the dropped ids, half the size'
+
+
+def test_batches_of_deleted_comments_do_not_stop_the_live_ones_after_them():
+    scenario = next(c for c in TREE['batching']['scenarios'] if c['name'] == 'deleted-only-batches-then-normal')
+    gone = [f'd{i}' for i in range(200)]
+    live = [f'l{i}' for i in range(40)]
+    tree = {i: ('t3_aaa1', []) for i in gone + live + [f't{i}' for i in range(5)]}
+    reddit = FakeReddit(tree, deleted=gone)
+    s = state([{'id': f't{i}', 'parent': 't3_aaa1'} for i in range(5)] +
+              [{'more': gone[:100], 'parent': 't3_aaa1'}, {'more': gone[100:], 'parent': 't3_aaa1'},
+               {'more': live, 'parent': 't3_aaa1'}])
+    drive(s, reddit)
+    show_all(s)
+    info = thread.coverage(s, 0, 0)
+    assert info['complete'] is scenario['expected']['complete'] and len(s['missing']) == scenario['expected']['missing']
+    assert all('t1_' + i in s['nodes'] for i in live) and len(reddit.requests) == 3
