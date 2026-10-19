@@ -143,3 +143,45 @@ def test_an_empty_collection_stays_empty_when_rerun(reddit, tmp_path):
     assert code == 7
     code, text, _ = run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--out', str(out))
     assert code == 7
+
+
+def test_a_karma_check_the_budget_cut_off_is_made_when_the_command_is_rerun(reddit, tmp_path):
+    # Codex P7 round 2: the file was already complete, so the rerun never checked the karma
+    from test_cli_people import about_user
+    out = tmp_path / 'profile.ndjson'
+    reddit.me().json('/user/example_user/overview.json', listing([]))
+    code, text, _ = run_cli(reddit, 'profile', 'u/example_user', '--out', str(out), '--max-requests', '2', '--json')
+    assert code == 8 and json.loads(text)['reason'] == 'karma_unchecked'
+    reddit.me().json('/user/example_user/overview.json', listing([]))
+    reddit.json('/user/example_user/about.json', about_user(28, 55636))
+    code, text, _ = run_cli(reddit, 'profile', 'u/example_user', '--out', str(out), '--json')
+    assert code == 9 and json.loads(text)['reason'] == 'history_not_visible'
+
+
+def test_a_verdict_cut_off_while_written_is_read_again(reddit, tmp_path):
+    # Codex P7 round 2: a torn verdict line left the earlier complete marker, and the rerun reported success
+    from test_cli_lists import epoch
+    out = tmp_path / 'sub.ndjson'
+    old = {**post('a')['data'], 'created_utc': epoch('2025-10-09T00:00:00')}
+    args = ['sub', 'r/example', '--sort', 'new', '--since', '2025-01-01', '--out', str(out), '--json']
+    reddit.me().json('/r/example/new.json', listing([{'kind': 't3', 'data': old}]))
+    code, _, _ = run_cli(reddit, *args)
+    assert code == 8
+    data = out.read_bytes()
+    out.write_bytes(data[:-20])  # the last line, the verdict, torn
+    reddit.me().json('/r/example/new.json', listing([{'kind': 't3', 'data': old}]))
+    code, text, _ = run_cli(reddit, *args)
+    assert code == 8 and json.loads(text)['window']['coverage'].startswith('open')
+
+
+def test_a_damaged_verdict_is_an_integrity_failure(reddit, tmp_path):
+    out = tmp_path / 'sub.ndjson'
+    reddit.me().json('/r/example/new.json', listing([]))
+    run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--out', str(out))
+    rows = out.read_text().splitlines()
+    last = json.loads(rows[-1])
+    assert last.get('verdict'), 'the empty result is kept as a verdict'
+    rows[-1] = json.dumps({**last, 'verdict': {'code': 7}})
+    out.write_text('\n'.join(rows) + '\n')
+    code, text, _ = run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--out', str(out))
+    assert code == 2 and 'integrity' in text

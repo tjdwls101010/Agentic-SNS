@@ -90,6 +90,9 @@ def _scan(data):
             result['skipped'].update(record.get('skipped') or [])
             result['count'] += len(page)
             result['state'] = record.get('state')
+            if not _verdict_ok(record.get('verdict')):
+                raise RedditError(2, 'The --out file failed its integrity check: a page line\'s verdict is damaged.',
+                                  'Keep this file as it is and use a new path.')
             result['complete'] = record.get('stop_reason') in COMPLETE
             result['verdict'] = record.get('verdict')
             result['boundary'], page = offset, []
@@ -135,6 +138,14 @@ def _open(path, flags):
     if flags & (os.O_RDWR | os.O_WRONLY):
         os.fchmod(fd, 0o600)
     return fd
+
+
+def _verdict_ok(verdict):
+    if verdict is None:
+        return True
+    return isinstance(verdict, dict) and verdict.get('code') in (7, 8, 9) and \
+        all(isinstance(verdict.get(key), str) for key in ('message', 'fix')) and \
+        isinstance(verdict.get('reason'), (str, type(None))) and isinstance(verdict.get('window'), (dict, type(None)))
 
 
 def peek(path):
@@ -231,8 +242,9 @@ class OutFile:
         self.state, self.complete = state, stop_reason in COMPLETE
 
     def conclude(self, stop_reason, verdict):
-        """Close a complete file with the verdict its reading ended in ({code, message, fix, reason, window}: empty, not
-        visible, a window the listing did not reach), as an empty page, so rerunning the command repeats it."""
+        """Mark the file complete, as an empty page, with the verdict its reading ended in when there is one ({code,
+        message, fix, reason, window}: empty, not visible, a window the listing did not reach) so rerunning the command
+        repeats it. One line: a torn one leaves the file incomplete, and the rerun reads and judges again."""
         marker = {'kind': 'page', 'state': self.state, 'ids': [], 'n': 0, 'stop_reason': stop_reason,
                   'verdict': verdict}
         try:
@@ -242,6 +254,7 @@ class OutFile:
         except OSError:
             raise RedditError(6, 'A page could not be written to the --out file.', 'Free disk space, then rerun the '
                                                                                    'same command.') from None
+        self.complete = stop_reason in COMPLETE
 
     def close(self):
         if self.stream is not None:

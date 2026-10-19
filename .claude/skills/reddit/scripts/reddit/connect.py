@@ -3,7 +3,7 @@
 from reddit import guard as protection
 from reddit import handles
 from reddit.aside import Aside
-from reddit.collection import OutFile, peek, resolve
+from reddit.collection import COMPLETE, OutFile, peek, resolve
 from reddit.errors import RedditError
 from reddit.paging import paginate
 from reddit.reddit_web import Client
@@ -128,14 +128,16 @@ def _read(connection, options, command, target, identity, reader, out_path):
             reading = reader(connection, state, out)
         reading.setdefault('observed', connection.observed or connection.reddit_account)
         if out is not None:
+            failure = reading.get('failure')
+            ending = reading.pop('ending', None)
+            if ending and failure is None:
+                out.conclude(ending, None)
+            elif ending and isinstance(failure, RedditError) and failure.code in (7, 8, 9) \
+                    and failure.reason != 'karma_unchecked':  # a judgment the rerun repeats; any other failure, it redoes
+                out.conclude(ending, {'code': failure.code, 'message': failure.message, 'fix': failure.fix,
+                                      'reason': failure.reason, 'window': reading.get('window')})
             reading['count'] = out.count
             reading['continuable'] = out.state is not None and not out.complete
-            failure = reading.get('failure')
-            if out.complete and isinstance(failure, RedditError) and failure.code in (7, 8, 9) \
-                    and failure.reason != 'karma_unchecked':
-                out.conclude(reading.get('stop_reason') or 'exhausted', {'code': failure.code, 'message': failure.message,
-                                                                         'fix': failure.fix, 'reason': failure.reason,
-                                                                         'window': reading.get('window')})
             stopped = out.complete or isinstance(failure, RedditError) and failure.code in (4, 5, 9)
             if not stopped and (reading.get('stop_reason') in ('budget', 'window_spent', 'probe_pending')
                                 or isinstance(failure, RedditError)):
@@ -223,7 +225,12 @@ def read_pages(connection, options, identity, state, out, *, request, command, t
         received.append(len(records))
         return records, {'has_next_page': after is not None, 'end_cursor': after}, bool(records)
 
+    ending = []
+
     def commit(records, page_state, reason, skipped):
+        if reason in COMPLETE:  # the file is marked complete with its verdict once the reading is judged (_read)
+            ending.append(reason)
+            reason = None
         out.commit(records, {**page_state, 'window': window.state(), **(extra or {})} if page_state else None, reason,
                    skipped, window.report())
 
@@ -249,6 +256,8 @@ def read_pages(connection, options, identity, state, out, *, request, command, t
                'coverage': window.report(), 'words': _words(identity, words), 'partial': bool(result['results'])}
     if window.active:
         reading['window'] = window.describe()
+    if ending:
+        reading['ending'] = ending[-1]
     if not result['results'] and failure is None and result['state'] is None and out is None and not window.active:
         reading['failure'] = RedditError(7, 'Reddit returned nothing here.', 'Try another target, order or period.')
     if result['state'] is not None:
