@@ -1,0 +1,1 @@
+r/${REDDIT_TASK_SUB2}에서 지난 한 달 동안 ${REDDIT_TASK_TOPIC} 불만이 얼마나 나왔어?
