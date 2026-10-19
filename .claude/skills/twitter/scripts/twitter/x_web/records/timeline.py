@@ -4,6 +4,7 @@ and the records of a list page.
 A Bottom termination ends the timeline even when a Bottom cursor is still sent (later pages come back empty).
 """
 from dataclasses import dataclass, field
+from urllib.parse import parse_qs, urlsplit
 
 from twitter.x_web.records.places import community_record, list_record
 from twitter.x_web.records.posts import account_record, post_record
@@ -57,7 +58,9 @@ def _dict(value):
 
 
 def _promoted(identity, content):
-    return identity.startswith(('promoted-', 'promotedTweet-')) or bool(content.get('promotedMetadata'))
+    # live trends spell it promoted_metadata, posts and events promotedMetadata
+    return identity.startswith(('promoted-', 'promotedTweet-')) or bool(content.get('promotedMetadata') or
+                                                                        content.get('promoted_metadata'))
 
 
 def _ident(kind, content, identity):
@@ -143,15 +146,33 @@ def walk(instructions):
     return page
 
 
+def _search_query(url):
+    """The search words in X's own trend link (twitter://search/?query=...), or None."""
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return None
+    if parts.scheme not in ('twitter', 'https') or 'search' not in (parts.netloc + parts.path):
+        return None
+    query = parse_qs(parts.query).get('query') or parse_qs(parts.query).get('q')
+    return query[0] if query and query[0].strip() else None
+
+
 def trend_record(node, identity, event=False):
+    """A trend (its words, X's label and rank, the search that reads it) or an event (its title and page)."""
     metadata = _dict(node.get('trendMetadata') or node.get('trend_metadata'))
-    url = node.get('url')
-    url = _dict(url).get('url') if isinstance(url, dict) else url
+    link = node.get('url') or node.get('trend_url') or node.get('eventSummaryUrl')
+    url = _dict(link).get('url') if isinstance(link, dict) else link
+    url = url if isinstance(url, str) else None
     name = node.get('name') or node.get('title') or ''
-    return {'id': identity, 'kind': 'event' if event else 'trend', 'name': name,
+    rank = node.get('rank')
+    rank = int(rank) if isinstance(rank, str) and rank.isdigit() else rank if type(rank) is int else None
+    query = _search_query(url) if url and not event else None
+    return {'id': identity, 'kind': 'event' if event else 'trend', 'name': name, 'rank': rank,
             'context': metadata.get('domainContext') or metadata.get('domain_context'),
             'description': metadata.get('metaDescription') or metadata.get('meta_description') or node.get('subtitle'),
-            'url': url if isinstance(url, str) else None}
+            'query': query or (name if not event and name else None),
+            'url': url if url and url.startswith('https://') else None}
 
 
 def records_of(page):

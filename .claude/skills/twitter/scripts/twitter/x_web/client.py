@@ -592,6 +592,20 @@ class Client:
         """One page of X's search across communities' posts for `text` (operators as typed)."""
         return self.timeline('GlobalCommunitiesLatestPostSearchTimeline', {'rawQuery': text}, cursor)
 
+    def explore(self):
+        """X's Explore tabs (one request): {tab id: timeline id}, the default tab's id and its first page."""
+        root, warnings = self.query('ExplorePage', {})
+        initial = root.get('initialTimeline') if isinstance(root, dict) else None
+        tabs = {t.get('id'): (t.get('timeline') or {}).get('id') for t in (root.get('timelines') or [])
+                if isinstance(t, dict)} if isinstance(root, dict) else {}
+        if not isinstance(initial, dict) or not tabs:
+            raise TwitterError(6, 'X\'s Explore answer is not what this skill expects.', 'Tell the user the X reader '
+                                                                                         'needs an update.',
+                               reason='shape_changed')
+        page = list_page(((initial.get('timeline') or {}).get('timeline') or {}).get('instructions'))
+        self.confirm()
+        return tabs, initial.get('id'), page
+
     def search(self, text, product, cursor):
         """One page of X's search for `text` (posts Top or Latest, People, Media), operators as typed."""
         return self.timeline('SearchTimeline', {'rawQuery': text, 'product': product,

@@ -89,8 +89,9 @@ TREND = {
         'name': 'string — the trend\'s words, or the event\'s title',
         'context': 'string|null — X\'s label (topic, place, "Trending")',
         'description': 'string|null — X\'s line under it (often a post count, rounded)',
-        'url': 'string|null — X\'s own link for it',
-        'search': 'string — the search command that reads it',
+        'rank': 'integer|null — its place on the tab',
+        'query': 'string|null — trends: the words search takes to read it (search "<query>")',
+        'url': 'string|null — an event\'s x.com page',
     },
 }
 

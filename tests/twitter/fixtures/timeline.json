@@ -781,7 +781,7 @@
    "name": "trends-and-events",
    "item": "26",
    "source": "code",
-   "fact": "TimelineTrend items are trends (name, trendMetadata.domainContext and metaDescription, the item's url); TimelineEventSummary items are events; a promoted trend is an ad.",
+   "fact": "TimelineTrend items are trends (name, trendMetadata.domainContext and metaDescription, the item's url); TimelineEventSummary items are events; a promoted trend is an ad. X's twitter:// link is not kept as url (it opens nothing outside X's app); its query is.",
    "instructions": [
     {
      "type": "TimelineAddEntries",
@@ -852,12 +852,136 @@
       "context": "Technology · Trending",
       "description": "12.3K posts",
       "kind": "trend",
-      "url": "twitter://search/?query=%23SyntheticTopic"
+      "query": "#SyntheticTopic"
      },
      {
       "name": "A synthetic event",
       "description": "Science · Live",
       "kind": "event"
+     }
+    ]
+   }
+  },
+  {
+   "name": "trends-live-shape",
+   "item": "26",
+   "source": "P2 capture (shape), synthetic values",
+   "fact": "Live Explore trends are snake_case: trend_metadata.domain_context / meta_description, trend_url.url (twitter://search/?query=...), rank; a promoted trend carries promoted_metadata (an ad, skipped and counted); an event links with eventSummaryUrl.url.",
+   "instructions": [
+    {
+     "type": "TimelineAddEntries",
+     "entries": [
+      {
+       "entryId": "trend-1",
+       "content": {
+        "itemContent": {
+         "itemType": "TimelineTrend",
+         "name": "#SyntheticTopic",
+         "rank": "1",
+         "trend_metadata": {
+          "domain_context": "Music · Trending",
+          "meta_description": "12.3K posts"
+         },
+         "trend_url": {
+          "url": "twitter://search/?query=%23SyntheticTopic&src=trend_click&vertical=trends",
+          "urlType": "DeepLink"
+         }
+        }
+       }
+      },
+      {
+       "entryId": "trend-2",
+       "content": {
+        "itemContent": {
+         "itemType": "TimelineTrend",
+         "name": "Sponsored Thing",
+         "promoted_metadata": {
+          "advertiser_results": {}
+         },
+         "trend_metadata": {}
+        }
+       }
+      },
+      {
+       "entryId": "trend-3",
+       "content": {
+        "itemContent": {
+         "itemType": "TimelineTrend",
+         "name": "Plain words here",
+         "rank": "2",
+         "trend_metadata": {
+          "domain_context": "Only on X · Trending"
+         },
+         "trend_url": {
+          "url": "twitter://search/?query=%22Plain+words%22&src=trend_click",
+          "urlType": "DeepLink"
+         }
+        }
+       }
+      },
+      {
+       "entryId": "stories-1",
+       "content": {
+        "itemContent": {
+         "itemType": "TimelineEventSummary",
+         "title": "A synthetic event",
+         "event": {
+          "rest_id": "1700000000000000001"
+         },
+         "eventSummaryUrl": {
+          "url": "https://x.com/i/events/1700000000000000001",
+          "urlType": "ExternalUrl"
+         }
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "entries": [
+     [
+      "trend",
+      "trend-1",
+      null,
+      0,
+      false
+     ],
+     [
+      "trend",
+      "trend-3",
+      null,
+      0,
+      false
+     ],
+     [
+      "event",
+      "stories-1",
+      null,
+      0,
+      false
+     ]
+    ],
+    "promoted": 1,
+    "trends": [
+     {
+      "name": "#SyntheticTopic",
+      "kind": "trend",
+      "rank": 1,
+      "context": "Music · Trending",
+      "description": "12.3K posts",
+      "query": "#SyntheticTopic"
+     },
+     {
+      "name": "Plain words here",
+      "kind": "trend",
+      "rank": 2,
+      "query": "\"Plain words\""
+     },
+     {
+      "name": "A synthetic event",
+      "kind": "event",
+      "url": "https://x.com/i/events/1700000000000000001"
      }
     ]
    }

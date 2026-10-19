@@ -181,3 +181,51 @@ def test_suggested_communities_and_community_search_continue_from_their_more_lin
         code, out, _ = run_cli(browser, *command_of(out.splitlines()[-1]))
         assert code == 0, out
         assert queries(browser)[-1]['variables']['cursor'] == cursor and queries(browser)[-1]['name'] == queries(browser)[-2]['name']
+
+
+# --- trends ----------------------------------------------------------------------------------------------------------
+
+def trend(name, rank, query, promoted=False):
+    content = {'itemType': 'TimelineTrend', 'name': name, 'rank': str(rank),
+               'trend_metadata': {'domain_context': 'Music · Trending'},
+               'trend_url': {'url': f'twitter://search/?query={query}&src=trend_click'}}
+    if promoted:
+        content['promoted_metadata'] = {'advertiser_results': {}}
+    return {'entryId': f'trend-{rank}', 'content': {'itemContent': content}}
+
+
+def explore(initial_entries):
+    return query_result({'data': {'explore_page': {'body': {'__typename': 'SegmentedTimelines', 'initialTimeline': {
+        'id': 'for_you', 'timeline': {'timeline': {'instructions': entries(initial_entries)}}}, 'timelines': [
+        {'id': 'for_you', 'timeline': {'id': 'VEZPUllPVQ=='}}, {'id': 'trending', 'timeline': {'id': 'VFJFTkRJTkc='}}]}}}},
+        headers=RATE)
+
+
+def test_trends_reads_the_trending_tab_by_its_timeline_and_leaves_ads_out(browser, data_dir):
+    trending = query_result({'data': {'timeline': {'timeline': {'instructions': entries(
+        [trend('#Synthetic', 1, '%23Synthetic'), trend('Ad', 2, 'ad', promoted=True), trend('Plain words', 3, '%22Plain+words%22')])}}}},
+        headers=RATE)
+    known_tab(browser, data_dir).respond('query', explore([])).respond('query', trending)
+    code, out, _ = run_cli(browser, 'trends')
+    assert code == 0, out
+    assert out.splitlines()[0].startswith('trends · tab=trending · 2 shown') and 'requests=2/25' in out.splitlines()[0]
+    assert '[t1] "#Synthetic" · trend · #1 · Music · Trending' in out and 'search: "#Synthetic"' in out
+    assert 'search: "\\"Plain words\\""' in out and '"Ad"' not in out and 'promoted' in out
+    calls = queries(browser)
+    assert [c['name'] for c in calls] == ['ExplorePage', 'GenericTimelineById']
+    assert calls[1]['variables']['timelineId'] == 'VFJFTkRJTkc='
+
+
+def test_the_for_you_tab_is_already_in_the_explore_answer(browser, data_dir):
+    user = {'entryId': 'who-1', 'content': {'entryType': 'TimelineTimelineModule', 'items': [
+        {'entryId': 'who-1-user-1', 'item': {'itemContent': {'itemType': 'TimelineUser', 'user_results': {'result': OWNER}}}}]}}
+    known_tab(browser, data_dir).respond('query', explore([trend('#Synthetic', 1, '%23Synthetic'), user]))
+    code, out, _ = run_cli(browser, 'trends', '--tab', 'foryou')
+    assert code == 0 and '[t1] "#Synthetic"' in out and '@author_a' not in out, out
+    assert 'other items' in out and [c['name'] for c in queries(browser)] == ['ExplorePage']
+
+
+def test_a_tab_explore_does_not_name_is_a_shape_change(browser, data_dir):
+    known_tab(browser, data_dir).respond('query', explore([]))
+    code, out, _ = run_cli(browser, 'trends', '--tab', 'sports')
+    assert code == 6 and 'sports' in json.loads(out)['message']

@@ -92,7 +92,7 @@ def test_ads_are_left_out_and_counted(browser, data_dir):
     known_tab(browser, data_dir).respond('query', query_result(home([entry(post('1850000000000000001'))], extra=[ad]),
                                                                headers=RATE))
     code, out, _ = feed(browser)
-    assert code == 0 and 'coverage: 1 promoted posts (ads) left out' in out
+    assert code == 0 and 'coverage: 1 promoted entries (ads) left out' in out
 
 
 def test_json_envelope(browser, data_dir):

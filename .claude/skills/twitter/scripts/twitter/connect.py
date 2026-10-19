@@ -274,7 +274,9 @@ def read_list(options, identity, state, out, *, order, fetch, command, target, e
         stop = 'not_paginable'
     coverage = window.report()
     if skipped['promoted']:
-        coverage.append(f'{skipped["promoted"]} promoted posts (ads) left out')
+        coverage.append(f'{skipped["promoted"]} promoted entries (ads) left out')
+    if skipped['other']:
+        coverage.append(f'{skipped["other"]} other items X mixed in were left out')
     reading = {'results': [] if out is not None else result['results'], 'stop_reason': stop,
                'failure': result['failure'], 'coverage': coverage, 'words': list_words(identity, words),
                'partial': bool(result['results'])}

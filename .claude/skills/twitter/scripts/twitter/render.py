@@ -207,9 +207,13 @@ def account(record, label):
 def trend(record, label):
     parts = [_quote(record.get('name') or ''), record.get('kind') or 'trend']
     parts += [_line(record[key]) for key in ('context', 'description') if record.get(key)]
+    if record.get('rank') is not None:
+        parts.insert(2, f'#{record["rank"]}')
     line = f'[{label}] ' + ' · '.join(parts)
-    if record.get('search'):
-        line += '\n     search: ' + record['search']
+    if record.get('query'):
+        line += '\n     search: ' + _quote(record['query'])
+    elif record.get('url'):
+        line += '\n     url: ' + _handle(record['url'])
     return line
 
 

@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date, datetime, time, timedelta
 
-from twitter import about, listing, maintenance, search, thread
+from twitter import about, explore, listing, maintenance, search, thread
 from twitter.errors import TwitterError
 from twitter.render import render_page, render_summary
 from twitter.results import failure_envelope
@@ -244,6 +244,14 @@ COMMANDS = {
                    'requests: 1 per page of about 20.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
     },
+    'trends': {
+        'help': 'Read the trends and events on one of X\'s Explore tabs.',
+        'run': explore.trends,
+        'arguments': [(('--tab',), {'choices': list(explore.TABS), 'default': 'trending', 'help': 'trending (default), foryou, news, sports or entertainment'})] + list(LIST),
+        'epilog': ['A trend is what X shows this account as popular now, in X\'s order and for X\'s region and language settings, not a measure of opinion or a full list; its count line is X\'s rounded figure. Each trend ends with search: <query>, the words search takes to read it; an event ends with its page. Promoted trends (ads) and the posts or accounts X mixes into Explore are left out and counted.',
+                   'requests: 1 for foryou (it comes with the Explore answer); 2 for the other tabs (the Explore answer names their timeline), then 1 per further page.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
+    },
     'doctor': {
         'help': 'Check Aside, the browser tab, login, account protection and X\'s limits; always JSON.',
         'run': maintenance.doctor,
@@ -287,7 +295,7 @@ HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 
 
-READS = ('feed', 'profile', 'about', 'graph', 'me', 'list', 'community', 'post', 'replies', 'reposts', 'search', 'quotes')
+READS = ('feed', 'profile', 'about', 'graph', 'me', 'list', 'community', 'post', 'replies', 'reposts', 'search', 'quotes', 'trends')
 
 
 def epilog(name, spec):
