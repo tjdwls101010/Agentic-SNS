@@ -36,8 +36,10 @@ KIND_EXIT = {'records': 0, 'resumable': 0, 'complete': 0, 'maintenance': 0, 'arg
 
 REQUESTS = ('how requests are counted: every read and retry this command sends counts exactly, and so does every '
             'x.com request the dedicated tab finishes while it runs (its own requests are told apart by a nonce in '
-            'the URL fragment, never sent to X). Opening the tab (or loading it again) is measured the same way, '
-            'about 14, and shown as "tab opened", outside --max-requests (20 when it cannot be measured). Requests '
+            'the URL fragment, never sent to X), so the total can end a little above --max-requests: no read is '
+            'sent once the budget is spent. Opening the tab (or loading it again) is measured the same way until '
+            'the load settles, about 15-25, and shown as "tab opened", outside --max-requests (20 plus what was seen '
+            'when the start of the load could not be measured). Requests '
             'the open tab made between commands are shown as unwatched=, not charged, but a block seen there stops '
             'the command before it sends anything. Static files do not count. All invocations share one lock and '
             '1-2 s pacing for the account and slow down when X\'s limit for an operation is nearly used; a command '
@@ -104,7 +106,7 @@ OPTIONS = {
     'after': (('--after',), {'type': positive, 'metavar': 'HANDLE', 'help': 'Continue from the numbered handle a more: line printed'}),
     'out': (('--out',), {'metavar': 'FILE', 'help': 'Collect into this NDJSON file, one committed page at a time; rerun the same command to resume. --limit then counts what is saved'}),
     'json': (('--json',), {'action': 'store_true', 'help': 'Print one JSON envelope instead of text'}),
-    'max_requests': (('--max-requests',), {'type': budget, 'default': 25, 'metavar': 'N', 'help': 'Requests this invocation may make (default 25, at most 400)'}),
+    'max_requests': (('--max-requests',), {'type': budget, 'default': 25, 'metavar': 'N', 'help': 'Request budget (default 25, at most 400): no read is sent once it is spent; the page\'s own requests while the command runs count too'}),
 }
 LIST = ('limit', 'chars', 'after', 'out', 'json', 'max_requests')
 
@@ -192,7 +194,7 @@ COMMANDS = {
                       (('--type',), {'choices': ['posts', 'accounts', 'media'], 'default': 'posts', 'help': 'posts, accounts (people) or media'}),
                       (('--sort',), {'choices': ['top', 'latest'], 'default': 'top', 'help': 'Posts and media: top (X\'s ranking) or latest (newest first)'})] + list(LIST),
         'epilog': ['Results are in X\'s order for this account: top is a ranking, not a sample of opinion; latest is newest first. Accounts with the same or similar names are different results (compare url and their marks).',
-                   'since: and until: in the query are filters X applies itself, so such a search read to the end (stopped=exhausted) covers its window: window ... closed (server-filtered); stopped by --limit, the budget or X\'s limit it is still open. X decides which day boundaries those operators use.',
+                   'since: and until: in the query are filters X applies itself, so such a search read to the end (stopped=exhausted) covers its window: window ... closed (server-filtered); stopped by --limit, the budget or X\'s limit it is still open. X decides which day boundaries those operators use (measured once: until:D ran to the end of D in this account\'s time zone), so check created_at at the edges.',
                    'X allows about 50 searches per 15 minutes for this account (quotes count too): a wide search costs that limit, and when it runs out the command stops with exit 10 (before any result) or stopped=rate_limited (after some), naming when it resets.',
                    'Without --limit or --out it reads one page; more: continues.',
                    'requests: 1 per page of about 20.'],
@@ -213,8 +215,9 @@ COMMANDS = {
         'run': maintenance.doctor,
         'arguments': [(('--unblock',), {'action': 'store_true', 'help': 'Only after a person has checked x.com in the '
                                         'Aside browser: make one check and lift a saved block if X answers normally'})],
-        'epilog': ['It opens the dedicated x.com tab if none is open (about 14 requests the page makes itself, measured; '
-                   '20 when they cannot be measured) and otherwise makes no request.',
+        'epilog': ['It opens the dedicated x.com tab if none is open (about 15-25 requests the page makes itself while '
+                   'it loads, measured; 20 plus what was seen when the start of the load could not be measured) and '
+                   'otherwise makes no request.',
                    'output: one JSON envelope; results[0] holds aside, tab {target_id, opened_now, reopened, '
                    'opening_measured}, login, account_id (the X account in use), blocked and block_reason, limits (X\'s '
                    'per-operation limits seen and not yet reset: {limit, remaining, reset}), requests_last_hour and '
@@ -229,8 +232,10 @@ COMMANDS = {
                    'outside any budget, inside X\'s Viewer limit). Only an answer for the account the block was '
                    'recorded for lifts it; anything else leaves it and exits 5 with verification_reason '
                    '(rate_limited, logged_out, account_mismatch, moved, time_limit, aside). Per-operation limits are '
-                   'never cleared by it. It means nothing unless a person has looked at x.com in the Aside browser '
-                   'first.'],
+                   'never cleared by it. When protection state is unreadable, it first keeps those files for a person '
+                   'as <name>.unreadable-<time> and stands a block for the account they name (or none), which the '
+                   'check then lifts or keeps. It means nothing unless a person has looked at x.com in the Aside '
+                   'browser first.'],
         'exits': (0, 2, 3, 4, 5, 6),
     },
     'schema': {
