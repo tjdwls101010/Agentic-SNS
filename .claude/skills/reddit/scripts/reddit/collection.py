@@ -2,7 +2,7 @@
 
 Line 1 is a header (kind header, format, the query context, started_at). Then records, each page closed by a marker
 (kind page, the state to resume from, ids and n of the records above it, stop_reason, skipped, coverage; the last
-marker of a complete file may carry the verdict its reading ended in, which a rerun repeats). Only
+marker of a complete file holds the result its reading ended in, which a rerun repeats). Only
 complete pages are trusted: the tail after the last marker is dropped and read again. A file for another query or an
 older format is refused before any byte changes. The file is the user's own: it must be a regular file with one link,
 it is opened without following a final symbolic link, kept private (0600) and locked without waiting; a path through a
@@ -45,13 +45,14 @@ def describe():
                       'once, then its comments flat, each with parent_id and depth',
             'page': 'after each committed page: kind "page" with no id, state (where the next page starts), ids and n '
                     'of the records above it, stop_reason, skipped, coverage; the last one of a complete file may '
-                    'add verdict {code, message, fix, reason, window}: the result the reading ended in (empty, not '
-                    'visible, a window the listing did not reach); ending (exhausted, window_reached) marks the page '
-                    'where a listing ended before that verdict was written, which a rerun then writes',
+                    'add verdict {code, message, fix, reason} (empty, not visible, a window the listing did not '
+                    'reach; null for a plain success) and window: the result the reading ended in; ending {stop: '
+                    'exhausted or window_reached, sent: whether Reddit sent anything} marks the page where a listing '
+                    'ended before that result was written, which a rerun then writes',
         },
         'resume': 'Rerun the same command with the same --out path: records after the last page line are dropped and '
                   'read again, saved ids are not written twice, and --limit counts what is saved. A complete file '
-                  'reads nothing and repeats its verdict. A file for another query, another account, an earlier format or one whose pages do '
+                  'reads nothing and repeats its result. A file for another query, another account, an earlier format or one whose pages do '
                   'not match their records is refused before any byte changes; use a new path.',
         'privacy': 'The file holds other people\'s names, words and profile links. Keep it outside the repository.',
     }
@@ -69,7 +70,7 @@ def _scan(data):
     except ValueError:
         header = None
     result = {'header': header, 'ids': set(), 'skipped': set(), 'count': 0, 'state': None, 'complete': False,
-              'verdict': None, 'ending': None, 'boundary': len(lines[0]) + 1}
+              'conclusion': None, 'ending': None, 'boundary': len(lines[0]) + 1}
     offset, page, broken = len(lines[0]) + 1, [], False
     for raw in lines[1:-1]:  # the last element follows the final newline: empty, or a partial line
         offset += len(raw) + 1
@@ -91,11 +92,13 @@ def _scan(data):
             result['skipped'].update(record.get('skipped') or [])
             result['count'] += len(page)
             result['state'] = record.get('state')
-            if not _verdict_ok(record.get('verdict')) or record.get('ending', None) not in (None, *COMPLETE):
+            if not _verdict_ok(record.get('verdict')) or not _ending_ok(record.get('ending')) or \
+                    not isinstance(record.get('window'), (dict, type(None))):
                 raise RedditError(2, 'The --out file failed its integrity check: a page line\'s verdict or ending is '
                                      'damaged.', 'Keep this file as it is and use a new path.')
             result['complete'] = record.get('stop_reason') in COMPLETE
-            result['verdict'] = record.get('verdict')
+            result['conclusion'] = {'stop_reason': record.get('stop_reason'), 'verdict': record.get('verdict'),
+                                    'window': record.get('window')} if result['complete'] else None
             result['ending'] = record.get('ending')
             result['boundary'], page = offset, []
         elif not broken:
@@ -147,12 +150,17 @@ def _verdict_ok(verdict):
         return True
     return isinstance(verdict, dict) and verdict.get('code') in (7, 8, 9) and \
         all(isinstance(verdict.get(key), str) for key in ('message', 'fix')) and \
-        isinstance(verdict.get('reason'), (str, type(None))) and isinstance(verdict.get('window'), (dict, type(None)))
+        isinstance(verdict.get('reason'), (str, type(None)))
+
+
+def _ending_ok(ending):
+    return ending is None or isinstance(ending, dict) and ending.get('stop') in COMPLETE and \
+        isinstance(ending.get('sent'), bool)
 
 
 def peek(path):
-    """(the query context a file was written for, whether it is complete, records saved, the verdict a complete
-    reading ended in or None), reading only; (None, False, 0, None) when the file does not exist or is empty. A file
+    """(the query context a file was written for, whether it is complete, records saved, the result a complete file
+    ended in — {stop_reason, verdict, window} — or None), reading only; (None, False, 0, None) when the file does not exist or is empty. A file
     that is not a current collection raises like opening it."""
     try:
         with os.fdopen(_open(resolve(path), os.O_RDONLY), 'rb') as stream:
@@ -163,7 +171,7 @@ def peek(path):
         return None, False, 0, None
     scan = _scan(data)
     _check_header(scan['header'], None)
-    return scan['header']['context'], scan['complete'], scan['count'], scan['verdict']
+    return scan['header']['context'], scan['complete'], scan['count'], scan['conclusion']
 
 
 class OutFile:
@@ -211,8 +219,8 @@ class OutFile:
 
     def commit(self, records, state, stop_reason, skipped=(), notes=(), ending=None):
         """Append one page and its marker, fsynced; records whose id is already saved are left out. Records are flat:
-        a nested replies tree is refused (each comment is its own record with parent_id). ending names how the
-        source ended (exhausted, window_reached) on a page whose completion waits for the reading's verdict."""
+        a nested replies tree is refused (each comment is its own record with parent_id). ending ({stop, sent})
+        names how the source ended on a page whose completion waits for the reading's result."""
         page, new = [], set()
         for record in records:
             if 'replies' in record:
@@ -246,12 +254,12 @@ class OutFile:
         self.count += len(page)
         self.state, self.complete, self.ending = state, stop_reason in COMPLETE, ending
 
-    def conclude(self, stop_reason, verdict):
-        """Mark the file complete, as an empty page, with the verdict its reading ended in when there is one ({code,
-        message, fix, reason, window}: empty, not visible, a window the listing did not reach) so rerunning the command
-        repeats it. One line: a torn one leaves the file incomplete, and the rerun reads and judges again."""
+    def conclude(self, stop_reason, verdict, window):
+        """Mark the file complete, as an empty page, with the result its reading ended in — the verdict when there is
+        one ({code, message, fix, reason}: empty, not visible, a window the listing did not reach) and the window — so
+        rerunning the command repeats it. One line: a torn one leaves the page that says how the source ended."""
         marker = {'kind': 'page', 'state': self.state, 'ids': [], 'n': 0, 'stop_reason': stop_reason,
-                  'verdict': verdict}
+                  'verdict': verdict, 'window': window}
         try:
             self.stream.write(_line(marker))
             self.stream.flush()

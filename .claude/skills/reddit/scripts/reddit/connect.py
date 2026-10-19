@@ -93,7 +93,7 @@ def run(options, *, command, target, identity, reader, window=None, bound=True):
 def _settled_file(path, context):
     """Decide a --out file from the file alone, before any request: a foreign or older file is refused, a complete
     one reads nothing. Returns the reading of a complete file, else None (read on)."""
-    saved, complete, count, verdict = peek(path)
+    saved, complete, count, conclusion = peek(path)
     if saved is None:
         return None
     if {k: v for k, v in saved.items() if k != 'reddit_account'} != {k: v for k, v in context.items()
@@ -101,12 +101,13 @@ def _settled_file(path, context):
         raise RedditError(2, 'The --out file belongs to another command, target, order, window or account.',
                           'Use a new --out path, or rerun the command that started this file.')
     if complete:
-        reading = {'results': [], 'stop_reason': 'exhausted', 'already_complete': True, 'count': count,
+        reading = {'results': [], 'stop_reason': conclusion['stop_reason'], 'already_complete': True, 'count': count,
                    'observed': saved.get('reddit_account')}
+        verdict = conclusion['verdict']
         if verdict:
             reading['failure'] = RedditError(verdict['code'], verdict['message'], verdict['fix'], verdict.get('reason'))
-            if verdict.get('window'):
-                reading['window'] = verdict['window']
+        if conclusion['window']:
+            reading['window'] = conclusion['window']
         return reading
     return None
 
@@ -134,11 +135,11 @@ def _read(connection, options, command, target, identity, reader, out_path):
                 failure = reading['failure'] = RedditError(7, 'Nothing fell inside the requested range.',
                                                            'Try another target, order or period.')
             if ending and failure is None:
-                out.conclude(ending, None)
+                out.conclude(ending, None, reading.get('window'))
             elif ending and isinstance(failure, RedditError) and failure.code in (7, 8, 9) \
                     and failure.reason != 'karma_unchecked':  # a judgment the rerun repeats; any other failure, it redoes
                 out.conclude(ending, {'code': failure.code, 'message': failure.message, 'fix': failure.fix,
-                                      'reason': failure.reason, 'window': reading.get('window')})
+                                      'reason': failure.reason}, reading.get('window'))
             reading['count'] = out.count
             reading['continuable'] = out.state is not None and not out.complete
             stopped = out.complete or isinstance(failure, RedditError) and failure.code in (4, 5, 9)
@@ -222,6 +223,7 @@ def read_pages(connection, options, identity, state, out, *, request, command, t
         start.pop(key, None)
 
     received = []
+    earlier = bool(start.get('seen') or start.get('cursor') or (out is not None and out.ids))
 
     def fetch(cursor):
         records, after = connection.network().listing(request(cursor))
@@ -231,28 +233,33 @@ def read_pages(connection, options, identity, state, out, *, request, command, t
     ending = []
 
     def commit(records, page_state, reason, skipped):
-        final = reason in COMPLETE  # the file is marked complete with its verdict once the reading is judged (_read)
+        final = reason in COMPLETE  # the file is marked complete with its result once the reading is judged (_read)
         if final:
             ending.append(reason)
         out.commit(records, {**page_state, 'window': window.state(), **(extra or {})} if page_state else None,
-                   None if final else reason, skipped, window.report(), ending=reason if final else None)
+                   None if final else reason, skipped, window.report(),
+                   ending={'stop': reason, 'sent': earlier or any(received)} if final else None)
 
     if out is not None:
         start.update(seen=sorted(out.ids, key=str), pending=[])
     limit = options.get('limit') or (None if out is not None else DISPLAY)
     if out is not None and options.get('limit') is not None:
         if out.count >= options['limit'] and not out.ending:
-            return {'results': [], 'stop_reason': 'limit_reached', 'words': _words(identity, words)}
+            reading = {'results': [], 'stop_reason': 'limit_reached', 'words': _words(identity, words)}
+            if window.active:
+                reading['window'] = window.describe()
+            return reading
         limit = max(limit - out.count, 0)
     closes = window.closes if window.active and window.bounds['start'] is not None else None
-    if out is not None and out.ending and out.state is None:  # the listing ended; only the verdict line was lost
-        ending.append(out.ending)
-        result = {'results': [], 'stop_reason': out.ending, 'failure': None, 'state': None}
+    if out is not None and out.ending and out.state is None:  # the listing ended; only the result line was lost
+        ending.append(out.ending['stop'])
+        earlier = out.ending['sent']
+        result = {'results': [], 'stop_reason': out.ending['stop'], 'failure': None, 'state': None}
     else:
         result = paginate(fetch, limit=limit, state=start, keep=window.keep, closes=closes,
                           commit=commit if out is not None else None, whole_pages=out is not None)
     stop, failure = result['stop_reason'], result['failure']
-    if stop == 'exhausted' and not any(received) and not start.get('seen') and not start.get('cursor'):
+    if stop == 'exhausted' and not earlier and not any(received):
         failure = RedditError(7, 'Reddit returned nothing here.', 'Try another target, order or period.')
     elif stop == 'exhausted' and window.bounds['start'] is not None:
         failure = RedditError(8, 'The listing ended before the window\'s start: Reddit had no older posts to show '

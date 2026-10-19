@@ -53,7 +53,7 @@ def test_page_commit_and_tail_replay(tmp_path):
     kept = lines(path)
     assert [r.get('id') for r in kept] == [None, 't3_a', 't3_b', None, 't3_c', None]
     assert kept[3] == {'kind': 'page', 'state': {'after': 't3_b'}, 'ids': ['t3_a', 't3_b'], 'n': 2, 'stop_reason': None}
-    assert collection.peek(path) == (X, True, 3, None)
+    assert collection.peek(path) == (X, True, 3, {'stop_reason': 'exhausted', 'verdict': None, 'window': None})
 
 
 @pytest.mark.parametrize('content', [

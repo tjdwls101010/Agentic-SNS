@@ -3,6 +3,8 @@ thread from the generation its file committed, even after the snapshot is gone),
 import json
 import shutil
 
+import pytest
+
 from conftest import VIEWER, run_cli
 from test_cli_thread import PERMALINK, more, pair, t1, things
 
@@ -243,8 +245,57 @@ def test_a_damaged_ending_is_an_integrity_failure(reddit, tmp_path):
     reddit.me().json('/r/example/new.json', listing([post('a')]))
     run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--out', str(out))
     rows = out.read_text().splitlines()[:-1]  # the completion line lost
-    assert json.loads(rows[-1]).get('ending') == 'exhausted'
-    for bad in ('not-an-ending', 3, True, {}, []):
+    assert json.loads(rows[-1]).get('ending') == {'stop': 'exhausted', 'sent': True}
+    for bad in ('exhausted', 3, True, {}, [], {'stop': 'limit_reached', 'sent': True}, {'stop': 'exhausted', 'sent': 1}):
         out.write_text('\n'.join(rows[:-1] + [json.dumps({**json.loads(rows[-1]), 'ending': bad})]) + '\n')
         code, text, _ = run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--out', str(out))
         assert code == 2 and 'integrity' in text, bad
+
+
+def _dated(identity, when):
+    from test_cli_lists import epoch
+    return {'kind': 't3', 'data': {**post(identity)['data'], 'created_utc': epoch(when)}}
+
+
+# Each scenario: the pages Reddit serves (in order) and the options; the property is the one the file exists for —
+# rerunning the same command answers as the first run did, whatever is left of its last line.
+RERUN = {
+    'empty-listing': ([listing([])], []),
+    'nothing-inside-listing-ended': ([listing([_dated('a', '2025-12-31T23:55:00')])], ['--since', '2026-01-01']),
+    'nothing-inside-window-closed': ([listing([_dated('a', '2025-06-01T00:00:00')], after='t3_a')],
+                                     ['--since', '2026-01-01']),
+    'inside-listing-ended': ([listing([_dated('a', '2026-03-01T00:00:00')], after='t3_a'),
+                              listing([_dated('b', '2026-02-01T00:00:00')])], ['--since', '2026-01-01']),
+    'inside-window-closed': ([listing([_dated('a', '2026-03-01T00:00:00'), _dated('b', '2025-06-01T00:00:00')],
+                                      after='t3_b')], ['--since', '2026-01-01']),
+    'limit-with-more-left': ([listing([_dated('a', '2026-03-01T00:00:00')], after='t3_a')],
+                             ['--since', '2026-01-01', '--limit', '1']),
+}
+
+
+def _answer(text):
+    envelope = json.loads(text)
+    return envelope.get('error'), envelope.get('reason'), (envelope.get('window') or {}).get('coverage')
+
+
+@pytest.mark.parametrize('cut', ['intact', 'completion-torn'])
+@pytest.mark.parametrize('name', sorted(RERUN))
+def test_a_rerun_answers_as_the_first_run_did(reddit, tmp_path, name, cut):
+    pages, extra = RERUN[name]
+    out = tmp_path / 'sub.ndjson'
+    args = ['sub', 'r/example', '--sort', 'new', *extra, '--out', str(out), '--json']
+
+    def serve():
+        reddit.me().json('/r/example/new.json', pages[0], query={'limit': '100'})
+        for page, before in zip(pages[1:], pages):
+            reddit.json('/r/example/new.json', page, query={'after': before['data']['after']})
+
+    serve()
+    code, text, _ = run_cli(reddit, *args)
+    first = (code, *_answer(text))
+    if cut == 'completion-torn' and json.loads(out.read_text().splitlines()[-1]).get('kind') == 'page':
+        out.write_bytes(out.read_bytes()[:-10])
+    for _ in range(2):  # the run that recovers, and the one after it
+        serve()
+        code, text, _ = run_cli(reddit, *args)
+        assert (code, *_answer(text)) == first
