@@ -124,7 +124,8 @@ def _replies(connection, options, start, out):
         for record in records:
             if _has_more(record, records):
                 record['replies_handle'] = handles.save(context, _branch(record, start['sort']))
-        return records, {'has_next_page': bool(page.cursor), 'end_cursor': page.cursor}, bool(records)
+        return (records, {'has_next_page': bool(page.cursor), 'end_cursor': page.cursor},
+                bool(records) or bool(page.unreadable))
 
     def commit(records, page_state, reason, skipped):
         out.commit(records, page_state, reason, skipped)

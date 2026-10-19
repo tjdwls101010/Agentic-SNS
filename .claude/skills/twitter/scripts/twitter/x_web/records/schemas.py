@@ -92,7 +92,7 @@ TREND = {
         'description': 'string|null — X\'s line under it (often a post count, rounded)',
         'rank': 'integer|null — its place on the tab',
         'query': 'string|null — the words search takes to read it (search "<query>"); an event\'s is its title',
-        'url': 'string|null — an event\'s x.com page',
+        'url': 'string|null — an https link X gave for it (usually none: X links trends and events inside its app)',
     },
 }
 

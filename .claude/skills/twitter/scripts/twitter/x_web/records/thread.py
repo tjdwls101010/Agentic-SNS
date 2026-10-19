@@ -27,11 +27,18 @@ class PostPage:
     branches: dict = field(default_factory=dict)   # reply id → ShowMore cursor of its collapsed branch
     hidden_cursor: str | None = None   # the cursor that reads the replies X hid
     other: int = 0
+    unreadable: int = 0                # post entries this skill could not turn into a record
+
+
+def _result(node):
+    """An entry's tweet result; an empty tweet_results is how X sends a deleted post (an unavailable record)."""
+    results = node.get('tweet_results') if isinstance(node.get('tweet_results'), dict) else {}
+    return results.get('result') or {}
 
 
 def post_page(instructions, post_id, continuing=False):
     page = walk(instructions)
-    records, found, reported, other = [], False, None, page.other
+    records, found, reported, other, unreadable = [], False, None, page.other, 0
     positions = {}   # module → posts seen in it so far
     for entry in page.entries:
         if entry.kind != 'post':
@@ -40,9 +47,9 @@ def post_page(instructions, post_id, continuing=False):
         if entry.module and not conversation:
             other += 1
             continue
-        record = post_record(entry.node.get('tweet_results', {}).get('result'), entry_id=entry.entry_id)
+        record = post_record(_result(entry.node), entry_id=entry.entry_id)
         if record is None:
-            other += 1
+            unreadable += 1
             continue
         if record.get('id') == post_id and not conversation:
             if record.get('unavailable'):
@@ -73,6 +80,10 @@ def post_page(instructions, post_id, continuing=False):
                 'unavailable': sum(1 for r in replies if r.get('unavailable'))}
     if found:
         coverage['reported'] = reported
+    elif unreadable and not continuing:
+        raise TwitterError(6, 'X\'s answer to TweetDetail is not where or what this skill expects.',
+                           'X changed this read; the skill needs an update. Tell the user which read failed; other '
+                           'commands may work.', reason='shape_changed')
     cursor = page.bottom if page.bottom and not page.terminated else None
     return PostPage(records=records, cursor=cursor, coverage=coverage, branches=branches,
-                    hidden_cursor=page.hidden[0] if page.hidden else None, other=other)
+                    hidden_cursor=page.hidden[0] if page.hidden else None, other=other, unreadable=unreadable)

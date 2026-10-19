@@ -10,6 +10,16 @@ END = {'end': True}  # a local marker meaning "nothing more to request"; never s
 _RETRY = 'Retry later with the more: command; this is not fixed by changing options.'
 
 
+
+def record_key(record):
+    """What a record is known by when telling repeats apart: its id, else its username, else its url (a record X sent
+    without an id can still be named)."""
+    if record.get('id') is not None:
+        return record['id']
+    if record.get('username'):
+        return '@' + record['username'].lower()
+    return record.get('url')
+
 def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None, commit=None, whole_pages=False,
              max_pages=None, idle_limit=2):
     """Read pages until the limit, the end, a boundary or a failure.
@@ -71,7 +81,7 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
         served += 1
         page, page_skipped, fresh = [], [], 0
         for record in records:
-            identity = record.get('id')
+            identity = record_key(record)
             if fetched and identity is not None:
                 if identity in seen:
                     continue

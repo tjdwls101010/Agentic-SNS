@@ -27,12 +27,18 @@ def trends(options):
         if not timeline_id:
             tabs, default, first = client.explore()
             if TABS[tab] == default:
+                if first.unreadable and not first.records:
+                    raise TwitterError(6, 'X\'s answer to ExplorePage is not where or what this skill expects.',
+                                       'Tell the user the X reader needs an update.', reason='shape_changed')
                 first = _trends_only(first)
                 reading = {'results': first.records, 'stop_reason': 'not_paginable', 'coverage': []}
                 if first.promoted:
                     reading['coverage'].append(f'{first.promoted} promoted entries (ads) left out')
                 if first.other:
                     reading['coverage'].append(f'{first.other} other items X mixed in were left out')
+                if first.unreadable:
+                    reading['coverage'].append(f'{first.unreadable} entries this skill could not read were left out '
+                                               '(X may have changed its answer)')
                 return reading
             timeline_id = tabs.get(TABS[tab])
             if not timeline_id:

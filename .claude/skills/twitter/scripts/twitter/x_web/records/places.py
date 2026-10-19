@@ -148,7 +148,7 @@ def notification_record(node):
 # What X answers for a list, community or space that does not exist (measured 2026-10-19): a stub with these keys only.
 # Anything else that does not read as one is X having changed the answer, not a missing target.
 def missing_list(node):
-    return isinstance(node, dict) and set(node) <= {'id', 'id_str', 'facepile_urls'}
+    return isinstance(node, dict) and set(node) == {'id', 'id_str', 'facepile_urls'}
 
 
 def missing_community(node):
@@ -156,4 +156,4 @@ def missing_community(node):
 
 
 def missing_space(node):
-    return isinstance(node, dict) and set(node) <= {'is_subscribed'}
+    return isinstance(node, dict) and set(node) == {'is_subscribed'}

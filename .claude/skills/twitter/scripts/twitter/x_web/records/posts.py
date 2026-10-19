@@ -222,8 +222,8 @@ def post_record(node, entry_id=None, _depth=0):
     None (the caller counts it)."""
     if not isinstance(node, dict) or _depth > MAX_DEPTH:
         return None
-    if node.get('__typename') == 'TweetTombstone':
-        return _tombstone(node, entry_id)
+    if node.get('__typename') in ('TweetTombstone', 'TweetUnavailable') or not node:
+        return _tombstone(node, entry_id)  # an empty result is how X sends a deleted post (seen in a capture)
     limited = [a.get('action') for a in _dict(node.get('limitedActionResults')).get('limited_actions') or []
                if isinstance(a, dict)]
     restricted = node.get('__typename') == 'TweetWithVisibilityResults'

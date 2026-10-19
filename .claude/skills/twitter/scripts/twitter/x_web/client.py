@@ -545,11 +545,15 @@ class Client:
     def posts(self, ids):
         """Several posts by id in one request, without replies; ids X did not return are unresolved."""
         root, warnings = self.query('TweetResultsByRestIds', {'tweetIds': list(ids)})
-        records = []
+        records, unreadable = [], 0
         for node in root if isinstance(root, list) else []:
             record = post_record(node) if isinstance(node, dict) else None
-            if record is not None and not record.get('unavailable'):
+            if record is None:
+                unreadable += 1
+            elif not record.get('unavailable'):
                 records.append(record)
+        if unreadable and not records:
+            raise _changed('TweetResultsByRestIds')
         self.confirm()
         return records
 

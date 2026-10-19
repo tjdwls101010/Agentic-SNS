@@ -388,3 +388,33 @@ def test_a_single_card_or_the_trends_are_not_collected_into_a_file(browser, data
                  ['trends']):
         code, out, _ = run_cli(browser, *args, '--out', str(tmp_path / 'x.ndjson'))
         assert code == 2 and browser.calls() == [], (args, out)
+
+
+# --- P4 re-review -------------------------------------------------------------------------------------------------
+
+def test_the_for_you_tab_with_only_unreadable_trends_is_a_shape_change(browser, data_dir):
+    broken = {'entryId': 'trend-1', 'content': {'itemContent': {'itemType': 'TimelineTweet', 'tweet_results': {'result': {'__typename': 'Tweet'}}}}}
+    known_tab(browser, data_dir).respond('query', explore([broken]))
+    code, out, _ = run_cli(browser, 'trends', '--tab', 'foryou')
+    assert code == 6, out
+
+
+def test_an_empty_or_unavailable_post_result_is_an_unavailable_post_not_a_shape_change(browser, data_dir):
+    items = [{'entryId': 'tweet-61', 'content': {'itemContent': {'itemType': 'TimelineTweet', 'tweet_results': {}}}},
+             {'entryId': 'tweet-62', 'content': {'itemContent': {'itemType': 'TimelineTweet',
+                                                                 'tweet_results': {'result': {'__typename': 'TweetUnavailable'}}}}}]
+    page = query_result({'data': {'user': {'result': {'timeline': {'timeline': {'instructions': entries(items)}}}}}}, headers=RATE)
+    known_tab(browser, data_dir).respond('query', page)
+    code, out, _ = run_cli(browser, 'me', 'likes', '--json')
+    assert code == 0, out
+    assert [(r['id'], r['unavailable']) for r in json.loads(out)['results']] == [('61', True), ('62', True)]
+
+
+def test_a_card_stub_is_only_the_measured_one(browser, data_dir):
+    for target, body in (('1500000000000000001', {'data': {'list': {}}}), ('1500000000000000001', {'data': {'list': {'id_str': '1'}}})):
+        known_tab(browser, data_dir).respond('query', query_result(body, headers=RATE))
+        code, out, _ = run_cli(browser, 'list', target, '--tab', 'about')
+        assert code == 6, out
+    known_tab(browser, data_dir).respond('query', query_result({'data': {'audioSpace': {}}}, headers=RATE))
+    code, out, _ = run_cli(browser, 'about', 'https://x.com/i/spaces/1AbCdEfGhIjKl')
+    assert code == 6, out

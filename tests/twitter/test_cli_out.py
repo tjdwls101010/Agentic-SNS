@@ -74,3 +74,20 @@ def test_a_previous_twitter_skill_file_is_refused_byte_identical(browser, data_d
     out.write_text(old)
     code, text, _ = run_cli(browser, 'feed', '--out', str(out))
     assert code == 2 and out.read_text() == old and browser.calls() == []
+
+
+def test_records_without_an_id_are_not_saved_twice(browser, data_dir, tmp_path):
+    out = tmp_path / 'f.ndjson'
+    nameless = {'__typename': 'User', 'core': {'screen_name': 'no_id_one'}}
+
+    def page(bottom):
+        items = [{'entryId': 'user-x', 'content': {'itemContent': {'itemType': 'TimelineUser', 'user_results': {'result': nameless}}}}]
+        if bottom:
+            items.append({'entryId': 'cursor-bottom-1', 'content': {'cursorType': 'Bottom', 'value': bottom}})
+        return query_result({'data': {'user': {'result': {'timeline': {'timeline': {'instructions': [
+            {'type': 'TimelineAddEntries', 'entries': items}]}}}}}}, headers=RATE)
+    by_name = query_result({'data': {'user': {'result': {**A}}}}, headers=RATE)
+    known_tab(browser, data_dir).respond('query', by_name).respond('query', page('C1')).respond('query', page(None))
+    code, text, _ = run_cli(browser, 'graph', 'author_a', 'followers', '--out', str(out))
+    assert code == 0, text
+    assert [r.get('username') for r in lines(out) if r.get('kind') == 'account'] == ['no_id_one']

@@ -185,7 +185,7 @@ def records_of(page):
     records = []
     for entry in page.entries:
         if entry.kind == 'post':
-            record = post_record(_dict(entry.node.get('tweet_results')).get('result'), entry_id=entry.entry_id)
+            record = post_record(_dict(entry.node.get('tweet_results')).get('result') or {}, entry_id=entry.entry_id)
         elif entry.kind == 'account':
             record = account_record(_dict(entry.node.get('user_results')).get('result'))
         elif entry.kind in ('trend', 'event'):

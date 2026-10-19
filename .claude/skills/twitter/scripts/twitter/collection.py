@@ -11,6 +11,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from twitter.paging import record_key
 from twitter.errors import TwitterError
 
 # Bumped whenever a saved page or the header changes meaning.
@@ -73,7 +74,7 @@ def _scan(data):
             if broken or record.get('ids') != page_ids or record.get('n') != len(page):
                 raise TwitterError(2, 'The --out file failed its integrity check: a page line does not match the '
                                        'records above it.', 'Keep this file as it is and use a new path.')
-            result['ids'].update(i for i in page_ids if i is not None)
+            result['ids'].update(k for k in (record_key(r) for r in page) if k is not None)
             result['skipped'].update(record.get('skipped') or [])
             result['count'] += len(page)
             result['parents'] += sum(1 for r in page if r.get('depth') == 0)
@@ -161,7 +162,7 @@ class OutFile:
         """Append one page and its marker, fsynced; records whose id is already saved are left out."""
         page, new = [], set()
         for record in records:
-            identity = record.get('id')
+            identity = record_key(record)
             if identity is not None and (identity in self.ids or identity in new):
                 continue
             page.append(record)

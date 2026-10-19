@@ -161,3 +161,18 @@ def test_a_handle_from_another_x_account_is_refused(browser, data_dir):
 def test_a_handle_is_a_number(browser, data_dir):
     code, out, _ = run_cli(browser, 'replies', 'abc123')
     assert code == 2 and browser.calls() == []
+
+
+def test_a_post_page_whose_post_cannot_be_read_is_a_shape_change(browser, data_dir):
+    broken = detail([{'entryId': 'tweet-101', 'content': {'itemContent': {'itemType': 'TimelineTweet',
+                                                                          'tweet_results': {'result': {'__typename': 'Tweet'}}}}}])
+    known_tab(browser, data_dir).respond('query', query_result(broken, headers=RATE))
+    code, out, _ = post(browser, '101')
+    assert code == 6, out
+
+
+def test_a_batch_of_unreadable_posts_is_a_shape_change(browser, data_dir):
+    batch = {'data': {'tweetResult': [{'result': {'__typename': 'Tweet'}}, {'result': {'__typename': 'Tweet'}}]}}
+    known_tab(browser, data_dir).respond('query', query_result(batch, headers=RATE))
+    code, out, _ = post(browser, '201', '202')
+    assert code == 6, out
