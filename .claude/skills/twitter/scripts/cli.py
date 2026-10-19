@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date, datetime, time, timedelta
 
-from twitter import listing, maintenance
+from twitter import listing, maintenance, thread
 from twitter.errors import TwitterError
 from twitter.render import render_page, render_summary
 from twitter.results import failure_envelope
@@ -121,6 +121,31 @@ COMMANDS = {
                    'requests: 1 per page of about 20 posts.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
     },
+    'post': {
+        'help': 'Read one post in full with its parent chain and first batch of replies, or several posts by id.',
+        'run': thread.post,
+        'arguments': [(('target',), {'nargs': '+', 'metavar': 'URL', 'help': 'x.com post URL or numeric id; several: those posts only, without replies'}),
+                      (('--sort',), {'choices': ['top', 'recent'], 'default': 'top', 'help': 'Reply order: top (X\'s ranking) or recent (newest first)'}),
+                      (('--limit',), {'type': positive, 'help': 'Reply threads to show from the first batch (each reply with what hangs under it)'}),
+                      (('--chars',), {'type': chars, 'help': 'Characters of each parent and reply to show (default 180; 0 = all); the post itself is always shown in full'}),
+                      'json', 'max_requests'],
+        'epilog': ['The post is shown in full (a long post\'s whole text, an article\'s whole body), after the posts it answers (parent). Its first batch of replies follows, each conversation thread as X shows it: a reply\'s depth is its place in the thread, and "reply to a post not shown" marks where X skipped posts. A reply with more under it ends with replies <handle>, which reads that branch from the reply\'s own page; more: reads the next batch of direct replies; a coverage line names the handle for the replies X hid as probable spam or low quality.',
+                   'top is X\'s ranking, which by X\'s own description puts paid subscribers\' replies higher; recent is newest first and does not include the replies X hid.',
+                   'A community note under a post is context other users added and rated helpful, not the author\'s words. An edited post lists its versions; post <id> opens any of them.',
+                   'Several ids: one request for those posts in full, without replies; ids X did not return are named (unresolved).',
+                   'requests: 1 (the post, its parents and the first replies in one read).'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+    },
+    'replies': {
+        'help': 'Read the next batch of a post\'s replies, the replies X hid, or the replies under one reply, by handle.',
+        'run': thread.replies,
+        'arguments': [(('target',), {'metavar': 'HANDLE', 'help': 'The number after "replies" or in a more: line'}),
+                      (('--limit',), {'type': positive, 'help': 'Replies to show; omitted: one batch, or every batch with --out. With --out it counts replies saved'}),
+                      'chars', 'out', 'json', 'max_requests'],
+        'epilog': ['A handle names a batch: the next batch of a post\'s direct replies, the replies X hid, or every reply one reply\'s own page lists (batch by batch). Running it again reads the same batch again, live; it is not a replay. more: prints the handle of the batch after.',
+                   'requests: 1 per batch of about 30-40 replies.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
+    },
     'doctor': {
         'help': 'Check Aside, the browser tab, login, account protection and X\'s limits; always JSON.',
         'run': maintenance.doctor,
@@ -161,7 +186,7 @@ HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 
 
-READS = ('feed',)
+READS = ('feed', 'post', 'replies')
 
 
 def epilog(name, spec):
@@ -198,11 +223,19 @@ def parser(hidden=False):
 
 def validate(options):
     for key in ('target', 'out'):
-        value = options.get(key)
-        if isinstance(value, str) and any(ord(c) < 32 or ord(c) == 127 for c in value):
-            raise TwitterError(2, f'The {key} contains a line break or another control character.', 'Pass it on one line.')
+        values = options.get(key)
+        for value in values if isinstance(values, list) else [values]:
+            if isinstance(value, str) and any(ord(c) < 32 or ord(c) == 127 for c in value):
+                raise TwitterError(2, f'The {key} contains a line break or another control character.',
+                                   'Pass it on one line.')
     if options.get('since') and options.get('until') and options['since'] > options['until']:
         raise TwitterError(2, '--since must not be later than --until.', 'Swap the two dates.')
+    if options['command'] == 'replies' and not (options['target'].isascii() and options['target'].isdigit()):
+        raise TwitterError(2, 'A replies handle is the number printed after "replies" or in a more: line.',
+                           'Copy the whole replies or more: line.')
+    if options['command'] == 'post' and len(options['target']) > 1 and (options.get('limit') or options['sort'] != 'top'):
+        raise TwitterError(2, 'Several posts are read without replies, so --limit and --sort do not apply.',
+                           'Drop them, or read one post.')
     if options.get('after') and options.get('out'):
         raise TwitterError(2, '--after and --out cannot be combined; --out resumes its own file.',
                            'Rerun the same command with the same --out path.')

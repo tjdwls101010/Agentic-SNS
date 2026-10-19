@@ -21,7 +21,7 @@ from urllib.parse import urlsplit
 
 from twitter.errors import TwitterError, diagnostic
 from twitter.x_web import classify
-from twitter.x_web.records import list_page
+from twitter.x_web.records import list_page, post_page, post_record
 
 _SNIPPETS = Path(__file__).with_name('snippets')
 _KIT = (_SNIPPETS / 'kit.js').read_text(encoding='utf-8').strip()
@@ -435,3 +435,27 @@ class Client:
     def feed(self, variant, cursor):
         """One page of the home feed: for you (HomeTimeline) or following (HomeLatestTimeline)."""
         return self.timeline('HomeLatestTimeline' if variant == 'following' else 'HomeTimeline', {}, cursor)
+
+    def post_page(self, post_id, *, sort, cursor=None):
+        """A post read: the post, its parents and a batch of its replies (first page), or a further batch by cursor —
+        the next direct replies, or the replies X hid (one request)."""
+        gone = TwitterError(9, 'This post is unavailable: deleted, withheld, protected or not visible to this account.',
+                            'Tell the user; retrying will not change it.', reason='unavailable')
+        variables = {'focalTweetId': post_id, 'rankingMode': 'Recency' if sort == 'recent' else 'Relevance'}
+        if cursor:
+            variables['cursor'] = cursor
+        root, warnings = self.query('TweetDetail', variables, missing=gone)
+        page = post_page(root, post_id, continuing=bool(cursor))
+        self.confirm()
+        return page
+
+    def posts(self, ids):
+        """Several posts by id in one request, without replies; ids X did not return are unresolved."""
+        root, warnings = self.query('TweetResultsByRestIds', {'tweetIds': list(ids)})
+        records = []
+        for node in root if isinstance(root, list) else []:
+            record = post_record(node) if isinstance(node, dict) else None
+            if record is not None and not record.get('unavailable'):
+                records.append(record)
+        self.confirm()
+        return records
