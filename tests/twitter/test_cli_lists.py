@@ -73,3 +73,37 @@ def test_empty_bookmarks_are_empty(browser, data_dir):
                                                                headers=RATE))
     code, out, _ = run_cli(browser, 'me', 'bookmarks')
     assert code == 7 and json.loads(out)['error'] == 'empty'
+
+
+def retweeters(nodes, bottom='CUR'):
+    items = [{'entryId': f'user-{n["rest_id"]}', 'content': {'itemContent': {'itemType': 'TimelineUser',
+                                                                             'user_results': {'result': n}}}} for n in nodes]
+    if bottom:
+        items.append({'entryId': 'cursor-bottom-1', 'content': {'cursorType': 'Bottom', 'value': bottom}})
+    return query_result({'data': {'retweeters_timeline': {'timeline': {'instructions': [
+        {'type': 'TimelineAddEntries', 'entries': items}]}}}}, headers=RATE)
+
+
+def test_reposts_reads_the_accounts_that_reposted_a_post(browser, data_dir):
+    known_tab(browser, data_dir).respond('query', retweeters([account('2000000001', 'fan_one')]))
+    code, out, _ = run_cli(browser, 'reposts', 'https://x.com/author_a/status/1850000000000000009')
+    assert code == 0, out
+    assert out.splitlines()[0].startswith('reposts · 1 shown') and '[a1] @fan_one' in out
+    [call] = [c['args'] for c in browser.calls() if c['op'] == 'query']
+    assert call['name'] == 'Retweeters' and call['variables']['tweetId'] == '1850000000000000009'
+    assert call['chunk_hint'] == 'bundle.TweetActivity'  # a lazily loaded operation, loaded from its chunk by hint
+
+
+def test_similar_accounts_are_xs_recommendation_for_that_profile(browser, data_dir):
+    module = {'entryId': 'similarto-1', 'content': {'entryType': 'TimelineTimelineModule', 'items': [
+        {'entryId': 'similarto-1-user-3', 'item': {'itemContent': {'itemType': 'TimelineUser',
+                                                                   'user_results': {'result': account('3', 'alike_one')}}}}]}}
+    connect = query_result({'data': {'connect_tab_timeline': {'timeline': {'instructions': [
+        {'type': 'TimelineAddEntries', 'entries': [module]}, {'type': 'TimelineTerminateTimeline', 'direction': 'Bottom'}]}}}},
+        headers=RATE)
+    known_tab(browser, data_dir).respond('query', by_name()).respond('query', connect)
+    code, out, _ = run_cli(browser, 'graph', 'author_a', 'similar')
+    assert code == 0, out
+    assert '[a1] @alike_one' in out and 'recommend' in out
+    call = [c['args'] for c in browser.calls() if c['op'] == 'query'][-1]
+    assert call['name'] == 'ConnectTabTimeline' and json.loads(call['variables']['context']) == {'contextualUserId': '1000000001'}

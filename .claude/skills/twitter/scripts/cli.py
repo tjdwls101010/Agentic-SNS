@@ -144,11 +144,11 @@ COMMANDS = {
         'exits': (0, 2, 3, 4, 5, 6, 7, 9, 10),
     },
     'graph': {
-        'help': 'Read the accounts a profile follows, or that follow it (all, verified, or ones you know).',
+        'help': 'Read the accounts a profile follows or that follow it, or the accounts X recommends as similar.',
         'run': listing.graph,
         'arguments': [(('target',), {'help': 'X @handle or profile URL'}),
-                      (('relation',), {'choices': ['following', 'followers', 'verified', 'known'], 'help': 'following, followers, verified (followers with a paid check) or known (its followers you follow)'})] + list(LIST),
-        'epilog': ['A follow records what an account did, not friendship or agreement. Counts on the card (about) are what X reports; the list is what X serves, page by page, and it can stop early: three pages in a row with no new account end the read (stopped=query_failure with that reason).',
+                      (('relation',), {'choices': ['following', 'followers', 'verified', 'known', 'similar'], 'help': 'following, followers, verified (followers with a paid check), known (its followers you follow) or similar (X\'s recommendation)'})] + list(LIST),
+        'epilog': ['A follow records what an account did, not friendship or agreement; similar is X\'s recommendation of accounts like this one, not a relationship of any kind. Counts on the card (about) are what X reports; the list is what X serves, page by page, and it can stop early: three pages in a row with no new account end the read (stopped=query_failure with that reason).',
                    'Without --limit or --out it reads one page; more: continues.',
                    'requests: 1 to find the account, then 1 per page of about 20 accounts.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
@@ -161,6 +161,15 @@ COMMANDS = {
                    'Without --limit, a window or --out it reads one page; more: continues.',
                    'requests: 1 per page of about 20 posts.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
+    },
+    'reposts': {
+        'help': 'Read the accounts that reposted one post.',
+        'run': listing.reposts,
+        'arguments': [(('target',), {'metavar': 'URL', 'help': 'x.com post URL or numeric id'})] + list(LIST),
+        'epilog': ['A repost is an account sharing the post as it is, which records the act, not agreement; quotes (the posts that add words) are read with quotes. The list is what X serves, page by page; three pages in a row with no new account end the read.',
+                   'Without --limit or --out it reads one page; more: continues.',
+                   'requests: 1 per page of about 20 accounts.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
     },
     'post': {
         'help': 'Read one post in full with its parent chain and first batch of replies, or several posts by id.',
@@ -253,7 +262,7 @@ HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 
 
-READS = ('feed', 'profile', 'about', 'graph', 'me', 'post', 'replies', 'search', 'quotes')
+READS = ('feed', 'profile', 'about', 'graph', 'me', 'post', 'replies', 'reposts', 'search', 'quotes')
 
 
 def epilog(name, spec):

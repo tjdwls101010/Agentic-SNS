@@ -1,9 +1,11 @@
 """feed, profile, graph, me, list and community posts: lists read by cursor in the server's order, with each
 surface's date-window policy (twitter.window).
 """
+import json
+
 from twitter import connect
 from twitter.errors import TwitterError
-from twitter.x_web import parse_account
+from twitter.x_web import parse_account, parse_post
 
 # Both home feeds are X's choice of order: the following feed is not newest first (P2 R8), so neither closes a window.
 FEEDS = {'foryou': ('foryou', 'unordered'), 'following': ('following', 'unordered')}
@@ -64,7 +66,7 @@ def profile(options):
 
 
 RELATIONS = {'following': 'Following', 'followers': 'Followers', 'verified': 'BlueVerifiedFollowers',
-             'known': 'FollowersYouKnow'}
+             'known': 'FollowersYouKnow', 'similar': 'ConnectTabTimeline'}
 # 성진: X의 계정 목록은 커서를 주면서 빈 쪽을 이어 보낼 때가 있다(현행 지식) — 새것 없는 쪽 3번 연속이면 멈춘다
 ACCOUNT_IDLE_PAGES = 3
 
@@ -78,11 +80,30 @@ def graph(options):
         client = connection.client
         saved = (state or {}) if out is None else (out.state or {})
         user_id = saved.get('user_id') or client.user(target.handle)['id']
-        return connect.read_list(options, identity, state, out, order=None, command='graph', target=target.url,
-                     extra={'user_id': user_id}, words=[relation], idle_limit=ACCOUNT_IDLE_PAGES,
-                     fetch=lambda cursor: client.timeline(RELATIONS[relation], {'userId': user_id}, cursor))
+        # the app asks for similar accounts with the profile as context (P2 R5), every other relation by user id
+        variables = ({'context': json.dumps({'contextualUserId': user_id})} if relation == 'similar'
+                     else {'userId': user_id})
+        reading = connect.read_list(options, identity, state, out, order=None, command='graph', target=target.url,
+                                    extra={'user_id': user_id}, words=[relation], idle_limit=ACCOUNT_IDLE_PAGES,
+                                    fetch=lambda cursor: client.timeline(RELATIONS[relation], variables, cursor))
+        if relation == 'similar':
+            reading['coverage'] = ['X recommends these as similar to this account; they are not its relationships',
+                                   *(reading.get('coverage') or [])]
+        return reading
 
     return connect.run(options, command='graph', target=target.url, identity=identity, reader=read)
+
+
+def reposts(options):
+    target = parse_post(options['target'])
+
+    def read(connection, state, out):
+        client = connection.client
+        return connect.read_list(options, {}, state, out, order=None, command='reposts', target=target.url,
+                                 idle_limit=ACCOUNT_IDLE_PAGES,
+                                 fetch=lambda cursor: client.timeline('Retweeters', {'tweetId': target.post_id}, cursor))
+
+    return connect.run(options, command='reposts', target=target.url, identity={}, reader=read)
 
 
 def me(options):
