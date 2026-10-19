@@ -41,6 +41,7 @@ class Page:
     cleared: bool = False
     promoted: int = 0
     other: int = 0
+    unreadable: int = 0     # entries of a known kind this skill could not turn into a record (a shape change)
 
 
 @dataclass
@@ -51,6 +52,7 @@ class ListPage:
     promoted: int = 0
     other: int = 0
     terminated: bool = False
+    unreadable: int = 0
 
 
 def _dict(value):
@@ -172,7 +174,8 @@ def trend_record(node, identity, event=False):
     return {'id': identity, 'kind': 'event' if event else 'trend', 'name': name, 'rank': rank,
             'context': metadata.get('domainContext') or metadata.get('domain_context'),
             'description': metadata.get('metaDescription') or metadata.get('meta_description') or node.get('subtitle'),
-            'query': query or (name if not event and name else None),
+            # an event's own link is a twitter:// deep link (P4 review): its title is the search that reads it
+            'query': query or (name or None),
             'url': url if url and url.startswith('https://') else None}
 
 
@@ -195,8 +198,9 @@ def records_of(page):
             record = community_record(_dict(entry.node.get('community_results')).get('result'))
         else:
             continue
-        if record is None or (not record.get('id') and not record.get('unavailable')):
-            page.other += 1  # nothing to name it by: counted, not shown
+        if record is None or not (record.get('id') or record.get('username') or record.get('url') or
+                                  record.get('unavailable')):
+            page.unreadable += 1  # nothing to name it by: counted, not shown
             continue
         record['unit'] = entry.module or entry.entry_id
         if entry.pinned and entry.kind == 'post':
@@ -215,4 +219,4 @@ def list_page(instructions):
     page = walk(instructions)
     records = records_of(page)
     return ListPage(records=records, cursor=page.bottom, has_next=bool(page.bottom) and not page.terminated,
-                    promoted=page.promoted, other=page.other, terminated=page.terminated)
+                    promoted=page.promoted, other=page.other, terminated=page.terminated, unreadable=page.unreadable)

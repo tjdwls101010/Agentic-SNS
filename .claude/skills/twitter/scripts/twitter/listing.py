@@ -122,7 +122,7 @@ def community(options):
     if not options.get('target'):
         return _discovery(options)
     target = parse_community(options['target'])
-    tab, sort = options['tab'], options['sort']
+    tab, sort = options['tab'] or 'posts', options['sort'] or 'top'
     identity = {'tab': tab, 'sort': sort if tab == 'posts' else None}
 
     def read(connection, state, out):
@@ -133,7 +133,7 @@ def community(options):
         if tab == 'posts':
             variables['rankingMode'] = 'Recency' if sort == 'recent' else 'Relevance'
         return connect.read_list(options, identity, state, out, order='unordered', command='community',
-                                 target=target.url, words=['--tab', tab] + (['--sort', sort] if tab == 'posts' else []),
+                                 target=target.url,
                                  fetch=lambda cursor: client.timeline(COMMUNITY_TABS[tab], variables, cursor))
 
     return connect.run(options, command='community', target=target.url, identity=identity, reader=read)

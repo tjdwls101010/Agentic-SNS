@@ -242,15 +242,18 @@ def read_list(options, identity, state, out, *, order, fetch, command, target, e
     for key in (extra or {}):
         start.pop(key, None)
     natural = start.pop('natural', None) or {}
-    skipped = {'promoted': 0, 'other': 0}
+    skipped = {'promoted': 0, 'other': 0, 'unreadable': 0}
 
     def fetch_page(cursor):
         page = fetch(cursor)
         skipped['promoted'] += page.promoted
         skipped['other'] += page.other
+        skipped['unreadable'] += page.unreadable
         if getattr(page, 'stop', None):
             natural['stop'] = page.stop
-        return page.records, {'has_next_page': page.has_next, 'end_cursor': page.cursor}, bool(page.records)
+        # a page whose entries could not be read is X having changed the answer (paging raises it), never "empty"
+        return (page.records, {'has_next_page': page.has_next, 'end_cursor': page.cursor},
+                bool(page.records) or bool(page.unreadable))
 
     def commit(records, page_state, reason, page_skipped):
         out.commit(records, {**page_state, 'window': window.state(), 'natural': dict(natural), **(extra or {})}
@@ -277,6 +280,9 @@ def read_list(options, identity, state, out, *, order, fetch, command, target, e
         coverage.append(f'{skipped["promoted"]} promoted entries (ads) left out')
     if skipped['other']:
         coverage.append(f'{skipped["other"]} other items X mixed in were left out')
+    if skipped['unreadable']:
+        coverage.append(f'{skipped["unreadable"]} entries this skill could not read were left out (X may have changed '
+                        'its answer)')
     reading = {'results': [] if out is not None else result['results'], 'stop_reason': stop,
                'failure': result['failure'], 'coverage': coverage, 'words': list_words(identity, words),
                'partial': bool(result['results'])}

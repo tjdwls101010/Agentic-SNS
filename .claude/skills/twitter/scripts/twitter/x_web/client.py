@@ -21,8 +21,8 @@ from urllib.parse import urlsplit
 
 from twitter.errors import TwitterError, diagnostic
 from twitter.x_web import classify
-from twitter.x_web.records import (account_record, community_record, list_page, list_record, post_page, post_record,
-                                   space_record)
+from twitter.x_web.records import (account_record, community_record, list_page, list_record, missing_community,
+                                   missing_list, missing_space, post_page, post_record, space_record)
 
 _SNIPPETS = Path(__file__).with_name('snippets')
 _KIT = (_SNIPPETS / 'kit.js').read_text(encoding='utf-8').strip()
@@ -56,6 +56,11 @@ def snippet(name):
 
 def _int(value, default=0):
     return value if type(value) is int and value >= 0 else default
+
+
+def _changed(operation):
+    return TwitterError(6, f'X\'s answer to {operation} is not where or what this skill expects.', classify.UPDATE_FIX,
+                        reason='shape_changed')
 
 
 def _host(url):
@@ -574,7 +579,7 @@ class Client:
         root, warnings = self.query('ListByRestId', {'listId': list_id}, missing=gone)
         record = list_record(root)
         if record is None:
-            raise gone
+            raise gone if missing_list(root) else _changed('ListByRestId')
         self.confirm()
         return record
 
@@ -585,7 +590,7 @@ class Client:
         root, warnings = self.query('CommunityByRestId', {'communityId': community_id}, missing=gone)
         record = community_record(root)
         if record is None:
-            raise gone
+            raise gone if missing_community(root) else _changed('CommunityByRestId')
         self.confirm()
         return record
 
@@ -596,7 +601,7 @@ class Client:
         root, warnings = self.query('AudioSpaceById', {'id': space_id}, missing=gone)
         record = space_record(root)
         if record is None:
-            raise gone
+            raise gone if missing_space(root) else _changed('AudioSpaceById')
         self.confirm()
         return record
 
@@ -614,7 +619,10 @@ class Client:
             raise TwitterError(6, 'X\'s Explore answer is not what this skill expects.', 'Tell the user the X reader '
                                                                                          'needs an update.',
                                reason='shape_changed')
-        page = list_page(((initial.get('timeline') or {}).get('timeline') or {}).get('instructions'))
+        instructions = ((initial.get('timeline') or {}).get('timeline') or {}).get('instructions')
+        if not isinstance(instructions, list):
+            raise _changed('ExplorePage')
+        page = list_page(instructions)
         self.confirm()
         return tabs, initial.get('id'), page
 

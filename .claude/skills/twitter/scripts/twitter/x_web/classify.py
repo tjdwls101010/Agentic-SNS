@@ -18,6 +18,8 @@ _CHALLENGE = re.compile(r'<!doctype|<html|cf-', re.I)
 _CONTRACT = re.compile(r'must be defined|coerced Null value|GRAPHQL_VALIDATION_FAILED')
 UNBLOCK_FIX = 'Stop requests. After a person checks x.com in the Aside browser, run doctor --unblock.'
 LOGIN_FIX = 'Log in to x.com in the Aside browser, then run doctor.'
+# reads for which X was seen answering "nothing" with an empty timeline object; elsewhere it is not assumed
+EMPTY_TIMELINES = ('ListMemberships', 'CombinedLists')
 UPDATE_FIX = 'X changed this read; the skill needs an update. Tell the user which read failed; other commands may work.'
 RETRY_FIX = 'Retry later; run doctor if it keeps failing.'
 LOCKED_PATHS = ('/account/access',)
@@ -136,7 +138,7 @@ def response(envelope, operation, root):
     if not isinstance(status, int) or status >= 400 or not body:
         return _failed('transient', f'X answered {operation} with HTTP {status} and no usable data.')
     value = at_root(body, root)
-    if value is None and root.endswith('.timeline.instructions') and \
+    if value is None and operation in EMPTY_TIMELINES and not errors and \
             at_root(body, root[:-len('.timeline.instructions')]) == {}:
         value = []  # an empty timeline object: nothing in it (measured: ListMemberships for an account in no lists)
     data = body.get('data') if isinstance(body, dict) else None

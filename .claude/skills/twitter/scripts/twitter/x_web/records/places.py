@@ -20,7 +20,13 @@ def _count(value):
 
 
 def _ms(value):
-    """Milliseconds since the epoch (an int or a digit string) as UTC ISO, or None."""
+    """Milliseconds since the epoch (an int or a digit string), or an ISO time ("…Z", as notifications send it), as UTC
+    ISO; None otherwise."""
+    if isinstance(value, str) and not value.isdigit():
+        try:
+            return datetime.fromisoformat(value.replace('Z', '+00:00')).astimezone(timezone.utc).isoformat()
+        except ValueError:
+            return None
     if isinstance(value, str) and value.isdigit():
         value = int(value)
     if type(value) is not int or value <= 0:
@@ -137,3 +143,17 @@ def notification_record(node):
             'suggested_by_x': icon == 'recommendation_icon', 'message': _str(_dict(node.get('rich_message')).get('text')),
             'created_at': _ms(node.get('timestamp_ms')), 'accounts': accounts, 'post_ids': posts,
             'url': url if url and url.startswith('https://') else None}
+
+
+# What X answers for a list, community or space that does not exist (measured 2026-10-19): a stub with these keys only.
+# Anything else that does not read as one is X having changed the answer, not a missing target.
+def missing_list(node):
+    return isinstance(node, dict) and set(node) <= {'id', 'id_str', 'facepile_urls'}
+
+
+def missing_community(node):
+    return isinstance(node, dict) and set(node) == {'__typename'} and node['__typename'] != 'Community'
+
+
+def missing_space(node):
+    return isinstance(node, dict) and set(node) <= {'is_subscribed'}

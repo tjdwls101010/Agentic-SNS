@@ -175,10 +175,13 @@ def test_a_list_record_and_the_stub_x_sends_for_a_list_that_does_not_exist():
     assert list_record({'facepile_urls': [], 'id': 'TGlzdDox', 'id_str': '1'}) is None
 
 
-def test_an_account_entry_without_an_id_is_counted_not_shown():
+def test_an_entry_with_nothing_to_name_it_by_is_unreadable_and_one_with_a_username_is_kept():
     entries = [{'entryId': 'user-x', 'content': {'itemContent': {'itemType': 'TimelineUser', 'user_results': {'result': {
         '__typename': 'User', 'core': {'screen_name': 'no_id_here'}}}}}},
+        {'entryId': 'user-y', 'content': {'itemContent': {'itemType': 'TimelineUser', 'user_results': {'result': {
+            '__typename': 'User', 'renamed': '2'}}}}},
         {'entryId': 'user-1', 'content': {'itemContent': {'itemType': 'TimelineUser', 'user_results': {'result': {
             '__typename': 'User', 'rest_id': '1', 'core': {'screen_name': 'has_id'}}}}}}]
     page = x_web.list_page([{'type': 'TimelineAddEntries', 'entries': entries}])
-    assert [r['username'] for r in page.records] == ['has_id'] and page.other == 1
+    assert [r['username'] for r in page.records] == ['no_id_here', 'has_id']  # a username still leads to about @name
+    assert page.unreadable == 1 and page.other == 0

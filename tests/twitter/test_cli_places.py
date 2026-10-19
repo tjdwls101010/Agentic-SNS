@@ -308,3 +308,83 @@ def test_an_empty_timeline_object_is_empty_not_a_shape_change(browser, data_dir)
     known_tab(browser, data_dir).respond('query', by_name()).respond('query', empty)
     code, out, _ = run_cli(browser, 'profile', 'author_a', '--tab', 'memberships')
     assert code == 7 and json.loads(out)['error'] == 'empty'
+
+
+# --- P4 review: an answer the skill misreads is a shape change, never "empty" or "does not exist" -------------------
+
+def test_a_page_of_entries_none_of_which_can_be_read_is_a_shape_change(browser, data_dir):
+    broken = [{'entryId': f'user-{i}', 'content': {'itemContent': {'itemType': 'TimelineUser', 'user_results': {
+        'result': {'__typename': 'User', 'renamed_id': str(i)}}}}} for i in range(3)]
+    page = query_result({'data': {'user': {'result': {'timeline': {'timeline': {'instructions': entries(broken)}}}}}}, headers=RATE)
+    known_tab(browser, data_dir).respond('query', by_name()).respond('query', page)
+    code, out, _ = run_cli(browser, 'graph', 'author_a', 'followers')
+    assert code == 6, out
+
+
+def test_an_account_with_a_name_but_no_id_is_still_shown(browser, data_dir):
+    named = [{'entryId': 'user-x', 'content': {'itemContent': {'itemType': 'TimelineUser', 'user_results': {
+        'result': {'__typename': 'User', 'core': {'screen_name': 'named_one'}}}}}}]
+    page = query_result({'data': {'user': {'result': {'timeline': {'timeline': {'instructions': entries(named)}}}}}}, headers=RATE)
+    known_tab(browser, data_dir).respond('query', by_name()).respond('query', page)
+    code, out, _ = run_cli(browser, 'graph', 'author_a', 'followers')
+    assert code == 0 and '@named_one' in out, out
+
+
+def test_an_empty_timeline_object_with_errors_or_on_other_reads_is_not_empty(browser, data_dir):
+    with_errors = query_result({'data': {'user': {'result': {'__typename': 'User', 'timeline': {}}}},
+                                'errors': [{'code': 22, 'message': 'Authorization'}]}, headers=RATE)
+    known_tab(browser, data_dir).respond('query', by_name()).respond('query', with_errors)
+    code, out, _ = run_cli(browser, 'profile', 'author_a', '--tab', 'memberships')
+    assert code == 6, out
+    followers = query_result({'data': {'user': {'result': {'__typename': 'User', 'timeline': {}}}}}, headers=RATE)
+    known_tab(browser, data_dir).respond('query', by_name()).respond('query', followers)
+    code, out, _ = run_cli(browser, 'graph', 'author_a', 'followers')
+    assert code == 6, out
+
+
+def test_a_card_whose_fields_moved_is_a_shape_change_not_a_missing_target(browser, data_dir):
+    moved = [('list', '1500000000000000001', {'data': {'list': {**{k: v for k, v in x_list().items() if k != 'name'}, 'title': 'L'}}}),
+             ('community', '1600000000000000001', {'data': {'communityResults': {'result': {**community(), '__typename': 'CommunityV2'}}}}),
+             ('about', 'https://x.com/i/spaces/1AbCdEfGhIjKl', {'data': {'audioSpace': {'is_subscribed': False, 'meta': {}}}})]
+    for command, target, body in moved:
+        known_tab(browser, data_dir).respond('query', query_result(body, headers=RATE))
+        args = [command, target] + (['--tab', 'about'] if command != 'about' else [])
+        code, out, _ = run_cli(browser, *args)
+        assert code == 6, (command, out)
+
+
+def test_explore_without_its_first_page_is_a_shape_change(browser, data_dir):
+    body = {'data': {'explore_page': {'body': {'initialTimeline': {'id': 'for_you', 'timeline': {}},
+                                                'timelines': [{'id': 'for_you', 'timeline': {'id': 'X'}}]}}}}
+    known_tab(browser, data_dir).respond('query', query_result(body, headers=RATE))
+    code, out, _ = run_cli(browser, 'trends', '--tab', 'foryou')
+    assert code == 6, out
+
+
+def test_notification_times_come_as_iso_text(browser, data_dir):
+    # measured: every captured notification sends timestamp_ms as "YYYY-MM-DDTHH:MM:SS.mmmZ"
+    item = notification('N9', stamp='2026-10-18T03:04:05.678Z')
+    known_tab(browser, data_dir).respond('query', notifications([item]))
+    code, out, _ = run_cli(browser, 'me', 'notifications', '--json')
+    assert code == 0 and json.loads(out)['results'][0]['created_at'].startswith('2026-10-18T03:04:05')
+
+
+def test_an_event_ends_with_the_search_that_reads_it(browser, data_dir):
+    event = {'entryId': 'stories-1', 'content': {'itemContent': {'itemType': 'TimelineEventSummary', 'title': 'A synthetic event',
+             'event': {'rest_id': '17'}, 'eventSummaryUrl': {'url': 'twitter://trending/?id=17', 'urlType': 'DeepLink'}}}}
+    known_tab(browser, data_dir).respond('query', explore([event]))
+    code, out, _ = run_cli(browser, 'trends', '--tab', 'foryou')
+    assert code == 0 and 'search: "A synthetic event"' in out, out
+
+
+def test_suggested_communities_take_no_tab_or_sort(browser, data_dir):
+    for extra in (['--tab', 'media'], ['--sort', 'recent']):
+        code, out, _ = run_cli(browser, 'community', *extra)
+        assert code == 2 and browser.calls() == [], out
+
+
+def test_a_single_card_or_the_trends_are_not_collected_into_a_file(browser, data_dir, tmp_path):
+    for args in (['list', '1500000000000000001', '--tab', 'about'], ['community', '1600000000000000001', '--tab', 'about'],
+                 ['trends']):
+        code, out, _ = run_cli(browser, *args, '--out', str(tmp_path / 'x.ndjson'))
+        assert code == 2 and browser.calls() == [], (args, out)

@@ -46,9 +46,10 @@ REQUESTS = ('how requests are counted: every read and retry this command sends c
             'ends within about two minutes. The tab is closed about 5 minutes after the last command.')
 TEXT_OUTPUT = ('output: first line "<command> · … · N shown · stopped=<reason> · requests=<used>/<budget>" (plus '
                '"x-limit <operation> resets <time> · next <time>" when X\'s limit stopped it); dated reads add '
-               '"window <since>..<until> · <coverage>"; then one record per [p1]/[r1]/[a1]/[t1] label, each ending '
+               '"window <since>..<until> · <coverage>"; then one record per label — [p1] post, [r1] reply, [a1] '
+               'account, [t1] trend or event, [l1] list, [c1] community, [s1] space, [n1] notification — each ending '
                'with the arguments of the next command (url: post <url> opens that one post; author; replies '
-               '<handle>); text is shown as text[N of M chars shown]; then coverage: lines; last, more: <command> when '
+               '<handle>; search: <query>); text is shown as text[N of M chars shown]; then coverage: lines; last, more: <command> when '
                'reading can continue.')
 JSON_OUTPUT = ('--json: one JSON envelope instead (ok, command, stop_reason, request_count, max_requests, limit, '
                'coverage, next, error, message, fix, results, with full texts); schema result describes every field.')
@@ -171,7 +172,7 @@ COMMANDS = {
         'arguments': [(('target',), {'metavar': 'URL', 'help': 'x.com/i/lists/<id> URL or the numeric list id'}),
                       (('--tab',), {'choices': ['posts', 'members', 'about'], 'default': 'posts', 'help': 'posts (from its members), members, or about (the card)'})] + list(LIST),
         'epilog': ['A list is a set of accounts someone curated; its posts are its members\' posts in X\'s order, so they are not the members\' whole output and no window closes on them. about is one record: name, owner, members, followers, private or public.',
-                   'A private list of someone else, or a deleted one, is unavailable (exit 9).',
+                   'about: a private list of someone else, or a deleted one, is unavailable (exit 9).',
                    'Without --limit or --out posts and members read one page; more: continues.',
                    'requests: 1 per page of about 20; about: 1.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
@@ -180,8 +181,8 @@ COMMANDS = {
         'help': 'Read a community\'s posts, media or card, or without a target the communities X suggests.',
         'run': listing.community,
         'arguments': [(('target',), {'nargs': '?', 'metavar': 'URL', 'help': 'x.com/i/communities/<id> URL or the numeric id; omitted: the communities X suggests to this account'}),
-                      (('--tab',), {'choices': ['posts', 'media', 'about'], 'default': 'posts', 'help': 'posts, media, or about (the card)'}),
-                      (('--sort',), {'choices': ['top', 'recent'], 'default': 'top', 'help': 'posts: top (X\'s ranking) or recent'})] + list(LIST),
+                      (('--tab',), {'choices': ['posts', 'media', 'about'], 'help': 'posts (default), media, or about (the card); with a target only'}),
+                      (('--sort',), {'choices': ['top', 'recent'], 'help': 'posts: top (default, X\'s ranking) or recent'})] + list(LIST),
         'epilog': ['A community is a group with its own feed: its posts are what members posted there, in X\'s order (top is a ranking; recent was not verified as newest first), so no window closes on them. about is one record: size, moderators, how one joins, topic, rules, who made it and your role. search --in communities searches posts across communities.',
                    'A suggested community is X\'s recommendation for this account, not a ranking of all communities.',
                    'Without --limit or --out it reads one page; more: continues.',
@@ -195,7 +196,7 @@ COMMANDS = {
         'epilog': ['A repost is an account sharing the post as it is, which records the act, not agreement; quotes (the posts that add words) are read with quotes. The list is what X serves, page by page; three pages in a row with no new account end the read.',
                    'Without --limit or --out it reads one page; more: continues.',
                    'requests: 1 per page of about 20 accounts.'],
-        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
     },
     'post': {
         'help': 'Read one post in full with its parent chain and first batch of replies, or several posts by id.',
@@ -249,9 +250,9 @@ COMMANDS = {
     'trends': {
         'help': 'Read the trends and events on one of X\'s Explore tabs.',
         'run': explore.trends,
-        'arguments': [(('--tab',), {'choices': list(explore.TABS), 'default': 'trending', 'help': 'trending (default), foryou, news, sports or entertainment'})] + list(LIST),
+        'arguments': [(('--tab',), {'choices': list(explore.TABS), 'default': 'trending', 'help': 'trending (default), foryou, news, sports or entertainment'})] + [a for a in LIST if a != 'out'],
         'epilog': ['A trend is what X shows this account as popular now, in X\'s order and for X\'s region and language settings, not a measure of opinion or a full list; its count line is X\'s rounded figure. Each trend ends with search: <query>, the words search takes to read it; an event ends with its page. Promoted trends (ads) and the posts or accounts X mixes into Explore are left out and counted.',
-                   'requests: 1 for foryou (it comes with the Explore answer); 2 for the other tabs (the Explore answer names their timeline), then 1 per further page.'],
+                   'requests: 1 for foryou (its first page comes with the Explore answer, and only that page is read); 2 for the other tabs (the Explore answer names their timeline), then 1 per further page.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
     },
     'doctor': {
@@ -289,7 +290,8 @@ COMMANDS = {
                                      'help': 'What to describe; omitted: the list of objects'})],
         'epilog': ['output: one JSON envelope; results holds the requested description (result: the envelope, stop '
                    'reasons, exit codes, window coverage, request counting and the text page; out: the --out file; '
-                   'post, account, trend: record fields), or one line per object.'],
+                   'post, account, trend, list, community, space, notification: record fields), or one line per '
+                   'object.'],
         'exits': (0, 2),
     },
 }
@@ -347,6 +349,13 @@ def validate(options):
     if options['command'] == 'post' and len(options['target']) > 1 and (options.get('limit') or options['sort'] != 'top'):
         raise TwitterError(2, 'Several posts are read without replies, so --limit and --sort do not apply.',
                            'Drop them, or read one post.')
+    if options['command'] == 'community' and not options.get('target') and (options.get('tab') or options.get('sort')):
+        raise TwitterError(2, 'Without a community, community lists the ones X suggests: --tab and --sort need a target.',
+                           'Pass a community URL or id, or drop --tab and --sort.')
+    if options['command'] == 'community' and options.get('target') and options.get('sort') and options.get('tab') in ('media', 'about'):
+        raise TwitterError(2, '--sort orders a community\'s posts only.', 'Drop --sort, or use --tab posts.')
+    if options.get('out') and options['command'] in ('list', 'community') and options.get('tab') == 'about':
+        raise TwitterError(2, 'about is one card, not a collection.', 'Drop --out.')
     if options['command'] == 'search' and not options['target'].strip():
         raise TwitterError(2, 'Search text must not be empty.', 'Pass the words to search for.')
     if options['command'] == 'search' and options.get('within') and (options['type'] != 'posts' or options['sort'] != 'top'):
