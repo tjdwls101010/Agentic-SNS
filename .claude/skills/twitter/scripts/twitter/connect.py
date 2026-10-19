@@ -11,6 +11,7 @@ from twitter import handles
 from twitter.aside import Aside
 from twitter.collection import OutFile, peek
 from twitter.errors import TwitterError
+from twitter.paths import data_dir
 from twitter.paging import paginate
 from twitter.results import finish
 from twitter.session import Session
@@ -108,6 +109,8 @@ def run(options, *, command, target, identity, reader, window=None):
     """
     connection, reading = None, None
     out_path = options.get('out')
+    if out_path:
+        _outside_data(out_path)
     try:
         if out_path:
             reading = _settled_file(out_path, _context(command, target, identity, None))
@@ -127,6 +130,15 @@ def run(options, *, command, target, identity, reader, window=None):
     report = connection.report() if connection else {'requests': 0, 'setup': 0, 'unwatched': 0, 'session_reset': False}
     return finish(reading, command=command, budget=options['max_requests'], identity=_public(identity), out=out_path,
                   **report)
+
+
+def _outside_data(path):
+    """An --out file inside the skill's own data/ would sit among its state (and be committed by nobody's choice)."""
+    target, data = Path(path).expanduser().absolute(), data_dir().absolute()
+    for place in {target, target.resolve() if target.exists() else target.parent.resolve() / target.name}:
+        if place == data or data in place.parents or data.resolve() in place.parents:
+            raise TwitterError(2, 'The --out file would sit inside the skill\'s data/ directory, among its state.',
+                               'Pass --out a path outside the skill folder (and outside the repository).')
 
 
 def _settled_file(path, context):
