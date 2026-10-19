@@ -130,6 +130,9 @@ def _read(connection, options, command, target, identity, reader, out_path):
         if out is not None:
             failure = reading.get('failure')
             ending = reading.pop('ending', None)
+            if ending and failure is None and not out.count:  # nothing saved: the empty result is the verdict to keep
+                failure = reading['failure'] = RedditError(7, 'Nothing fell inside the requested range.',
+                                                           'Try another target, order or period.')
             if ending and failure is None:
                 out.conclude(ending, None)
             elif ending and isinstance(failure, RedditError) and failure.code in (7, 8, 9) \

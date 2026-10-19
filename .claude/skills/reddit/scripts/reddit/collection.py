@@ -91,12 +91,12 @@ def _scan(data):
             result['skipped'].update(record.get('skipped') or [])
             result['count'] += len(page)
             result['state'] = record.get('state')
-            if not _verdict_ok(record.get('verdict')):
-                raise RedditError(2, 'The --out file failed its integrity check: a page line\'s verdict is damaged.',
-                                  'Keep this file as it is and use a new path.')
+            if not _verdict_ok(record.get('verdict')) or record.get('ending', None) not in (None, *COMPLETE):
+                raise RedditError(2, 'The --out file failed its integrity check: a page line\'s verdict or ending is '
+                                     'damaged.', 'Keep this file as it is and use a new path.')
             result['complete'] = record.get('stop_reason') in COMPLETE
             result['verdict'] = record.get('verdict')
-            result['ending'] = record.get('ending') if record.get('ending') in COMPLETE else None
+            result['ending'] = record.get('ending')
             result['boundary'], page = offset, []
         elif not broken:
             page.append(record)

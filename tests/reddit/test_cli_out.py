@@ -223,3 +223,28 @@ def test_a_torn_completion_of_a_longer_listing_is_judged_from_the_file(reddit, t
     assert [f for f in reddit.paths() if 'new.json' in f] == before, 'judged from the file, the listing not read again'
     code, text, _ = run_cli(reddit, *args)
     assert code == 8, 'and kept from then on'
+
+
+def test_a_window_with_nothing_inside_stays_empty_when_rerun(reddit, tmp_path):
+    # Codex P7 round 5: the empty verdict was made after the file was concluded, so the rerun said complete (0)
+    from test_cli_lists import epoch
+    out = tmp_path / 'sub.ndjson'
+    old = {**post('a')['data'], 'created_utc': epoch('2025-10-09T00:00:00')}
+    args = ['sub', 'r/example', '--sort', 'new', '--since', '2026-01-01', '--out', str(out), '--json']
+    reddit.me().json('/r/example/new.json', listing([{'kind': 't3', 'data': old}], after='t3_a'))
+    code, _, _ = run_cli(reddit, *args)
+    assert code == 7
+    code, text, _ = run_cli(reddit, *args)
+    assert code == 7 and json.loads(text)['error'] == 'empty'
+
+
+def test_a_damaged_ending_is_an_integrity_failure(reddit, tmp_path):
+    out = tmp_path / 'sub.ndjson'
+    reddit.me().json('/r/example/new.json', listing([post('a')]))
+    run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--out', str(out))
+    rows = out.read_text().splitlines()[:-1]  # the completion line lost
+    assert json.loads(rows[-1]).get('ending') == 'exhausted'
+    for bad in ('not-an-ending', 3, True, {}, []):
+        out.write_text('\n'.join(rows[:-1] + [json.dumps({**json.loads(rows[-1]), 'ending': bad})]) + '\n')
+        code, text, _ = run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--out', str(out))
+        assert code == 2 and 'integrity' in text, bad
