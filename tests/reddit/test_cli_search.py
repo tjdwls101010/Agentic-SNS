@@ -79,3 +79,16 @@ def test_me_subs_logged_out(reddit):
     reddit.me().json('/subreddits/mine/subscriber.json', listing([], modhash=''))
     code, out, _ = run_cli(reddit, 'me', 'subs')
     assert code == 4
+
+
+def test_me_shows_what_it_held_back_without_a_request(reddit):
+    # Codex P7: the held-back tail of a me read sent an account check
+    reddit.me().json('/subreddits/mine/subscriber.json',
+                     listing([{'kind': 't5', 'data': {'id': f's{n}', 'name': f't5_s{n}', 'display_name': f'sub{n}'}}
+                              for n in (1, 2)]))
+    code, out, _ = run_cli(reddit, 'me', 'subs', '--limit', '1')
+    more = [line for line in out.splitlines() if line.startswith('more: ')][0]
+    before = len(reddit.fetches())
+    from conftest import command_of
+    code, out, _ = run_cli(reddit, *command_of(more))
+    assert code == 0 and 'requests=0/25' in out.splitlines()[0] and len(reddit.fetches()) == before

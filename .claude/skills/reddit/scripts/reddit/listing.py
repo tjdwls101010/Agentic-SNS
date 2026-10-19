@@ -46,9 +46,12 @@ def me(options):
     identity = {'collection': collection}
 
     def read(connection, state, out):
-        connection.network()  # the account check names whose lists these are
+        def page(after):
+            connection.network()  # the account check names whose lists these are, made only when a page is read
+            return routes.mine(collection, connection.reddit_account, after)
+
         return connect.read_pages(connection, options, identity, state, out, command='me', target=None, words=[collection],
-                     request=lambda after: routes.mine(collection, connection.reddit_account, after))
+                     request=page)
 
     return connect.run(options, command='me', target=None, identity=identity, reader=read)
 
