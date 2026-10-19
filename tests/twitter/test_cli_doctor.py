@@ -204,6 +204,16 @@ def test_unblock_lifts_the_block_after_one_clean_viewer_read(browser, data_dir):
     assert buckets(data_dir)['Viewer']['remaining'] == 99  # its own bucket kept, as from any response
 
 
+def test_unblock_recovers_from_unreadable_protection_state_after_a_clean_check(browser, data_dir):
+    path = data_dir / 'protection'
+    path.mkdir(parents=True)
+    (path / 'blocked.json').write_text('{broken')
+    known_tab(browser, data_dir).respond('query', query_result(VIEWER, headers=RATE)).respond('modules', MODULES)
+    code, result, _ = doctor(browser, '--unblock')
+    assert code == 0, result
+    assert block_file(data_dir) is None and (path / 'blocked.json.unreadable').read_text() == '{broken'
+
+
 def test_unblock_without_room_in_the_viewer_limit_sends_nothing_and_keeps_the_block(browser, data_dir):
     block_file(data_dir, LOCK)
     buckets(data_dir, {'Viewer': {'limit': 100, 'remaining': 0, 'reset': int(time.time()) + 300}})

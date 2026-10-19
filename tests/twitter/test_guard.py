@@ -417,11 +417,18 @@ def test_one_operations_slowdown_is_waited_out_without_holding_the_lock(data_dir
     assert 60 in free and g.used == 1
 
 
-def test_an_unreadable_bucket_file_is_reported_as_unreadable_not_as_a_time_limit(data_dir):
+def test_the_unblock_check_sets_unreadable_state_aside_and_keeps_a_block_until_it_passes(data_dir):
+    """Otherwise an unreadable file refuses every request, the unblock check included, with no way out but deleting
+    protection by hand."""
     clock = Clock(1000)
-    write(data_dir, 'blocked.json', {'reason': 'account_locked', 'blocked_at': 900, 'account_id': '1'})
-    write(data_dir, 'buckets.json', 'not json')
+    write(data_dir, 'blocked.json', 'not json')
+    write(data_dir, 'buckets.json', {'Viewer': 'broken'})
+    with make(clock).verify_unblock() as slot:
+        assert slot.block_record == {'reason': 'account_locked', 'blocked_at': 1000, 'account_id': None}
+    assert (data_dir / 'protection/blocked.json.unreadable').read_text() == 'not json'
+    assert (data_dir / 'protection/buckets.json.unreadable').exists() and read(data_dir, 'buckets.json') is None
+    assert read(data_dir, 'blocked.json')['reason'] == 'account_locked'  # not cleared: the caller did not call clear()
     with pytest.raises(TwitterError) as error:
-        with make(clock).verify_unblock():
-            pytest.fail('no check may be sent')
-    assert error.value.code == 5 and error.value.reason == 'unreadable'
+        with make(clock).request(operation='TweetDetail'):
+            pytest.fail('still blocked')
+    assert error.value.code == 5 and error.value.reason == 'account_locked'

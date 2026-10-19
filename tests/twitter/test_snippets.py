@@ -223,6 +223,12 @@ def test_signals_survive_a_reload_of_the_same_tab_but_not_a_new_tab(tmp_path):
     assert len(out['results'][2]['signals']) == 1 and out['results'][3]['signals'] == []
 
 
+def test_a_lock_code_in_a_json_typed_app_response_is_still_a_signal(tmp_path):
+    lock = {**app_response('HomeTimeline', 200, '{"errors":[{"code":326}]}'), 'type': 'json'}
+    out = run(tmp_path, [{'snippet': 'state', 'args': {}}, {'snippet': 'state', 'args': {}, 'app': [lock]}], page())
+    assert [s['codes'] for s in out['results'][1]['signals']] == [[326]]
+
+
 def test_acknowledged_signals_are_dropped(tmp_path):
     out = run(tmp_path, [{'snippet': 'state', 'args': {}},
                          {'snippet': 'state', 'args': {}, 'app': [app_response('ViewerBadgeCounts', 429)]},

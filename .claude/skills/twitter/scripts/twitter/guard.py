@@ -37,8 +37,9 @@ CALL_SECONDS = 3      # the least time a browser call needs: a wait that leaves 
 
 UNBLOCK_FIX = 'Stop requests. After a person checks x.com in the Aside browser, run doctor --unblock.'
 _UNREADABLE = TwitterError(5, 'Account protection state is unreadable, so requests are refused.',
-                           'Check x.com in the Aside browser, then run doctor --unblock; do not delete data/protection '
-                           'by hand.', reason='unreadable')
+                           'Check x.com in the Aside browser, then run doctor --unblock: it sets the unreadable files '
+                           'aside and keeps the block until its check passes. Do not delete data/protection by hand.',
+                           reason='unreadable')
 
 
 def _directory():
@@ -389,6 +390,7 @@ class Guard:
             if self.checked:
                 raise TwitterError(5, 'This invocation already made its one unblock check.', UNBLOCK_FIX)
             self.checked = True
+            self._set_aside_unreadable()
             record = _block()
             try:
                 wait = max(self._wait_for(operation))
@@ -396,9 +398,7 @@ class Guard:
                 if error.reason == 'rate_limited':
                     raise refused('rate_limited', reset=error.details['reset'],
                                   next_allowed_at=error.details['next_allowed_at']) from None
-                if error.reason == 'time_limit':
-                    raise refused('time_limit') from None
-                raise  # unreadable protection state is its own refusal
+                raise refused('time_limit') from None
             if wait > 0:
                 self.sleep(wait)
             self._reserve_pace()
@@ -411,6 +411,27 @@ class Guard:
                 self._held = None
                 self._reserve_pace()
                 _log('unblock_check', slot.reserved, operation, self.clock())
+
+    def _set_aside_unreadable(self):
+        """Inside the unblock check's lock: an unreadable state file is kept for a person as <name>.unreadable and,
+        failing closed, replaced by a block for an unknown account, which the check then lifts or keeps."""
+        directory = _directory()
+        unreadable = []
+        for name, read in (('blocked.json', _block), ('buckets.json', lambda: _buckets(self.clock())),
+                           ('pace.json', _next_allowed)):
+            try:
+                read()
+            except TwitterError as error:
+                if error.reason != 'unreadable':
+                    raise
+                unreadable.append(name)
+        for name in unreadable:
+            try:
+                (directory / name).replace(directory / (name + '.unreadable'))
+            except OSError:
+                raise _UNREADABLE from None
+        if unreadable:
+            _write('blocked.json', {'reason': 'account_locked', 'blocked_at': self.clock(), 'account_id': None})
 
     @property
     def checking(self):

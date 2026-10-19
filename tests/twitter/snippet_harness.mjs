@@ -3,7 +3,7 @@
 //   node snippet_harness.mjs <case.json>
 //
 // case: {"calls": [{"source": "<composed page function file>", "args": {...}, "before": [entries], "during": [entries],
-//                   "app": [{"url", "status", "body", "headers"}], "reload": true, "lost": true, "repeat": n}],
+//                   "app": [{"url", "status", "body", "headers", "type"}], "reload": true, "lost": true, "repeat": n}],
 //        "page": {"location", "cookie", "html", "modules": {"<id>": "<factory source>"}, "exports": {"<id>": {...}},
 //                 "chunks": {"<id>": {"name", "modules": {...}}}, "state": {...redux state} | null, "fetch": [{status,
 //                 body, headers}], "buffered": [entries], "fragment": true}}
@@ -111,8 +111,14 @@ for (const entry of pageSpec.buffered || []) pending.push(entry);
 async function appRequest(context, request) {
   // The app's own request, through the page's XHR, so a hook installed earlier sees it.
   await vm.runInContext(`((r) => { const x = new window.XMLHttpRequest(); x.open('GET', r.url);
-    Object.defineProperty(x, 'status', {value: r.status}); Object.defineProperty(x, 'responseText', {value: r.body || ''});
-    Object.defineProperty(x, 'responseType', {value: ''}); Object.defineProperty(x, 'responseURL', {value: r.url});
+    Object.defineProperty(x, 'status', {value: r.status}); Object.defineProperty(x, 'responseURL', {value: r.url});
+    Object.defineProperty(x, 'responseType', {value: r.type || ''});
+    if (r.type === 'json') {  // as browsers do: the parsed body in response, and responseText throws
+      Object.defineProperty(x, 'response', {value: JSON.parse(r.body || 'null')});
+      Object.defineProperty(x, 'responseText', {get() { throw new Error('InvalidStateError'); }});
+    } else {
+      Object.defineProperty(x, 'responseText', {value: r.body || ''});
+    }
     x.__headers = r.headers || {}; x.send(); })`, context)(request);
 }
 

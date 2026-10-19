@@ -68,7 +68,9 @@
       if (watched(this.__xsUrl || '')) {
         this.addEventListener('loadend', () => {
           try {
-            const text = this.responseType === '' || this.responseType === 'text' ? this.responseText : '';
+            const type = this.responseType;
+            const text = type === '' || type === 'text' ? this.responseText
+              : type === 'json' && this.response !== null ? JSON.stringify(this.response) : '';
             remember(this.responseURL || this.__xsUrl, this.status, text, k => this.getResponseHeader(k));
           } catch (_) { /* never break the app */ }
         });
