@@ -21,7 +21,7 @@ from urllib.parse import urlsplit
 
 from twitter.errors import TwitterError, diagnostic
 from twitter.x_web import classify
-from twitter.x_web.records import list_page, post_page, post_record
+from twitter.x_web.records import account_record, list_page, post_page, post_record
 
 _SNIPPETS = Path(__file__).with_name('snippets')
 _KIT = (_SNIPPETS / 'kit.js').read_text(encoding='utf-8').strip()
@@ -459,3 +459,22 @@ class Client:
                 records.append(record)
         self.confirm()
         return records
+
+    def user(self, handle):
+        """The account behind a handle as a record (one request); a handle X does not know, or a suspended account, is
+        unavailable."""
+        gone = TwitterError(9, f'X has no account @{handle} visible to this account (suspended, deactivated or never '
+                               'existed).', 'Check the handle; tell the user rather than retrying.', reason='unavailable')
+        root, warnings = self.query('UserByScreenName', {'screen_name': handle}, missing=gone)
+        record = account_record(root)
+        if record.get('unavailable') or not record.get('id'):
+            raise gone
+        self.confirm()
+        return record
+
+    def users(self, handles):
+        """Several accounts by handle in one request; handles X did not return are unresolved."""
+        root, warnings = self.query('UsersByScreenNames', {'screen_names': list(handles)})
+        records = [account_record(node) for node in (root if isinstance(root, list) else []) if isinstance(node, dict)]
+        self.confirm()
+        return [r for r in records if not r.get('unavailable') and r.get('id')]

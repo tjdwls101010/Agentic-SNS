@@ -2,8 +2,10 @@
 surface's date-window policy (twitter.window).
 """
 from twitter import connect
+from twitter.errors import TwitterError
 from twitter.paging import paginate
 from twitter.window import Window
+from twitter.x_web import parse_account
 
 # Both home feeds are X's choice of order: the following feed is not newest first (P2 R8), so neither closes a window.
 FEEDS = {'foryou': ('foryou', 'unordered'), 'following': ('following', 'unordered')}
@@ -19,6 +21,47 @@ def feed(options):
                      fetch=lambda cursor: connection.client.feed(variant, cursor))
 
     return connect.run(options, command='feed', target=None, identity=identity, reader=read,
+                       window=_window(options, order))
+
+
+# tab → (operation, date order). posts is UserTweets: posts and reposts, newest first (X's own Posts tab now hides
+# reposts, X14); media is UserMedia: photos, videos and GIFs (X's own Media tab now shows videos only).
+TABS = {'posts': ('UserTweets', 'newest_first'), 'replies': ('UserRepliesTimeline', 'newest_first'),
+        'media': ('UserMedia', 'finite'), 'highlights': ('UserHighlightsTweets', 'finite'),
+        'articles': ('UserArticlesTweets', 'finite')}
+
+
+def profile(options):
+    target = parse_account(options['target'])
+    tab = options.get('tab')
+    if tab and target.tab and tab != target.tab:
+        raise TwitterError(2, f'The URL is the {target.tab} tab but --tab asks for {tab}.', 'Give one of them.')
+    tab = tab or target.tab or 'posts'
+    if tab not in TABS:
+        raise TwitterError(2, f'The {tab} tab is not a list of posts.', 'Use --tab posts, replies, media, highlights or '
+                                                                        'articles.')
+    operation, order = TABS[tab]
+    identity = {'tab': tab, 'since': options.get('since'), 'until': options.get('until')}
+
+    def read(connection, state, out):
+        client = connection.client
+        saved = (state or {}) if out is None else (out.state or {})
+        user_id, card = saved.get('user_id'), None
+        if not user_id:
+            card = client.user(target.handle)
+            user_id = card['id']
+        reading = _read(options, identity, state, out, order=order, command='profile', target=target.url,
+                        extra={'user_id': user_id},
+                        fetch=lambda cursor: client.timeline(operation, {'userId': user_id}, cursor))
+        if card is not None and not reading['results'] and not reading.get('failure') and \
+                not reading.get('continuation') and (out is None or not out.count):
+            if card.get('private') and (card.get('relationship') or {}).get('following') is not True:
+                reading['failure'] = TwitterError(9, f'@{target.handle} is protected and this account does not follow '
+                                                     'it.', 'Tell the user; only approved followers can read it.',
+                                                  reason='unavailable')
+        return reading
+
+    return connect.run(options, command='profile', target=target.url, identity=identity, reader=read,
                        window=_window(options, order))
 
 

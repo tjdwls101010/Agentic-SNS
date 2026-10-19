@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date, datetime, time, timedelta
 
-from twitter import listing, maintenance, thread
+from twitter import about, listing, maintenance, thread
 from twitter.errors import TwitterError
 from twitter.render import render_page, render_summary
 from twitter.results import failure_envelope
@@ -121,6 +121,26 @@ COMMANDS = {
                    'requests: 1 per page of about 20 posts.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
     },
+    'profile': {
+        'help': 'Read a profile\'s tab: posts (with reposts), replies, media, highlights or articles.',
+        'run': listing.profile,
+        'arguments': [(('target',), {'help': 'X @handle or profile URL; a tab URL such as /<handle>/with_replies reads that tab'}),
+                      (('--tab',), {'choices': ['posts', 'replies', 'media', 'highlights', 'articles'], 'help': 'The tab (default: the URL\'s tab, else posts)'}),
+                      'since', 'until'] + list(LIST),
+        'epilog': ['posts holds the account\'s posts and reposts, newest first (X\'s own Posts tab now hides reposts); a repost row is dated when it was reposted. posts and replies are newest first, so a --since window closes at the first page wholly older than it (a pinned post sits first whatever its date and does not close it). media (photos, videos and GIFs), highlights and articles are not served in date order: a window covers them only when read to the end.',
+                   'A protected account this account does not follow is unavailable (exit 9), which is not the same as empty.',
+                   'Without --limit, a window or --out it reads one page; more: continues.',
+                   'requests: 1 to find the account, then 1 per page of about 20 posts.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+    },
+    'about': {
+        'help': 'Read an account\'s card, or several accounts\' cards in one request.',
+        'run': about.about,
+        'arguments': [(('target',), {'nargs': '+', 'help': 'X @handle or profile URL; several are read together'}), 'json', 'max_requests'],
+        'epilog': ['A card: name, bio, links, location, join date, counts (followers, following, posts), whether it is protected, its relation to you, and its marks: a paid check is an X subscription, not an identity check; a Business or Government badge is granted by X to an organisation; a declared Parody, Commentary or Fan label is the account\'s own. Several handles: those X did not return are named (unresolved).',
+                   'requests: 1.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 9, 10),
+    },
     'post': {
         'help': 'Read one post in full with its parent chain and first batch of replies, or several posts by id.',
         'run': thread.post,
@@ -186,7 +206,7 @@ HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 
 
-READS = ('feed', 'post', 'replies')
+READS = ('feed', 'profile', 'about', 'post', 'replies')
 
 
 def epilog(name, spec):
