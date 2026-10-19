@@ -21,6 +21,7 @@ from urllib.parse import urlsplit
 
 from twitter.errors import TwitterError, diagnostic
 from twitter.x_web import classify
+from twitter.x_web.records import list_page
 
 _SNIPPETS = Path(__file__).with_name('snippets')
 _KIT = (_SNIPPETS / 'kit.js').read_text(encoding='utf-8').strip()
@@ -291,10 +292,10 @@ class Client:
 
     # --- requests --------------------------------------------------------------------------------------------
 
-    def _call(self, name, args, operation):
+    def _call(self, name, args, operation, judge=None):
         """One guarded browser call that may send `operation`: block, limit, budget and pacing first; the answer and
-        every signal the tab kept are judged, and a block or bucket recorded, before the lock is released. A vanished
-        tab is reopened once (outside this request's charge)."""
+        every signal the tab kept are judged — and a block or bucket recorded — before the lock is released (judge(result)
+        gives the verdict on the answer itself). A vanished tab is reopened once (outside this request's charge)."""
         for attempt in range(2):
             try:
                 with self.guard.request(operation=operation) as slot:
@@ -335,7 +336,10 @@ class Client:
                     if result.get('network_error'):
                         raise TwitterError(6, 'The request to X did not complete.', classify.RETRY_FIX, reason='network')
                     slot.observe(result.get('status'), result.get('headers'))
-                    return result, slot
+                    verdict = judge(result) if judge else None
+                    if verdict is not None and verdict.block:
+                        self._stop(slot, verdict)
+                    return result, verdict
             except TwitterError as error:
                 if error.reason != 'tab_missing' or attempt:
                     raise
@@ -363,8 +367,8 @@ class Client:
                 'fallback': self._fallback(operation)}
         retried = set()
         while True:
-            result, _ = self._call('query', args, operation)
-            verdict = classify.response(result, operation, spec['root'])
+            result, verdict = self._call('query', args, operation,
+                                         lambda r: classify.response(r, operation, spec['root']))
             if verdict.kind == 'ok':
                 used = result.get('used') or {}
                 if used.get('source') in ('live', 'chunk') and isinstance(used.get('query_id'), str):
@@ -417,3 +421,17 @@ class Client:
         """The logged-in account as X answers it (one Viewer read)."""
         root, _ = self.query('Viewer', {})
         return root
+
+    # --- reads, in the skill's terms ---------------------------------------------------------------------------
+
+    def timeline(self, operation, variables, cursor=None):
+        """One page of a timeline surface as records (see records.list_page)."""
+        root, warnings = self.query(operation, {**variables, **({'cursor': cursor} if cursor else {})})
+        page = list_page(root)
+        page.warnings = warnings
+        self.confirm()
+        return page
+
+    def feed(self, variant, cursor):
+        """One page of the home feed: for you (HomeTimeline) or following (HomeLatestTimeline)."""
+        return self.timeline('HomeLatestTimeline' if variant == 'following' else 'HomeTimeline', {}, cursor)

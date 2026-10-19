@@ -10,9 +10,11 @@ import os
 import re
 import shlex
 import sys
+from datetime import date, datetime, time, timedelta
 
-from twitter import maintenance
+from twitter import listing, maintenance
 from twitter.errors import TwitterError
+from twitter.render import render_page, render_summary
 from twitter.results import failure_envelope
 
 EXIT_CODES = {
@@ -32,12 +34,93 @@ KIND_EXIT = {'records': 0, 'resumable': 0, 'complete': 0, 'maintenance': 0, 'arg
              'blocked': 5, 'failed': 6, 'empty': 7, 'partial': 8, 'unavailable': 9, 'rate_limited': 10}
 
 
+REQUESTS = ('how requests are counted: every read and retry this command sends counts exactly, and so does every '
+            'x.com request the dedicated tab finishes while it runs (its own requests are told apart by a nonce in '
+            'the URL fragment, never sent to X). Opening the tab (or loading it again) is measured the same way, '
+            'about 14, and shown as "tab opened", outside --max-requests (20 when it cannot be measured). Requests '
+            'the open tab made between commands are shown as unwatched=, not charged, but a block seen there stops '
+            'the command before it sends anything. Static files do not count. All invocations share one lock and '
+            '1-2 s pacing for the account and slow down when X\'s limit for an operation is nearly used; a command '
+            'ends within about two minutes. The tab is closed about 5 minutes after the last command.')
+TEXT_OUTPUT = ('output: first line "<command> · … · N shown · stopped=<reason> · requests=<used>/<budget>" (plus '
+               '"x-limit <operation> resets <time> · next <time>" when X\'s limit stopped it); dated reads add '
+               '"window <since>..<until> · <coverage>"; then one record per [p1]/[r1]/[a1]/[t1] label, each ending '
+               'with the arguments of the next command (url: post <url> opens that one post; author; replies '
+               '<handle>); text is shown as text[N of M chars shown]; then coverage: lines; last, more: <command> when '
+               'reading can continue.')
+JSON_OUTPUT = ('--json: one JSON envelope instead (ok, command, stop_reason, request_count, max_requests, limit, '
+               'coverage, next, error, message, fix, results, with full texts); schema result describes every field.')
+OUT_OUTPUT = ('--out FILE: records go to an NDJSON file a whole page at a time and stdout gets one summary line (one '
+              'JSON object with --json); rerun the same command with the same file to resume. --out cannot be '
+              'combined with --after. The file holds other people\'s posts: keep it outside the repository.')
+FAILURE = ('failure: one JSON envelope (ok false, error, message, fix) when nothing was read; records read before a '
+           'failure print as usual, followed by a "coverage: incomplete — <message> fix: <fix>" line. Exit 10 (an '
+           'operation\'s limit) and exit 5 (a block a person must clear) are different: the first passes by itself '
+           'at the time shown and other commands still work.')
+
+
 class Parser(argparse.ArgumentParser):
     def error(self, message):
         raise TwitterError(2, message, f'Run {self.prog} --help.')
 
 
+def positive(value):
+    if value.isascii() and value.isdigit() and int(value) > 0:
+        return int(value)
+    raise argparse.ArgumentTypeError('expected a positive integer')
+
+
+def chars(value):
+    if value.isascii() and value.isdigit():
+        return int(value)
+    raise argparse.ArgumentTypeError('expected 0 (full text) or a positive integer')
+
+
+def budget(value):
+    number = positive(value)
+    # 성진: 호출당 400회 상한은 실계정 보호용(하루 누적 상한은 두지 않음, X4). 일회용 계정으로 바꾸면 올려도 됨
+    if number > 400:
+        raise argparse.ArgumentTypeError('at most 400 requests per invocation')
+    return number
+
+
+def day(value):
+    try:
+        found = date.fromisoformat(value)
+        for edge in (found, found + timedelta(days=1)):  # a window's bounds are local midnights, the day after included
+            datetime.combine(edge, time()).astimezone().timestamp()
+        return found.isoformat()
+    except ValueError:
+        raise argparse.ArgumentTypeError('expected a date as YYYY-MM-DD') from None
+    except (OverflowError, OSError):
+        raise argparse.ArgumentTypeError('expected a date this computer can turn into a local time') from None
+
+
+OPTIONS = {
+    'limit': (('--limit',), {'type': positive, 'help': 'Records to show; omitted: the default the description below gives (one page for most reads)'}),
+    'since': (('--since',), {'type': day, 'metavar': 'DAY', 'help': 'First local day to include, YYYY-MM-DD'}),
+    'until': (('--until',), {'type': day, 'metavar': 'DAY', 'help': 'Last local day to include, YYYY-MM-DD'}),
+    'chars': (('--chars',), {'type': chars, 'help': 'Characters of each text to show (default 180; 0 = all received); --json and --out keep all'}),
+    'after': (('--after',), {'type': positive, 'metavar': 'HANDLE', 'help': 'Continue from the numbered handle a more: line printed'}),
+    'out': (('--out',), {'metavar': 'FILE', 'help': 'Collect into this NDJSON file, one committed page at a time; rerun the same command to resume. --limit then counts what is saved'}),
+    'json': (('--json',), {'action': 'store_true', 'help': 'Print one JSON envelope instead of text'}),
+    'max_requests': (('--max-requests',), {'type': budget, 'default': 25, 'metavar': 'N', 'help': 'Requests this invocation may make (default 25, at most 400)'}),
+}
+LIST = ('limit', 'chars', 'after', 'out', 'json', 'max_requests')
+
+
 COMMANDS = {
+    'feed': {
+        'help': 'Read your home feed, a page at a time.',
+        'run': listing.feed,
+        'arguments': [(('--feed',), {'choices': ['foryou', 'following'], 'default': 'foryou', 'help': 'foryou: the posts X ranks for this account; following: from the accounts it follows'}),
+                      'since', 'until'] + list(LIST),
+        'epilog': ['foryou is what X chose to show this account, not everything; following holds only the accounts it follows, and X does not serve it newest first either, so neither feed can close a --since window: a window keeps the posts dated inside it among those read (a sample, not the whole day).',
+                   'A repost row is the reposter\'s act, dated when it was reposted; the words are the original\'s, shown under it with their own author. Promoted posts (ads) are left out and counted.',
+                   'Without --limit, a window or --out it reads one page; more: continues.',
+                   'requests: 1 per page of about 20 posts.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
+    },
     'doctor': {
         'help': 'Check Aside, the browser tab, login, account protection and X\'s limits; always JSON.',
         'run': maintenance.doctor,
@@ -78,8 +161,16 @@ HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 
 
+READS = ('feed',)
+
+
 def epilog(name, spec):
     lines = list(spec['epilog'])
+    if name in READS:
+        lines += [REQUESTS, TEXT_OUTPUT, JSON_OUTPUT]
+        if 'out' in [a for a in spec['arguments'] if isinstance(a, str)]:
+            lines.append(OUT_OUTPUT)
+        lines.append(FAILURE)
     lines.append('exit codes:\n' + '\n'.join(f'  {code}  {EXIT_CODES[code]}' for code in spec['exits']))
     return '\n\n'.join(lines)
 
@@ -94,7 +185,8 @@ def parser(hidden=False):
     for name, spec in COMMANDS.items():
         sub = commands.add_parser(name, help=spec['help'], description=spec['help'], epilog=epilog(name, spec),
                                   formatter_class=argparse.RawTextHelpFormatter, prog=f'cli.py {name}')
-        for flags, settings in spec['arguments']:
+        for argument in spec['arguments']:
+            flags, settings = OPTIONS[argument] if isinstance(argument, str) else argument
             sub.add_argument(*flags, **settings)
     if hidden:  # the idle cleanup the skill starts itself; not part of the help
         for name, spec in HIDDEN.items():
@@ -102,6 +194,18 @@ def parser(hidden=False):
             for flags, settings in spec['arguments']:
                 sub.add_argument(*flags, **settings)
     return root
+
+
+def validate(options):
+    for key in ('target', 'out'):
+        value = options.get(key)
+        if isinstance(value, str) and any(ord(c) < 32 or ord(c) == 127 for c in value):
+            raise TwitterError(2, f'The {key} contains a line break or another control character.', 'Pass it on one line.')
+    if options.get('since') and options.get('until') and options['since'] > options['until']:
+        raise TwitterError(2, '--since must not be later than --until.', 'Swap the two dates.')
+    if options.get('after') and options.get('out'):
+        raise TwitterError(2, '--after and --out cannot be combined; --out resumes its own file.',
+                           'Rerun the same command with the same --out path.')
 
 
 def invocation():
@@ -116,7 +220,14 @@ def command_line(words):
 def emit(kind, envelope, options):
     if isinstance(envelope.get('next'), list):
         envelope['next'] = command_line(envelope['next'])
-    print(json.dumps(envelope, ensure_ascii=False))
+    machine = options.get('json') or options['command'] in ('doctor', 'schema', 'idle')
+    if options.get('out') and envelope.get('out') is not None and (envelope['ok'] or envelope.get('count')):
+        print(json.dumps({k: v for k, v in envelope.items() if k != 'results'}, ensure_ascii=False) if machine
+              else render_summary(envelope))
+    elif machine or (not envelope['ok'] and not envelope.get('results')):
+        print(json.dumps(envelope, ensure_ascii=False))
+    else:
+        print(render_page(envelope, chars=options.get('chars'), command=options['command']))
     return KIND_EXIT[kind]
 
 
@@ -125,6 +236,7 @@ def main(argv=None):
     options = {'command': None}
     try:
         options = vars(parser(hidden=bool(argv) and argv[0] in HIDDEN).parse_args(argv))
+        validate(options)
         if options['command'] == 'schema':
             options['exit_codes'] = [(code, meaning, [k for k, c in KIND_EXIT.items() if c == code])
                                      for code, meaning in EXIT_CODES.items()]
