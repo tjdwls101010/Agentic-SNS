@@ -99,8 +99,9 @@ def test_slow_down_when_half_spent(data_dir):
     send(g, headers=first['headers'])
     gap = json.loads((protection(data_dir) / 'pace.json').read_text())['next_allowed_at'] - time.time()
     assert first['next_gap_at_most'] >= gap > first['next_gap_at_least'] - 0.1
+    assert 'slow_until' not in buckets(data_dir)['general']
     send(g, headers=second['headers'])
-    gap = json.loads((protection(data_dir) / 'pace.json').read_text())['next_allowed_at'] - time.time()
+    gap = buckets(data_dir)['general']['slow_until'] - time.time()
     assert gap >= second['next_gap_at_least'] - 0.1 and g.slowest >= 9.9
 
 
@@ -173,12 +174,12 @@ def test_a_probe_answered_without_headers_makes_the_bucket_unmetered(data_dir):
 
 def test_a_share_link_is_never_a_probe(data_dir):
     g = guard.Guard(ACCOUNT, 25)
-    send(g, metered=False, headers=H(None, None, None))
-    assert not (protection(data_dir) / 'buckets.json').exists() or 'general' not in buckets(data_dir)
+    send(g, 'share', metered=False, headers=H(None, None, None))
+    assert 'general' not in buckets(data_dir) and buckets(data_dir)['share'] == {'status': 'unknown'}
     send(g, headers=H('1', '99', '300'))  # the general bucket still gets its own probe
     assert buckets(data_dir)['general']['status'] == 'known' and g.used == 2
     log = [json.loads(line) for line in (protection(data_dir) / 'requests.jsonl').read_text().splitlines()]
-    assert [entry['bucket'] for entry in log] == ['share', 'general']
+    assert [entry['bucket'] for entry in log if entry['n'] == 1] == ['share', 'general']
 
 
 def test_a_rate_limit_blocks_only_its_bucket(data_dir):
@@ -192,7 +193,8 @@ def test_a_rate_limit_blocks_only_its_bucket(data_dir):
     assert caught.value.code == 5 and caught.value.reason == 'rate_limit'
     send(g, 'general', headers=H('1', '99', '300'))
     log = [json.loads(line) for line in (protection(data_dir) / 'requests.jsonl').read_text().splitlines()]
-    assert [entry['outcome'] for entry in log] == ['rate_limited', 'ok']
+    assert [entry['outcome'] for entry in log if entry['n'] == 0] == ['rate_limited', 'ok']
+    assert sum(entry['n'] for entry in log) == 2
 
 
 def test_a_rate_limit_without_reset_lasts_the_default(data_dir):
@@ -335,3 +337,103 @@ def test_recent_counts_the_log_of_every_invocation(data_dir):
     send(guard.Guard(ACCOUNT, 25), headers=H('1', '99', '300'))
     send(guard.Guard(ACCOUNT, 25), headers=H('2', '98', '300'))
     assert guard.Guard(ACCOUNT, 25).recent() == {'last_hour': 2, 'last_day': 2}
+
+
+# --- reproductions of the P3 shared-contract review (Codex, round 1)
+
+
+def test_a_dead_probes_rate_limit_outlives_the_probe(data_dir):
+    dead = subprocess.Popen(['true'])
+    dead.wait()
+    write_buckets(data_dir, {'general': {'status': 'probe', 'pid': dead.pid, 'started_at': time.time() - 126,
+                                         'blocked_until': time.time() + 170}})
+    with pytest.raises(RedditError) as caught:
+        send(guard.Guard(ACCOUNT, 25))
+    assert caught.value.reason == 'rate_limit'
+    write_buckets(data_dir, {'general': {'status': 'unmetered', 'until': time.time() - 1,
+                                         'blocked_until': time.time() + 170}})
+    with pytest.raises(RedditError) as caught:
+        send(guard.Guard(ACCOUNT, 25))
+    assert caught.value.reason == 'rate_limit'
+
+
+def test_a_share_link_429_is_not_sent_again(data_dir):
+    g = guard.Guard(ACCOUNT, 25)
+    with g.request('share', metered=False) as slot:
+        slot.report(None)
+        slot.rate_limit('300')
+    with pytest.raises(RedditError) as caught:
+        send(g, 'share', metered=False)
+    assert caught.value.reason == 'rate_limit'
+    send(g, 'general', headers=H('1', '99', '300'))
+
+
+def test_the_unblock_check_is_one_general_request_within_the_budget(data_dir):
+    challenged_with_wiki_limit(data_dir)
+    g = guard.Guard(ACCOUNT, 1)
+    send_failed = False
+    with g.verify_unblock() as check:
+        with g.request('general') as inner:
+            inner.report(H('5', '95', '300'))
+        for bucket in ('general', 'wiki'):
+            try:
+                with g.request(bucket):
+                    pass
+            except RedditError:
+                send_failed = True
+        check.clear()
+    assert send_failed and g.used == 1
+    spent = guard.Guard(ACCOUNT, 1)
+    send(spent, headers=H('6', '94', '300'))
+    (protection(data_dir) / 'blocked.json').write_text(json.dumps({'reason': 'challenge', 'blocked_at': time.time(),
+                                                                   'expires_at': None}))
+    with pytest.raises(RedditError) as caught:
+        with spent.verify_unblock():
+            pass
+    assert caught.value.reason == 'budget'
+
+
+@pytest.mark.parametrize('bucket', [{'status': 'known'}, {'status': 'known', 'remaining': 5, 'used': 5},
+                                    {'status': 'probe'}, {'status': 'unmetered'}, {'status': 'known', 'remaining': -1,
+                                                                                  'used': 1, 'reset_at': 5.0}])
+def test_a_bucket_missing_what_its_status_needs_fails_closed(data_dir, bucket):
+    write_buckets(data_dir, {'general': bucket})
+    with pytest.raises(RedditError) as caught:
+        send(guard.Guard(ACCOUNT, 25))
+    assert caught.value.code == 5
+
+
+def test_a_low_general_bucket_does_not_slow_the_wiki(data_dir):
+    g = guard.Guard(ACCOUNT, 25)
+    send(g, headers=H('99', '1', '300'))
+    send(g, 'wiki', headers=H('1', '599', '300'))
+    with pytest.raises(RedditError) as caught:
+        send(g)
+    assert caught.value.reason == 'window_spent'
+
+
+def test_slow_down_waits_add_up_to_a_limit_per_command(data_dir, monkeypatch):
+    slept = []
+    monkeypatch.delenv('REDDIT_TEST_NO_WAIT')
+    monkeypatch.setattr(guard.time, 'sleep', lambda seconds: slept.append(seconds))
+    write_buckets(data_dir, {'general': {**known(10, 90, 290), 'slow_until': time.time() + 20}})
+    g = guard.Guard(ACCOUNT, 25)
+    send(g, headers=H('91', '9', '200'))
+    write_buckets(data_dir, {'general': {**known(9, 91, 200), 'slow_until': time.time() + 20}})
+    with pytest.raises(RedditError) as caught:
+        send(g)
+    assert caught.value.reason == 'window_spent' and sum(s for s in slept if s > 2.5) <= guard.MAX_WAIT_SECONDS
+
+
+KILL_SHARE = textwrap.dedent('''
+    import os, signal, sys
+    from reddit import guard
+    with guard.Guard(sys.argv[1], 25).request('share', metered=False) as slot:
+        os.kill(os.getpid(), signal.SIGKILL)
+''')
+
+
+def test_a_request_killed_after_sending_is_still_logged(data_dir):
+    env = {**os.environ, 'PYTHONPATH': str(SKILL / 'scripts'), 'REDDIT_DATA_DIR': str(data_dir)}
+    assert subprocess.run([sys.executable, '-c', KILL_SHARE, ACCOUNT], env=env).returncode == -signal.SIGKILL
+    assert guard.Guard(ACCOUNT, 25).recent() == {'last_hour': 1, 'last_day': 1}

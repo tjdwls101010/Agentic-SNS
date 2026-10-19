@@ -231,3 +231,93 @@ def test_scrub(case):
         assert got == case['output']
     else:
         assert not [x for x in case['output_excludes'] if x in json.dumps(got)]
+
+
+# --- reproductions of the P3 shared-contract review (Codex, round 1)
+
+
+def test_a_header_without_its_newline_is_refused_unchanged(tmp_path):
+    path = tmp_path / 'out.ndjson'
+    content = json.dumps({'kind': 'header', 'format': collection.FORMAT, 'context': X})
+    path.write_text(content)
+    with pytest.raises(RedditError):
+        collection.OutFile(path, X)
+    assert path.read_text() == content
+
+
+def test_a_record_committed_twice_fails_integrity(tmp_path):
+    path = tmp_path / 'out.ndjson'
+    head = json.dumps({'kind': 'header', 'format': collection.FORMAT, 'context': X})
+    a = json.dumps({'kind': 'post', 'id': 't3_a'})
+    page = json.dumps({'kind': 'page', 'ids': ['t3_a'], 'n': 1, 'stop_reason': None})
+    path.write_text('\n'.join([head, a, page, a, page.replace('null', '"exhausted"')]) + '\n')
+    with pytest.raises(RedditError) as caught:
+        collection.OutFile(path, X)
+    assert 'integrity' in caught.value.message
+
+
+def test_a_snapshot_reference_cannot_name_another_file(data_dir):
+    store = snapshots.Snapshots('u0')
+    victim = data_dir / 'protection/u0'
+    victim.mkdir(parents=True)
+    (victim / 'buckets.json').write_text('{}')
+    with pytest.raises(RedditError):
+        store.save('../../protection/u0/buckets', {'x': 1})
+    assert (victim / 'buckets.json').read_text() == '{}'
+
+
+HANDLE_SAVER = '''
+import os, sys, time
+from reddit import handles
+while not os.path.exists(sys.argv[1]):
+    time.sleep(0.001)
+for _ in range(40):
+    print(handles.save('u0', {'command': 'sub', 'reddit_account': 'v'}, {}))
+'''
+
+
+def test_processes_never_get_the_same_handle_number(data_dir, tmp_path):
+    import subprocess
+    import sys
+    from conftest import SKILL
+    go = tmp_path / 'go'
+    env = {**os.environ, 'PYTHONPATH': str(SKILL / 'scripts'), 'REDDIT_DATA_DIR': str(data_dir)}
+    children = [subprocess.Popen([sys.executable, '-c', HANDLE_SAVER, str(go)], env=env, stdout=subprocess.PIPE,
+                                 text=True) for _ in range(4)]
+    time.sleep(0.5)
+    go.write_text('go')
+    numbers = [int(n) for child in children for n in child.communicate()[0].split()]
+    assert len(numbers) == 160 and len(set(numbers)) == 160
+
+
+def test_a_collection_in_use_is_refused(tmp_path):
+    path = tmp_path / 'out.ndjson'
+    first = collection.OutFile(path, X)
+    with pytest.raises(RedditError) as caught:
+        collection.OutFile(path, X)
+    assert 'lock' in caught.value.message
+    first.close()
+
+
+SNAPSHOT_HOLDER = '''
+import sys, time
+from reddit import snapshots
+with snapshots.Snapshots('u0').locked():
+    open(sys.argv[1], 'w').write('in'); time.sleep(1.5)
+'''
+
+
+def test_snapshots_are_changed_one_process_at_a_time(data_dir, tmp_path):
+    import subprocess
+    import sys
+    from conftest import SKILL
+    flag = tmp_path / 'in'
+    env = {**os.environ, 'PYTHONPATH': str(SKILL / 'scripts'), 'REDDIT_DATA_DIR': str(data_dir)}
+    child = subprocess.Popen([sys.executable, '-c', SNAPSHOT_HOLDER, str(flag)], env=env)
+    while not flag.exists():
+        time.sleep(0.02)
+    started = time.time()
+    with snapshots.Snapshots('u0').locked():
+        waited = time.time() - started
+    child.wait(timeout=10)
+    assert waited > 1.0

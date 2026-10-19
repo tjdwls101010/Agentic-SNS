@@ -117,7 +117,7 @@ def test_requests(case):
 
 def test_a_share_link_is_unmetered():
     request = routes.share('https://www.reddit.com/r/example/s/AbC123')
-    assert request.bucket is None and request.metered is False
+    assert request.bucket == 'share' and request.metered is False
 
 
 def records(name):

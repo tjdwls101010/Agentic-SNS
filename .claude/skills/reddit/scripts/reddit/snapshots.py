@@ -64,11 +64,14 @@ class Snapshots:
                 continue
         return max(found)[1] if found else None
 
-    def load(self, generation):
-        """The snapshot of a generation; None when it expired or was evicted; unreadable raises (argument error)."""
+    def _path(self, generation):
         if not isinstance(generation, str) or not _GENERATION.fullmatch(generation):
             raise RedditError(2, 'The thread reference is not one this skill made.', _REOPEN)
-        path = self.directory / f'{generation}.json'
+        return self.directory / f'{generation}.json'
+
+    def load(self, generation):
+        """The snapshot of a generation; None when it expired or was evicted; unreadable raises (argument error)."""
+        path = self._path(generation)
         try:
             if time.time() - path.stat().st_mtime > TTL_SECONDS:
                 return None
@@ -83,11 +86,11 @@ class Snapshots:
 
     def save(self, generation, state):
         """Write a generation, then evict expired and, above MAX_BYTES, the oldest other snapshots."""
+        path = self._path(generation)
         encoded = json.dumps(state, ensure_ascii=False, separators=(',', ':')).encode()
         if len(encoded) > MAX_BYTES:
             raise RedditError(6, 'This comment thread is larger than the space kept for threads.',
                               'Read it with --out instead, which writes as it goes.')
-        path = self.directory / f'{generation}.json'
         temporary = None
         try:
             with tempfile.NamedTemporaryFile('wb', dir=self.directory, suffix='.tmp', delete=False) as stream:

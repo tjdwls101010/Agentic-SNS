@@ -24,13 +24,15 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
     state = dict(state or {})
     cursor, waiting = state.get('cursor'), list(state.get('pending') or [])
     seen, closed = set(state.get('seen') or []), bool(state.get('closed'))
-    results, skipped, visited, pages, served = [], [], set(), 0, 0
-    idle = 0  # consecutive fetched pages that brought no record not seen before
+    # cursors already requested and pages in a row with nothing new, carried across continuations
+    visited, idle = set(state.get('visited') or []), int(state.get('idle') or 0)
+    results, skipped, pages, served = [], [], 0, 0
 
     def snapshot():
         if cursor == END and not waiting:
             return None
-        return {'cursor': cursor, 'pending': waiting, 'seen': sorted(seen, key=str), 'closed': closed}
+        return {'cursor': cursor, 'pending': waiting, 'seen': sorted(seen, key=str), 'closed': closed,
+                'visited': sorted(visited), 'idle': idle}
 
     def outcome(reason, failure=None):
         return {'results': results, 'stop_reason': reason, 'failure': failure, 'state': snapshot(),

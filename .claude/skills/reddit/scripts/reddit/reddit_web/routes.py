@@ -46,7 +46,7 @@ class Request:
 
     @property
     def bucket(self):
-        return None if self.url else bucket_of(self.path)
+        return 'share' if self.url else bucket_of(self.path)
 
     @property
     def metered(self):

@@ -61,7 +61,7 @@ def _scan(data):
     """
     lines = data.split(b'\n')
     try:
-        header = json.loads(lines[0])
+        header = json.loads(lines[0]) if len(lines) > 1 else None  # a header without its newline is incomplete
     except ValueError:
         header = None
     result = {'header': header, 'ids': set(), 'skipped': set(), 'count': 0, 'state': None, 'complete': False,
@@ -78,7 +78,9 @@ def _scan(data):
             continue
         if record.get('kind') == 'page' and 'id' not in record:
             page_ids = [r.get('id') for r in page]
-            if broken or record.get('ids') != page_ids or record.get('n') != len(page):
+            named = [i for i in page_ids if i is not None]
+            if broken or record.get('ids') != page_ids or record.get('n') != len(page) or \
+                    len(set(named)) != len(named) or result['ids'] & set(named):
                 raise RedditError(2, 'The --out file failed its integrity check: a page line does not match the '
                                      'records above it.', 'Keep this file as it is and use a new path.')
             result['ids'].update(i for i in page_ids if i is not None)
