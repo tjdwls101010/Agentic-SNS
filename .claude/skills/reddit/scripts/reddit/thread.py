@@ -365,7 +365,7 @@ def _open(connection, snapshots, command, target, sort, handle, out, options):
         state = snapshots.load(out.state['generation']) or _rebuild(out.state)
         return state
     anchor = 't1_' + target.comment_id if target.comment_id else None
-    if command == 'comments':
+    if command == 'comments' and out is None:  # a new collection starts its own reading: it holds every comment
         latest = snapshots.latest(key)
         state = snapshots.load(latest) if latest else None
         if state is not None and (anchor is None or anchor in state['nodes']):
