@@ -203,3 +203,17 @@ def test_a_tab_lost_mid_command_is_replaced_by_the_one_another_command_already_o
     assert 'opener' not in browser.ops()
     assert [c['tab'] for c in browser.calls() if c['op'] == 'query'] == ['T1', 'T2']
     assert json.loads(session.read_text())['tab'] == 'T2'
+
+
+def test_a_resume_state_that_cannot_be_saved_is_named_even_after_a_resumable_stop(browser, data_dir):
+    spent = {**RATE, 'x-rate-limit-remaining': '0'}
+    known_tab(browser, data_dir).respond('query', query_result(home(['1']), headers=spent))
+    handles = data_dir / 'handles'
+    handles.mkdir(parents=True)
+    handles.chmod(stat.S_IRUSR | stat.S_IXUSR)
+    try:
+        code, out, _ = run_cli(browser, 'feed', '--limit', '40', '--json')
+    finally:
+        handles.chmod(0o700)
+    envelope = json.loads(out)
+    assert code == 8 and 'save a handle' in envelope['message'] and 'next' not in envelope

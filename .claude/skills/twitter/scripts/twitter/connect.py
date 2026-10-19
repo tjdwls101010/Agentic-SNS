@@ -188,8 +188,7 @@ def _continue(reading, options, account_id):
     try:
         number = handles.save(context, continuation['state'])
     except TwitterError as error:
-        current = reading.get('failure')
-        reading['failure'] = error if current is None or current.code == 8 else current
+        reading['failure'] = error  # whatever stopped the read, it cannot be resumed now: this is what to fix
         return
     reading['continuable'] = True
     reading['next'] = words(continuation['command'], continuation['target'], continuation['words'], options,
