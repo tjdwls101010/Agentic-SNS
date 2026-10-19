@@ -46,7 +46,8 @@ def describe():
             'page': 'after each committed page: kind "page" with no id, state (where the next page starts), ids and n '
                     'of the records above it, stop_reason, skipped, coverage; the last one of a complete file may '
                     'add verdict {code, message, fix, reason, window}: the result the reading ended in (empty, not '
-                    'visible, a window the listing did not reach)',
+                    'visible, a window the listing did not reach); ending (exhausted, window_reached) marks the page '
+                    'where a listing ended before that verdict was written, which a rerun then writes',
         },
         'resume': 'Rerun the same command with the same --out path: records after the last page line are dropped and '
                   'read again, saved ids are not written twice, and --limit counts what is saved. A complete file '
@@ -68,7 +69,7 @@ def _scan(data):
     except ValueError:
         header = None
     result = {'header': header, 'ids': set(), 'skipped': set(), 'count': 0, 'state': None, 'complete': False,
-              'verdict': None, 'boundary': len(lines[0]) + 1}
+              'verdict': None, 'ending': None, 'boundary': len(lines[0]) + 1}
     offset, page, broken = len(lines[0]) + 1, [], False
     for raw in lines[1:-1]:  # the last element follows the final newline: empty, or a partial line
         offset += len(raw) + 1
@@ -95,6 +96,7 @@ def _scan(data):
                                   'Keep this file as it is and use a new path.')
             result['complete'] = record.get('stop_reason') in COMPLETE
             result['verdict'] = record.get('verdict')
+            result['ending'] = record.get('ending') if record.get('ending') in COMPLETE else None
             result['boundary'], page = offset, []
         elif not broken:
             page.append(record)
@@ -171,7 +173,7 @@ class OutFile:
         self.path, self.context = resolve(path), context
         self.ids, self.skipped = set(), set()
         self.count = 0
-        self.state, self.complete = None, False
+        self.state, self.complete, self.ending = None, False, None
         self.stream = None
         try:
             self.stream = os.fdopen(_open(self.path, os.O_RDWR | os.O_CREAT), 'r+b')
@@ -203,13 +205,14 @@ class OutFile:
         scan = _scan(data)
         _check_header(scan['header'], self.context)
         self.ids, self.skipped, self.count = scan['ids'], scan['skipped'], scan['count']
-        self.state, self.complete = scan['state'], scan['complete']
+        self.state, self.complete, self.ending = scan['state'], scan['complete'], scan['ending']
         self.stream.seek(scan['boundary'])
         self.stream.truncate()
 
-    def commit(self, records, state, stop_reason, skipped=(), notes=()):
+    def commit(self, records, state, stop_reason, skipped=(), notes=(), ending=None):
         """Append one page and its marker, fsynced; records whose id is already saved are left out. Records are flat:
-        a nested replies tree is refused (each comment is its own record with parent_id)."""
+        a nested replies tree is refused (each comment is its own record with parent_id). ending names how the
+        source ended (exhausted, window_reached) on a page whose completion waits for the reading's verdict."""
         page, new = [], set()
         for record in records:
             if 'replies' in record:
@@ -227,6 +230,8 @@ class OutFile:
             marker['skipped'] = list(skipped)
         if notes:
             marker['coverage'] = list(notes)
+        if ending:
+            marker['ending'] = ending
         try:
             for record in page:
                 self.stream.write(_line(record))
@@ -239,7 +244,7 @@ class OutFile:
         self.ids |= new
         self.skipped |= set(skipped)
         self.count += len(page)
-        self.state, self.complete = state, stop_reason in COMPLETE
+        self.state, self.complete, self.ending = state, stop_reason in COMPLETE, ending
 
     def conclude(self, stop_reason, verdict):
         """Mark the file complete, as an empty page, with the verdict its reading ended in when there is one ({code,

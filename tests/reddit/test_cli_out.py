@@ -201,3 +201,25 @@ def test_a_torn_completion_is_judged_again_even_when_the_limit_was_reached(reddi
     code, text, _ = run_cli(reddit, *args)
     assert code == 8 and json.loads(text)['window']['coverage'].startswith('open')
     assert [r['id'] for r in lines(out) if r.get('kind') == 'post'] == ['t3_a'], 'nothing saved twice'
+
+
+def test_a_torn_completion_of_a_longer_listing_is_judged_from_the_file(reddit, tmp_path):
+    # Codex P7 round 4: with two pages the reread stopped at the limit after the first one
+    from test_cli_lists import epoch
+    out = tmp_path / 'sub.ndjson'
+    first = {**post('a')['data'], 'created_utc': epoch('2025-10-10T00:00:00')}
+    second = {**post('b')['data'], 'created_utc': epoch('2025-10-09T00:00:00')}
+    args = ['sub', 'r/example', '--sort', 'new', '--since', '2025-01-01', '--limit', '2', '--out', str(out), '--json']
+    reddit.me().json('/r/example/new.json', listing([{'kind': 't3', 'data': first}], after='t3_a'),
+                     query={'limit': '100'})
+    reddit.json('/r/example/new.json', listing([{'kind': 't3', 'data': second}]), query={'after': 't3_a'})
+    code, _, _ = run_cli(reddit, *args)
+    assert code == 8
+    out.write_bytes(out.read_bytes()[:-20])
+    before = [f for f in reddit.paths() if 'new.json' in f]
+    reddit.me()
+    code, text, _ = run_cli(reddit, *args)
+    assert code == 8 and json.loads(text)['window']['coverage'].startswith('open')
+    assert [f for f in reddit.paths() if 'new.json' in f] == before, 'judged from the file, the listing not read again'
+    code, text, _ = run_cli(reddit, *args)
+    assert code == 8, 'and kept from then on'

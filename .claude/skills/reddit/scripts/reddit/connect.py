@@ -228,23 +228,26 @@ def read_pages(connection, options, identity, state, out, *, request, command, t
     ending = []
 
     def commit(records, page_state, reason, skipped):
-        if reason in COMPLETE:  # the file is marked complete with its verdict once the reading is judged (_read)
+        final = reason in COMPLETE  # the file is marked complete with its verdict once the reading is judged (_read)
+        if final:
             ending.append(reason)
-            reason = None
-        out.commit(records, {**page_state, 'window': window.state(), **(extra or {})} if page_state else None, reason,
-                   skipped, window.report())
+        out.commit(records, {**page_state, 'window': window.state(), **(extra or {})} if page_state else None,
+                   None if final else reason, skipped, window.report(), ending=reason if final else None)
 
     if out is not None:
         start.update(seen=sorted(out.ids, key=str), pending=[])
     limit = options.get('limit') or (None if out is not None else DISPLAY)
     if out is not None and options.get('limit') is not None:
-        # a file whose listing ended without its completion line is read again and judged, whatever its count
-        if out.count >= options['limit'] and out.state is not None:
+        if out.count >= options['limit'] and not out.ending:
             return {'results': [], 'stop_reason': 'limit_reached', 'words': _words(identity, words)}
         limit = max(limit - out.count, 0)
     closes = window.closes if window.active and window.bounds['start'] is not None else None
-    result = paginate(fetch, limit=limit, state=start, keep=window.keep, closes=closes,
-                      commit=commit if out is not None else None, whole_pages=out is not None)
+    if out is not None and out.ending and out.state is None:  # the listing ended; only the verdict line was lost
+        ending.append(out.ending)
+        result = {'results': [], 'stop_reason': out.ending, 'failure': None, 'state': None}
+    else:
+        result = paginate(fetch, limit=limit, state=start, keep=window.keep, closes=closes,
+                          commit=commit if out is not None else None, whole_pages=out is not None)
     stop, failure = result['stop_reason'], result['failure']
     if stop == 'exhausted' and not any(received) and not start.get('seen') and not start.get('cursor'):
         failure = RedditError(7, 'Reddit returned nothing here.', 'Try another target, order or period.')
