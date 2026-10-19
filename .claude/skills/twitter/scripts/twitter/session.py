@@ -7,6 +7,8 @@ session lock (the lock order everywhere is session, then protection):
   commands starting together open one tab.
 - <account>.ack: the time of the last tab signal already moved into account protection (only grows).
 - <account>.dirty: present while the tab should have been emptied after a block and could not be.
+- <account>.nonce.json: how many of the skill's own requests were sent and how many the tab's timing list matched
+  by their nonce (doctor reports whether the matching works in this browser).
 - <account>.queries.json: operation ids learned from the tab. A cache: a lost update costs a re-index.
 Unreadable or missing state only means a new tab is opened and the bundled operation table is used, so it never blocks
 a request; an unreadable tab record is reported (reset) so the result can say the session was started over.
@@ -214,3 +216,19 @@ class Session:
             return
         data['queries'][name] = entry
         _write(self._path('.queries.json'), json.dumps(data))
+
+    def note_nonce(self, sent, matched):
+        """Add one command's own requests and the timing entries matched to them by their nonce."""
+        if not sent and not matched:
+            return
+        data = self.nonce
+        _write(self._path('.nonce.json'), json.dumps({'sent': data['sent'] + sent, 'matched': data['matched'] + matched,
+                                                     'at': time.time()}))
+
+    @property
+    def nonce(self):
+        try:
+            data = json.loads(self._path('.nonce.json').read_text())
+        except (OSError, ValueError):
+            data = {}
+        return {key: data.get(key) if type(data.get(key)) is int else 0 for key in ('sent', 'matched')}
