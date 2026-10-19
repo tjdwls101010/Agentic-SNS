@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date, datetime, time, timedelta
 
-from twitter import about, listing, maintenance, thread
+from twitter import about, listing, maintenance, search, thread
 from twitter.errors import TwitterError
 from twitter.render import render_page, render_summary
 from twitter.results import failure_envelope
@@ -185,6 +185,29 @@ COMMANDS = {
                    'requests: 1 per batch of about 30-40 replies.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
     },
+    'search': {
+        'help': 'Search posts, accounts or media, with X\'s search operators.',
+        'run': search.search,
+        'arguments': [(('target',), {'metavar': 'QUERY', 'help': 'What to search for, as typed into X: words, "phrases", OR, -exclusions and operators (from: to: since:YYYY-MM-DD until:YYYY-MM-DD min_faves: filter:links lang: …)'}),
+                      (('--type',), {'choices': ['posts', 'accounts', 'media'], 'default': 'posts', 'help': 'posts, accounts (people) or media'}),
+                      (('--sort',), {'choices': ['top', 'latest'], 'default': 'top', 'help': 'Posts and media: top (X\'s ranking) or latest (newest first)'})] + list(LIST),
+        'epilog': ['Results are in X\'s order for this account: top is a ranking, not a sample of opinion; latest is newest first. Accounts with the same or similar names are different results (compare url and their marks).',
+                   'since: and until: in the query are filters X applies itself, so such a search read to the end (stopped=exhausted) covers its window: window ... closed (server-filtered); stopped by --limit, the budget or X\'s limit it is still open. X decides which day boundaries those operators use.',
+                   'X allows about 50 searches per 15 minutes for this account (quotes count too): a wide search costs that limit, and when it runs out the command stops with exit 10 (before any result) or stopped=rate_limited (after some), naming when it resets.',
+                   'Without --limit or --out it reads one page; more: continues.',
+                   'requests: 1 per page of about 20.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
+    },
+    'quotes': {
+        'help': 'Read the posts that quote one post.',
+        'run': search.quotes,
+        'arguments': [(('target',), {'metavar': 'URL', 'help': 'x.com post URL or numeric id'}),
+                      (('--sort',), {'choices': ['top', 'recent'], 'default': 'top', 'help': 'top (X\'s ranking) or recent'})] + list(LIST),
+        'epilog': ['Each quote is its own post with two voices: the quoter\'s words, and the quoted post shown under it with its own author. Asked the way X\'s own quotes screen asks (a search for the post\'s id and its media links), so it shares search\'s limit (about 50 per 15 minutes).',
+                   'Without --limit or --out it reads one page; more: continues.',
+                   'requests: 1 per page of about 20.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
+    },
     'doctor': {
         'help': 'Check Aside, the browser tab, login, account protection and X\'s limits; always JSON.',
         'run': maintenance.doctor,
@@ -225,7 +248,7 @@ HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 
 
-READS = ('feed', 'profile', 'about', 'graph', 'me', 'post', 'replies')
+READS = ('feed', 'profile', 'about', 'graph', 'me', 'post', 'replies', 'search', 'quotes')
 
 
 def epilog(name, spec):
@@ -275,6 +298,8 @@ def validate(options):
     if options['command'] == 'post' and len(options['target']) > 1 and (options.get('limit') or options['sort'] != 'top'):
         raise TwitterError(2, 'Several posts are read without replies, so --limit and --sort do not apply.',
                            'Drop them, or read one post.')
+    if options['command'] == 'search' and not options['target'].strip():
+        raise TwitterError(2, 'Search text must not be empty.', 'Pass the words to search for.')
     if options.get('after') and options.get('out'):
         raise TwitterError(2, '--after and --out cannot be combined; --out resumes its own file.',
                            'Rerun the same command with the same --out path.')

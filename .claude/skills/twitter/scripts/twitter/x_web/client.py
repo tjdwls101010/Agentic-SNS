@@ -478,3 +478,15 @@ class Client:
         records = [account_record(node) for node in (root if isinstance(root, list) else []) if isinstance(node, dict)]
         self.confirm()
         return [r for r in records if not r.get('unavailable') and r.get('id')]
+
+    def search(self, text, product, cursor):
+        """One page of X's search for `text` (posts Top or Latest, People, Media), operators as typed."""
+        return self.timeline('SearchTimeline', {'rawQuery': text, 'product': product,
+                                                'withGrokTranslatedBio': product in ('Top', 'People')}, cursor)
+
+    def quotes(self, post_id, sort, cursor):
+        """One page of the posts quoting a post, asked the way X's own quotes screen asks (a search)."""
+        query = f'quoted_tweet_id:{post_id} OR url:"status/{post_id}/video" OR url:"status/{post_id}/photo"'
+        product = 'Latest' if sort == 'recent' else 'Top'
+        return self.timeline('SearchTimeline', {'rawQuery': query, 'product': product, 'querySource': 'tdqt',
+                                                'withGrokTranslatedBio': product == 'Top'}, cursor)
