@@ -141,6 +141,25 @@ COMMANDS = {
                    'requests: 1.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 9, 10),
     },
+    'graph': {
+        'help': 'Read the accounts a profile follows, or that follow it (all, verified, or ones you know).',
+        'run': listing.graph,
+        'arguments': [(('target',), {'help': 'X @handle or profile URL'}),
+                      (('relation',), {'choices': ['following', 'followers', 'verified', 'known'], 'help': 'following, followers, verified (followers with a paid check) or known (its followers you follow)'})] + list(LIST),
+        'epilog': ['A follow records what an account did, not friendship or agreement. Counts on the card (about) are what X reports; the list is what X serves, page by page, and it can stop early: three pages in a row with no new account end the read (stopped=query_failure with that reason).',
+                   'Without --limit or --out it reads one page; more: continues.',
+                   'requests: 1 to find the account, then 1 per page of about 20 accounts.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+    },
+    'me': {
+        'help': 'Read your own bookmarks or likes.',
+        'run': listing.me,
+        'arguments': [(('collection',), {'choices': ['bookmarks', 'likes'], 'help': 'bookmarks or likes (nobody else\'s likes are public on X)'})] + list(LIST),
+        'epilog': ['In X\'s order (most recently saved or liked first, as X serves it); each post keeps its own date, not when you saved or liked it.',
+                   'Without --limit, a window or --out it reads one page; more: continues.',
+                   'requests: 1 per page of about 20 posts.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
+    },
     'post': {
         'help': 'Read one post in full with its parent chain and first batch of replies, or several posts by id.',
         'run': thread.post,
@@ -206,7 +225,7 @@ HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 
 
-READS = ('feed', 'profile', 'about', 'post', 'replies')
+READS = ('feed', 'profile', 'about', 'graph', 'me', 'post', 'replies')
 
 
 def epilog(name, spec):

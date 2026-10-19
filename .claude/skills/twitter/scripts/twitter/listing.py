@@ -65,6 +65,44 @@ def profile(options):
                        window=_window(options, order))
 
 
+RELATIONS = {'following': 'Following', 'followers': 'Followers', 'verified': 'BlueVerifiedFollowers',
+             'known': 'FollowersYouKnow'}
+# 성진: X의 계정 목록은 커서를 주면서 빈 쪽을 이어 보낼 때가 있다(현행 지식) — 새것 없는 쪽 3번 연속이면 멈춘다
+ACCOUNT_IDLE_PAGES = 3
+
+
+def graph(options):
+    target = parse_account(options['target'])
+    relation = options['relation']
+    identity = {'relation': relation}
+
+    def read(connection, state, out):
+        client = connection.client
+        saved = (state or {}) if out is None else (out.state or {})
+        user_id = saved.get('user_id') or client.user(target.handle)['id']
+        return _read(options, identity, state, out, order=None, command='graph', target=target.url,
+                     extra={'user_id': user_id}, words=[relation], idle_limit=ACCOUNT_IDLE_PAGES,
+                     fetch=lambda cursor: client.timeline(RELATIONS[relation], {'userId': user_id}, cursor))
+
+    return connect.run(options, command='graph', target=target.url, identity=identity, reader=read)
+
+
+def me(options):
+    collection = options['collection']
+    identity = {'collection': collection}
+
+    def read(connection, state, out):
+        client = connection.client
+        if collection == 'likes':
+            fetch = lambda cursor: client.timeline('Likes', {'userId': connection.account_id}, cursor)  # noqa: E731
+        else:
+            fetch = lambda cursor: client.timeline('Bookmarks', {}, cursor)  # noqa: E731
+        return _read(options, identity, state, out, order='unordered', command='me', target=None, words=[collection],
+                     fetch=fetch)
+
+    return connect.run(options, command='me', target=None, identity=identity, reader=read)
+
+
 def _read(options, identity, state, out, *, order, fetch, command, target, extra=None, words=None, stops=False,
           idle_limit=2):
     start = dict(out.state or {}) if out is not None else dict(state or {})
