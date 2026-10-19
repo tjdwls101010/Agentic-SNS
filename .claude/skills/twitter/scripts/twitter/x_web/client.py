@@ -288,12 +288,15 @@ class Client:
         if not isinstance(report, dict):
             return
         signals = [s for s in report.get('signals') or [] if isinstance(s, dict)]
-        verdicts = []
+        verdicts, unrecorded = [], None
         for kept in signals:
             verdict = classify.signal(kept)
             if verdict.kind == 'rate_limited':
                 rate = kept.get('rate') if isinstance(kept.get('rate'), dict) else None
-                slot.record_bucket(verdict.bucket, 429 if kept.get('status') == 429 else 200, rate)
+                try:
+                    slot.record_bucket(verdict.bucket, 429 if kept.get('status') == 429 else 200, rate)
+                except TwitterError as error:
+                    unrecorded = unrecorded or error  # a block among the signals is still recorded first
             verdicts.append(verdict)
         if isinstance(report.get('moved'), str):
             verdicts.append(classify.signal({'moved': report['moved']}))
@@ -301,6 +304,8 @@ class Client:
         moments = [s['at'] for s in signals if type(s.get('at')) in (int, float)]
         if strongest is not None and strongest.block:
             self._stop(slot, strongest, moments, report.get('user_id'))
+        if unrecorded is not None:
+            raise unrecorded  # not acknowledged: protection does not hold what the signals said
         if moments:
             self.memory.acknowledge(max(moments))
         if strongest is not None:
@@ -398,8 +403,6 @@ class Client:
                         diagnostic('request', operation=operation, count=self.guard.count, status=result.get('status'),
                                    source=(result.get('used') or {}).get('source'))
                     self._consume(result, slot)
-                    if unrecorded is not None:
-                        raise unrecorded
                     if result.get('stopped') == 'limit':
                         raise self._limit(operation)
                     if result.get('stopped'):
@@ -420,6 +423,8 @@ class Client:
                     verdict = judge(result) if judge else None
                     if verdict is not None and verdict.block:
                         self._stop(slot, verdict)
+                    if unrecorded is not None:
+                        raise unrecorded
                     return result, verdict
             except TwitterError as error:
                 if error.reason != 'tab_missing' or attempt or self.guard.checking:

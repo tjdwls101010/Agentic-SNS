@@ -490,3 +490,26 @@ def test_evidence_set_aside_earlier_is_not_overwritten(data_dir):
             pass
     kept = sorted(p.read_text() for p in (data_dir / 'protection').glob('buckets.json.unreadable-*'))
     assert kept == ['broken at 1000', 'broken at 2000']
+
+
+def test_an_invalid_block_keeps_the_account_it_names(data_dir):
+    write(data_dir, 'blocked.json', {'reason': 'suspended', 'account_id': '1000000098'})
+    with make(Clock(1000)).verify_unblock() as slot:
+        assert slot.block_record['account_id'] == '1000000098'
+
+
+def test_a_state_file_that_cannot_be_set_aside_is_named_for_a_person(data_dir):
+    (data_dir / 'protection/blocked.json').mkdir(parents=True)
+    with pytest.raises(TwitterError) as error:
+        with make(Clock(1000)).verify_unblock():
+            pytest.fail('no check may be sent')
+    assert error.value.code == 5 and 'blocked.json' in error.value.message and 'person' in error.value.fix
+
+
+def test_a_dangling_block_link_is_unreadable_not_absent(data_dir):
+    (data_dir / 'protection').mkdir(parents=True)
+    (data_dir / 'protection/blocked.json').symlink_to(data_dir / 'nowhere.json')
+    with pytest.raises(TwitterError) as error:
+        with make(Clock(1000)).request(operation='TweetDetail'):
+            pytest.fail('no request may be sent')
+    assert error.value.code == 5

@@ -74,9 +74,12 @@ def _write(name, value):
 
 def _read(name):
     """The parsed state file (an object), None when absent; anything else raises (fail closed)."""
+    path = _directory() / name
     try:
-        value = json.loads((_directory() / name).read_text())
+        value = json.loads(path.read_text())
     except FileNotFoundError:
+        if path.is_symlink():
+            raise _UNREADABLE from None  # a link to nothing is not the absence of state
         return None
     except (OSError, ValueError):
         raise _UNREADABLE from None
@@ -129,6 +132,18 @@ def _next_allowed():
     if not _number(value):
         raise _UNREADABLE
     return value
+
+
+def _named_account(path):
+    """The account an unreadable block file still names, so its replacement is lifted only for that account."""
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    account = value.get('account_id') if isinstance(value, dict) else None
+    if type(account) is int and account > 0:
+        account = str(account)
+    return account if isinstance(account, str) and account.isdigit() else None
 
 
 def _blocked_error(record):
@@ -443,9 +458,13 @@ class Guard:
             try:
                 shutil.copyfile(directory / name, target)
             except OSError:
-                raise _UNREADABLE from None
+                raise TwitterError(5, f'Account protection file {name} is not a readable file, so requests are '
+                                      'refused and it cannot be set aside.',
+                                   f'A person should repair or remove data/protection/{name} after checking x.com in '
+                                   'the Aside browser.', reason='unreadable') from None
         if 'blocked.json' in broken or not (directory / 'blocked.json').exists():
-            _write('blocked.json', {'reason': 'account_locked', 'blocked_at': self.clock(), 'account_id': None})
+            _write('blocked.json', {'reason': 'account_locked', 'blocked_at': self.clock(),
+                                    'account_id': _named_account(directory / 'blocked.json')})
         for name in broken:
             if name != 'blocked.json':
                 try:

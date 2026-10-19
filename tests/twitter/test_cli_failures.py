@@ -238,3 +238,21 @@ def test_an_aside_failure_near_the_deadline_is_still_an_aside_failure(browser, d
     browser.respond('state', {'__sleep': 1.9, '__raw_stdout': 'Error: other side closed\n', '__exit': 1})
     code, out, _ = run_cli(browser, 'feed', env={'TWITTER_DEADLINE_SECONDS': '2.5'})
     assert code == 3 and json.loads(out)['error'] == 'aside'
+
+
+def test_a_lock_in_the_own_response_is_acted_on_even_when_its_limit_cannot_be_recorded(browser, data_dir):
+    buckets = data_dir / 'protection/buckets.json'
+    known_tab(browser, data_dir).respond('query', {**query_result('{"errors":[{"code":326}]}', headers=RATE),
+                                                   '__write': {str(buckets): 'not json'}})
+    code, out, _ = run_cli(browser, 'feed')
+    assert code == 5 and 'close' in browser.ops()
+    assert json.loads((data_dir / 'protection/blocked.json').read_text())['reason'] == 'account_locked'
+
+
+def test_a_limit_that_cannot_be_recorded_does_not_hide_a_lock_seen_after_it(browser, data_dir):
+    (data_dir / 'protection').mkdir(parents=True)
+    (data_dir / 'protection/buckets.json').write_text('not json')
+    known_tab(browser, data_dir, signals=[signal('NotificationsTimeline', at=1), signal('ViewerBadgeCounts', 200, (326,), at=2)])
+    code, out, _ = run_cli(browser, 'feed')
+    assert code == 5 and 'close' in browser.ops()
+    assert json.loads((data_dir / 'protection/blocked.json').read_text())['account_id'] == '1000000099'
