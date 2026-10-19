@@ -215,6 +215,8 @@ def summarize(path):
     for command in commands:
         text = outputs.get(command['id'], '')
         command['output_head'] = text[:400]
+        if command['tool'] != 'Bash':
+            continue  # a Read of a saved output repeats its first line; only the call that ran made requests
         match = re.search(r'requests=(\d+)/\d+', text) or re.search(r'"request_count":\s*(\d+)', text)
         if match:
             requests += int(match.group(1))
