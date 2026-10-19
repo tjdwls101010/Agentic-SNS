@@ -93,7 +93,7 @@ def run(options, *, command, target, identity, reader, window=None, bound=True):
 def _settled_file(path, context):
     """Decide a --out file from the file alone, before any request: a foreign or older file is refused, a complete
     one reads nothing. Returns the reading of a complete file, else None (read on)."""
-    saved, complete, count = peek(path)
+    saved, complete, count, verdict = peek(path)
     if saved is None:
         return None
     if {k: v for k, v in saved.items() if k != 'reddit_account'} != {k: v for k, v in context.items()
@@ -101,8 +101,13 @@ def _settled_file(path, context):
         raise RedditError(2, 'The --out file belongs to another command, target, order, window or account.',
                           'Use a new --out path, or rerun the command that started this file.')
     if complete:
-        return {'results': [], 'stop_reason': 'exhausted', 'already_complete': True, 'count': count,
-                'observed': saved.get('reddit_account')}
+        reading = {'results': [], 'stop_reason': 'exhausted', 'already_complete': True, 'count': count,
+                   'observed': saved.get('reddit_account')}
+        if verdict:
+            reading['failure'] = RedditError(verdict['code'], verdict['message'], verdict['fix'], verdict.get('reason'))
+            if verdict.get('window'):
+                reading['window'] = verdict['window']
+        return reading
     return None
 
 
@@ -126,7 +131,12 @@ def _read(connection, options, command, target, identity, reader, out_path):
             reading['count'] = out.count
             reading['continuable'] = out.state is not None and not out.complete
             failure = reading.get('failure')
-            stopped = isinstance(failure, RedditError) and failure.code in (4, 5, 9)
+            if out.complete and isinstance(failure, RedditError) and failure.code in (7, 8, 9) \
+                    and failure.reason != 'karma_unchecked':
+                out.conclude(reading.get('stop_reason') or 'exhausted', {'code': failure.code, 'message': failure.message,
+                                                                         'fix': failure.fix, 'reason': failure.reason,
+                                                                         'window': reading.get('window')})
+            stopped = out.complete or isinstance(failure, RedditError) and failure.code in (4, 5, 9)
             if not stopped and (reading.get('stop_reason') in ('budget', 'window_spent', 'probe_pending')
                                 or isinstance(failure, RedditError)):
                 reading['next'] = words(command, target, reading.get('words', []), options, out=out_path)

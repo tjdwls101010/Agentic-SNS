@@ -102,3 +102,44 @@ def test_a_new_thread_collection_holds_comments_already_shown_by_an_earlier_read
     reddit.me().json('/comments/aaa1.json', pair([t1('c1', 't3_aaa1'), t1('c2', 't3_aaa1')]))
     code, text, _ = run_cli(reddit, 'comments', PERMALINK, '--out', str(out))
     assert code == 0 and [r['id'] for r in lines(out) if r.get('kind') == 'comment'] == ['t1_c1', 't1_c2']
+
+
+def test_a_hidden_history_is_judged_for_a_collection_too_and_kept(reddit, tmp_path):
+    # Codex P7: profile --out skipped the karma check and ended as an empty result (7)
+    from test_cli_people import about_user
+    out = tmp_path / 'profile.ndjson'
+    reddit.me().json('/user/example_user/overview.json', listing([]))
+    reddit.json('/user/example_user/about.json', about_user(28, 55636))
+    code, text, _ = run_cli(reddit, 'profile', 'u/example_user', '--out', str(out), '--json')
+    envelope = json.loads(text)
+    assert code == 9 and envelope['reason'] == 'history_not_visible' and 'next' not in envelope
+    before = len(reddit.fetches())
+    code, text, _ = run_cli(reddit, 'profile', 'u/example_user', '--out', str(out), '--json')
+    assert code == 9 and json.loads(text)['reason'] == 'history_not_visible' and len(reddit.fetches()) == before
+
+
+def test_a_window_the_listing_did_not_reach_stays_open_when_the_command_is_rerun(reddit, tmp_path):
+    # Codex P7: the rerun said already complete (0) and dropped the window's warning; the first run offered a resume
+    from test_cli_lists import epoch
+    out = tmp_path / 'sub.ndjson'
+    old = {**post('a')['data'], 'created_utc': epoch('2025-10-09T00:00:00')}
+    reddit.me().json('/r/example/new.json', listing([{'kind': 't3', 'data': old}]))
+    code, text, _ = run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--since', '2025-01-01', '--out', str(out),
+                            '--json')
+    envelope = json.loads(text)
+    assert code == 8 and envelope['window']['coverage'].startswith('open') and 'next' not in envelope
+    before = len(reddit.fetches())
+    code, text, _ = run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--since', '2025-01-01', '--out', str(out),
+                            '--json')
+    envelope = json.loads(text)
+    assert code == 8 and 'ended before' in envelope['message'] and envelope['window']['coverage'].startswith('open')
+    assert len(reddit.fetches()) == before
+
+
+def test_an_empty_collection_stays_empty_when_rerun(reddit, tmp_path):
+    out = tmp_path / 'sub.ndjson'
+    reddit.me().json('/r/example/new.json', listing([]))
+    code, text, _ = run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--out', str(out))
+    assert code == 7
+    code, text, _ = run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--out', str(out))
+    assert code == 7

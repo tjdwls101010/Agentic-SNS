@@ -73,7 +73,7 @@ def profile(options):
         reading = connect.read_pages(connection, options, identity, state, out, command='profile', target=target.name,
                         request=lambda after: routes.profile(target.user, kind, sort, options.get('time'), after))
         failure = reading.get('failure')
-        if unfiltered and out is None and failure is not None and failure.code == 7:
+        if unfiltered and (out is None or not out.count) and failure is not None and failure.code == 7:
             reading['failure'] = _history(connection, target.user, kind)
         return reading
 

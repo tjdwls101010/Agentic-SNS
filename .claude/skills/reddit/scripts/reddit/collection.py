@@ -1,7 +1,8 @@
 """--out files: NDJSON committed a whole page at a time, so an interrupted collection resumes where it stopped.
 
 Line 1 is a header (kind header, format, the query context, started_at). Then records, each page closed by a marker
-(kind page, the state to resume from, ids and n of the records above it, stop_reason, skipped, coverage). Only
+(kind page, the state to resume from, ids and n of the records above it, stop_reason, skipped, coverage; the last
+marker of a complete file may carry the verdict its reading ended in, which a rerun repeats). Only
 complete pages are trusted: the tail after the last marker is dropped and read again. A file for another query or an
 older format is refused before any byte changes. The file is the user's own: it must be a regular file with one link,
 it is opened without following a final symbolic link, kept private (0600) and locked without waiting; a path through a
@@ -43,11 +44,13 @@ def describe():
             'record': 'a post, comment, subreddit or user record (see schema <object>); a thread file holds the post '
                       'once, then its comments flat, each with parent_id and depth',
             'page': 'after each committed page: kind "page" with no id, state (where the next page starts), ids and n '
-                    'of the records above it, stop_reason, skipped, coverage',
+                    'of the records above it, stop_reason, skipped, coverage; the last one of a complete file may '
+                    'add verdict {code, message, fix, reason, window}: the result the reading ended in (empty, not '
+                    'visible, a window the listing did not reach)',
         },
         'resume': 'Rerun the same command with the same --out path: records after the last page line are dropped and '
                   'read again, saved ids are not written twice, and --limit counts what is saved. A complete file '
-                  'reads nothing. A file for another query, another account, an earlier format or one whose pages do '
+                  'reads nothing and repeats its verdict. A file for another query, another account, an earlier format or one whose pages do '
                   'not match their records is refused before any byte changes; use a new path.',
         'privacy': 'The file holds other people\'s names, words and profile links. Keep it outside the repository.',
     }
@@ -65,7 +68,7 @@ def _scan(data):
     except ValueError:
         header = None
     result = {'header': header, 'ids': set(), 'skipped': set(), 'count': 0, 'state': None, 'complete': False,
-              'boundary': len(lines[0]) + 1}
+              'verdict': None, 'boundary': len(lines[0]) + 1}
     offset, page, broken = len(lines[0]) + 1, [], False
     for raw in lines[1:-1]:  # the last element follows the final newline: empty, or a partial line
         offset += len(raw) + 1
@@ -88,6 +91,7 @@ def _scan(data):
             result['count'] += len(page)
             result['state'] = record.get('state')
             result['complete'] = record.get('stop_reason') in COMPLETE
+            result['verdict'] = record.get('verdict')
             result['boundary'], page = offset, []
         elif not broken:
             page.append(record)
@@ -134,18 +138,19 @@ def _open(path, flags):
 
 
 def peek(path):
-    """(the query context a file was written for, whether it is complete, records saved), reading only; (None, False,
-    0) when the file does not exist or is empty. A file that is not a current collection raises like opening it."""
+    """(the query context a file was written for, whether it is complete, records saved, the verdict a complete
+    reading ended in or None), reading only; (None, False, 0, None) when the file does not exist or is empty. A file
+    that is not a current collection raises like opening it."""
     try:
         with os.fdopen(_open(resolve(path), os.O_RDONLY), 'rb') as stream:
             data = stream.read()
     except FileNotFoundError:
-        return None, False, 0
+        return None, False, 0, None
     if not data:
-        return None, False, 0
+        return None, False, 0, None
     scan = _scan(data)
     _check_header(scan['header'], None)
-    return scan['header']['context'], scan['complete'], scan['count']
+    return scan['header']['context'], scan['complete'], scan['count'], scan['verdict']
 
 
 class OutFile:
@@ -224,6 +229,19 @@ class OutFile:
         self.skipped |= set(skipped)
         self.count += len(page)
         self.state, self.complete = state, stop_reason in COMPLETE
+
+    def conclude(self, stop_reason, verdict):
+        """Close a complete file with the verdict its reading ended in ({code, message, fix, reason, window}: empty, not
+        visible, a window the listing did not reach), as an empty page, so rerunning the command repeats it."""
+        marker = {'kind': 'page', 'state': self.state, 'ids': [], 'n': 0, 'stop_reason': stop_reason,
+                  'verdict': verdict}
+        try:
+            self.stream.write(_line(marker))
+            self.stream.flush()
+            os.fsync(self.stream.fileno())
+        except OSError:
+            raise RedditError(6, 'A page could not be written to the --out file.', 'Free disk space, then rerun the '
+                                                                                   'same command.') from None
 
     def close(self):
         if self.stream is not None:
