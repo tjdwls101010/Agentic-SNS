@@ -748,7 +748,480 @@
  "after_recon": {
   "item": "X8, X12, R3",
   "source": "P2",
-  "fact": "Community notes (birdwatch_pivot and the withBirdwatchNotes variable), polls and link cards (card.legacy.binding_values), article bodies (fieldToggles withArticlePlainText / withArticleRichContentState) and edit markers (edit_control: earlier version ids) have not been seen in a response yet. Their cases are written from the P2 captures, read by a person, not invented here.",
-  "cases": []
+  "fact": "Shapes seen in the P2 captures (2026-10-19), written here with synthetic values; polls were not seen live and their case follows X's known card keys (X15: unverified).",
+  "cases": [
+   {
+    "name": "community-note",
+    "item": "X8 R3",
+    "source": "P2",
+    "fact": "birdwatch_pivot is a community note shown under the post: other users' added context, not the author's words. title says what it is, subtitle.text is the note, note.rest_id its id.",
+    "parser": "post",
+    "raw": {
+     "__typename": "Tweet",
+     "rest_id": "1850000000000000301",
+     "core": {
+      "user_results": {
+       "result": {
+        "$user": "A"
+       }
+      }
+     },
+     "legacy": {
+      "full_text": "post 1850000000000000301",
+      "created_at": "Thu Oct 15 10:00:00 +0000 2026",
+      "entities": {}
+     },
+     "birdwatch_pivot": {
+      "title": "Readers added context they thought people might want to know",
+      "shorttitle": "Readers added context",
+      "subtitle": {
+       "text": "The quoted figure is from 2019; the 2026 figure is lower. https://t.co/NOTESRC1",
+       "entities": [
+        {
+         "fromIndex": 61,
+         "toIndex": 84,
+         "ref": {
+          "type": "TimelineUrl",
+          "url": "https://t.co/NOTESRC1",
+          "expandedUrl": "https://stats.example.org/2026",
+          "urlType": "ExternalUrl"
+         }
+        }
+       ]
+      },
+      "note": {
+       "rest_id": "1860000000000000001"
+      },
+      "destinationUrl": "https://twitter.com/i/birdwatch/n/1860000000000000001",
+      "visualStyle": "Default",
+      "iconType": "BirdwatchV1Icon"
+     }
+    },
+    "expected": {
+     "community_note": {
+      "id": "1860000000000000001",
+      "title": "Readers added context they thought people might want to know",
+      "text": "The quoted figure is from 2019; the 2026 figure is lower. https://stats.example.org/2026",
+      "url": "https://x.com/i/birdwatch/n/1860000000000000001"
+     }
+    }
+   },
+   {
+    "name": "link-card",
+    "item": "X8 R3",
+    "source": "P2",
+    "fact": "A link card: card.legacy.name and binding_values (title, description, domain, card_url); the card_url is the post's t.co link, so its destination comes from the post's url entities.",
+    "parser": "post",
+    "raw": {
+     "__typename": "Tweet",
+     "rest_id": "1850000000000000302",
+     "core": {
+      "user_results": {
+       "result": {
+        "$user": "A"
+       }
+      }
+     },
+     "legacy": {
+      "full_text": "Read this https://t.co/CARD0001",
+      "created_at": "Thu Oct 15 10:00:00 +0000 2026",
+      "entities": {
+       "urls": [
+        {
+         "url": "https://t.co/CARD0001",
+         "expanded_url": "https://news.example.com/story/1"
+        }
+       ]
+      }
+     },
+     "card": {
+      "rest_id": "card://1",
+      "legacy": {
+       "name": "summary_large_image",
+       "url": "https://t.co/CARD0001",
+       "binding_values": [
+        {
+         "key": "title",
+         "value": {
+          "string_value": "A synthetic headline",
+          "type": "STRING"
+         }
+        },
+        {
+         "key": "description",
+         "value": {
+          "string_value": "What the page says about itself.",
+          "type": "STRING"
+         }
+        },
+        {
+         "key": "domain",
+         "value": {
+          "string_value": "news.example.com",
+          "type": "STRING"
+         }
+        },
+        {
+         "key": "vanity_url",
+         "value": {
+          "string_value": "news.example.com",
+          "type": "STRING",
+          "scribe_key": "vanity_url"
+         }
+        },
+        {
+         "key": "card_url",
+         "value": {
+          "string_value": "https://t.co/CARD0001",
+          "type": "STRING",
+          "scribe_key": "card_url"
+         }
+        }
+       ]
+      }
+     }
+    },
+    "expected": {
+     "card": {
+      "kind": "summary_large_image",
+      "title": "A synthetic headline",
+      "description": "What the page says about itself.",
+      "domain": "news.example.com",
+      "url": "https://news.example.com/story/1"
+     }
+    }
+   },
+   {
+    "name": "poll-card-unverified",
+    "item": "X8 X15",
+    "source": "known X card keys (not seen live)",
+    "fact": "A poll is a card named poll<N>choice_text_only whose binding values hold choiceK_label and choiceK_count (strings), counts_are_final (boolean) and end_datetime_utc. Read but marked unverified in schema.",
+    "parser": "post",
+    "raw": {
+     "__typename": "Tweet",
+     "rest_id": "1850000000000000303",
+     "core": {
+      "user_results": {
+       "result": {
+        "$user": "A"
+       }
+      }
+     },
+     "legacy": {
+      "full_text": "post 1850000000000000303",
+      "created_at": "Thu Oct 15 10:00:00 +0000 2026",
+      "entities": {}
+     },
+     "card": {
+      "rest_id": "card://2",
+      "legacy": {
+       "name": "poll2choice_text_only",
+       "url": "https://t.co/POLL0001",
+       "binding_values": [
+        {
+         "key": "choice1_label",
+         "value": {
+          "string_value": "Yes",
+          "type": "STRING"
+         }
+        },
+        {
+         "key": "choice1_count",
+         "value": {
+          "string_value": "30",
+          "type": "STRING"
+         }
+        },
+        {
+         "key": "choice2_label",
+         "value": {
+          "string_value": "No",
+          "type": "STRING"
+         }
+        },
+        {
+         "key": "choice2_count",
+         "value": {
+          "string_value": "10",
+          "type": "STRING"
+         }
+        },
+        {
+         "key": "counts_are_final",
+         "value": {
+          "boolean_value": true,
+          "type": "BOOLEAN"
+         }
+        },
+        {
+         "key": "end_datetime_utc",
+         "value": {
+          "string_value": "2026-10-16T10:00:00Z",
+          "type": "STRING"
+         }
+        }
+       ]
+      }
+     }
+    },
+    "expected": {
+     "card": {
+      "kind": "poll2choice_text_only",
+      "poll": {
+       "choices": [
+        {
+         "label": "Yes",
+         "count": 30
+        },
+        {
+         "label": "No",
+         "count": 10
+        }
+       ],
+       "final": true,
+       "ends_at": "2026-10-16T10:00:00Z"
+      }
+     }
+    }
+   },
+   {
+    "name": "article-in-a-list",
+    "item": "X8 R3",
+    "source": "P2",
+    "fact": "In lists an article is its title and preview text (article.article_results.result); its body comes only in a post read.",
+    "parser": "post",
+    "raw": {
+     "__typename": "Tweet",
+     "rest_id": "1850000000000000304",
+     "core": {
+      "user_results": {
+       "result": {
+        "$user": "A"
+       }
+      }
+     },
+     "legacy": {
+      "full_text": "post 1850000000000000304",
+      "created_at": "Thu Oct 15 10:00:00 +0000 2026",
+      "entities": {}
+     },
+     "article": {
+      "article_results": {
+       "result": {
+        "rest_id": "1870000000000000001",
+        "title": "A synthetic article",
+        "preview_text": "The opening lines of the article…",
+        "metadata": {
+         "first_published_at_secs": 1792300000
+        }
+       }
+      }
+     }
+    },
+    "expected": {
+     "article": {
+      "id": "1870000000000000001",
+      "title": "A synthetic article",
+      "preview": "The opening lines of the article…",
+      "text": null
+     }
+    }
+   },
+   {
+    "name": "article-body-in-a-post-read",
+    "item": "X8 R3",
+    "source": "P2",
+    "fact": "A post read with withArticleRichContentState carries content_state.blocks: the article's paragraphs in order; their texts joined by blank lines are the body.",
+    "parser": "post",
+    "raw": {
+     "__typename": "Tweet",
+     "rest_id": "1850000000000000305",
+     "core": {
+      "user_results": {
+       "result": {
+        "$user": "A"
+       }
+      }
+     },
+     "legacy": {
+      "full_text": "post 1850000000000000305",
+      "created_at": "Thu Oct 15 10:00:00 +0000 2026",
+      "entities": {}
+     },
+     "article": {
+      "article_results": {
+       "result": {
+        "rest_id": "1870000000000000002",
+        "title": "A long synthetic article",
+        "preview_text": "First paragraph.",
+        "content_state": {
+         "blocks": [
+          {
+           "key": "a",
+           "type": "unstyled",
+           "text": "First paragraph.",
+           "entityRanges": [],
+           "inlineStyleRanges": [],
+           "data": {}
+          },
+          {
+           "key": "b",
+           "type": "header-two",
+           "text": "A heading",
+           "entityRanges": [],
+           "inlineStyleRanges": [],
+           "data": {}
+          },
+          {
+           "key": "c",
+           "type": "atomic",
+           "text": " ",
+           "entityRanges": [],
+           "inlineStyleRanges": [],
+           "data": {}
+          },
+          {
+           "key": "d",
+           "type": "blockquote",
+           "text": "A quoted line.",
+           "entityRanges": [],
+           "inlineStyleRanges": [],
+           "data": {}
+          }
+         ],
+         "entityMap": []
+        }
+       }
+      }
+     }
+    },
+    "expected": {
+     "article": {
+      "id": "1870000000000000002",
+      "title": "A long synthetic article",
+      "text": "First paragraph.\n\nA heading\n\nA quoted line."
+     }
+    }
+   },
+   {
+    "name": "edited-latest-version",
+    "item": "X12 R3",
+    "source": "P2",
+    "fact": "The latest version of an edited post carries edit_control.edit_control_initial.edit_tweet_ids (every version, oldest first) and initial_tweet_id.",
+    "parser": "post",
+    "raw": {
+     "__typename": "Tweet",
+     "rest_id": "1850000000000000307",
+     "core": {
+      "user_results": {
+       "result": {
+        "$user": "A"
+       }
+      }
+     },
+     "legacy": {
+      "full_text": "post 1850000000000000307",
+      "created_at": "Thu Oct 15 10:00:00 +0000 2026",
+      "entities": {}
+     },
+     "edit_control": {
+      "edit_control_initial": {
+       "edit_tweet_ids": [
+        "1850000000000000306",
+        "1850000000000000307"
+       ],
+       "editable_until_msecs": "1792319914000",
+       "edits_remaining": "4",
+       "is_edit_eligible": true
+      },
+      "initial_tweet_id": "1850000000000000306"
+     }
+    },
+    "expected": {
+     "edit": {
+      "versions": [
+       "1850000000000000306",
+       "1850000000000000307"
+      ],
+      "latest": true
+     }
+    }
+   },
+   {
+    "name": "edited-earlier-version",
+    "item": "X12 R3",
+    "source": "P2",
+    "fact": "The first version carries edit_control.edit_tweet_ids directly; it is not the latest when later ids follow it. post <id> opens any version.",
+    "parser": "post",
+    "raw": {
+     "__typename": "Tweet",
+     "rest_id": "1850000000000000306",
+     "core": {
+      "user_results": {
+       "result": {
+        "$user": "A"
+       }
+      }
+     },
+     "legacy": {
+      "full_text": "post 1850000000000000306",
+      "created_at": "Thu Oct 15 10:00:00 +0000 2026",
+      "entities": {}
+     },
+     "edit_control": {
+      "edit_tweet_ids": [
+       "1850000000000000306",
+       "1850000000000000307"
+      ],
+      "editable_until_msecs": "1792319914000",
+      "edits_remaining": "4",
+      "is_edit_eligible": true
+     }
+    },
+    "expected": {
+     "edit": {
+      "versions": [
+       "1850000000000000306",
+       "1850000000000000307"
+      ],
+      "latest": false
+     }
+    }
+   },
+   {
+    "name": "never-edited",
+    "item": "X12",
+    "source": "P2",
+    "fact": "One version only is no edit history.",
+    "parser": "post",
+    "raw": {
+     "__typename": "Tweet",
+     "rest_id": "1850000000000000308",
+     "core": {
+      "user_results": {
+       "result": {
+        "$user": "A"
+       }
+      }
+     },
+     "legacy": {
+      "full_text": "post 1850000000000000308",
+      "created_at": "Thu Oct 15 10:00:00 +0000 2026",
+      "entities": {}
+     },
+     "edit_control": {
+      "edit_tweet_ids": [
+       "1850000000000000308"
+      ],
+      "editable_until_msecs": "1",
+      "edits_remaining": "5",
+      "is_edit_eligible": true
+     }
+    },
+    "expected": {
+     "edit": null
+    }
+   }
+  ]
  }
 }

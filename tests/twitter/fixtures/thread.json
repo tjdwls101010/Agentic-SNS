@@ -1,5 +1,5 @@
 {
- "about": "A post page (appendix A 24): TweetDetail's instructions read into the asked post (role post), its parents (role parent, top first) and its replies (role reply) with depth, plus reply coverage. Roles follow position and ids, never query names: the entry whose post id is the asked id is the post; on a first page, posts before it outside any module are parents; posts inside conversationthread-* modules are replies; other modules (related posts, who to follow) are not part of the conversation; the new reader counts them as other (the previous one dropped them silently). depth is how far down the in-page reply chain a reply sits (0 answers the post). Coverage: reported (the post's own reply_count as X reports it), direct_shown, nested_shown, branches (collapsed branches inside modules: ShowMore cursors), hidden (X's 'show more replies' prompts outside modules: ShowMoreThreads, ShowMoreThreadsPrompt), unavailable (tombstones among replies). {\"$post\": [id, reply_to_id]} stands for a minimal tweet result with that rest_id answering reply_to_id (null for none), author A, created_at 2026-10-15T10:00:00Z; a \"legacy_extra\" object inside the result is merged into its legacy. source: code (previous thread.py), measured (planning session: page 1 = the post + 38 conversationthread modules of one post each + a Bottom cursor, no ShowMore), P2 (cursor shapes not yet seen).",
+ "about": "A post page (appendix A 24): TweetDetail's instructions read into the asked post (role post), its parents (role parent, top first) and its replies (role reply) with depth, plus reply coverage. Roles follow position and ids, never query names: the entry whose post id is the asked id is the post; on a first page, posts before it outside any module are parents; posts inside conversationthread-* modules are replies; other modules (related posts, who to follow) are not part of the conversation; the new reader counts them as other (the previous one dropped them silently). depth is a reply's place in its conversation module (0: the module's first item, which answers the post; later items sit under it); parent_shown says whether the post a reply answers is on the page (X's modules can skip posts). Coverage: reported (the post's own reply_count as X reports it), direct_shown, nested_shown, branches (collapsed branches inside modules: ShowMore cursors), hidden (X's 'show more replies' prompts outside modules: ShowMoreThreads, ShowMoreThreadsPrompt), unavailable (tombstones among replies). {\"$post\": [id, reply_to_id]} stands for a minimal tweet result with that rest_id answering reply_to_id (null for none), author A, created_at 2026-10-15T10:00:00Z; a \"legacy_extra\" object inside the result is merged into its legacy. source: code (previous thread.py), measured (planning session: page 1 = the post + 38 conversationthread modules of one post each + a Bottom cursor, no ShowMore), P2 (cursor shapes not yet seen).",
  "users": {
   "A": {
    "__typename": "User",
@@ -558,6 +558,100 @@
    "expected": {
     "order": [],
     "coverage_has_reported": false
+   }
+  },
+  {
+   "name": "module-skips-a-post",
+   "item": "24",
+   "source": "P2",
+   "fact": "A conversation module can skip posts: its second item answers a post that is not on the page. It is still under the first item (depth by position in the module), and parent_shown false says the post it answers was not shown.",
+   "post_id": "1850000000000000140",
+   "cursor": null,
+   "instructions": [
+    {
+     "type": "TimelineAddEntries",
+     "entries": [
+      {
+       "entryId": "tweet-1850000000000000140",
+       "content": {
+        "itemContent": {
+         "itemType": "TimelineTweet",
+         "tweet_results": {
+          "result": {
+           "$post": [
+            "1850000000000000140",
+            null
+           ]
+          }
+         }
+        }
+       }
+      },
+      {
+       "entryId": "conversationthread-1850000000000000141",
+       "content": {
+        "entryType": "TimelineTimelineModule",
+        "items": [
+         {
+          "entryId": "conversationthread-1850000000000000141-tweet-1850000000000000141",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTweet",
+            "tweet_results": {
+             "result": {
+              "$post": [
+               "1850000000000000141",
+               "1850000000000000140"
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "entryId": "conversationthread-1850000000000000141-tweet-1850000000000000143",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTweet",
+            "tweet_results": {
+             "result": {
+              "$post": [
+               "1850000000000000143",
+               "1850000000000000142"
+              ]
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "order": [
+     [
+      "1850000000000000140",
+      "post",
+      0
+     ],
+     [
+      "1850000000000000141",
+      "reply",
+      0
+     ],
+     [
+      "1850000000000000143",
+      "reply",
+      1
+     ]
+    ],
+    "parent_shown": {
+     "1850000000000000141": true,
+     "1850000000000000143": false
+    }
    }
   }
  ]

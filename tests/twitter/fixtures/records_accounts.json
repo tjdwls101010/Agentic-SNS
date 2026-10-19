@@ -1,81 +1,458 @@
 {
-  "about": "Account records (appendix A 18, 33). parser account: one raw X user result (as found at user_results.result or data.user.result) to one record, or a record with unavailable true for a UserUnavailable. expected lists only the fields the case is about; a field not named is free. Field names are the skill's own (shared with the threads skill where the concept is the same: username, full_name, follower_count, private, bio); X-only ideas keep X's meaning (is_blue_verified, verified_type). X sends newer grouped fields (core, avatar, location, privacy, verification, relationship_counts, tweet_counts, action_counts, website, banner, pinned_items, relationship_perspectives) and older legacy ones; the newer wins and legacy fills what it lacks. Counts X does not send are null (not reported), never 0. Times are UTC ISO. source: code (previous records.py), P2 (inferred, confirmed against captures). All people, ids and links are synthetic.",
-  "cases": [
-    {"name": "grouped-fields", "item": "18", "source": "code", "fact": "Identity and profile come from the grouped fields; the profile URL is built from the handle.",
-     "parser": "account",
-     "raw": {"__typename": "User", "rest_id": "1000000001",
-             "core": {"screen_name": "example_author", "name": "Example Author", "created_at": "Wed Oct 10 20:19:24 +0000 2018"},
-             "avatar": {"image_url": "https://pbs.twimg.com/profile_images/1/synthetic_normal.jpg"},
-             "banner": {"image_url": "https://pbs.twimg.com/profile_banners/1000000001/1"},
-             "location": {"location": "Example City"},
-             "website": {"url": "https://example.org/about"},
-             "privacy": {"protected": false},
-             "relationship_counts": {"followers": 1200, "following": 300},
-             "tweet_counts": {"tweets": 4500, "media_tweets": 80},
-             "action_counts": {"favorites_count": 9000},
-             "legacy": {}},
-     "expected": {"id": "1000000001", "username": "example_author", "full_name": "Example Author", "created_at": "2018-10-10T20:19:24+00:00",
-                  "follower_count": 1200, "following_count": 300, "post_count": 4500, "media_count": 80, "like_count": 9000,
-                  "location": "Example City", "website": "https://example.org/about", "url": "https://x.com/example_author",
-                  "avatar_url": "https://pbs.twimg.com/profile_images/1/synthetic_normal.jpg", "banner_url": "https://pbs.twimg.com/profile_banners/1000000001/1",
-                  "private": false, "unavailable": false}},
-    {"name": "legacy-fallback", "item": "18", "source": "code", "fact": "When the grouped fields are absent, legacy fills screen_name, name, created_at, followers_count, friends_count (following) and statuses_count (posts).",
-     "parser": "account",
-     "raw": {"__typename": "User", "rest_id": "1000000002",
-             "legacy": {"screen_name": "legacy_person", "name": "Legacy Person", "created_at": "Mon Jan 02 03:04:05 +0000 2012",
-                        "followers_count": 15, "friends_count": 20, "statuses_count": 7}},
-     "expected": {"id": "1000000002", "username": "legacy_person", "full_name": "Legacy Person", "created_at": "2012-01-02T03:04:05+00:00",
-                  "follower_count": 15, "following_count": 20, "post_count": 7}},
-    {"name": "counts-not-sent-are-null", "item": "18,33", "source": "code", "fact": "A count X did not send is null (not reported), not 0.",
-     "parser": "account",
-     "raw": {"__typename": "User", "rest_id": "1000000003", "core": {"screen_name": "sparse_account", "name": "Sparse"}, "legacy": {}},
-     "expected": {"follower_count": null, "following_count": null, "post_count": null, "media_count": null, "like_count": null}},
-    {"name": "paid-check-and-org-badge", "item": "18,33", "source": "code", "fact": "is_blue_verified is the paid subscription mark, not identity verification; verification.verified_type Business or Government is an organisation badge; verification.verified is the separate verified flag.",
-     "parser": "account",
-     "raw": {"__typename": "User", "rest_id": "1000000004", "core": {"screen_name": "org_example", "name": "Org Example"},
-             "is_blue_verified": true, "verification": {"verified": false, "verified_type": "Business"}, "legacy": {}},
-     "expected": {"is_blue_verified": true, "is_verified": false, "verified_type": "Business"}},
-    {"name": "no-badges", "item": "18", "source": "code", "fact": "Without the fields, both marks are false and the type null.",
-     "parser": "account",
-     "raw": {"__typename": "User", "rest_id": "1000000005", "core": {"screen_name": "plain_person", "name": "Plain"}, "legacy": {}},
-     "expected": {"is_blue_verified": false, "is_verified": false, "verified_type": null}},
-    {"name": "bio-links-expanded", "item": "18", "source": "code", "fact": "The bio's t.co links are replaced by their destinations (profile_bio first, legacy description entities as fallback).",
-     "parser": "account",
-     "raw": {"__typename": "User", "rest_id": "1000000006", "core": {"screen_name": "bio_person", "name": "Bio"},
-             "profile_bio": {"description": "Writing at https://t.co/AAAA1111 and more",
-                             "entities": {"description": {"urls": [{"url": "https://t.co/AAAA1111", "expanded_url": "https://blog.example.org/"}]}}},
-             "legacy": {}},
-     "expected": {"bio": "Writing at https://blog.example.org/ and more"}},
-    {"name": "bio-legacy-fallback", "item": "18", "source": "code", "fact": "Without profile_bio, legacy.description with legacy.entities.description.urls.",
-     "parser": "account",
-     "raw": {"__typename": "User", "rest_id": "1000000007", "core": {"screen_name": "bio_legacy", "name": "Bio L"},
-             "legacy": {"description": "See https://t.co/BBBB2222", "entities": {"description": {"urls": [{"url": "https://t.co/BBBB2222", "expanded_url": "https://example.net/x"}]}}}},
-     "expected": {"bio": "See https://example.net/x"}},
-    {"name": "relationship-to-viewer", "item": "18", "source": "code", "fact": "relationship_perspectives says how the logged-in account relates to this one; a perspective X did not send is null (unknown), follow_request_sent defaults to false.",
-     "parser": "account",
-     "raw": {"__typename": "User", "rest_id": "1000000008", "core": {"screen_name": "friend_example", "name": "Friend"},
-             "relationship_perspectives": {"following": true, "followed_by": false},
-             "legacy": {}},
-     "expected": {"relationship": {"following": true, "followed_by": false, "blocking": null, "muting": null, "follow_request_sent": false}}},
-    {"name": "protected-account", "item": "18", "source": "code", "fact": "privacy.protected marks an account whose posts only approved followers see.",
-     "parser": "account",
-     "raw": {"__typename": "User", "rest_id": "1000000009", "core": {"screen_name": "locked_posts", "name": "Locked"}, "privacy": {"protected": true}, "follow_request_sent": true, "legacy": {}},
-     "expected": {"private": true, "relationship": {"follow_request_sent": true}}},
-    {"name": "affiliation-and-pins", "item": "18", "source": "code", "fact": "affiliates_highlighted_label is the organisation label X shows next to the name; pinned_items.tweet_ids_str are the pinned post ids.",
-     "parser": "account",
-     "raw": {"__typename": "User", "rest_id": "1000000010", "core": {"screen_name": "staff_member", "name": "Staff"},
-             "affiliates_highlighted_label": {"label": {"description": "Example Org", "url": {"url": "https://x.com/example_org", "urlType": "DeepLink"}, "userLabelType": "BusinessLabel"}},
-             "professional": {"professional_type": "Creator", "category": [{"name": "Science"}]},
-             "pinned_items": {"tweet_ids_str": ["1850000000000000100"]},
-             "legacy": {}},
-     "expected": {"affiliation": {"label": "Example Org", "url": "https://x.com/example_org"}, "pinned_post_ids": ["1850000000000000100"]}},
-    {"name": "pins-legacy-fallback", "item": "18", "source": "P2", "fact": "Older payloads keep the pin in legacy.pinned_tweet_ids_str.",
-     "parser": "account",
-     "raw": {"__typename": "User", "rest_id": "1000000011", "core": {"screen_name": "old_pins", "name": "Old Pins"}, "legacy": {"pinned_tweet_ids_str": ["1850000000000000101"]}},
-     "expected": {"pinned_post_ids": ["1850000000000000101"]}},
-    {"name": "unavailable-user", "item": "10,18", "source": "code", "fact": "A UserUnavailable result is an account that cannot be shown (suspended, deactivated); it keeps the reason X gave.",
-     "parser": "account",
-     "raw": {"__typename": "UserUnavailable", "reason": "Suspended"},
-     "expected": {"unavailable": true, "unavailable_reason": "Suspended"}}
-  ]
+ "about": "Account records (appendix A 18, 33). parser account: one raw X user result (as found at user_results.result or data.user.result) to one record, or a record with unavailable true for a UserUnavailable. expected lists only the fields the case is about; a field not named is free. Field names are the skill's own (shared with the threads skill where the concept is the same: username, full_name, follower_count, private, bio); X-only ideas keep X's meaning (is_blue_verified, verified_type). X sends newer grouped fields (core, avatar, location, privacy, verification, relationship_counts, tweet_counts, action_counts, website, banner, pinned_items, relationship_perspectives) and older legacy ones; the newer wins and legacy fills what it lacks. Counts X does not send are null (not reported), never 0. Times are UTC ISO. source: code (previous records.py), P2 (inferred, confirmed against captures). All people, ids and links are synthetic.",
+ "cases": [
+  {
+   "name": "grouped-fields",
+   "item": "18",
+   "source": "code",
+   "fact": "Identity and profile come from the grouped fields; the profile URL is built from the handle.",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000001",
+    "core": {
+     "screen_name": "example_author",
+     "name": "Example Author",
+     "created_at": "Wed Oct 10 20:19:24 +0000 2018"
+    },
+    "avatar": {
+     "image_url": "https://pbs.twimg.com/profile_images/1/synthetic_normal.jpg"
+    },
+    "banner": {
+     "image_url": "https://pbs.twimg.com/profile_banners/1000000001/1"
+    },
+    "location": {
+     "location": "Example City"
+    },
+    "website": {
+     "url": "https://example.org/about"
+    },
+    "privacy": {
+     "protected": false
+    },
+    "relationship_counts": {
+     "followers": 1200,
+     "following": 300
+    },
+    "tweet_counts": {
+     "tweets": 4500,
+     "media_tweets": 80
+    },
+    "action_counts": {
+     "favorites_count": 9000
+    },
+    "legacy": {}
+   },
+   "expected": {
+    "id": "1000000001",
+    "username": "example_author",
+    "full_name": "Example Author",
+    "created_at": "2018-10-10T20:19:24+00:00",
+    "follower_count": 1200,
+    "following_count": 300,
+    "post_count": 4500,
+    "media_count": 80,
+    "like_count": 9000,
+    "location": "Example City",
+    "website": "https://example.org/about",
+    "url": "https://x.com/example_author",
+    "avatar_url": "https://pbs.twimg.com/profile_images/1/synthetic_normal.jpg",
+    "banner_url": "https://pbs.twimg.com/profile_banners/1000000001/1",
+    "private": false,
+    "unavailable": false
+   }
+  },
+  {
+   "name": "legacy-fallback",
+   "item": "18",
+   "source": "code",
+   "fact": "When the grouped fields are absent, legacy fills screen_name, name, created_at, followers_count, friends_count (following) and statuses_count (posts).",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000002",
+    "legacy": {
+     "screen_name": "legacy_person",
+     "name": "Legacy Person",
+     "created_at": "Mon Jan 02 03:04:05 +0000 2012",
+     "followers_count": 15,
+     "friends_count": 20,
+     "statuses_count": 7
+    }
+   },
+   "expected": {
+    "id": "1000000002",
+    "username": "legacy_person",
+    "full_name": "Legacy Person",
+    "created_at": "2012-01-02T03:04:05+00:00",
+    "follower_count": 15,
+    "following_count": 20,
+    "post_count": 7
+   }
+  },
+  {
+   "name": "counts-not-sent-are-null",
+   "item": "18,33",
+   "source": "code",
+   "fact": "A count X did not send is null (not reported), not 0.",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000003",
+    "core": {
+     "screen_name": "sparse_account",
+     "name": "Sparse"
+    },
+    "legacy": {}
+   },
+   "expected": {
+    "follower_count": null,
+    "following_count": null,
+    "post_count": null,
+    "media_count": null,
+    "like_count": null
+   }
+  },
+  {
+   "name": "paid-check-and-org-badge",
+   "item": "18,33",
+   "source": "code",
+   "fact": "is_blue_verified is the paid subscription mark, not identity verification; verification.verified_type Business or Government is an organisation badge; verification.verified is the separate verified flag.",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000004",
+    "core": {
+     "screen_name": "org_example",
+     "name": "Org Example"
+    },
+    "is_blue_verified": true,
+    "verification": {
+     "verified": false,
+     "verified_type": "Business"
+    },
+    "legacy": {}
+   },
+   "expected": {
+    "is_blue_verified": true,
+    "is_verified": false,
+    "verified_type": "Business"
+   }
+  },
+  {
+   "name": "no-badges",
+   "item": "18",
+   "source": "code",
+   "fact": "Without the fields, both marks are false and the type null.",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000005",
+    "core": {
+     "screen_name": "plain_person",
+     "name": "Plain"
+    },
+    "legacy": {}
+   },
+   "expected": {
+    "is_blue_verified": false,
+    "is_verified": false,
+    "verified_type": null
+   }
+  },
+  {
+   "name": "bio-links-expanded",
+   "item": "18",
+   "source": "code",
+   "fact": "The bio's t.co links are replaced by their destinations (profile_bio first, legacy description entities as fallback).",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000006",
+    "core": {
+     "screen_name": "bio_person",
+     "name": "Bio"
+    },
+    "profile_bio": {
+     "description": "Writing at https://t.co/AAAA1111 and more",
+     "entities": {
+      "description": {
+       "urls": [
+        {
+         "url": "https://t.co/AAAA1111",
+         "expanded_url": "https://blog.example.org/"
+        }
+       ]
+      }
+     }
+    },
+    "legacy": {}
+   },
+   "expected": {
+    "bio": "Writing at https://blog.example.org/ and more"
+   }
+  },
+  {
+   "name": "bio-legacy-fallback",
+   "item": "18",
+   "source": "code",
+   "fact": "Without profile_bio, legacy.description with legacy.entities.description.urls.",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000007",
+    "core": {
+     "screen_name": "bio_legacy",
+     "name": "Bio L"
+    },
+    "legacy": {
+     "description": "See https://t.co/BBBB2222",
+     "entities": {
+      "description": {
+       "urls": [
+        {
+         "url": "https://t.co/BBBB2222",
+         "expanded_url": "https://example.net/x"
+        }
+       ]
+      }
+     }
+    }
+   },
+   "expected": {
+    "bio": "See https://example.net/x"
+   }
+  },
+  {
+   "name": "relationship-to-viewer",
+   "item": "18",
+   "source": "code",
+   "fact": "relationship_perspectives says how the logged-in account relates to this one; a perspective X did not send is null (unknown), follow_request_sent defaults to false.",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000008",
+    "core": {
+     "screen_name": "friend_example",
+     "name": "Friend"
+    },
+    "relationship_perspectives": {
+     "following": true,
+     "followed_by": false
+    },
+    "legacy": {}
+   },
+   "expected": {
+    "relationship": {
+     "following": true,
+     "followed_by": false,
+     "blocking": null,
+     "muting": null,
+     "follow_request_sent": false
+    }
+   }
+  },
+  {
+   "name": "protected-account",
+   "item": "18",
+   "source": "code",
+   "fact": "privacy.protected marks an account whose posts only approved followers see.",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000009",
+    "core": {
+     "screen_name": "locked_posts",
+     "name": "Locked"
+    },
+    "privacy": {
+     "protected": true
+    },
+    "follow_request_sent": true,
+    "legacy": {}
+   },
+   "expected": {
+    "private": true,
+    "relationship": {
+     "follow_request_sent": true
+    }
+   }
+  },
+  {
+   "name": "affiliation-and-pins",
+   "item": "18",
+   "source": "code",
+   "fact": "affiliates_highlighted_label is the organisation label X shows next to the name; pinned_items.tweet_ids_str are the pinned post ids.",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000010",
+    "core": {
+     "screen_name": "staff_member",
+     "name": "Staff"
+    },
+    "affiliates_highlighted_label": {
+     "label": {
+      "description": "Example Org",
+      "url": {
+       "url": "https://x.com/example_org",
+       "urlType": "DeepLink"
+      },
+      "userLabelType": "BusinessLabel"
+     }
+    },
+    "professional": {
+     "professional_type": "Creator",
+     "category": [
+      {
+       "name": "Science"
+      }
+     ]
+    },
+    "pinned_items": {
+     "tweet_ids_str": [
+      "1850000000000000100"
+     ]
+    },
+    "legacy": {}
+   },
+   "expected": {
+    "affiliation": {
+     "label": "Example Org",
+     "url": "https://x.com/example_org"
+    },
+    "pinned_post_ids": [
+     "1850000000000000100"
+    ]
+   }
+  },
+  {
+   "name": "pins-legacy-fallback",
+   "item": "18",
+   "source": "P2",
+   "fact": "Older payloads keep the pin in legacy.pinned_tweet_ids_str.",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000011",
+    "core": {
+     "screen_name": "old_pins",
+     "name": "Old Pins"
+    },
+    "legacy": {
+     "pinned_tweet_ids_str": [
+      "1850000000000000101"
+     ]
+    }
+   },
+   "expected": {
+    "pinned_post_ids": [
+     "1850000000000000101"
+    ]
+   }
+  },
+  {
+   "name": "unavailable-user",
+   "item": "10,18",
+   "source": "code",
+   "fact": "A UserUnavailable result is an account that cannot be shown (suspended, deactivated); it keeps the reason X gave.",
+   "parser": "account",
+   "raw": {
+    "__typename": "UserUnavailable",
+    "reason": "Suspended"
+   },
+   "expected": {
+    "unavailable": true,
+    "unavailable_reason": "Suspended"
+   }
+  },
+  {
+   "name": "declared-label",
+   "item": "18",
+   "source": "P2",
+   "fact": "parody_commentary_fan_label is the label the account declared about itself (Parody, Commentary, Fan); the string 'None' means none.",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000012",
+    "core": {
+     "screen_name": "commentary_acct",
+     "name": "Commentary"
+    },
+    "parody_commentary_fan_label": "Commentary"
+   },
+   "expected": {
+    "declared_label": "Commentary"
+   }
+  },
+  {
+   "name": "declared-label-none",
+   "item": "18",
+   "source": "P2",
+   "fact": "The string 'None' is no label.",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000013",
+    "core": {
+     "screen_name": "plain_two",
+     "name": "Plain"
+    },
+    "parody_commentary_fan_label": "None"
+   },
+   "expected": {
+    "declared_label": null
+   }
+  },
+  {
+   "name": "no-legacy-at-all",
+   "item": "18",
+   "source": "P2",
+   "fact": "Current user results carry no legacy object at all; grouped fields alone make the record.",
+   "parser": "account",
+   "raw": {
+    "__typename": "User",
+    "rest_id": "1000000014",
+    "core": {
+     "screen_name": "grouped_only",
+     "name": "Grouped",
+     "created_at": "Mon Jan 02 03:04:05 +0000 2012"
+    },
+    "relationship_counts": {
+     "followers": 3,
+     "following": 4
+    },
+    "tweet_counts": {
+     "tweets": 5
+    },
+    "privacy": {
+     "protected": false
+    },
+    "verification": {
+     "verified": false
+    },
+    "is_blue_verified": true,
+    "relationship_perspectives": {
+     "following": false,
+     "followed_by": false,
+     "blocking": false,
+     "blocked_by": false,
+     "muting": true
+    }
+   },
+   "expected": {
+    "username": "grouped_only",
+    "follower_count": 3,
+    "following_count": 4,
+    "post_count": 5,
+    "is_blue_verified": true,
+    "relationship": {
+     "following": false,
+     "followed_by": false,
+     "blocking": false,
+     "muting": true
+    }
+   }
+  }
+ ]
 }
