@@ -70,6 +70,7 @@ def test_a_listing_that_ends_before_the_window_is_partial(reddit):
     reddit.me().json('/r/example/new.json', listing([post('a', epoch('2026-10-01T00:00:00'))]), query={'limit': '100'})
     code, out, _ = run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--since', '2026-01-01')
     assert code == 8 and 'ended before' in out and 'title a' in out
+    assert 'stopped=exhausted' in out.splitlines()[0], 'the listing ended; no budget ran out'
 
 
 def test_a_window_needs_sort_new(reddit):

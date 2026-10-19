@@ -95,7 +95,9 @@ def _failure_kind(error, has_records):
 
 
 def _stop_of(error):
-    """The stop reason of a resumable stop (code 8): which limit ended it."""
+    """The stop reason of a code 8 stop: which limit ended it, or the listing's end before the window's start."""
+    if error.reason == 'listing_ended':
+        return 'exhausted'
     return error.reason if error.reason in _RESUMABLE else 'budget'
 
 

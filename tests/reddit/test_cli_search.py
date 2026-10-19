@@ -49,6 +49,14 @@ def test_an_empty_search_is_not_retried(reddit):
     assert code == 7 and reddit.paths() == ['/api/me.json', '/search.json']
 
 
+def test_an_empty_search_in_a_window_is_empty(reddit):
+    # measured 2026-10-20: an empty answer under --since came back as 8, stopped=budget
+    reddit.me().json('/r/example/search.json', listing([]))
+    code, out, _ = run_cli(reddit, 'search', 'x', '--in', 'r/example', '--sort', 'new', '--since', '2026-10-13', '--json')
+    envelope = json.loads(out)
+    assert code == 7 and envelope['error'] == 'empty' and envelope['stop_reason'] == 'exhausted'
+
+
 def test_related_reads_the_other_discussions_of_a_link(reddit):
     reddit.me().json('/duplicates/aaa1.json', [listing([post('aaa1')]), listing([post('bbb2', subreddit='other')])])
     code, out, _ = run_cli(reddit, 'related', 'https://www.reddit.com/r/example/comments/aaa1/t/')

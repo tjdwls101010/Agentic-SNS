@@ -206,8 +206,11 @@ def read_pages(connection, options, identity, state, out, *, request, command, t
     for key in (extra or {}):
         start.pop(key, None)
 
+    received = []
+
     def fetch(cursor):
         records, after = connection.network().listing(request(cursor))
+        received.append(len(records))
         return records, {'has_next_page': after is not None, 'end_cursor': after}, bool(records)
 
     def commit(records, page_state, reason, skipped):
@@ -225,7 +228,9 @@ def read_pages(connection, options, identity, state, out, *, request, command, t
     result = paginate(fetch, limit=limit, state=start, keep=window.keep, closes=closes,
                       commit=commit if out is not None else None, whole_pages=out is not None)
     stop, failure = result['stop_reason'], result['failure']
-    if stop == 'exhausted' and window.bounds['start'] is not None:
+    if stop == 'exhausted' and not any(received) and not start.get('seen') and not start.get('cursor'):
+        failure = RedditError(7, 'Reddit returned nothing here.', 'Try another target, order or period.')
+    elif stop == 'exhausted' and window.bounds['start'] is not None:
         failure = RedditError(8, 'The listing ended before the window\'s start: Reddit had no older posts to show '
                                  'here, so the window is not covered.', 'Use a later --since, or search with --sort '
                                                                         'new instead of reading the listing.',
