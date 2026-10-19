@@ -215,7 +215,7 @@ COMMANDS = {
                    'A comment link is answered from the latest snapshot of its post when it holds that comment (no request); otherwise its subtree is read (1 request).',
                    'With --out the whole thread is written: the post once, then every comment flat (parent_id and depth), a page per expansion; rerun the same command to resume the same reading even after its snapshot expired.',
                    'requests: none from the snapshot; otherwise 1 account check + 1 per expansion (or 1 for a new read); --max-requests bounds a large thread, more: continues.'],
-        'exits': (0, 2, 3, 4, 5, 6, 8, 9),
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
     },
     'doctor': {
         'help': 'Check Aside, the Reddit login and account protection; always JSON.',
