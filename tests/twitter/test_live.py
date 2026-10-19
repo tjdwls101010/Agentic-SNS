@@ -1,7 +1,8 @@
 """Live smoke against the real X account in the Aside browser — opt in with TWITTER_LIVE=1.
 
 Targets come from the environment only (this repository is public): TWITTER_LIVE_POST (a public post URL with replies
-beyond the first batch). Each step asserts what a working read must show: records with their fields, a stop reason,
+beyond the first batch and reposts), TWITTER_LIVE_ACCOUNT (a public @handle with lists), TWITTER_LIVE_LIST and
+TWITTER_LIVE_COMMUNITY (ids), TWITTER_LIVE_SPACE (a space link; ended or gone is fine). Each step asserts what a working read must show: records with their fields, a stop reason,
 requests within the budget, a continuation that leads to the next read, no duplicates across pages. Never point it at
 a screen that changes state when read (the notifications screen marks notifications as read).
 """
@@ -68,4 +69,38 @@ def test_doctor_feed_two_pages_post_more_replies_and_a_branch():
         code, under = cli('replies', str(branch['replies_handle']), '--json')
         assert code == 0, under
         assert any(r['reply_to_id'] == branch['id'] for r in under['results'])
+    print(json.dumps({'spent': SPENT}), file=sys.stderr)
+
+
+def test_the_surfaces_added_after_the_core():
+    """P4: each read makes 1-2 requests of its own (the rest is the page's own background, 2-4 a command), with the
+    records its kind promises."""
+    def read(*args, kinds, allow=(0,)):
+        code, result = cli(*args, '--json', '--max-requests', '5')
+        assert code in allow, result
+        if code == 0:
+            assert result['results'] and {r['kind'] for r in result['results']} <= set(kinds), result.get('message')
+            missing = [{k: (r[k] if k in ('kind', 'unavailable', 'role', 'unit') else type(r[k]).__name__) for k in sorted(r)}
+                       for r in result['results'] if not r.get('id') and not r.get('unavailable')]
+            assert not missing, (args[:2], missing[:2])
+        assert own(result) <= 8
+        return result
+
+    account = os.environ['TWITTER_LIVE_ACCOUNT']
+    read('reposts', os.environ['TWITTER_LIVE_POST'], kinds=('account',))
+    read('graph', account, 'similar', kinds=('account',), allow=(0, 7))  # X's suggestions vary, sometimes none
+    read('profile', account, '--tab', 'lists', kinds=('list',))
+    read('profile', account, '--tab', 'memberships', kinds=('list',), allow=(0, 7))
+    for tab, kinds in (('posts', ('post',)), ('members', ('account',)), ('about', ('list',))):
+        read('list', os.environ['TWITTER_LIVE_LIST'], '--tab', tab, kinds=kinds)
+    for tab, kinds in (('posts', ('post',)), ('media', ('post',)), ('about', ('community',))):
+        read('community', os.environ['TWITTER_LIVE_COMMUNITY'], '--tab', tab, kinds=kinds)
+    read('community', kinds=('community',))
+    read('search', 'the', '--in', 'communities', kinds=('post',))
+    trending = read('trends', kinds=('trend', 'event'))
+    assert all(r.get('query') for r in trending['results'] if r['kind'] == 'trend')
+    read('trends', '--tab', 'foryou', kinds=('trend', 'event'))
+    read('about', os.environ['TWITTER_LIVE_SPACE'], kinds=('space',), allow=(0, 9))
+    read('me', 'notifications', kinds=('notification', 'post'), allow=(0, 7))
+    read('me', 'mentions', kinds=('post',), allow=(0, 7))
     print(json.dumps({'spent': SPENT}), file=sys.stderr)
