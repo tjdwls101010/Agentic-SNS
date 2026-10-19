@@ -58,7 +58,7 @@
       {"name": "missing-ids-counted", "post": "aaa1",
        "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": ["c2", "c3"], "parent": "t3_aaa1", "count": 2}],
        "expansions": [{"request": {"kind": "ids", "ids": ["c2", "c3"]}, "answer": [{"id": "c2", "parent": "t3_aaa1"}]}],
-       "expected": {"missing": ["c3"], "gaps_left": 0, "requests": 3, "note": "new rule (P2 R1): c3 is asked for three times before it counts as missing; the old reader counted it missing after one reply"}}
+       "expected": {"missing": ["c3"], "gaps_left": 0, "requests": 1, "note": "the reply holds one thing, far from a cut, so c3 is gone at once (P2 R1)"}}
     ]
   },
   "coverage": {
@@ -79,12 +79,12 @@
        "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": ["d1"], "parent": "t3_aaa1", "count": 1}, {"id": "c2", "parent": "t3_aaa1"}, {"more": ["c3"], "parent": "t3_aaa1", "count": 1}],
        "server": {"d1": null, "c3": {"id": "c3", "parent": "t3_aaa1"}},
        "old": {"stalled": true, "c3_read": false},
-       "expected": {"stalled": false, "c3_read": true, "missing": ["d1"], "complete": true, "requests": 3, "note": "d1 and c3 go in one batch (across gaps); d1 is asked for twice more alone"}}
+       "expected": {"stalled": false, "c3_read": true, "missing": ["d1"], "complete": true, "requests": 1, "note": "d1 and c3 go in one batch (across gaps); the reply was not cut, so d1 is gone"}}
     ]
   },
   "batching": {
     "item": "24,25 (P2 R1)",
-    "fact": "The new expansion plan: when no comment is left to show, take the first gap in depth-first order and gather not-yet-requested ids of the same post across gaps, up to 100, into one morechildren request; the descriptor remembers each id's gap and its order inside that gap; the reply's requested comments go back into their own gap's place in the gap's own id order (Reddit's reply order differs), descendants under their parents in reply order, a new more under its parent as a new gap. Reddit cuts a reply at about 100 things, so an id that did not come is put first in the next batch and counts as missing only after three requests (P2 R1: 31 of 38 absent ids came on the second request; the last 7 asked alone came back empty). Progress is a new comment, a new gap or a requested id finished (received or missing). Only the same descriptor planned again without progress stalls, and only that gap. An id-less gap under a comment is that comment's subtree in one request.",
+    "fact": "The new expansion plan: when no comment is left to show, take the first gap in depth-first order and gather not-yet-requested ids of the same post across gaps, up to 100, into one morechildren request; the descriptor remembers each id's gap and its order inside that gap; the reply's requested comments go back into their own gap's place in the gap's own id order (Reddit's reply order differs), descendants under their parents in reply order, a new more under its parent as a new gap. Reddit cuts a reply at about 100 things and drops whole requested comments from a cut reply, so an id absent from a cut reply (90 things or more) is asked again in a batch of only such ids, half as large each time; an id absent from a reply that was not cut, or asked alone, is gone (P2 R1: a 100-id reply of 99 things lacked 38 ids, 31 of which came in the next 38-id reply of 88 things; the last 7 asked alone came back empty). Progress is a new comment, a new gap or a requested id finished (received or missing). Only the same descriptor planned again without progress stalls, and only that gap. An id-less gap under a comment is that comment's subtree in one request.",
     "scenarios": [
       {"name": "two-gaps-same-parent", "post": "aaa1",
        "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": ["a1", "a2"], "parent": "t3_aaa1", "count": 2}, {"id": "x1", "parent": "t3_aaa1"}, {"more": ["b1"], "parent": "t3_aaa1", "count": 1}],

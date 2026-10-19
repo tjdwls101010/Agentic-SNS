@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date, datetime, time, timedelta
 
-from reddit import listing, maintenance
+from reddit import listing, maintenance, thread
 from reddit.errors import RedditError
 from reddit.render import render_page, render_summary
 from reddit.results import failure_envelope
@@ -134,6 +134,35 @@ COMMANDS = {
                    'requests: 1 account check + 1 per page of 100; a more: that only shows what the last page already brought makes none.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
     },
+    'post': {
+        'help': 'Read one post in full and the first batch of its comments.',
+        'run': thread.post,
+        'arguments': [(('target',), {'metavar': 'URL', 'help': 'A post URL, id or redd.it link; a comment link opens the post at that comment; a share link (/r/<sub>/s/...) is resolved first'}),
+                      (('--sort',), {'choices': thread.COMMENT_SORTS, 'default': 'best', 'help': 'Comment order: best (default), top, new, controversial, old, qa'}),
+                      (('--limit',), {'type': positive, 'help': 'Comments to show (default 25)'}),
+                      (('--depth',), {'type': count, 'help': 'Reply levels to show (default 2; 0 = top-level comments only)'}),
+                      (('--context',), {'type': count, 'help': 'For a comment link: how many of its ancestors Reddit sends with it'}),
+                      'chars', 'json', 'max_requests'],
+        'epilog': ['The post is shown in full. Reddit sends up to 500 of its comments, 10 levels deep, in one answer; the rest are gaps. The comments shown are the first batch in depth-first order within --depth: each [c] line names the comment it answers (reply-to=), and the first line of the thread: line counts what Reddit reports (deleted and removed included), what arrived, what is shown, what is deeper than --depth and what is left to expand. more: continues the same reading (comments --after).',
+                   'The sort is the order inside each batch, not across batches. A thread\'s suggested sort and contest mode (random order, hidden scores) are on the thread: line.',
+                   'Every comment carries its permalink: comments <that url> opens it in full with what hangs under it.',
+                   'requests: 1 account check + 1 (a share link adds 1 per redirect, at most 3).'],
+        'exits': (0, 2, 3, 4, 5, 6, 8, 9),
+    },
+    'comments': {
+        'help': 'Read the next batch of a thread, or one comment in full with what hangs under it.',
+        'run': thread.comments,
+        'arguments': [(('target',), {'metavar': 'URL', 'help': 'A post URL (its next batch), or a comment\'s permalink (that comment, always, with its ancestors as context and what hangs under it)'}),
+                      (('--sort',), {'choices': thread.COMMENT_SORTS, 'default': 'best', 'help': 'Comment order (default best); a reading keeps its order'}),
+                      (('--limit',), {'type': positive, 'help': 'Comments to show (default 25); with --out, comments to save'}),
+                      (('--depth',), {'type': count, 'help': 'Reply levels to show (default 2), counted from the linked comment for a comment link'}),
+                      'chars', 'after', 'out', 'json', 'max_requests'],
+        'epilog': ['A batch comes from the snapshot the last post or comments read left (for a day): no request while it holds comments not yet shown. When none is left within --depth, the next gaps are expanded: up to 100 comment ids across gaps in one request, and a "continue this thread" branch in one request each. A comment Reddit lists but does not send when asked is counted as asked for but never sent (deleted or removed).',
+                   'A comment link is answered from the latest snapshot of its post when it holds that comment (no request); otherwise its subtree is read (1 request).',
+                   'With --out the whole thread is written: the post once, then every comment flat (parent_id and depth), a page per expansion; rerun the same command to resume the same reading even after its snapshot expired.',
+                   'requests: none from the snapshot; otherwise 1 account check + 1 per expansion (or 1 for a new read); --max-requests bounds a large thread, more: continues.'],
+        'exits': (0, 2, 3, 4, 5, 6, 8, 9),
+    },
     'doctor': {
         'help': 'Check Aside, the Reddit login and account protection; always JSON.',
         'run': maintenance.doctor,
@@ -151,7 +180,7 @@ COMMANDS = {
         'exits': (0, 2),
     },
 }
-READS = ('feed', 'sub')
+READS = ('feed', 'sub', 'post', 'comments')
 
 
 def epilog(name, spec):
