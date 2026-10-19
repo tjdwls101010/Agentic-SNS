@@ -11,8 +11,8 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from twitter.paging import record_key
 from twitter.errors import TwitterError
+from twitter.paging import record_key
 
 # Bumped whenever a saved page or the header changes meaning.
 FORMAT = 3

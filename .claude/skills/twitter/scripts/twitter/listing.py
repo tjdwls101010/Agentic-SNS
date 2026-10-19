@@ -181,7 +181,7 @@ def me(options):
         else:
             fetch = lambda cursor: client.timeline('Bookmarks', {}, cursor)  # noqa: E731
         return connect.read_list(options, identity, state, out, order='unordered', command='me', target=None, words=[collection],
-                                 kinds=('notification', 'post') if collection == 'notifications' else ('post',),
+                                 kinds=('notification', 'post') if collection in ('notifications', 'mentions') else ('post',),
                      fetch=fetch)
 
     return connect.run(options, command='me', target=None, identity=identity, reader=read)

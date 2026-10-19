@@ -176,3 +176,14 @@ def test_a_batch_of_unreadable_posts_is_a_shape_change(browser, data_dir):
     known_tab(browser, data_dir).respond('query', query_result(batch, headers=RATE))
     code, out, _ = post(browser, '201', '202')
     assert code == 6, out
+
+
+def test_replies_that_cannot_be_read_are_reported_on_the_post_page(browser, data_dir):
+    name = 'conversationthread-110'
+    broken = {'entryId': name, 'content': {'entryType': 'TimelineTimelineModule', 'items': [
+        {'entryId': f'{name}-tweet-110', 'item': {'itemContent': {'itemType': 'TimelineTweet', 'tweet_results': {
+            'result': {'__typename': 'Tweet', 'renamed': '110'}}}}}]}}
+    page = detail([single(tweet('101', reply_to='100')), broken])
+    known_tab(browser, data_dir).respond('query', query_result(page, headers=RATE))
+    code, out, _ = post(browser, '101')
+    assert code == 0 and 'could not read' in out, out

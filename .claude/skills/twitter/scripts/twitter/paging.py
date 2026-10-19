@@ -10,7 +10,6 @@ END = {'end': True}  # a local marker meaning "nothing more to request"; never s
 _RETRY = 'Retry later with the more: command; this is not fixed by changing options.'
 
 
-
 def record_key(record):
     """What a record is known by when telling repeats apart: its id, else its username, else its url (a record X sent
     without an id can still be named)."""
@@ -19,6 +18,7 @@ def record_key(record):
     if record.get('username'):
         return '@' + record['username'].lower()
     return record.get('url')
+
 
 def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None, commit=None, whole_pages=False,
              max_pages=None, idle_limit=2):

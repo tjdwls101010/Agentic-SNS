@@ -13,7 +13,7 @@ as low quality), unavailable (tombstones among the replies).
 from dataclasses import dataclass, field
 
 from twitter.errors import TwitterError
-from twitter.x_web.records.posts import post_record
+from twitter.x_web.records.posts import entry_result, post_record
 from twitter.x_web.records.timeline import walk
 
 CONVERSATION = 'conversationthread-'
@@ -30,12 +30,6 @@ class PostPage:
     unreadable: int = 0                # post entries this skill could not turn into a record
 
 
-def _result(node):
-    """An entry's tweet result; an empty tweet_results is how X sends a deleted post (an unavailable record)."""
-    results = node.get('tweet_results') if isinstance(node.get('tweet_results'), dict) else {}
-    return results.get('result') or {}
-
-
 def post_page(instructions, post_id, continuing=False):
     page = walk(instructions)
     records, found, reported, other, unreadable = [], False, None, page.other, 0
@@ -47,7 +41,7 @@ def post_page(instructions, post_id, continuing=False):
         if entry.module and not conversation:
             other += 1
             continue
-        record = post_record(_result(entry.node), entry_id=entry.entry_id)
+        record = post_record(entry_result(entry.node), entry_id=entry.entry_id)
         if record is None:
             unreadable += 1
             continue

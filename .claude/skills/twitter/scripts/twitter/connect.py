@@ -248,9 +248,11 @@ def read_list(options, identity, state, out, *, order, fetch, command, target, e
         page = fetch(cursor)
         if kinds:
             # what X mixes into a surface (accounts it suggests among posts, dated by when they joined) is left out
-            # before the window weighs the page's order, and counted
+            # before the window weighs the page's order, and counted — unreadable ones of other kinds too
             kept = [r for r in page.records if r.get('kind') in kinds]
-            page.other += len(page.records) - len(kept)
+            foreign = sum(1 for kind in page.unreadable_kinds if kind not in kinds)
+            page.other += len(page.records) - len(kept) + foreign
+            page.unreadable -= foreign
             page.records = kept
         skipped['promoted'] += page.promoted
         skipped['other'] += page.other

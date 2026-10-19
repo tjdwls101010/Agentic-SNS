@@ -418,3 +418,44 @@ def test_a_card_stub_is_only_the_measured_one(browser, data_dir):
     known_tab(browser, data_dir).respond('query', query_result({'data': {'audioSpace': {}}}, headers=RATE))
     code, out, _ = run_cli(browser, 'about', 'https://x.com/i/spaces/1AbCdEfGhIjKl')
     assert code == 6, out
+
+
+# --- final review -------------------------------------------------------------------------------------------------
+
+def test_only_the_measured_empty_tweet_results_is_a_deleted_post(browser, data_dir):
+    moved = [{'entryId': f'tweet-7{i}', 'content': {'itemContent': {'itemType': 'TimelineTweet',
+                                                                     'tweet_results': {'tweet': {'rest_id': f'7{i}'}}}}} for i in range(2)]
+    page = query_result({'data': {'user': {'result': {'timeline': {'timeline': {'instructions': entries(moved)}}}}}}, headers=RATE)
+    known_tab(browser, data_dir).respond('query', page)
+    code, out, _ = run_cli(browser, 'me', 'likes')
+    assert code == 6, out
+
+
+def test_unreadable_entries_of_a_kind_the_surface_does_not_hold_are_mixed_in_not_a_shape_change(browser, data_dir):
+    who = {'entryId': 'who-to-follow-1', 'content': {'entryType': 'TimelineTimelineModule', 'items': [
+        {'entryId': 'who-to-follow-1-user-x', 'item': {'itemContent': {'itemType': 'TimelineUser', 'user_results': {
+            'result': {'__typename': 'User'}}}}}]}}
+    page = query_result({'data': {'user': {'result': {'timeline': {'timeline': {'instructions': entries([who])}}}}}}, headers=RATE)
+    known_tab(browser, data_dir).respond('query', by_name()).respond('query', page)
+    code, out, _ = run_cli(browser, 'profile', 'author_a')
+    assert code == 7, out
+
+
+def test_mentions_keep_notification_entries(browser, data_dir):
+    known_tab(browser, data_dir).respond('query', notifications([notification('N5', 'reply_icon', 'Author A replied')]))
+    code, out, _ = run_cli(browser, 'me', 'mentions')
+    assert code == 0 and '[n1] reply' in out, out
+
+
+def test_an_unavailable_quote_keeps_its_id_and_a_repost_of_a_gone_post_keeps_its_own_link(browser, data_dir):
+    quoting = {**post('81'), 'quoted_status_result': {'result': {'__typename': 'TweetUnavailable', 'reason': 'Protected'}}}
+    quoting['legacy'] = {**quoting['legacy'], 'quoted_status_id_str': '555'}
+    reposting = {**post('82'), 'legacy': {**post('82')['legacy'], 'retweeted_status_result': {'result': {'__typename': 'TweetUnavailable'}}}}
+    items = [{'entryId': f'tweet-{n["rest_id"]}', 'content': {'itemContent': {'itemType': 'TimelineTweet', 'tweet_results': {'result': n}}}}
+             for n in (quoting, reposting)]
+    page = query_result({'data': {'user': {'result': {'timeline': {'timeline': {'instructions': entries(items)}}}}}}, headers=RATE)
+    known_tab(browser, data_dir).respond('query', page)
+    code, out, _ = run_cli(browser, 'me', 'likes')
+    assert code == 0, out
+    assert 'post 555' in out and 'Protected' in out
+    assert 'url: "https://x.com/author_a/status/82"' in out

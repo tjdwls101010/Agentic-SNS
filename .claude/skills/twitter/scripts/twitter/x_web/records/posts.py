@@ -212,9 +212,18 @@ def _tombstone(node, entry_id):
     if isinstance(entry_id, str):
         match = re.search(r'tweet-(\d+)$', entry_id)
         identity = match[1] if match else None
-    text = _dict(_dict(node.get('tombstone')).get('text')).get('text')
+    text = _dict(_dict(node.get('tombstone')).get('text')).get('text') or node.get('reason')
     return {'id': identity, 'unavailable': True, 'unavailable_reason': text if isinstance(text, str) else None,
             'kind': 'post'}
+
+
+def entry_result(content):
+    """The tweet result of a timeline entry's content. An empty tweet_results — and only that, the shape X was seen
+    sending for a deleted post — stands for a tombstone; any other missing result is None (unreadable)."""
+    results = content.get('tweet_results') if isinstance(content, dict) else None
+    if results == {}:
+        return {'__typename': 'TweetTombstone'}
+    return _dict(results).get('result')
 
 
 def post_record(node, entry_id=None, _depth=0):
@@ -222,8 +231,8 @@ def post_record(node, entry_id=None, _depth=0):
     None (the caller counts it)."""
     if not isinstance(node, dict) or _depth > MAX_DEPTH:
         return None
-    if node.get('__typename') in ('TweetTombstone', 'TweetUnavailable') or not node:
-        return _tombstone(node, entry_id)  # an empty result is how X sends a deleted post (seen in a capture)
+    if node.get('__typename') in ('TweetTombstone', 'TweetUnavailable'):
+        return _tombstone(node, entry_id)
     limited = [a.get('action') for a in _dict(node.get('limitedActionResults')).get('limited_actions') or []
                if isinstance(a, dict)]
     restricted = node.get('__typename') == 'TweetWithVisibilityResults'

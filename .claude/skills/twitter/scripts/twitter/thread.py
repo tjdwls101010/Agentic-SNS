@@ -30,6 +30,9 @@ def post(options):
         shown_ids = [r['id'] for r in records if r.get('id')]
         reading = {'results': records, 'stop_reason': 'exhausted', 'details': {'replies': page.coverage},
                    'coverage': _coverage(page.coverage)}
+        if page.unreadable:
+            reading['coverage'].append(f'{page.unreadable} replies this skill could not read were left out (X may have '
+                                       'changed its answer)')
         if page.hidden_cursor:
             number = handles.save(context, {'kind': 'hidden', 'post_id': target.post_id, 'sort': sort,
                                             'cursor': page.hidden_cursor, 'seen': shown_ids, 'pending': []})

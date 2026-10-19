@@ -90,7 +90,8 @@ def _counts(record):
 
 def _nested(label, record, chars, indent):
     if record.get('unavailable'):
-        return f'{indent}     {label}: unavailable — {_line(record.get("unavailable_reason") or "")}'
+        ident = f' (post {record["id"]})' if record.get('id') else ''
+        return f'{indent}     {label}: unavailable{ident} — {_line(record.get("unavailable_reason") or "")}'
     return (f'{indent}     {label}: {_who(record.get("author"))} · {_time(record.get("created_at"))} · '
             f'{_text(record, chars)} · url: {_handle(record.get("url"))}')
 
@@ -148,7 +149,7 @@ def post(record, label, labels, chars):
             if original.get('quoted_post'):
                 lines.append(_nested('quoting', original['quoted_post'], chars, indent))
             lines += _extras(original, chars, indent)
-        lines.append(f'{indent}     url: {_handle(original.get("url"))}   author: '
+        lines.append(f'{indent}     url: {_handle(original.get("url") or record.get("url"))}   author: '
                      f'{_handle((original.get("author") or {}).get("username"))}   reposter: '
                      f'{_handle((record.get("author") or {}).get("username"))}')
         return '\n'.join(lines)

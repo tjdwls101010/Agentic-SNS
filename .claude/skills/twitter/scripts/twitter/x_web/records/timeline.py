@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from urllib.parse import parse_qs, urlsplit
 
 from twitter.x_web.records.places import community_record, list_record, notification_record
-from twitter.x_web.records.posts import account_record, post_record
+from twitter.x_web.records.posts import account_record, entry_result, post_record
 
 HIDDEN_CURSORS = ('ShowMoreThreads', 'ShowMoreThreadsPrompt')
 
@@ -42,6 +42,7 @@ class Page:
     promoted: int = 0
     other: int = 0
     unreadable: int = 0     # entries of a known kind this skill could not turn into a record (a shape change)
+    unreadable_kinds: list = field(default_factory=list)   # the kind of each, so a surface weighs only its own
 
 
 @dataclass
@@ -53,6 +54,7 @@ class ListPage:
     other: int = 0
     terminated: bool = False
     unreadable: int = 0
+    unreadable_kinds: list = field(default_factory=list)
 
 
 def _dict(value):
@@ -185,7 +187,7 @@ def records_of(page):
     records = []
     for entry in page.entries:
         if entry.kind == 'post':
-            record = post_record(_dict(entry.node.get('tweet_results')).get('result') or {}, entry_id=entry.entry_id)
+            record = post_record(entry_result(entry.node), entry_id=entry.entry_id)
         elif entry.kind == 'account':
             record = account_record(_dict(entry.node.get('user_results')).get('result'))
         elif entry.kind in ('trend', 'event'):
@@ -201,6 +203,7 @@ def records_of(page):
         if record is None or not (record.get('id') or record.get('username') or record.get('url') or
                                   record.get('unavailable')):
             page.unreadable += 1  # nothing to name it by: counted, not shown
+            page.unreadable_kinds.append(entry.kind)
             continue
         record['unit'] = entry.module or entry.entry_id
         if entry.pinned and entry.kind == 'post':
@@ -219,4 +222,5 @@ def list_page(instructions):
     page = walk(instructions)
     records = records_of(page)
     return ListPage(records=records, cursor=page.bottom, has_next=bool(page.bottom) and not page.terminated,
-                    promoted=page.promoted, other=page.other, terminated=page.terminated, unreadable=page.unreadable)
+                    promoted=page.promoted, other=page.other, terminated=page.terminated, unreadable=page.unreadable,
+                    unreadable_kinds=page.unreadable_kinds)
