@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .claude/histories
 tests/threads/captures/
+tests/twitter/captures/
