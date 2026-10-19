@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date, datetime, time, timedelta
 
-from reddit import listing, maintenance, thread
+from reddit import about, listing, maintenance, thread
 from reddit.errors import RedditError
 from reddit.render import render_page, render_summary
 from reddit.results import failure_envelope
@@ -134,6 +134,28 @@ COMMANDS = {
                    'requests: 1 account check + 1 per page of 100; a more: that only shows what the last page already brought makes none.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
     },
+    'profile': {
+        'help': 'Read a redditor\'s public activity: posts and comments, newest first by default.',
+        'run': listing.profile,
+        'arguments': [(('target',), {'help': 'u/<name> or a profile URL'}),
+                      (('--type',), {'choices': listing.PROFILE_TYPES, 'default': 'overview', 'help': 'overview (posts and comments together, default), posts or comments'}),
+                      (('--sort',), {'choices': listing.PROFILE_SORTS, 'default': 'new', 'help': 'new (default), hot, top or controversial (with --time)'}),
+                      TIME, *WINDOW, *LIST],
+        'epilog': ['A public history is that account\'s observed activity on Reddit. An account can hide its history from other accounts, or hide some communities from it: what is shown may leave things out.',
+                   'An empty first page (no --after, --time, --since or --until) is checked against the account\'s karma for that kind (one more request): with karma it is a history that is not visible — hidden or deleted — (exit 9, reason history_not_visible), not an empty one; with no karma it is reported as observed (exit 7). A filtered empty result is just empty (7).',
+                   'A page asks Reddit for 100 items and shows 25 (--limit); more: shows the rest of the page with no request. --since/--until need --sort new.',
+                   'requests: 1 account check + 1 per page of 100, +1 when an empty first page is checked against karma.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
+    },
+    'about': {
+        'help': 'Read a community\'s card and rules, or a user\'s card.',
+        'run': about.about,
+        'arguments': [(('target',), {'help': 'r/<name> or u/<name> (or their URLs); a bare word is refused'}), 'chars', 'json', 'max_requests'],
+        'epilog': ['A community: name, title, short description, sidebar, subscribers, active users, age, access type (public, restricted, private) and NSFW, then its rules. A user: karma by kind, account age, profile description, and the moderator, admin and verified markers. Karma, age and flair say what an account did on Reddit, not who the person is.',
+                   'One live read tied to no handle or file, so the Reddit account is not checked first (the first line says account not checked).',
+                   'requests: 2 for a community (card, rules), 1 for a user.'],
+        'exits': (0, 2, 3, 4, 5, 6, 9),
+    },
     'post': {
         'help': 'Read one post in full and the first batch of its comments.',
         'run': thread.post,
@@ -180,7 +202,7 @@ COMMANDS = {
         'exits': (0, 2),
     },
 }
-READS = ('feed', 'sub', 'post', 'comments')
+READS = ('feed', 'sub', 'profile', 'about', 'post', 'comments')
 
 
 def epilog(name, spec):

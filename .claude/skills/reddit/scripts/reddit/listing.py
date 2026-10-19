@@ -7,7 +7,7 @@ closes when a page is wholly older than --since, pinned posts aside.
 from reddit import connect
 from reddit.errors import RedditError
 from reddit.paging import paginate
-from reddit.reddit_web import FEED_SORTS, SUB_SORTS, TIMES, parse_target, require, routes
+from reddit.reddit_web import FEED_SORTS, PROFILE_SORTS, PROFILE_TYPES, SUB_SORTS, TIMES, parse_target, require, routes
 from reddit.window import Window
 
 DISPLAY = 25
@@ -34,6 +34,53 @@ def sub(options):
                      request=lambda after: routes.listing(target.sub, sort, options.get('time'), after))
 
     return connect.run(options, command='sub', target=target.name, identity=identity, reader=read)
+
+
+_KARMA = {'overview': ('activity', 'karma', ('post_karma', 'comment_karma')),
+          'posts': ('posts', 'post karma', ('post_karma',)),
+          'comments': ('comments', 'comment karma', ('comment_karma',))}
+
+
+def profile(options):
+    """A redditor's public activity. A first unfiltered page that comes back empty is judged against the account's
+    karma for that kind (one more request): karma means the history is hidden from other accounts or was deleted
+    (exit 9), no karma is only what was observed (exit 7)."""
+    target = require(parse_target(options['target']), ('user',), 'profile')
+    kind = options.get('type') or 'overview'
+    sort = options.get('sort') or 'new'
+    identity = {'type': kind, 'sort': sort, 'time': options.get('time'), 'since': options.get('since'),
+                'until': options.get('until')}
+    unfiltered = not (options.get('after') or options.get('since') or options.get('until') or options.get('time'))
+
+    def read(connection, state, out):
+        reading = _read(connection, options, identity, state, out, command='profile', target=target.name,
+                        request=lambda after: routes.profile(target.user, kind, sort, options.get('time'), after))
+        failure = reading.get('failure')
+        if unfiltered and out is None and failure is not None and failure.code == 7:
+            reading['failure'] = _history(connection, target.user, kind)
+        return reading
+
+    return connect.run(options, command='profile', target=target.name, identity=identity, reader=read)
+
+
+def _history(connection, name, kind):
+    """The error an empty first page means, from the karma of that kind."""
+    noun, karma_name, fields = _KARMA[kind]
+    try:
+        card = connection.network().user(name)
+    except RedditError as error:
+        if error.code == 8:
+            return RedditError(8, 'The list was empty and karma could not be checked within the budget.',
+                               'Rerun the same command (with a larger --max-requests if needed) to tell a hidden '
+                               'history from an empty one.', reason='karma_unchecked')
+        return error
+    karma = sum(card.get(field) or 0 for field in fields)
+    if karma > 0:
+        return RedditError(9, f'no visible {noun} although {karma_name} is {karma:g}: the history is hidden from other '
+                              'accounts or was deleted', f'Tell the user; about u/{name} still reads the account\'s '
+                                                         'card (karma, age).', reason='history_not_visible')
+    return RedditError(7, f'no visible {noun}; {karma_name} is 0', 'An empty history here is what was observed, not '
+                                                                  'proof the account never posted.')
 
 
 def _read(connection, options, identity, state, out, *, request, command, target, words=None, extra=None):
@@ -88,4 +135,4 @@ def _words(identity, positional=None):
     return words
 
 
-__all__ = ['FEED_SORTS', 'SUB_SORTS', 'TIMES', 'feed', 'sub']
+__all__ = ['FEED_SORTS', 'PROFILE_SORTS', 'PROFILE_TYPES', 'SUB_SORTS', 'TIMES', 'feed', 'profile', 'sub']
