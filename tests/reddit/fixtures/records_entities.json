@@ -1,0 +1,41 @@
+{
+  "about": "Raw t5, rule and t2 data to the skill's community, rule and user records (appendix A 19). Expected values name only the fields a case is about. Moderators, pinned posts and wiki records are filled after P2 (R4, R5).",
+  "cases": [
+    {"name": "community", "item": "19", "kind": "t5",
+     "fact": "A community card: name, title, short and long description, scale, age, NSFW and access type.",
+     "raw": {"id": "s1", "name": "t5_s1", "display_name": "example", "title": "Example community", "public_description": "Short.", "description": "Long sidebar.",
+             "subscribers": 12345, "accounts_active": 67, "created_utc": 1300000000, "over18": false, "subreddit_type": "public"},
+     "record": {"kind": "subreddit", "id": "t5_s1", "name": "example", "url": "https://www.reddit.com/r/example/", "title": "Example community", "text": "Short.",
+                "description": "Long sidebar.", "subscribers": 12345, "active": 67, "created_at": "2011-03-13T07:06:40+00:00", "nsfw": false, "visibility": "public"}},
+    {"name": "restricted-nsfw-community", "item": "19", "kind": "t5",
+     "fact": "subreddit_type restricted (anyone reads, only approved users post) and over18 are carried as markers.",
+     "raw": {"id": "s2", "display_name": "adults", "over18": true, "subreddit_type": "restricted", "subscribers": null},
+     "record": {"id": "t5_s2", "nsfw": true, "visibility": "restricted", "subscribers": null}},
+    {"name": "community-in-search", "item": "19", "kind": "t5",
+     "fact": "A t5 in a community search result is the same record.",
+     "raw": {"id": "s3", "name": "t5_s3", "display_name": "ObsidianMD", "subscribers": 200000, "public_description": "Notes."},
+     "record": {"name": "ObsidianMD", "url": "https://www.reddit.com/r/ObsidianMD/"}},
+    {"name": "rule", "item": "19", "kind": "rule",
+     "fact": "A rule: its short name, description and what it applies to (link, comment or all).",
+     "raw": {"short_name": "No self-promotion", "description": "Do not post your own products.", "kind": "link", "priority": 0},
+     "record": {"name": "No self-promotion", "text": "Do not post your own products.", "applies_to": "link"}},
+    {"name": "user", "item": "19", "kind": "t2",
+     "fact": "A user card: karma by kind, account age, profile description, and the mod, admin and verified markers. The fullname is t2_ + id.",
+     "raw": {"id": "u1", "name": "example_user", "link_karma": 1200, "comment_karma": 24000, "created_utc": 1500000000,
+             "subreddit": {"public_description": "I write about gardens."}, "is_mod": true, "is_employee": false, "verified": true},
+     "record": {"kind": "user", "id": "t2_u1", "name": "example_user", "url": "https://www.reddit.com/user/example_user/", "post_karma": 1200, "comment_karma": 24000,
+                "created_at": "2017-07-14T02:40:00+00:00", "text": "I write about gardens.", "moderator": true, "admin": false, "verified": true}},
+    {"name": "user-without-profile", "item": "19", "kind": "t2",
+     "fact": "An account without a profile subreddit has no description.",
+     "raw": {"id": "u2", "name": "plain_user", "link_karma": 0, "comment_karma": 0, "created_utc": 1700000000, "subreddit": null},
+     "record": {"text": "", "post_karma": 0, "comment_karma": 0}},
+    {"name": "user-in-search", "item": "19", "kind": "t2",
+     "fact": "A t2 in a user search result is the same record (the fullname from id).",
+     "raw": {"id": "u3", "name": "search_hit", "link_karma": 5, "comment_karma": 6},
+     "record": {"id": "t2_u3", "name": "search_hit"}}
+  ],
+  "after_recon": {
+    "about": "Moderators (moderators.json), pinned posts (the sticky source R5 decides), wiki_page and wiki_index records (R4), and a suspended or shadowbanned user's about answer (R2).",
+    "cases": []
+  }
+}
