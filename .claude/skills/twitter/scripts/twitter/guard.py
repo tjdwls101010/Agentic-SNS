@@ -368,13 +368,18 @@ class Guard:
         """The critical section of looking at the tab without a request: a saved block stops it (unless
         allow_blocked: emptying the tab, which sends nothing), and a block or bucket it sees is recorded before the lock
         is released."""
-        if self._held is not None:
-            yield Slot(self, 0, False)
-            return
-        with self._locked(_time_limit):
-            if not allow_blocked:
-                self.check()
-            yield Slot(self, 0, False)
+        slot = Slot(self, 0, False)
+        try:
+            if self._held is not None:
+                yield slot
+                return
+            with self._locked(_time_limit):
+                if not allow_blocked:
+                    self.check()
+                yield slot
+        finally:
+            if slot.reserved:  # the page's own requests the look saw and charged to this command
+                _log('background', slot.reserved, None, self.clock())
 
     @contextmanager
     def verify_unblock(self, operation='Viewer'):

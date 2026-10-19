@@ -289,6 +289,17 @@ def test_charged_and_unwatched_requests_are_logged_and_rolled(data_dir):
     assert lines[0]['operation'] == 'TweetDetail'
 
 
+def test_what_a_look_at_the_tab_charges_is_logged_too(data_dir):
+    """The page's own requests a look saw are charged to the command; the day's log must not miss them."""
+    g = make(Clock(1000))
+    with g.observe() as slot:
+        slot.charge(3)
+    with g.observe():
+        pass
+    lines = [json.loads(line) for line in (data_dir / 'protection/requests.jsonl').read_text().splitlines()]
+    assert [(line['kind'], line['n']) for line in lines] == [('background', 3)] and g.count == 3
+
+
 # --- stores.json unblock: the verification slot -------------------------------------------------------------------
 
 def test_the_verification_slot_passes_the_block_and_clears_only_when_asked(data_dir):
