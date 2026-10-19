@@ -15,23 +15,35 @@ class Connection:
     Built first and started second, so the requests a failed start already made are still reported.
     """
 
-    def __init__(self, budget, verbose=False):
+    def __init__(self, budget, verbose=False, bound=True):
         self.aside = Aside()
         self.guard = protection.Guard(self.aside.account, budget)
         self.client = Client(self.aside, self.guard, verbose)
+        self.bound = bound           # whether the reading can leave a handle or a file tied to a Reddit account
         self.reddit_account = None   # the Reddit account confirmed by this invocation's check, if it made one
+        self.observed = None         # the Reddit account a continued reading was read with
 
     @property
     def account(self):
         return self.aside.account
 
-    def start(self, check_account=True):
-        """Refuse a standing block before anything is sent; then, for a reading bound to the account, confirm which
-        Reddit account the browser is logged in to (one request)."""
+    def start(self):
+        """Refuse a standing block before anything is read."""
         self.guard.check()
-        if check_account:
-            self.reddit_account = self.client.account()
         return self
+
+    def network(self):
+        """The client, once a bound reading has confirmed which Reddit account the browser is logged in to (one
+        request, made before the first other request of the invocation) and that it is the one a continued reading
+        was read with. A reading served from what a handle kept never gets here, so it makes no request."""
+        if self.bound and self.reddit_account is None:
+            self.reddit_account = self.client.account()
+        if self.observed is not None and self.reddit_account is not None and self.observed != self.reddit_account:
+            raise RedditError(4, f'This reading was read as u/{self.observed}, but the Aside browser is now logged in '
+                                 f'to Reddit as u/{self.reddit_account}.', 'Run the original command again (without '
+                                                                           '--after) to read as the current account.',
+                              reason='account_changed')
+        return self.client
 
     def report(self):
         """What finish() needs to know about the requests."""
@@ -48,11 +60,11 @@ def run(options, *, command, target, identity, reader, window=None, bound=True):
     connection, reading = None, None
     out_path = options.get('out')
     try:
-        connection = Connection(options['max_requests'], options.get('verbose'))
+        connection = Connection(options['max_requests'], options.get('verbose'), bound)
         if out_path:
             reading = _settled_file(out_path, _context(command, target, identity, connection.account, None))
         if reading is None:
-            connection.start(check_account=bound)
+            connection.start()
             reading = _read(connection, options, command, target, identity, reader, out_path)
     except RedditError as error:
         reading = {**(reading or {}), 'failure': error}
@@ -61,10 +73,10 @@ def run(options, *, command, target, identity, reader, window=None, bound=True):
         reading['window'] = window
     report = connection.report() if connection else {'requests': 0, 'reddit': {}, 'slowest': 0}
     account = None
-    if connection is not None and (connection.reddit_account or reading.get('observed')):
-        account = {'observed': reading.get('observed') or connection.reddit_account,
+    if connection is not None and bound:
+        account = {'observed': reading.get('observed') or connection.observed or connection.reddit_account,
                    'checked': connection.reddit_account is not None}
-    elif connection is not None and not bound:
+    elif connection is not None:
         account = {'observed': None, 'checked': False}
     kind, envelope = finish(reading, command=command, requests=report['requests'], budget=options['max_requests'],
                             identity=_public(identity), out=str(resolve(out_path)) if out_path else None,
@@ -91,16 +103,21 @@ def _settled_file(path, context):
 
 
 def _read(connection, options, command, target, identity, reader, out_path):
-    context = _context(command, target, identity, connection.account, connection.reddit_account)
-    state = handles.load(connection.account, options['after'], context) if options.get('after') else None
-    out = OutFile(out_path, context) if out_path else None
+    state = None
+    if options.get('after'):
+        state, connection.observed = handles.load(connection.account, options['after'],
+                                                  _context(command, target, identity, connection.account, None))
+    if out_path:
+        connection.network()  # a collection is always read now, and its file is tied to the account that reads it
+    out = OutFile(out_path, _context(command, target, identity, connection.account, connection.reddit_account)) \
+        if out_path else None
     reading = None
     try:
         if out is not None and out.complete:
             reading = {'results': [], 'stop_reason': 'exhausted', 'already_complete': True}
         else:
             reading = reader(connection, state, out)
-        reading.setdefault('observed', connection.reddit_account)
+        reading.setdefault('observed', connection.observed or connection.reddit_account)
         if out is not None:
             reading['count'] = out.count
             reading['continuable'] = out.state is not None and not out.complete

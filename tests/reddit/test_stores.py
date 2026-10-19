@@ -133,12 +133,12 @@ def test_handle_numbers_increase_and_survive_cleaning(data_dir):
     for path in (data_dir / 'handles/u0').glob('*.json'):
         path.unlink()
     assert handles.save('u0', CONTEXT, {}) == second + 1
-    assert handles.load('u0', second + 1, CONTEXT) == {}
+    assert handles.load('u0', second + 1, CONTEXT) == ({}, 'viewer')
 
 
 def test_handle_bound_to_its_query(data_dir):
     number = handles.save('u0', CONTEXT, {'after': 't3_a'})
-    assert handles.load('u0', number, CONTEXT) == {'after': 't3_a'}
+    assert handles.load('u0', number, CONTEXT) == ({'after': 't3_a'}, 'viewer')
     with pytest.raises(RedditError) as caught:
         handles.load('u0', number, {**CONTEXT, 'sort': 'hot'})
     assert caught.value.code == 2 and 'another' in caught.value.message
@@ -147,11 +147,9 @@ def test_handle_bound_to_its_query(data_dir):
     assert caught.value.code == 2, 'another Aside account has its own handles'
 
 
-def test_handle_read_by_another_reddit_account(data_dir):
+def test_a_handle_names_the_reddit_account_that_read_it(data_dir):
     number = handles.save('u0', CONTEXT, {})
-    with pytest.raises(RedditError) as caught:
-        handles.load('u0', number, {**CONTEXT, 'reddit_account': 'someone_else'})
-    assert caught.value.code == 4 and caught.value.reason == 'account_changed'
+    assert handles.load('u0', number, {**CONTEXT, 'reddit_account': None}) == ({}, 'viewer')
 
 
 def test_expired_and_old_format_handles(data_dir):

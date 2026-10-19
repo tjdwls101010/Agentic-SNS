@@ -4,8 +4,9 @@ A window keeps the dated records written on its local days (--since included, --
 without a date cannot be placed and is left out and counted. Its bounds are fixed when the window is made — the local
 midnights of --since and the day after --until, in the computer's time zone then — and saved with a continuation, so
 a later run continues the same span even if the time zone changed. Only a newest-first listing (sort new) can prove it
-passed --since: a page closes the window when every record on it is older than the start, pinned records aside,
-provided every record so far came newest first; once the order breaks, nothing closes it.
+passed --since: the first record older than the start closes the window, pinned records aside (a profile pins them to
+the top whatever their date), provided every record so far came newest first; once the order breaks, nothing closes
+it.
 """
 from datetime import date, datetime, time, timedelta, timezone
 
@@ -76,7 +77,7 @@ class Window:
         if times:
             self.last = times[-1]
         start = self.bounds['start']
-        return start is not None and bool(times) and not self.unordered and max(times) < start
+        return start is not None and bool(times) and not self.unordered and min(times) < start
 
     def describe(self):
         """The window as the result names it: local days, the zone they were judged in, and the UTC bounds."""

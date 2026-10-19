@@ -220,7 +220,7 @@ def _header(envelope, command, shown):
                       'apart')
     account = envelope.get('account')
     if account and not account.get('checked'):
-        header.append('account not checked')
+        header.append(f'read earlier as u/{account["observed"]}' if account.get('observed') else 'account not checked')
     return header
 
 

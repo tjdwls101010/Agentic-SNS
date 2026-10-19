@@ -20,7 +20,7 @@ def doctor(options):
                 connection.reddit_account = connection.client.account()  # runs inside the check's critical section
                 check.clear()
         else:
-            connection.start()
+            connection.start().network()
         state, recent = connection.guard.state(), connection.guard.recent()
         check = {
             'aside': 'available', 'aside_account': connection.account, 'login': 'ready',

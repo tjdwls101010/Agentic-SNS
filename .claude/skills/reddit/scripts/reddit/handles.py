@@ -54,8 +54,9 @@ def save(account, context, state):
 
 
 def load(account, number, context):
-    """The state saved under `number` for this exact `context`. Another query, an expired or older handle is an
-    argument error; the same query observed with another Reddit account than the one logged in now is a login error."""
+    """(state, observed) saved under `number` for this exact `context` (reddit_account aside): observed is the Reddit
+    account that read it, for the caller to compare with the one logged in now before it sends anything. Another
+    query, an expired or older handle is an argument error."""
     if type(number) is bool or not str(number).isascii() or not str(number).isdigit() or int(number) < 1:
         raise RedditError(2, 'A handle is a positive number printed by an earlier command.', 'Copy the whole more: line.')
     try:
@@ -69,18 +70,13 @@ def load(account, number, context):
             {k: v for k, v in context.items() if k != 'reddit_account'}:
         raise RedditError(2, f'Handle {int(number)} belongs to another command, target, order, window or account.',
                           'Copy the whole more: line that printed it.')
-    if saved.get('reddit_account') != context.get('reddit_account'):
-        raise RedditError(4, f'Handle {int(number)} was read as u/{saved.get("reddit_account")}, but the Aside browser '
-                             f'is now logged in to Reddit as u/{context.get("reddit_account")}.',
-                          'Run the original command again (without --after) to read as the current account.',
-                          reason='account_changed')
     created = record.get('created_at')
     if type(created) not in (int, float) or time.time() - created > TTL_SECONDS:
         raise RedditError(2, f'Handle {int(number)} has expired.', _RESTART)
     state = record.get('state')
     if not isinstance(state, dict):
         raise RedditError(2, f'Handle {int(number)} is incomplete.', _RESTART)
-    return state
+    return state, saved.get('reddit_account')
 
 
 def _prune(directory):

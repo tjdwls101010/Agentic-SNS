@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date, datetime, time, timedelta
 
-from reddit import maintenance
+from reddit import listing, maintenance
 from reddit.errors import RedditError
 from reddit.render import render_page, render_summary
 from reddit.results import failure_envelope
@@ -108,7 +108,32 @@ OPTIONS = {
 LIST = ('limit', 'chars', 'after', 'out', 'json', 'max_requests')
 WINDOW = ('since', 'until')
 
+TIME = (('--time',), {'choices': listing.TIMES, 'help': 'Reddit\'s own period for a ranking (top, controversial): hour, day, week, month, year, all. Not a date window'})
 COMMANDS = {
+    'feed': {
+        'help': 'Read your home feed, a page at a time.',
+        'run': listing.feed,
+        'arguments': [(('--sort',), {'choices': listing.FEED_SORTS, 'default': 'best', 'help': 'best (default) and hot are Reddit\'s ranking for this account; new is newest first; top with --time'}),
+                      TIME, *WINDOW, *LIST],
+        'epilog': ['The home feed is Reddit\'s choice for this account (its subscriptions and what it ranks), not Reddit as a whole.',
+                   'A page asks Reddit for 100 posts and shows 25 (--limit); more: shows the rest of the page with no request, then reads the next page.',
+                   '--since/--until (local days, --until included) work with --sort new only and keep the posts written on those days; --time is Reddit\'s period for top. The window line says whether the window was covered.',
+                   'requests: 1 account check + 1 per page of 100; a more: that only shows what the last page already brought makes none.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8),
+    },
+    'sub': {
+        'help': 'Read a community\'s listing (r/name, r/a+b, r/popular, r/all).',
+        'run': listing.sub,
+        'arguments': [(('target',), {'help': 'r/<name>, a community URL, or r/<a+b> for several at once (r/popular and r/all are Reddit-wide)'}),
+                      (('--sort',), {'choices': listing.SUB_SORTS, 'default': 'hot', 'help': 'hot (default), new (newest first), top or controversial (with --time), rising'}),
+                      TIME, *WINDOW, *LIST],
+        'epilog': ['A community\'s listing is that community\'s own; r/popular and r/all are Reddit-wide rankings. Pinned posts (moderators\' announcements, often old) sit at the top of hot; under new they sit at their own date.',
+                   'A page asks Reddit for 100 posts and shows 25 (--limit); more: shows the rest of the page with no request, then reads the next page.',
+                   '--since/--until (local days, --until included) work with --sort new only: the window closes at the first page wholly older than --since; if the listing ends first, the result is partial (8) because the window was not covered.',
+                   'A private, quarantined or banned community is unavailable (exit 9), which is not the same as empty (7).',
+                   'requests: 1 account check + 1 per page of 100; a more: that only shows what the last page already brought makes none.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
+    },
     'doctor': {
         'help': 'Check Aside, the Reddit login and account protection; always JSON.',
         'run': maintenance.doctor,
@@ -126,7 +151,7 @@ COMMANDS = {
         'exits': (0, 2),
     },
 }
-READS = ()
+READS = ('feed', 'sub')
 
 
 def epilog(name, spec):
