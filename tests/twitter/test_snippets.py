@@ -270,3 +270,11 @@ def test_the_skills_own_response_is_not_kept_as_a_background_signal(tmp_path):
                            'x-rate-limit-remaining': '0', 'x-rate-limit-reset': '1792300000'}}]))
     assert out['results'][1]['status'] == 429
     assert out['results'][1]['signals'] == [] and out['results'][2]['signals'] == []
+
+
+def test_arm_says_whether_the_timing_buffer_was_still_whole_at_install(tmp_path):
+    main = {'url': 'https://abs.twimg.com/responsive-web/client-web/main.SYNTH.js', 'status': 200}
+    out = run(tmp_path, [{'snippet': 'arm', 'args': {}}], page(buffered=[main], entries_api=True))
+    assert out['results'][0]['buffer_intact'] is True
+    out = run(tmp_path, [{'snippet': 'arm', 'args': {}}], page(buffered=[], entries_api=True))
+    assert out['results'][0]['buffer_intact'] is False

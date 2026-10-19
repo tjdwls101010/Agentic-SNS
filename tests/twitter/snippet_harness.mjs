@@ -93,8 +93,10 @@ function makeWindow() {
   const document = {cookie: pageSpec.cookie === undefined ? 'ct0=SYNTHCSRF0000; twid=u%3D1000000099' : pageSpec.cookie,
                     readyState: 'complete', documentElement: {outerHTML: pageSpec.html || '<html></html>'},
                     querySelector: (sel) => sel === '#react-root' && pageSpec.react !== false ? root : null};
+  // entries_api: performance.getEntriesByType('resource') answers what is still in the timing buffer (the buffered entries)
+  const buffer = () => (pageSpec.entries_api ? pending.map(e => ({name: e.url})) : []);
   const context = {fetch: realFetch, XMLHttpRequest, PerformanceObserver, location, sessionStorage, document,
-                   performance: {now: () => 1234.5}, URL, URLSearchParams, AbortController, setTimeout, clearTimeout,
+                   performance: {now: () => 1234.5, getEntriesByType: () => buffer()}, URL, URLSearchParams, AbortController, setTimeout, clearTimeout,
                    JSON, Object, Array, String, Number, Boolean, Promise, Date, Math, Set, Map, encodeURIComponent,
                    decodeURIComponent, Error, RegExp};
   if (pageSpec.webpack !== false) context.webpackChunk_twitter_responsive_web = {push: (entry) => { if (entry[2]) entry[2](runtime); }};

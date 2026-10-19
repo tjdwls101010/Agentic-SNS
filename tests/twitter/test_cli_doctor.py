@@ -57,11 +57,28 @@ def test_opens_a_tab_without_an_agent_and_measures_what_the_load_cost(browser, d
     assert [(line['kind'], line['n']) for line in log(data_dir)] == [('tab_open', 14)]
 
 
+def test_what_the_page_requests_after_the_load_settles_is_charged_in_the_same_command(browser, data_dir):
+    opening(browser, resources=6).respond('modules', {**MODULES, 'resources': 4, 'statuses': [200] * 4})
+    code, result, _ = doctor(browser)
+    assert code == 0, result
+    assert result['request_count'] == 11 and result['setup_requests'] == 11  # 6 + the document + 4 seen later
+
+
 def test_an_opening_the_kit_saw_too_late_is_charged_the_reserve(browser, data_dir):
     opening(browser, resources=3, early=False).respond('modules', MODULES)
     code, result, _ = doctor(browser)
     assert code == 0, result
     assert result['setup_requests'] == 20 and result['results'][0]['tab']['opening_measured'] is False
+
+
+def test_an_opening_whose_timing_buffer_was_still_whole_is_measured_even_after_the_app_started(browser, data_dir):
+    browser.respond('opener', {'tabs': ['NEW1']})
+    browser.respond('load:arm', {'installed_at': 478, 'location': START, 'ready_at_install': 'interactive',
+                                 'app_at_install': True, 'buffer_intact': True})
+    browser.respond('state', state(resources=13)).respond('modules', MODULES)
+    code, result, _ = doctor(browser)
+    assert code == 0, result
+    assert result['setup_requests'] == 14 and result['results'][0]['tab']['opening_measured'] is True
 
 
 def test_a_tab_that_closes_with_its_opener_is_reported_not_reopened_again_and_again(browser, data_dir):

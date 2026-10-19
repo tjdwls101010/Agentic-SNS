@@ -16,8 +16,14 @@
   const pathOf = url => { try { return new URL(url, location.href).pathname; } catch (_) { return ''; } };
   let kit = window.__xSkill;
   if (!kit) {
+    // bufferIntact: the app's main bundle is still in the timing buffer, so X had not emptied it yet and the observer
+    // (buffered) sees the whole load even when the app had already started
+    let bufferIntact = false;
+    try {
+      bufferIntact = performance.getEntriesByType('resource').some(e => /\/responsive-web\/client-web\/main\./.test(e.name));
+    } catch (_) { bufferIntact = false; }
     kit = {entries: [], read: 0, signals: [], issued: new Set(), installedAt: performance.now(),
-           readyAtInstall: document.readyState, appAtInstall: !!self.webpackChunk_twitter_responsive_web,
+           readyAtInstall: document.readyState, appAtInstall: !!self.webpackChunk_twitter_responsive_web, bufferIntact,
            fetch0: window.fetch.bind(window), cache: {}};
     const keep = list => {
       for (const e of list) {

@@ -157,7 +157,9 @@ class Client:
     def _settle_load(self, slot, armed):
         """Wait for the loaded app, its store and login, checking each look for a block; charge what the load cost:
         what the tab's observer saw plus the document, or OPEN_RESERVE when the kit came too late to see it all."""
-        early = isinstance(armed, dict) and armed.get('ready_at_install') == 'loading' and not armed.get('app_at_install')
+        # measured when the kit came before the app ran, or while X's timing buffer still held the whole load
+        early = isinstance(armed, dict) and (armed.get('buffer_intact') is True or
+                                             (armed.get('ready_at_install') == 'loading' and not armed.get('app_at_install')))
         deadline = time.monotonic() + min(LOAD_WAIT, max(1.0, self._seconds() - 5))
         seen, state, sessionless = 1, None, 0   # the document itself is a request too
         while True:
@@ -406,6 +408,8 @@ class Client:
         with self.guard.observe() as slot:
             result = self.browser.evaluate(self.tab, SNIPPETS['modules'], self._args({'names': READ_OPERATIONS,
                                                                                        'hints': hints}), self._seconds())
+            if isinstance(result, dict):
+                slot.charge(_int(result.get('resources')))  # the page's own requests while this command ran
             self._consume(result, slot)
         return result if isinstance(result, dict) else {}
 

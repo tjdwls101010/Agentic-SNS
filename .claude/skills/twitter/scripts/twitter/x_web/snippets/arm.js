@@ -4,4 +4,4 @@
 if (location.href === 'about:blank' || !document.documentElement) return null;
 const kit = KIT(args);
 return {installed_at: Math.round(kit.installedAt), ready_at_install: kit.readyAtInstall, app_at_install: kit.appAtInstall,
-        location: location.href};
+        buffer_intact: kit.bufferIntact, location: location.href};
