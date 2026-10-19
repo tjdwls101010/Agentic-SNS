@@ -459,3 +459,11 @@ def test_an_unavailable_quote_keeps_its_id_and_a_repost_of_a_gone_post_keeps_its
     assert code == 0, out
     assert 'post 555' in out and 'Protected' in out
     assert 'url: "https://x.com/author_a/status/82"' in out
+
+
+def test_a_post_entry_whose_result_key_was_renamed_is_unreadable_not_mixed_in(browser, data_dir):
+    renamed = [{'entryId': 'tweet-91', 'content': {'itemContent': {'itemType': 'TimelineTweet', 'tweetResult': {'result': post('91')}}}}]
+    page = query_result({'data': {'user': {'result': {'timeline': {'timeline': {'instructions': entries(renamed)}}}}}}, headers=RATE)
+    known_tab(browser, data_dir).respond('query', page)
+    code, out, _ = run_cli(browser, 'me', 'likes')
+    assert code == 6, out

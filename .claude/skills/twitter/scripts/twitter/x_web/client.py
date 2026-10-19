@@ -543,7 +543,8 @@ class Client:
         return page
 
     def posts(self, ids):
-        """Several posts by id in one request, without replies; ids X did not return are unresolved."""
+        """Several posts by id in one request, without replies: (records, how many returned could not be read); ids X
+        did not return are unresolved."""
         root, warnings = self.query('TweetResultsByRestIds', {'tweetIds': list(ids)})
         records, unreadable = [], 0
         for node in root if isinstance(root, list) else []:
@@ -555,7 +556,7 @@ class Client:
         if unreadable and not records:
             raise _changed('TweetResultsByRestIds')
         self.confirm()
-        return records
+        return records, unreadable
 
     def user(self, handle):
         """The account behind a handle as a record (one request); a handle X does not know, or a suspended account, is

@@ -187,3 +187,23 @@ def test_replies_that_cannot_be_read_are_reported_on_the_post_page(browser, data
     known_tab(browser, data_dir).respond('query', query_result(page, headers=RATE))
     code, out, _ = post(browser, '101')
     assert code == 0 and 'could not read' in out, out
+
+
+def test_a_batch_names_what_it_could_not_read_apart_from_what_x_did_not_return(browser, data_dir):
+    batch = {'data': {'tweetResult': [{'result': tweet('201')}, {'result': {'__typename': 'Tweet'}}]}}
+    known_tab(browser, data_dir).respond('query', query_result(batch, headers=RATE))
+    code, out, _ = post(browser, '201', '202')
+    assert code == 0 and 'could not read' in out, out
+
+
+def test_a_further_batch_of_replies_reports_the_replies_it_could_not_read(browser, data_dir):
+    known_tab(browser, data_dir).respond('query', query_result(FIRST, headers=RATE))
+    _, out, _ = post(browser, '101')
+    more = command_of(out.splitlines()[-1])
+    name = 'conversationthread-140'
+    nxt = detail([module('141', tweet('141', B, '101')), {'entryId': name, 'content': {'entryType': 'TimelineTimelineModule', 'items': [
+        {'entryId': f'{name}-tweet-140', 'item': {'itemContent': {'itemType': 'TimelineTweet', 'tweet_results': {
+            'result': {'__typename': 'Tweet', 'renamed': '140'}}}}}]}}])
+    browser.respond('state', state()).respond('query', query_result(nxt, headers=RATE))
+    code, out, _ = run_cli(browser, *more)
+    assert code == 0 and 'post 141' in out and 'could not read' in out, out

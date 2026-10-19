@@ -111,8 +111,9 @@ def walk(instructions):
                 page.entries.append(Entry(kind, _ident(kind, content, identity), content, identity, module, index,
                                           pinned, _dict(content.get('socialContext'))))
                 return
-        kind = {'TimelineTrend': 'trend', 'TimelineEventSummary': 'event',
-                'TimelineNotification': 'notification'}.get(content.get('itemType'))
+        kind = {'TimelineTrend': 'trend', 'TimelineEventSummary': 'event', 'TimelineNotification': 'notification',
+                # a post or account item without the key it carries its result in: kept so it counts as unreadable
+                'TimelineTweet': 'post', 'TimelineUser': 'account'}.get(content.get('itemType'))
         if kind:
             page.entries.append(Entry(kind, identity, content, identity, module, index, pinned))
         else:

@@ -54,13 +54,16 @@ def _batch(options, targets):
     ids = list(dict.fromkeys(t.post_id for t in targets))
 
     def read(connection, state, out):
-        records = connection.client.posts(ids)
+        records, unreadable = connection.client.posts(ids)
         found = {r['id'] for r in records}
         missing = [i for i in ids if i not in found]
-        reading = {'results': records, 'stop_reason': 'not_paginable'}
+        reading = {'results': records, 'stop_reason': 'not_paginable', 'coverage': []}
         if missing:
-            reading['coverage'] = ['unavailable or not returned: ' + ', '.join(missing)]
+            reading['coverage'].append('unavailable or not returned: ' + ', '.join(missing))
             reading['details'] = {'unresolved': missing}
+        if unreadable:
+            reading['coverage'].append(f'{unreadable} of the posts X returned this skill could not read (X may have '
+                                       'changed its answer), so ids named above may be among them')
         if not records:
             reading['failure'] = TwitterError(7, 'None of these posts is available to this account.',
                                               'Check the ids; deleted or protected posts cannot be read.')
@@ -116,6 +119,7 @@ def _replies(connection, options, start, out):
     """Batches of the next direct replies, the hidden replies, or the replies under one reply; continued by handle."""
     client, context = connection.client, _context(connection)
     kind = start['kind']
+    unread = [0]
 
     def fetch(cursor):
         if kind == 'branch':
@@ -127,6 +131,7 @@ def _replies(connection, options, start, out):
         for record in records:
             if _has_more(record, records):
                 record['replies_handle'] = handles.save(context, _branch(record, start['sort']))
+        unread[0] += page.unreadable
         return (records, {'has_next_page': bool(page.cursor), 'end_cursor': page.cursor},
                 bool(records) or bool(page.unreadable))
 
@@ -156,6 +161,9 @@ def _replies(connection, options, start, out):
     if kind == 'branch' and result['state'] is None and isinstance(reported, int) and shown < reported:
         reading['coverage'] = [f'X reports {reported} replies to this reply; {shown} were shown (some can be hidden, '
                                'deleted or not visible to this account)']
+    if unread[0]:
+        reading['coverage'] = [*(reading.get('coverage') or []), f'{unread[0]} replies this skill could not read were '
+                               'left out (X may have changed its answer)']
     if result['state'] is not None and out is None:
         nxt = handles.save(context, {**start, 'cursor': result['state']['cursor'],
                                      'pending': result['state']['pending'], 'seen': result['state']['seen']})
