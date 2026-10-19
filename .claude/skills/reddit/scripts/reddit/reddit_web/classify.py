@@ -119,6 +119,15 @@ def classify(envelope, expect, *, personal=False, wiki=False):
         valid = isinstance(things, list) and _listing({'kind': 'Listing', 'data': {'children': things}}) and \
             all(thing['kind'] in ('t1', 'more') for thing in things)
         empty = valid and not things
+    elif expect == 'wiki_page':
+        valid = isinstance(body, dict) and body.get('kind') == 'wikipage' and isinstance(body.get('data'), dict) and \
+            isinstance(body['data'].get('content_md'), str)
+    elif expect == 'wiki_index':
+        valid = isinstance(body, dict) and body.get('kind') == 'wikipagelisting' and isinstance(body.get('data'), list) \
+            and all(isinstance(name, str) for name in body['data'])
+    elif expect == 'moderators':
+        valid = isinstance(body, dict) and body.get('kind') == 'UserList' and isinstance(body.get('data'), dict) and \
+            isinstance(body['data'].get('children'), list) and all(isinstance(c, dict) for c in body['data']['children'])
     else:
         raise RedditError(2, f'Unknown expected response: {expect}.', 'Report this as a skill bug.')
     if not valid:

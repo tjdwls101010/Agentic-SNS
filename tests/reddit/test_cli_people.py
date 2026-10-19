@@ -71,10 +71,13 @@ def test_about_a_community_reads_its_card_and_rules_without_an_account_check(red
                                                                 'description': 'Sidebar.', 'subreddit_type': 'public'}})
     reddit.json('/r/example/about/rules.json', {'rules': [{'short_name': 'Be kind', 'description': 'No insults.',
                                                             'kind': 'all'}]})
+    reddit.json('/r/example/about/moderators.json', {'kind': 'UserList', 'data': {'children': []}})
+    reddit.json('/r/example/hot.json', listing([]))
     code, out, _ = run_cli(reddit, 'about', 'r/example')
-    assert code == 0 and 'account not checked' in out.splitlines()[0] and 'requests=2/25' in out.splitlines()[0]
+    assert code == 0 and 'account not checked' in out.splitlines()[0] and 'requests=4/25' in out.splitlines()[0]
     assert '[s1] r/example · 1234 subscribers' in out and 'rule 1: "Be kind"' in out
-    assert reddit.paths() == ['/r/example/about.json', '/r/example/about/rules.json']
+    assert reddit.paths() == ['/r/example/about.json', '/r/example/about/rules.json', '/r/example/about/moderators.json',
+                              '/r/example/hot.json']
 
 
 def test_about_a_user(reddit):

@@ -184,8 +184,32 @@ def community(record, label, chars):
         lines.append(f'     rule {number}: {_quote(flatten(rule.get("name")))} · '
                      + _text(rule.get('text'), chars, 'text') + (f' · applies to {rule["applies_to"]}'
                                                                  if rule.get('applies_to') else ''))
+    if record.get('moderators') is not None:
+        mods = record['moderators']
+        lines.append(f'     moderators: ' + (', '.join(f'u/{m["name"]}' + (f' (flair={_quote(m["flair"])})' if m.get('flair') else '')
+                                                    for m in mods) or 'none listed'))
+    for pinned in record.get('pinned') or []:
+        lines.append(f'     pinned: {_quote(flatten(pinned.get("title")))} · {_time(pinned.get("created_at"))} · '
+                     f'u/{pinned.get("author")} · {pinned.get("url")}')
     lines.append(f'     url: {record.get("url")}')
     return '\n'.join(lines)
+
+
+def wiki(record, label, chars):
+    if record.get('kind') == 'wiki_index':
+        lines = [f'[{label}] r/{record.get("subreddit")} wiki',
+                 '     pages: ' + (', '.join(record.get('pages') or []) or 'none')]
+        if record.get('settings_pages'):
+            lines.append('     settings pages: ' + ', '.join(record['settings_pages']))
+        lines.append(f'     url: {record.get("url")}')
+        return '\n'.join(lines)
+    head = [f'r/{record.get("subreddit")} wiki {record.get("page")}', f'revised {_time(record.get("revised_at"))}']
+    if record.get('revised_by'):
+        head[-1] += f' by u/{record["revised_by"]}'
+    if record.get('reason'):
+        head.append(f'note={_quote(record["reason"])}')
+    return '\n'.join([f'[{label}] ' + ' · '.join(head), '     ' + _text(record.get('text'), chars),
+                      f'     url: {record.get("url")}'])
 
 
 def user(record, label, chars):
@@ -250,10 +274,10 @@ def render_page(envelope, *, chars=None, command=None):
                      f'{_line(window["coverage"])}')
     if thread:
         lines.append(_thread_line(thread))
-    labels, counts = {}, {'p': 0, 'c': 0, 's': 0, 'u': 0}
+    labels, counts = {}, {'p': 0, 'c': 0, 's': 0, 'u': 0, 'w': 0}
     for record in results:
         kind = record.get('kind')
-        prefix = {'post': 'p', 'comment': 'c', 'subreddit': 's', 'user': 'u'}.get(kind, 'p')
+        prefix = {'post': 'p', 'comment': 'c', 'subreddit': 's', 'user': 'u', 'wiki_page': 'w', 'wiki_index': 'w'}.get(kind, 'p')
         counts[prefix] += 1
         label = f'{prefix}{counts[prefix]}'
         if kind == 'comment':
@@ -262,6 +286,8 @@ def render_page(envelope, *, chars=None, command=None):
             lines.append(community(record, label, limit))
         elif kind == 'user':
             lines.append(user(record, label, limit))
+        elif kind in ('wiki_page', 'wiki_index'):
+            lines.append(wiki(record, label, None if chars is None else limit))
         else:
             lines.append(post(record, label, limit, full=command in ('post', 'comments')))
         labels[record.get('id')] = label

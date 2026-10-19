@@ -7,7 +7,7 @@ from reddit.errors import RedditError, diagnostic
 from reddit.reddit_web import routes
 from reddit.reddit_web.classify import classify, outcome, rate_limit_seconds
 from reddit.reddit_web.records import tree
-from reddit.reddit_web.records.entities import community, rule, user
+from reddit.reddit_web.records.entities import community, moderator, rule, user, wiki_index, wiki_page
 from reddit.reddit_web.records.lists import page
 from reddit.reddit_web.targets import BASE, parse_target
 
@@ -148,3 +148,17 @@ class Client:
 
     def user(self, name):
         return user(self.get(routes.user(name))['data'])
+
+    def moderators(self, sub):
+        return [moderator(item) for item in self.get(routes.moderators(sub))['data']['children']]
+
+    def pinned(self, sub):
+        """The community's pinned posts: the stickied posts at the top of hot."""
+        records, _after = self.listing(routes.pinned(sub))
+        return [record for record in records if record.get('pinned')]
+
+    def wiki_page(self, sub, page):
+        return wiki_page(sub, page, self.get(routes.wiki_page(sub, page))['data'])
+
+    def wiki_index(self, sub):
+        return wiki_index(sub, self.get(routes.wiki_index(sub))['data'])

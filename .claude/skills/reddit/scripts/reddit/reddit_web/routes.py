@@ -28,7 +28,8 @@ _ID = r'[A-Za-z0-9]+'
 _ROUTES = (
     (r'/(best|hot|new|top|rising)\.json', 'general'),
     (rf'/r/{_SUB}(\+{_SUB})*/(hot|new|top|rising|controversial|search)\.json', 'general'),
-    (rf'/r/{_SUB}/about(/rules)?\.json', 'general'),
+    (rf'/r/{_SUB}/about(/rules|/moderators)?\.json', 'general'),
+    (rf'/r/{_SUB}/wiki/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)?\.json', 'wiki'),
     (rf'/(r/{_SUB}/)?comments/{_ID}(/[^/]+/{_ID})?\.json', 'general'),
     (rf'/duplicates/{_ID}\.json', 'general'),
     (r'/user/[A-Za-z0-9_-]+/(about|overview|submitted|comments|saved|upvoted)\.json', 'general'),
@@ -133,6 +134,24 @@ def community(sub):
 
 def rules(sub):
     return Request(f'/r/{sub}/about/rules.json', expect='rules')
+
+
+def moderators(sub):
+    return Request(f'/r/{sub}/about/moderators.json', expect='moderators')
+
+
+def pinned(sub):
+    """The first page of hot: Reddit puts a community's pinned posts at its top (P2 R5: one request with the whole
+    records, where about/sticky.json costs a redirect and a request per slot)."""
+    return Request(f'/r/{sub}/hot.json', {'limit': 10})
+
+
+def wiki_page(sub, page):
+    return Request(f'/r/{sub}/wiki/{page}.json', expect='wiki_page')
+
+
+def wiki_index(sub):
+    return Request(f'/r/{sub}/wiki/pages.json', expect='wiki_index')
 
 
 def user(name):

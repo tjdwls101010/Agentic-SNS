@@ -7,7 +7,7 @@ from reddit.paths import data_dir
 from reddit.results import describe as describe_result
 from reddit.results import finish
 
-SCHEMA_OBJECTS = ['result', 'out', 'post', 'comment', 'subreddit', 'user']
+SCHEMA_OBJECTS = ['result', 'out', 'post', 'comment', 'subreddit', 'user', 'moderator', 'wiki_page', 'wiki_index']
 
 
 def doctor(options):
@@ -97,11 +97,25 @@ RECORDS = {
         'id': 'string — t5_<id>', 'name, url, title': 'string', 'text': 'string — the short description',
         'description': 'string — the sidebar', 'subscribers, active': 'number|null',
         'created_at': 'string|null', 'nsfw': 'boolean', 'visibility': 'string — public, restricted, private ...',
-        'rules': 'array — about only: [{name, text, applies_to}]'}},
+        'rules': 'array — about only: [{name, text, applies_to}]',
+        'moderators': 'array — about only: moderator records (see schema moderator)',
+        'pinned': 'array — about only: the posts pinned at the top of hot (post records); announcements and megathreads, '
+                  'often old'}},
     'user': {'object': 'user', 'description': 'A redditor ([u] label). A public history is that account\'s observed '
                                               'activity; a profile may hide it, or hide some communities from it.',
              'fields': {'id': 'string — t2_<id>', 'name, url': 'string',
                         'post_karma, comment_karma': 'number|null — karma earned by posts and by comments',
                         'created_at': 'string|null', 'text': 'string — the profile description',
                         'moderator, admin, verified': 'boolean'}},
+    'moderator': {'object': 'moderator', 'description': 'A moderator of a community (about r/).', 'fields': {
+        'id': 'string — t2_<id>', 'name, url': 'string', 'flair': 'string|null — their flair in that community',
+        'since': 'string|null — when they became a moderator there (UTC ISO-8601)'}},
+    'wiki_page': {'object': 'wiki_page', 'description': 'One wiki page ([w] label).', 'fields': {
+        'id': 'string — wiki:<community>/<page>@<revision>: a later revision is another record',
+        'subreddit, page, url': 'string', 'text': 'string — the page\'s markdown as received',
+        'revised_at': 'string|null — when it was last revised (UTC ISO-8601)', 'revised_by': 'string|null',
+        'reason': 'string|null — the revision note'}},
+    'wiki_index': {'object': 'wiki_index', 'description': 'A wiki\'s page list ([w] label).', 'fields': {
+        'id': 'string — wiki:<community>', 'subreddit, url': 'string', 'pages': 'array<string> — article pages',
+        'settings_pages': 'array<string> — config/... pages (sidebar, rules text)'}},
 }

@@ -11,7 +11,7 @@ PACKAGE = SCRIPTS / 'reddit'
 TESTS = Path(__file__).resolve().parent
 MAINTENANCE = REPO / 'contrast/reddit'
 
-FEATURES = {'listing', 'thread', 'search', 'about', 'maintenance', 'connect'}
+FEATURES = {'listing', 'thread', 'search', 'about', 'wiki', 'maintenance', 'connect'}
 SYSTEMS = {'aside', 'reddit_web'}
 STORES = {'guard', 'handles', 'collection', 'snapshots'}
 HELPERS = {'paging', 'results', 'render', 'errors', 'paths', 'window'}

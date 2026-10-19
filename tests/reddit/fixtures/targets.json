@@ -55,7 +55,10 @@
     {"input": "https://www.reddit.com/r/example/comments/aaa1/t/ccc3/extra/", "item": "14", "refused": true, "why": "too many segments"},
     {"input": "https://www.reddit.com/r/example/s/AbC123", "item": "7", "target": {"kind": "share", "sub": "example", "url": "https://www.reddit.com/r/example/s/AbC123"}},
     {"input": "https://www.reddit.com/r/example/s/Ab-C", "item": "7", "refused": true, "why": "a share token is letters and digits"},
-    {"input": "https://www.reddit.com/r/example/wiki/index", "item": "13", "refused": true, "why": "after_recon: the old parser refuses wiki URLs; P4 decides whether wiki accepts a wiki URL as its target"},
+    {"input": "https://www.reddit.com/r/example/wiki/index", "item": "R4", "target": {"kind": "wiki", "sub": "example", "page": "index"}, "fact": "a wiki URL names a community's wiki page (P4)"},
+    {"input": "https://www.reddit.com/r/example/wiki/401k/after-tax", "item": "R4", "target": {"kind": "wiki", "sub": "example", "page": "401k/after-tax"}},
+    {"input": "https://www.reddit.com/r/example/wiki/", "item": "R4", "target": {"kind": "wiki", "sub": "example", "page": null}, "fact": "the wiki itself: its page list"},
+    {"input": "r/example/wiki/a/b/c", "item": "R4", "refused": true, "why": "a wiki page name has at most one / level here"},
     {"input": "", "item": "10", "refused": true, "why": "empty"}
   ],
   "commands": {

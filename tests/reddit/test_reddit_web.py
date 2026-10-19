@@ -9,7 +9,8 @@ from reddit import reddit_web
 from reddit.errors import RedditError
 from reddit.reddit_web import routes
 
-P3_EXPECTS = ('listing', 'thing:t2', 'thing:t5', 'me', 'post_pair', 'duplicates', 'rules', 'morechildren')
+P3_EXPECTS = ('listing', 'thing:t2', 'thing:t5', 'me', 'post_pair', 'duplicates', 'rules', 'morechildren', 'wiki_page',
+              'wiki_index', 'moderators')
 
 
 def subset(expected, actual, path='$'):
@@ -35,7 +36,8 @@ OUTCOMES = {5: 'blocked', 4: 'login', 9: 'unavailable', 7: 'empty', 6: 'failed'}
 def test_classify(case):
     want = case['outcome']
     try:
-        reddit_web.classify(case['envelope'], case['expect'], personal=case.get('personal', False))
+        reddit_web.classify(case['envelope'], case['expect'], personal=case.get('personal', False),
+                            wiki=case['expect'].startswith('wiki'))
         got = {'outcome': 'ok'}
     except RedditError as error:
         got = {'outcome': OUTCOMES[error.code], 'reason': error.reason, 'message': error.message, 'fix': error.fix}
@@ -59,15 +61,14 @@ def test_targets(case):
         return
     target = reddit_web.parse_target(case['input'])
     subset(case['target'], {'kind': target.kind, 'sub': target.sub, 'post_id': target.post_id,
-                            'comment_id': target.comment_id, 'user': target.user, 'url': target.url})
+                            'comment_id': target.comment_id, 'user': target.user, 'url': target.url, 'page': target.page})
 
 
 ROUTES = fixture('routes.json')
 
 
 @pytest.mark.parametrize('case', [c for c in ROUTES['paths']['cases']] +
-                         [c for c in ROUTES['after_recon']['cases'] if 'path' in c and 'wiki' not in c['path']
-                          and 'moderators' not in c['path']], ids=lambda c: c['path'])
+                         [c for c in ROUTES['after_recon']['cases'] if 'path' in c], ids=lambda c: c['path'])
 def test_paths(case):
     if case['allowed']:
         assert routes.bucket_of(case['path']) == case.get('bucket', 'general')
@@ -135,11 +136,14 @@ def test_comment_records(case):
     subset(case['record'], reddit_web.comment(case['raw']))
 
 
-@pytest.mark.parametrize('case', [c for c in records('records_entities.json') if c['kind'] in ('t5', 't2', 'rule', 't3')],
-                         ids=lambda c: c['name'])
+@pytest.mark.parametrize('case', records('records_entities.json'), ids=lambda c: c['name'])
 def test_entity_records(case):
-    builder = {'t5': reddit_web.community, 't2': reddit_web.user, 'rule': reddit_web.rule, 't3': reddit_web.post}[case['kind']]
-    subset(case['record'], builder(case['raw']))
+    raw = case['raw']
+    built = {'t5': lambda: reddit_web.community(raw), 't2': lambda: reddit_web.user(raw), 'rule': lambda: reddit_web.rule(raw),
+             't3': lambda: reddit_web.post(raw), 'moderator': lambda: reddit_web.moderator(raw),
+             'wiki_page': lambda: reddit_web.wiki_page(raw['subreddit'], raw['page'], raw['data']),
+             'wiki_index': lambda: reddit_web.wiki_index(raw['subreddit'], raw['data'])}[case['kind']]()
+    subset(case['record'], built)
 
 
 @pytest.mark.parametrize('case', fixture('tree.json')['walk']['cases'], ids=lambda c: c['name'])

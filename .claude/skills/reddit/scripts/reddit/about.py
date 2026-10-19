@@ -1,4 +1,4 @@
-"""about: a community's card and rules, or a user's card — one record, read live, tied to no account state (no
+"""about: a community's card, rules, moderators and pinned posts, or a user's card — one record, read live, tied to no account state (no
 handle, no file), so the Reddit account is not checked first."""
 from reddit import connect
 from reddit.errors import RedditError
@@ -18,6 +18,8 @@ def about(options):
             return {'results': [client.user(target.user)], 'stop_reason': 'exhausted'}
         card = client.community(target.sub)
         card['rules'] = client.rules(target.sub)
+        card['moderators'] = client.moderators(target.sub)
+        card['pinned'] = client.pinned(target.sub)
         return {'results': [card], 'stop_reason': 'exhausted'}
 
     return connect.run(options, command='about', target=target.name, identity={}, reader=read, bound=False)

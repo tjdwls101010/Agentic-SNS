@@ -11,16 +11,18 @@ _HOSTS = {'reddit.com', 'www.reddit.com', 'old.reddit.com', 'np.reddit.com', 'sh
 _POST_ID = r'[A-Za-z0-9]{1,10}'
 _SUB = r'[A-Za-z0-9_]{1,21}'
 _USER = r'[A-Za-z0-9_-]{3,20}'
+_PAGE = r'[A-Za-z0-9_-]{1,64}(?:/[A-Za-z0-9_-]{1,64})?'
 
 
 @dataclass(frozen=True)
 class Target:
-    kind: str                   # post | comment | subreddit | subreddits | user | me | share
+    kind: str                   # post | comment | subreddit | subreddits | user | me | share | wiki
     sub: str | None = None
     post_id: str | None = None
     comment_id: str | None = None
     user: str | None = None
     url: str | None = None      # a share link's canonical URL
+    page: str | None = None     # a wiki page name (None: the wiki's page list)
 
     @property
     def name(self):
@@ -31,6 +33,8 @@ class Target:
             return f'u/{self.user}'
         if self.kind == 'share':
             return self.url
+        if self.kind == 'wiki':
+            return f'r/{self.sub}/wiki' + (f'/{self.page}' if self.page else '')
         return permalink(self.post_id, self.comment_id)
 
 
@@ -97,6 +101,11 @@ def parse_target(value):
         if len(names) != 1:
             raise _invalid()
         segments = segments[2:]
+    if sub and segments[0] == 'wiki' and len(segments) <= 3:
+        page = '/'.join(segments[1:]) or None
+        if page is not None:
+            _checked(page, _PAGE)
+        return Target('wiki', sub=sub, page=page)
     if sub and len(segments) == 2 and segments[0] == 's':
         token = _checked(segments[1], r'[A-Za-z0-9]+')
         return Target('share', sub=sub, url=f'{BASE}/r/{sub}/s/{token}')
@@ -125,7 +134,7 @@ def require(target, kinds, command):
     """The target when its kind is one the command takes, else an argument error naming them."""
     if target.kind not in kinds:
         names = {'post': 'a post', 'comment': 'a comment link', 'share': 'a share link', 'subreddit': 'r/<name>',
-                 'subreddits': 'r/<a+b>', 'user': 'u/<name>', 'me': 'u/me'}
+                 'subreddits': 'r/<a+b>', 'user': 'u/<name>', 'me': 'u/me', 'wiki': 'a wiki URL'}
         raise RedditError(2, f'{command} takes ' + ', '.join(names[k] for k in kinds) + f', not {names[target.kind]}.',
                           f'Run {command} --help for its targets.')
     return target

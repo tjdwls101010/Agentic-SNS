@@ -28,8 +28,14 @@ def expect_of(request):
         return 'thing:t2'
     if path.endswith('/about.json'):
         return 'thing:t5'
-    if '/wiki/' in path or path.endswith('/moderators.json') or path.endswith('/sticky.json') or not path:
-        return None  # read by P4 surfaces, or a share link page
+    if path.endswith('/wiki/pages.json'):
+        return 'wiki_index'
+    if '/wiki/' in path:
+        return 'wiki_page'
+    if path.endswith('/moderators.json'):
+        return 'moderators'
+    if path.endswith('/sticky.json') or not path:
+        return None  # a redirect, or a share link page
     return 'listing'
 
 
@@ -41,7 +47,7 @@ def test_a_captured_answer_reads_cleanly(path):
     if expect is None or capture['status'] != 200:
         pytest.skip('not a 200 answer of a surface P3 reads')
     try:
-        body = reddit_web.classify(capture, expect)
+        body = reddit_web.classify(capture, expect, wiki=expect.startswith('wiki'))
     except RedditError as error:
         assert error.code == 7, (expect, error.message)
         return
@@ -57,5 +63,11 @@ def test_a_captured_answer_reads_cleanly(path):
         reddit_web.page(body[1])
     elif expect == 'thing:t2':
         assert reddit_web.user(body['data'])['name']
+    elif expect == 'wiki_page':
+        assert reddit_web.wiki_page('x', 'index', body['data'])['text']
+    elif expect == 'wiki_index':
+        assert reddit_web.wiki_index('x', body['data'])['pages']
+    elif expect == 'moderators':
+        assert all(reddit_web.moderator(m)['name'] for m in body['data']['children'])
     elif expect == 'thing:t5':
         assert reddit_web.community(body['data'])['name']

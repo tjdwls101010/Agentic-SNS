@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date, datetime, time, timedelta
 
-from reddit import about, listing, maintenance, search, thread
+from reddit import about, listing, maintenance, search, thread, wiki
 from reddit.errors import RedditError
 from reddit.render import render_page, render_summary
 from reddit.results import failure_envelope
@@ -151,9 +151,22 @@ COMMANDS = {
         'help': 'Read a community\'s card and rules, or a user\'s card.',
         'run': about.about,
         'arguments': [(('target',), {'help': 'r/<name> or u/<name> (or their URLs); a bare word is refused'}), 'chars', 'json', 'max_requests'],
-        'epilog': ['A community: name, title, short description, sidebar, subscribers, active users, age, access type (public, restricted, private) and NSFW, then its rules. A user: karma by kind, account age, profile description, and the moderator, admin and verified markers. Karma, age and flair say what an account did on Reddit, not who the person is.',
+        'epilog': ['A community: name, title, short description, sidebar, subscribers, active users, age, access type (public, restricted, private) and NSFW, then its rules, its moderators and its pinned posts (moderators\' announcements and megathreads, which can gather a topic the listing then shows less of). A user: karma by kind, account age, profile description, and the moderator, admin and verified markers. Karma, age and flair say what an account did on Reddit, not who the person is.',
                    'One live read tied to no handle or file, so the Reddit account is not checked first (the first line says account not checked).',
-                   'requests: 2 for a community (card, rules), 1 for a user.'],
+                   'requests: 4 for a community (card, rules, moderators, the first page of hot for its pinned posts), 1 for a user.'],
+        'exits': (0, 2, 3, 4, 5, 6, 9),
+    },
+    'wiki': {
+        'help': 'Read a community\'s wiki: one page in full, or its page list.',
+        'run': wiki.wiki,
+        'arguments': [(('target',), {'help': 'r/<name>, or a wiki URL (https://www.reddit.com/r/<name>/wiki/<page>)'}),
+                      (('page',), {'nargs': '?', 'help': 'The page (default index; names such as faq or faq/start)'}),
+                      (('--pages',), {'action': 'store_true', 'help': 'List the wiki\'s pages instead of reading one'}),
+                      (('--chars',), {'type': count, 'help': 'Characters of the page to show (default: all)'}), 'json', 'max_requests'],
+        'epilog': ['A wiki page is what its community\'s moderators wrote and revised (when, by whom and why are on the first record line): often a FAQ, rules in detail, or recommended resources. The page list keeps settings pages (config/..., the sidebar and rules text) apart.',
+                   'Wiki pages count in Reddit\'s own wiki bucket, not the one listings and threads use; the first line shows it as reddit wiki window. One live read tied to no handle or file, so the Reddit account is not checked first.',
+                   'A page that does not exist, or a wiki that is off or private, is unavailable (exit 9).',
+                   'requests: 1.'],
         'exits': (0, 2, 3, 4, 5, 6, 9),
     },
     'search': {
@@ -234,7 +247,7 @@ COMMANDS = {
         'exits': (0, 2),
     },
 }
-READS = ('feed', 'sub', 'profile', 'about', 'search', 'related', 'me', 'post', 'comments')
+READS = ('feed', 'sub', 'profile', 'about', 'wiki', 'search', 'related', 'me', 'post', 'comments')
 
 
 def epilog(name, spec):
