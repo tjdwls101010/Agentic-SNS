@@ -15,11 +15,13 @@ A response may be {"__raw_stdout": "...", "__exit": n} to print exactly that, or
 {"__write": {"<path>": "<text>"}} those files are written first (another command changing shared state meanwhile).
 With "tabs_fail_after_load" in the scenario, listing tabs fails once a tab has loaded a page.
 """
+import fcntl
 import json
 import os
 import re
 import sys
 import time
+from contextlib import contextmanager
 
 
 def load():
@@ -28,8 +30,21 @@ def load():
 
 
 def save(scenario):
-    with open(os.environ['TWITTER_FAKE_SCENARIO'], 'w') as f:
+    path = os.environ['TWITTER_FAKE_SCENARIO']
+    with open(path + '.tmp', 'w') as f:
         json.dump(scenario, f)
+    os.replace(path + '.tmp', path)
+
+
+@contextmanager
+def locked():
+    """One process at a time reads and updates the scenario (two commands may run at once)."""
+    with open(os.environ['TWITTER_FAKE_SCENARIO'] + '.lock', 'a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def log(entry):
@@ -67,34 +82,32 @@ def emit(value):
 
 def opener(account):
     line = sys.stdin.readline()
-    scenario = load()
-    log({'op': 'opener', 'account': account, 'marked': 'twitter-opener' in line})
-    response = take(scenario, 'opener', {}) or {'tabs': ['OPENED']}
+    with locked():
+        scenario = load()
+        log({'op': 'opener', 'account': account, 'marked': 'twitter-opener' in line})
+        response = take(scenario, 'opener', {}) or {'tabs': ['OPENED']}
     if '__sleep' in response:
         time.sleep(response['__sleep'])
-        scenario = load()
     tabs = response.get('tabs') or []
-    scenario['tabs'] += [{'id': t, 'url': 'about:blank'} for t in tabs]
-    save(scenario)
+    with locked():
+        scenario = load()
+        scenario['tabs'] += [{'id': t, 'url': 'about:blank'} for t in tabs]
+        save(scenario)
     sys.stdout.write('\x1b[2maccount: u0\x1b[0m\n\x1b[32mrepl\x1b[0m > ' + json.dumps({'kind': 'opened', 'tabs': tabs}) + '\n')
     sys.stdout.flush()
     sys.stdin.read()  # held until the skill ends the session
     log({'op': 'opener_end'})
-    scenario = load()
-    if scenario.get('opener_end_closes_tab'):
-        scenario['tabs'] = [t for t in scenario['tabs'] if t['id'] not in tabs]
-        save(scenario)
+    with locked():
+        scenario = load()
+        if scenario.get('opener_end_closes_tab'):
+            scenario['tabs'] = [t for t in scenario['tabs'] if t['id'] not in tabs]
+            save(scenario)
     return 0
 
 
-def main(argv):
-    account = None
-    if argv[:1] == ['--account']:
-        account, argv = argv[1], argv[2:]
-    if argv == ['repl']:
-        return opener(account)
+def answer(program, account):
+    """The scripted response to one program (or an exit code), with the scenario updated: run under the lock."""
     scenario = load()
-    program = argv[1]
     aside, args = const(program, 'ASIDE'), const(program, 'ARGS')
     if aside['op'] == 'tabs':
         log({'op': 'tabs', 'account': account})
@@ -125,6 +138,19 @@ def main(argv):
     if response is None:
         print(f'fake aside: no scripted response for {op} {json.dumps(args)[:300]}', file=sys.stderr)
         return 1
+    return response
+
+
+def main(argv):
+    account = None
+    if argv[:1] == ['--account']:
+        account, argv = argv[1], argv[2:]
+    if argv == ['repl']:
+        return opener(account)
+    with locked():
+        response = answer(argv[1], account)
+    if isinstance(response, int):
+        return response
     for path, text in (response.get('__write') or {}).items():
         with open(path, 'w') as handle:
             handle.write(text)
