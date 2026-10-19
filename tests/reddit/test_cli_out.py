@@ -82,6 +82,19 @@ def test_a_thread_collection_resumes_its_own_reading_after_the_snapshot_is_gone(
     assert saved == ['t3_aaa1', 't1_c1', 't1_c2', 't1_c3', 't1_c4'] and 't1_n1' not in saved
 
 
+def test_a_comment_link_after_a_resumed_collection_reads_the_comment_again(reddit, tmp_path, data_dir):
+    # Codex P7: the resumed tree keeps no text, and a link answered from it crashed
+    out = tmp_path / 'thread.ndjson'
+    reddit.me().json('/comments/aaa1.json', pair(TREE))
+    run_cli(reddit, 'comments', PERMALINK, '--out', str(out), '--max-requests', '2')
+    shutil.rmtree(data_dir / 'snapshots')
+    reddit.me().json('/api/morechildren.json', things(t1('c3', 't3_aaa1'), t1('c4', 't3_aaa1')))
+    run_cli(reddit, 'comments', PERMALINK, '--out', str(out))
+    reddit.me().json('/comments/aaa1/_/c1.json', pair([t1('c1', 't3_aaa1', [t1('c2', 't1_c1')])]), query={'context': '0'})
+    code, text, _ = run_cli(reddit, 'comments', PERMALINK + 'c1/')
+    assert code == 0 and 'comment c1' in text and 'comment c2' in text
+
+
 def test_a_new_thread_collection_holds_comments_already_shown_by_an_earlier_read(reddit, tmp_path):
     out = tmp_path / 'thread.ndjson'
     reddit.me().json('/comments/aaa1.json', pair([t1('c1', 't3_aaa1'), t1('c2', 't3_aaa1')]))

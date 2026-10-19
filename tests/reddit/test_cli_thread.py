@@ -92,6 +92,23 @@ def test_a_linked_comment_shows_what_hangs_under_it_even_after_the_post_showed_i
     assert 'comment c3' not in out, "the post's own reading is left as it was"
 
 
+def test_a_linked_comment_with_ancestors_ends_when_its_subtree_is_read(reddit):
+    # Codex P7: the ancestors sent as context stayed unshown, so more: never ended
+    reddit.me().json('/comments/aaa1/_/c2.json', pair([t1('c1', 't3_aaa1', [t1('c2', 't1_c1', [t1('c3', 't1_c2')])])]),
+                     query={'context': '1'})
+    code, out, _ = run_cli(reddit, 'post', PERMALINK + 'c2/', '--context', '1')
+    assert code == 0 and 'comment c3' in out and 'stopped=exhausted' in out and more_line(out) is None
+
+
+def test_a_linked_comment_is_shown_in_full(reddit):
+    # Codex P7: the help promises the comment in full; it was cut at the default 180 characters
+    long = 'word ' * 80
+    reddit.me().json('/comments/aaa1/_/c9.json', pair([t1('c9', 't1_c8', [t1('c10', 't1_c9', body=long)], body=long)]))
+    code, out, _ = run_cli(reddit, 'comments', PERMALINK + 'c9/')
+    assert code == 0 and f'text[{len(long.strip())} of {len(long.strip())} chars shown]' in out.split('[c2]')[0]
+    assert 'text[180 of' in out.split('[c2]')[1], 'the replies keep the default'
+
+
 def test_a_linked_comment_not_yet_read_opens_its_subtree(reddit):
     reddit.me().json('/comments/aaa1/_/c9.json', pair([t1('c9', 't1_c8', [t1('c10', 't1_c9')])]),
                      query={'context': '0'})

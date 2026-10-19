@@ -37,7 +37,39 @@ def create(post, items, sort, key, generation, observed, anchor=None):
              'children': {post['id']: []}, 'gaps': {}, 'gap_seq': 0, 'consumed': [], 'tries': {}, 'missing': [],
              'requested': 0, 'observed_at': time.time(), 'expanded_at': [], 'reddit_account': observed}
     ingest(state, items)
+    if anchor in state['nodes']:
+        _scope(state, anchor)
     return state
+
+
+def _family(state, anchor):
+    """(ancestors top first, the anchor and what was received under it) of a comment."""
+    nodes, children = state['nodes'], state['children']
+    under, stack = [], [anchor]
+    while stack:
+        name = stack.pop()
+        under.append(name)
+        stack.extend(child for child in children.get(name, []) if child in nodes)
+    chain, current = [], nodes[anchor]['parent']
+    while current in nodes:
+        chain.insert(0, current)
+        current = nodes[current]['parent']
+    return chain, under
+
+
+def _scope(state, anchor):
+    """A comment link's reading covers that comment's subtree: what Reddit sent around it (ancestors as context) counts
+    as shown, and gaps outside it are not this reading's to expand."""
+    _chain, under = _family(state, anchor)
+    inside = set(under)
+    for name, node in state['nodes'].items():
+        if name not in inside:
+            node['shown'] = True
+    for key in [key for key, gap in state['gaps'].items() if gap['parent'] not in inside]:
+        gap = state['gaps'].pop(key)
+        siblings = state['children'].get(gap['parent'], [])
+        if key in siblings:
+            siblings.remove(key)
 
 
 def _gap_key(parent, ids):
@@ -371,9 +403,13 @@ def _open(connection, snapshots, command, target, sort, handle, out, options):
     if command == 'comments' and out is None:  # a new collection starts its own reading: it holds every comment
         latest = snapshots.latest(key)
         state = snapshots.load(latest) if latest else None
-        if state is not None and (anchor is None or anchor in state['nodes']):
+        if state is not None and anchor is None:
             connection.observed = state['reddit_account']
-            return _view(state, anchor, sub_key, snapshots.new(sub_key)) if anchor else state
+            return state
+        if state is not None and anchor in state['nodes'] and \
+                all(state['nodes'][name].get('record') is not None for part in _family(state, anchor) for name in part):
+            connection.observed = state['reddit_account']  # a resumed --out tree keeps no text: read the link instead
+            return _view(state, anchor, sub_key, snapshots.new(sub_key))
     client = connection.network()
     generation = snapshots.new(sub_key)
     context = options.get('context') if command == 'post' else (0 if target.comment_id else None)
@@ -389,15 +425,7 @@ def _view(state, anchor, key, generation):
     comment's ancestors (already shown: context rows), the comment and what was received under it (unshown) and the
     gaps under it. The post's reading is left as it was."""
     nodes, children = state['nodes'], state['children']
-    under, stack = [], [anchor]
-    while stack:
-        name = stack.pop()
-        under.append(name)
-        stack.extend(child for child in children.get(name, []) if child in nodes)
-    chain, current = [], nodes[anchor]['parent']
-    while current in nodes:
-        chain.insert(0, current)
-        current = nodes[current]['parent']
+    chain, under = _family(state, anchor)
     view = create(state['post'], [], state['sort'], key, generation, state['reddit_account'], anchor)
     view['observed_at'] = state['observed_at']
     for name in chain + [anchor]:

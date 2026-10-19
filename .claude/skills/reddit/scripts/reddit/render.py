@@ -281,7 +281,8 @@ def render_page(envelope, *, chars=None, command=None):
         counts[prefix] += 1
         label = f'{prefix}{counts[prefix]}'
         if kind == 'comment':
-            lines.append(comment(record, label, limit, labels, context=bool(record.get('context'))))
+            full = record.get('anchor') and chars is None  # a comment link opens that comment in full
+            lines.append(comment(record, label, None if full else limit, labels, context=bool(record.get('context'))))
         elif kind == 'subreddit':
             lines.append(community(record, label, limit))
         elif kind == 'user':
