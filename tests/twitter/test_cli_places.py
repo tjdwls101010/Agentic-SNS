@@ -91,3 +91,93 @@ def test_a_list_x_does_not_return_is_unavailable(browser, data_dir):
     known_tab(browser, data_dir).respond('query', query_result(stub, headers=RATE))
     code, out, _ = run_cli(browser, 'list', '1500000000000000001', '--tab', 'about')
     assert code == 9
+
+
+# --- communities -----------------------------------------------------------------------------------------------------
+
+def community(ident='1600000000000000001', **extra):
+    return {'__typename': 'Community', 'rest_id': ident, 'id_str': ident, 'name': 'Synthetic community',
+            'description': 'For tests', 'member_count': 1200, 'moderator_count': 3, 'created_at': 1767225600000,
+            'join_policy': 'Open', 'is_nsfw': False, 'role': 'NonMember',
+            'primary_community_topic': {'topic_id': '1', 'topic_name': 'Technology'},
+            'rules': [{'rest_id': '1', 'name': 'Be kind'}], 'creator_results': {'result': OWNER}, **extra}
+
+
+def test_community_posts_by_ranking_or_recency(browser, data_dir):
+    timeline = {'data': {'communityResults': {'result': {'ranked_community_timeline': {'timeline': {'instructions': entries([
+        {'entryId': 'tweet-21', 'content': {'itemContent': {'itemType': 'TimelineTweet', 'tweet_results': {'result': post('21')}}}}],
+        'C1')}}}}}}
+    for sort, mode in (('top', 'Relevance'), ('recent', 'Recency')):
+        known_tab(browser, data_dir).respond('query', query_result(timeline, headers=RATE))
+        code, out, _ = run_cli(browser, 'community', 'https://x.com/i/communities/1600000000000000001', '--sort', sort)
+        assert code == 0 and 'post 21' in out, out
+        call = queries(browser)[-1]
+        assert call['name'] == 'CommunityTweetsTimeline' and call['variables']['communityId'] == '1600000000000000001'
+        assert call['variables']['rankingMode'] == mode
+
+
+def test_community_media_and_card(browser, data_dir):
+    media = {'data': {'communityResults': {'result': {'community_media_timeline': {'timeline': {'instructions': entries([
+        {'entryId': 'tweet-22', 'content': {'itemContent': {'itemType': 'TimelineTweet', 'tweet_results': {'result': post('22')}}}}])}}}}}}
+    known_tab(browser, data_dir).respond('query', query_result(media, headers=RATE))
+    code, out, _ = run_cli(browser, 'community', '1600000000000000001', '--tab', 'media')
+    assert code == 0 and 'post 22' in out and queries(browser)[-1]['name'] == 'CommunityMediaTimeline'
+    card = {'data': {'communityResults': {'result': community()}}}
+    known_tab(browser, data_dir).respond('query', query_result(card, headers=RATE))
+    code, out, _ = run_cli(browser, 'community', '1600000000000000001', '--tab', 'about')
+    assert code == 0, out
+    assert '[c1] "Synthetic community" · members=1200 moderators=3 · open to join · technology · you are not a member' in out
+    assert 'rules: "Be kind"' in out and 'created by @author_a' in out
+
+
+def test_a_community_that_does_not_exist_is_unavailable(browser, data_dir):
+    # measured 2026-10-19: X answers 200 with a result that is only a __typename other than Community
+    stub = {'data': {'communityResults': {'result': {'__typename': 'CommunityUnavailable'}}}}
+    known_tab(browser, data_dir).respond('query', query_result(stub, headers=RATE))
+    code, out, _ = run_cli(browser, 'community', '1600000000000000001', '--tab', 'about')
+    assert code == 9
+
+
+def test_without_a_target_community_lists_the_communities_x_suggests(browser, data_dir):
+    discovery = {'data': {'viewer': {'community_discovery_timeline': {'timeline': {'instructions': entries([
+        {'entryId': 'community-1600000000000000001', 'content': {'itemContent': {'itemType': 'TimelineCommunity',
+                                                                                 'community_results': {'result': community()}}}}])}}}}}
+    known_tab(browser, data_dir).respond('query', query_result(discovery, headers=RATE))
+    code, out, _ = run_cli(browser, 'community')
+    assert code == 0 and '[c1] "Synthetic community"' in out and 'suggest' in out, out
+    call = queries(browser)[-1]
+    assert call['name'] == 'CommunityDiscoveryTimeline' and call['chunk_hint'] == 'bundle.Communities'
+
+
+def test_search_in_communities_reads_community_posts(browser, data_dir):
+    page = {'data': {'search_by_raw_query': {'communities_latest_posts_search_page': {'timeline': {'instructions': entries([
+        {'entryId': 'tweet-23', 'content': {'itemContent': {'itemType': 'TimelineTweet', 'tweet_results': {'result': post('23')}}}}])}}}}}
+    known_tab(browser, data_dir).respond('query', query_result(page, headers=RATE))
+    code, out, _ = run_cli(browser, 'search', 'rust', '--in', 'communities')
+    assert code == 0 and 'post 23' in out, out
+    call = queries(browser)[-1]
+    assert call['name'] == 'GlobalCommunitiesLatestPostSearchTimeline' and call['variables']['rawQuery'] == 'rust'
+
+
+def test_search_in_communities_reads_posts_only(browser, data_dir):
+    code, out, _ = run_cli(browser, 'search', 'rust', '--in', 'communities', '--type', 'accounts')
+    assert code == 2 and 'posts only' in json.loads(out)['message'] and browser.calls() == []
+
+
+def test_suggested_communities_and_community_search_continue_from_their_more_line(browser, data_dir):
+    from conftest import command_of, state
+    discovery = {'data': {'viewer': {'community_discovery_timeline': {'timeline': {'instructions': entries([
+        {'entryId': 'community-1600000000000000001', 'content': {'itemContent': {'itemType': 'TimelineCommunity',
+                                                                                 'community_results': {'result': community()}}}}],
+        'DISC2')}}}}}
+    search = {'data': {'search_by_raw_query': {'communities_latest_posts_search_page': {'timeline': {'instructions': entries([
+        {'entryId': 'tweet-24', 'content': {'itemContent': {'itemType': 'TimelineTweet', 'tweet_results': {'result': post('24')}}}}],
+        'SRCH2')}}}}}
+    for args, body, cursor in ((['community'], discovery, 'DISC2'), (['search', 'rust', '--in', 'communities'], search, 'SRCH2')):
+        known_tab(browser, data_dir).respond('query', query_result(body, headers=RATE))
+        code, out, _ = run_cli(browser, *args)
+        assert code == 0 and out.splitlines()[-1].startswith('more: '), out
+        browser.respond('state', state()).respond('query', query_result(body, headers=RATE))
+        code, out, _ = run_cli(browser, *command_of(out.splitlines()[-1]))
+        assert code == 0, out
+        assert queries(browser)[-1]['variables']['cursor'] == cursor and queries(browser)[-1]['name'] == queries(browser)[-2]['name']

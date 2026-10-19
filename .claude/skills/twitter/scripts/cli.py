@@ -174,6 +174,18 @@ COMMANDS = {
                    'requests: 1 per page of about 20; about: 1.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
     },
+    'community': {
+        'help': 'Read a community\'s posts, media or card, or without a target the communities X suggests.',
+        'run': listing.community,
+        'arguments': [(('target',), {'nargs': '?', 'metavar': 'URL', 'help': 'x.com/i/communities/<id> URL or the numeric id; omitted: the communities X suggests to this account'}),
+                      (('--tab',), {'choices': ['posts', 'media', 'about'], 'default': 'posts', 'help': 'posts, media, or about (the card)'}),
+                      (('--sort',), {'choices': ['top', 'recent'], 'default': 'top', 'help': 'posts: top (X\'s ranking) or recent'})] + list(LIST),
+        'epilog': ['A community is a group with its own feed: its posts are what members posted there, in X\'s order (top is a ranking; recent was not verified as newest first), so no window closes on them. about is one record: size, moderators, how one joins, topic, rules, who made it and your role. search --in communities searches posts across communities.',
+                   'A suggested community is X\'s recommendation for this account, not a ranking of all communities.',
+                   'Without --limit or --out it reads one page; more: continues.',
+                   'requests: 1 per page of about 20; about: 1.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+    },
     'reposts': {
         'help': 'Read the accounts that reposted one post.',
         'run': listing.reposts,
@@ -213,7 +225,8 @@ COMMANDS = {
         'run': search.search,
         'arguments': [(('target',), {'metavar': 'QUERY', 'help': 'What to search for, as typed into X: words, "phrases", OR, -exclusions and operators (from: to: since:YYYY-MM-DD until:YYYY-MM-DD min_faves: filter:links lang: …)'}),
                       (('--type',), {'choices': ['posts', 'accounts', 'media'], 'default': 'posts', 'help': 'posts, accounts (people) or media'}),
-                      (('--sort',), {'choices': ['top', 'latest'], 'default': 'top', 'help': 'Posts and media: top (X\'s ranking) or latest (newest first)'})] + list(LIST),
+                      (('--sort',), {'choices': ['top', 'latest'], 'default': 'top', 'help': 'Posts and media: top (X\'s ranking) or latest (newest first)'}),
+                      (('--in',), {'choices': ['communities'], 'dest': 'within', 'help': 'communities: search posts in communities only (X\'s community search; posts, in X\'s order)'})] + list(LIST),
         'epilog': ['Results are in X\'s order for this account: top is a ranking, not a sample of opinion; latest is newest first. Accounts with the same or similar names are different results (compare url and their marks).',
                    'since: and until: in the query are filters X applies itself, so such a search read to the end (stopped=exhausted) covers its window: window ... closed (server-filtered); stopped by --limit, the budget or X\'s limit it is still open. X decides which day boundaries those operators use (measured once: until:D ran to the end of D in this account\'s time zone), so check created_at at the edges.',
                    'X allows about 50 searches per 15 minutes for this account (quotes count too): a wide search costs that limit, and when it runs out the command stops with exit 10 (before any result) or stopped=rate_limited (after some), naming when it resets.',
@@ -274,7 +287,7 @@ HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 
 
-READS = ('feed', 'profile', 'about', 'graph', 'me', 'list', 'post', 'replies', 'reposts', 'search', 'quotes')
+READS = ('feed', 'profile', 'about', 'graph', 'me', 'list', 'community', 'post', 'replies', 'reposts', 'search', 'quotes')
 
 
 def epilog(name, spec):
@@ -326,6 +339,8 @@ def validate(options):
                            'Drop them, or read one post.')
     if options['command'] == 'search' and not options['target'].strip():
         raise TwitterError(2, 'Search text must not be empty.', 'Pass the words to search for.')
+    if options['command'] == 'search' and options.get('within') and (options['type'] != 'posts' or options['sort'] != 'top'):
+        raise TwitterError(2, 'search --in communities reads posts only, in X\'s order.', 'Drop --type and --sort.')
     if options.get('after') and options.get('out'):
         raise TwitterError(2, '--after and --out cannot be combined; --out resumes its own file.',
                            'Rerun the same command with the same --out path.')

@@ -113,4 +113,26 @@ LIST = {
     },
 }
 
-SCHEMAS = {'post': POST, 'account': ACCOUNT, 'trend': TREND, 'list': LIST}
+COMMUNITY = {
+    'object': 'community',
+    'description': 'An X community: a group with its own feed, members, moderators and rules.',
+    'fields': {
+        'kind': 'string — community',
+        'id': 'string — the community id (community <id> reads it)',
+        'name': 'string|null',
+        'description': 'string|null',
+        'member_count': 'integer|null — ' + NULL,
+        'moderator_count': 'integer|null — ' + NULL,
+        'created_at': 'string|null — UTC ISO',
+        'open_to_join': 'boolean|null — false: joining needs a moderator\'s approval',
+        'join_policy': 'string|null — X\'s own value',
+        'nsfw': 'boolean|null',
+        'your_role': 'string|null — this account\'s place: not a member, member, moderator or admin',
+        'topic': 'string|null — the topic X files it under',
+        'rules': 'array — the rules\' titles',
+        'creator': 'object|null — {id, username, name}',
+        'url': 'string — x.com/i/communities/<id>',
+    },
+}
+
+SCHEMAS = {'post': POST, 'account': ACCOUNT, 'trend': TREND, 'list': LIST, 'community': COMMUNITY}

@@ -21,7 +21,7 @@ from urllib.parse import urlsplit
 
 from twitter.errors import TwitterError, diagnostic
 from twitter.x_web import classify
-from twitter.x_web.records import account_record, list_page, list_record, post_page, post_record
+from twitter.x_web.records import account_record, community_record, list_page, list_record, post_page, post_record
 
 _SNIPPETS = Path(__file__).with_name('snippets')
 _KIT = (_SNIPPETS / 'kit.js').read_text(encoding='utf-8').strip()
@@ -576,6 +576,21 @@ class Client:
             raise gone
         self.confirm()
         return record
+
+    def community(self, community_id):
+        """One community's card (one request); a community X does not return to this account is unavailable."""
+        gone = TwitterError(9, 'This community is unavailable: deleted, suspended or never existed.',
+                            'Check the community id; tell the user rather than retrying.', reason='unavailable')
+        root, warnings = self.query('CommunityByRestId', {'communityId': community_id}, missing=gone)
+        record = community_record(root)
+        if record is None:
+            raise gone
+        self.confirm()
+        return record
+
+    def community_search(self, text, cursor):
+        """One page of X's search across communities' posts for `text` (operators as typed)."""
+        return self.timeline('GlobalCommunitiesLatestPostSearchTimeline', {'rawQuery': text}, cursor)
 
     def search(self, text, product, cursor):
         """One page of X's search for `text` (posts Top or Latest, People, Media), operators as typed."""

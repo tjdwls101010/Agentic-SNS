@@ -5,7 +5,7 @@ import json
 
 from twitter import connect
 from twitter.errors import TwitterError
-from twitter.x_web import parse_account, parse_list, parse_post
+from twitter.x_web import parse_account, parse_community, parse_list, parse_post
 
 # Both home feeds are X's choice of order: the following feed is not newest first (P2 R8), so neither closes a window.
 FEEDS = {'foryou': ('foryou', 'unordered'), 'following': ('following', 'unordered')}
@@ -112,6 +112,44 @@ def lists(options):
                                  fetch=lambda cursor: client.timeline(LIST_TABS[tab], {'listId': target.list_id}, cursor))
 
     return connect.run(options, command='list', target=target.url, identity=identity, reader=read)
+
+
+COMMUNITY_TABS = {'posts': 'CommunityTweetsTimeline', 'media': 'CommunityMediaTimeline'}
+
+
+def community(options):
+    """A community's posts, media or card; without a target, the communities X suggests to this account."""
+    if not options.get('target'):
+        return _discovery(options)
+    target = parse_community(options['target'])
+    tab, sort = options['tab'], options['sort']
+    identity = {'tab': tab, 'sort': sort if tab == 'posts' else None}
+
+    def read(connection, state, out):
+        client = connection.client
+        if tab == 'about':
+            return {'results': [client.community(target.community_id)], 'stop_reason': 'not_paginable'}
+        variables = {'communityId': target.community_id}
+        if tab == 'posts':
+            variables['rankingMode'] = 'Recency' if sort == 'recent' else 'Relevance'
+        return connect.read_list(options, identity, state, out, order='unordered', command='community',
+                                 target=target.url, words=['--tab', tab] + (['--sort', sort] if tab == 'posts' else []),
+                                 fetch=lambda cursor: client.timeline(COMMUNITY_TABS[tab], variables, cursor))
+
+    return connect.run(options, command='community', target=target.url, identity=identity, reader=read)
+
+
+def _discovery(options):
+    def read(connection, state, out):
+        client = connection.client
+        reading = connect.read_list(options, {}, state, out, order=None, command='community',
+                                    target=None, fetch=lambda cursor: client.timeline('CommunityDiscoveryTimeline', {},
+                                                                                     cursor))
+        reading['coverage'] = ['communities X suggests to this account, not a ranking of all communities',
+                               *(reading.get('coverage') or [])]
+        return reading
+
+    return connect.run(options, command='community', target=None, identity={}, reader=read)  # no target: the suggestions
 
 
 def reposts(options):

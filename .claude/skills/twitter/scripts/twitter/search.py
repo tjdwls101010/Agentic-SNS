@@ -25,6 +25,8 @@ def _server_window(text):
 
 def search(options):
     text, kind, sort = options['target'], options['type'], options['sort']
+    if options.get('within') == 'communities':
+        return _in_communities(options, text)
     product = PRODUCTS[kind][sort]
     identity = {'type': kind, 'sort': None if kind == 'accounts' else sort}
     window = _server_window(text) if kind != 'accounts' else None
@@ -35,6 +37,20 @@ def search(options):
         return connect.read_list(options, identity, state, out, order=order, command='search', target=text,
                                  words=['--type', kind] + (['--sort', sort] if kind != 'accounts' else []),
                                  fetch=lambda cursor: client.search(text, product, cursor))
+
+    return connect.run(options, command='search', target=text, identity=identity, reader=read, window=window)
+
+
+def _in_communities(options, text):
+    """Posts in communities that match `text`, in the order X's community search serves them."""
+    identity = {'in': 'communities'}
+    window = _server_window(text)
+
+    def read(connection, state, out):
+        client = connection.client
+        return connect.read_list(options, identity, state, out, order='server' if window else 'unordered',
+                                 command='search', target=text, words=['--in', 'communities'],
+                                 fetch=lambda cursor: client.community_search(text, cursor))
 
     return connect.run(options, command='search', target=text, identity=identity, reader=read, window=window)
 

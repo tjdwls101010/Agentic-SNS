@@ -54,3 +54,26 @@ def list_record(node):
             'you_follow': node.get('following') if isinstance(node.get('following'), bool) else None,
             'you_are_member': node.get('is_member') if isinstance(node.get('is_member'), bool) else None,
             'url': f'{ORIGIN}/i/lists/{ident}'}
+
+
+_ROLES = {'NonMember': 'not a member', 'Member': 'member', 'Moderator': 'moderator', 'Admin': 'admin'}
+
+
+def community_record(node):
+    """One X community: its size, how one joins, its topic and rules, and this account's role; None for anything X
+    sends in place of a community (a community that does not exist comes back as another __typename, measured)."""
+    node = _dict(node)
+    ident = _str(node.get('id_str')) or (str(node['rest_id']) if node.get('rest_id') else None)
+    if node.get('__typename') != 'Community' or not ident:
+        return None
+    rules = [_str(_dict(rule).get('name')) for rule in node.get('rules') or []]
+    policy = _str(node.get('join_policy'))
+    return {'kind': 'community', 'id': ident, 'name': _str(node.get('name')),
+            'description': _str(node.get('description')), 'member_count': _count(node.get('member_count')),
+            'moderator_count': _count(node.get('moderator_count')), 'created_at': _ms(node.get('created_at')),
+            'open_to_join': policy == 'Open' if policy else None, 'join_policy': policy,
+            'nsfw': node.get('is_nsfw') if isinstance(node.get('is_nsfw'), bool) else None,
+            'your_role': _ROLES.get(node.get('role'), _str(node.get('role'))),
+            'topic': _str(_dict(node.get('primary_community_topic')).get('topic_name')),
+            'rules': [rule for rule in rules if rule], 'creator': _who(node.get('creator_results')),
+            'url': f'{ORIGIN}/i/communities/{ident}'}

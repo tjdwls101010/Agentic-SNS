@@ -230,6 +230,29 @@ def x_list(record, label):
     return '\n'.join(lines)
 
 
+def community(record, label):
+    parts = [_quote(record.get('name') or ''),
+             f'members={_count(record.get("member_count"))} moderators={_count(record.get("moderator_count"))}']
+    if record.get('open_to_join') is not None:
+        parts.append('open to join' if record['open_to_join'] else 'joining needs approval')
+    parts += [_line(record['topic']).lower()] if record.get('topic') else []
+    parts += ['nsfw'] if record.get('nsfw') else []
+    if record.get('your_role'):
+        parts.append('you are not a member' if record['your_role'] == 'not a member' else
+                     f'you are {"an" if record["your_role"][0] in "aeiou" else "a"} {_line(record["your_role"])}')
+    lines = [f'[{label}] ' + ' · '.join(parts)]
+    if record.get('description'):
+        lines.append('     about: ' + _quote(record['description']))
+    if record.get('rules'):
+        lines.append('     rules: ' + ' · '.join(_quote(rule) for rule in record['rules']))
+    made = [f'created by @{record["creator"]["username"]}'] if (record.get('creator') or {}).get('username') else []
+    made += ['created=' + _time(record['created_at'])[:10]] if record.get('created_at') else []
+    if made:
+        lines.append('     ' + ' · '.join(made))
+    lines.append(f'     url: {_handle(record.get("url"))}')
+    return '\n'.join(lines)
+
+
 def _replies_line(replies):
     reported = '?' if replies.get('reported') is None else replies['reported']
     return (f'replies: {replies.get("direct_shown", 0)} direct and {replies.get("nested_shown", 0)} nested shown of '
@@ -267,9 +290,13 @@ def render_page(envelope, *, chars=None, command=None):
         lines.append(f'window {window.get("since") or ""}..{window.get("until") or ""} · {_line(window["coverage"])}')
     if envelope.get('replies'):
         lines.append(_replies_line(envelope['replies']))
-    labels, counts = {}, {'p': 0, 'r': 0, 'a': 0, 't': 0, 'l': 0}
+    labels, counts = {}, {'p': 0, 'r': 0, 'a': 0, 't': 0, 'l': 0, 'c': 0}
     for record in results:
         kind = record.get('kind')
+        if kind == 'community':
+            counts['c'] += 1
+            lines.append(community(record, f'c{counts["c"]}'))
+            continue
         if kind == 'list':
             counts['l'] += 1
             lines.append(x_list(record, f'l{counts["l"]}'))
