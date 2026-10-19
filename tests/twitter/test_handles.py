@@ -94,6 +94,8 @@ def test_a_handle_in_the_previous_twitter_format_is_refused(data_dir):
     (data_dir / 'handles').mkdir(parents=True, exist_ok=True)
     (data_dir / 'handles/7.json').write_text(json.dumps({'cursor': 'C', 'pending': [], 'format': 2,
                                                         'created_at': 1792300000.0, 'context': X}))
+    before = (data_dir / 'handles/7.json').read_bytes()
     with pytest.raises(TwitterError) as error:
         handles.load(7, X)
     assert error.value.code == 2 and 'earlier version' in error.value.message
+    assert (data_dir / 'handles/7.json').read_bytes() == before  # refused, not rewritten
