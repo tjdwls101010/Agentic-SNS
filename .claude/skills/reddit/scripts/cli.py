@@ -12,7 +12,7 @@ import shlex
 import sys
 from datetime import date, datetime, time, timedelta
 
-from reddit import about, listing, maintenance, thread
+from reddit import about, listing, maintenance, search, thread
 from reddit.errors import RedditError
 from reddit.render import render_page, render_summary
 from reddit.results import failure_envelope
@@ -156,6 +156,38 @@ COMMANDS = {
                    'requests: 2 for a community (card, rules), 1 for a user.'],
         'exits': (0, 2, 3, 4, 5, 6, 9),
     },
+    'search': {
+        'help': 'Search posts, communities or users, across Reddit or inside one community.',
+        'run': search.search,
+        'arguments': [(('text',), {'metavar': 'TEXT', 'help': 'What to search for, as one argument; sent to Reddit as it is'}),
+                      (('--type',), {'choices': search.SEARCH_TYPES, 'default': 'posts', 'help': 'posts (default), subs (communities) or users'}),
+                      (('--in',), {'dest': 'within', 'metavar': 'r/NAME', 'help': 'Search posts inside this one community'}),
+                      (('--sort',), {'choices': search.SEARCH_SORTS, 'default': 'relevance', 'help': 'relevance (default), hot, top, new (newest first) or comments (most commented)'}),
+                      TIME,
+                      (('--nsfw',), {'action': 'store_true', 'help': 'Include posts marked over 18 (otherwise Reddit leaves most out)'}),
+                      *WINDOW, *LIST],
+        'epilog': ['Reddit matches words loosely: several words find posts with any of them, so results can be off-topic. These operators work inside TEXT: "exact phrase", subreddit:NAME, author:NAME, title:WORD, self:yes (text posts), site:DOMAIN, flair:NAME; url:TEXT matches loosely. Comments cannot be searched here.',
+                   'Results are Reddit\'s ranking for this query, not a sample of what Reddit holds; an empty search shows nothing matched these words in Reddit\'s index, not that nobody discussed it.',
+                   '--time is Reddit\'s period (hour ... all); --since/--until (local days) need --sort new.',
+                   'requests: 1 account check + 1 per page of 100 (25 shown; more: shows the rest of the page with no request).'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
+    },
+    'related': {
+        'help': 'Read the other discussions of the same link (crossposts and duplicates).',
+        'run': listing.related,
+        'arguments': [(('target',), {'metavar': 'URL', 'help': 'A post URL or id'}), *LIST],
+        'epilog': ['Each other post of the same link, in other communities or the same one: one link\'s discussion is often split across communities that react differently. Exit 7 when there is none.',
+                   'requests: 1 account check + 1 per page of 100.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
+    },
+    'me': {
+        'help': 'Read your own subscriptions, saved or upvoted items.',
+        'run': listing.me,
+        'arguments': [(('collection',), {'choices': listing.ME_COLLECTIONS, 'help': 'subs (subscribed communities), saved or upvoted'}), *LIST],
+        'epilog': ['Lists of the Reddit account the Aside browser is logged in to (the account check names it). saved and upvoted hold posts and comments, newest saved or upvoted first.',
+                   'requests: 1 account check + 1 per page of 100.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8),
+    },
     'post': {
         'help': 'Read one post in full and the first batch of its comments.',
         'run': thread.post,
@@ -202,7 +234,7 @@ COMMANDS = {
         'exits': (0, 2),
     },
 }
-READS = ('feed', 'sub', 'profile', 'about', 'post', 'comments')
+READS = ('feed', 'sub', 'profile', 'about', 'search', 'related', 'me', 'post', 'comments')
 
 
 def epilog(name, spec):

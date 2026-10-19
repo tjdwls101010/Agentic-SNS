@@ -5,8 +5,12 @@ from reddit import handles
 from reddit.aside import Aside
 from reddit.collection import OutFile, peek, resolve
 from reddit.errors import RedditError
+from reddit.paging import paginate
 from reddit.reddit_web import Client
 from reddit.results import finish
+from reddit.window import Window
+
+DISPLAY = 25
 
 
 class Connection:
@@ -187,3 +191,61 @@ def _public(identity):
     """The identity options a result names in its header."""
     return {key: value for key, value in identity.items()
             if key in ('sort', 'time', 'type', 'collection', 'within') and value is not None}
+
+
+def read_pages(connection, options, identity, state, out, *, request, command, target, words=None, extra=None):
+    """A listing read page by page in Reddit's order, as a reading for run().
+
+    A page asks for 100 records and shows --limit of them (25 by default); the rest wait in the handle, so the next
+    more: shows them with no request. A date window is only for sort new (a timeline): it keeps the records of its
+    local days and closes at the first record older than --since, pinned posts aside; a listing that ends first did
+    not cover the window (partial).
+    """
+    start = dict(out.state or {}) if out is not None else dict(state or {})
+    window = Window(options.get('since'), options.get('until'), start.pop('window', None))
+    for key in (extra or {}):
+        start.pop(key, None)
+
+    def fetch(cursor):
+        records, after = connection.network().listing(request(cursor))
+        return records, {'has_next_page': after is not None, 'end_cursor': after}, bool(records)
+
+    def commit(records, page_state, reason, skipped):
+        out.commit(records, {**page_state, 'window': window.state(), **(extra or {})} if page_state else None, reason,
+                   skipped, window.report())
+
+    if out is not None:
+        start.update(seen=sorted(out.ids, key=str), pending=[])
+    limit = options.get('limit') or (None if out is not None else DISPLAY)
+    if out is not None and options.get('limit') is not None:
+        if out.count >= options['limit']:
+            return {'results': [], 'stop_reason': 'limit_reached', 'words': _words(identity, words)}
+        limit -= out.count
+    closes = window.closes if window.active and window.bounds['start'] is not None else None
+    result = paginate(fetch, limit=limit, state=start, keep=window.keep, closes=closes,
+                      commit=commit if out is not None else None, whole_pages=out is not None)
+    stop, failure = result['stop_reason'], result['failure']
+    if stop == 'exhausted' and window.bounds['start'] is not None:
+        failure = RedditError(8, 'The listing ended before the window\'s start: Reddit had no older posts to show '
+                                 'here, so the window is not covered.', 'Use a later --since, or search with --sort '
+                                                                        'new instead of reading the listing.',
+                              reason='listing_ended')
+    reading = {'results': [] if out is not None else result['results'], 'stop_reason': stop, 'failure': failure,
+               'coverage': window.report(), 'words': _words(identity, words), 'partial': bool(result['results'])}
+    if window.active:
+        reading['window'] = window.describe()
+    if not result['results'] and failure is None and result['state'] is None and out is None and not window.active:
+        reading['failure'] = RedditError(7, 'Reddit returned nothing here.', 'Try another target, order or period.')
+    if result['state'] is not None:
+        reading['continuation'] = {'command': command, 'target': target, 'identity': identity,
+                                   'words': _words(identity, words),
+                                   'state': {**result['state'], 'window': window.state(), **(extra or {})}}
+    return reading
+
+
+def _words(identity, positional=None):
+    words = list(positional or [])
+    for key in ('type', 'sort', 'time', 'since', 'until'):
+        if identity.get(key):
+            words += ['--' + key, identity[key]]
+    return words
