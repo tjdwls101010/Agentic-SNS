@@ -376,3 +376,52 @@ def test_looking_at_the_tab_is_refused_under_a_block_unless_it_only_empties_it(d
     assert error.value.code == 5
     with g.observe(allow_blocked=True):
         pass
+
+
+def test_a_wait_that_leaves_too_little_time_for_the_call_is_refused_without_sleeping(data_dir):
+    """Sleeping until just before the deadline only to time out in the browser call is a lost request (P3 review 10)."""
+    clock = Clock(1000)
+    write(data_dir, 'buckets.json', {'SearchTimeline': {'limit': 50, 'remaining': 5, 'reset': 1300, 'next_at': 1008}})
+    g = make(clock, deadline=10)
+    with pytest.raises(TwitterError) as error:
+        with g.request(operation='SearchTimeline'):
+            pytest.fail('no request may be sent')
+    assert error.value.code == 10 and error.value.details['next_allowed_at'] == 1008 and clock.slept == []
+    write(data_dir, 'pace.json', {'next_allowed_at': 1001.5})
+    with pytest.raises(TwitterError) as error:
+        with make(clock, deadline=3).request(operation='TweetDetail'):
+            pytest.fail('no request may be sent')
+    assert error.value.reason == 'time_limit' and clock.slept == []
+
+
+def test_one_operations_slowdown_is_waited_out_without_holding_the_lock(data_dir):
+    """Another operation's command must not queue behind a stretched limit (plan X4; P3 review 11)."""
+    import fcntl
+    clock = Clock(1000)
+    write(data_dir, 'buckets.json', {'SearchTimeline': {'limit': 50, 'remaining': 5, 'reset': 1300, 'next_at': 1060}})
+    free = []
+
+    def sleep(seconds):
+        with open(data_dir / 'protection' / 'lock', 'a') as other:
+            try:
+                fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(other, fcntl.LOCK_UN)
+                free.append(seconds)
+            except BlockingIOError:
+                pass
+        clock.sleep(seconds)
+
+    g = guard.Guard(25, deadline_seconds=100, clock=clock.time, monotonic=clock.monotonic, sleep=sleep)
+    with g.request(operation='SearchTimeline'):
+        pass
+    assert 60 in free and g.used == 1
+
+
+def test_an_unreadable_bucket_file_is_reported_as_unreadable_not_as_a_time_limit(data_dir):
+    clock = Clock(1000)
+    write(data_dir, 'blocked.json', {'reason': 'account_locked', 'blocked_at': 900, 'account_id': '1'})
+    write(data_dir, 'buckets.json', 'not json')
+    with pytest.raises(TwitterError) as error:
+        with make(clock).verify_unblock():
+            pytest.fail('no check may be sent')
+    assert error.value.code == 5 and error.value.reason == 'unreadable'

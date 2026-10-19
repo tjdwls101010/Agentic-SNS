@@ -33,6 +33,7 @@ RESET_WITHOUT_HEADER = 900   # X's limits are 15-minute windows; a 429 without a
 DEADLINE_SECONDS = 100
 REASONS = ('challenge', 'account_locked')
 LOCK_POLL = 0.05
+CALL_SECONDS = 3      # the least time a browser call needs: a wait that leaves less is a stop, not a lost request
 
 UNBLOCK_FIX = 'Stop requests. After a person checks x.com in the Aside browser, run doctor --unblock.'
 _UNREADABLE = TwitterError(5, 'Account protection state is unreadable, so requests are refused.',
@@ -142,8 +143,9 @@ def _time_limit():
                         reason='time_limit')
 
 
-def _limit_error(operation, reset, next_allowed):
-    return TwitterError(10, f'X\'s limit for {operation} is used up for now; it resets at {_local(reset)}.',
+def _limit_error(operation, reset, next_allowed, slowed=False):
+    state = 'nearly used up, so its requests are spaced out' if slowed else 'used up for now'
+    return TwitterError(10, f'X\'s limit for {operation} is {state}; it resets at {_local(reset)}.',
                         f'This is not an account problem and other commands still work. Retry this one after '
                         f'{_local(next_allowed)}.', reason='rate_limited', operation=operation, reset=reset,
                         next_allowed_at=next_allowed)
@@ -297,7 +299,8 @@ class Guard:
                 lock.close()
 
     def _wait_for(self, operation):
-        """Seconds to wait before `operation` may go, or raise its limit / the deadline (see the module docstring)."""
+        """(pacing, slowdown): the seconds to wait before `operation` may go, or raise its limit / the deadline when
+        the wait would leave less than CALL_SECONDS for the call (see the module docstring)."""
         if self.time_left() <= 0:
             raise _time_limit()
         now = self.clock()
@@ -306,12 +309,11 @@ class Guard:
             raise _limit_error(operation, bucket['reset'], bucket['reset'])
         pace = max(0.0, _next_allowed() - now)
         slow = max(0.0, bucket['next_at'] - now) if bucket and 'next_at' in bucket else 0.0
-        wait = max(pace, slow)
-        if wait >= self.time_left():
-            if slow >= pace:
-                raise _limit_error(operation, bucket['reset'], bucket['next_at'])
+        if max(pace, slow) + CALL_SECONDS >= self.time_left():
+            if slow > 0 and slow >= pace:
+                raise _limit_error(operation, bucket['reset'], bucket['next_at'], slowed=True)
             raise _time_limit()
-        return wait
+        return pace, slow
 
     def _reserve_pace(self):
         _write('pace.json', {'next_allowed_at': self.clock() + random.uniform(*PACE_SECONDS)})
@@ -332,27 +334,33 @@ class Guard:
             finally:
                 _log(kind or 'unblock_check', slot.reserved, operation, self.clock())
             return
-        with self._locked(_time_limit):
-            self.check()
-            if budgeted and self.used + reserve > self.budget:
-                raise TwitterError(8, 'The request budget (--max-requests) is spent.',
-                                   'Run more: to continue, or rerun with a larger --max-requests.', reason='budget')
-            wait = self._wait_for(operation)
-            if wait > 0:
-                self.sleep(wait)
-            _forget_reset_buckets(self.clock())
-            # Reserve the next gap before the request too, so a killed process cannot leave pacing unrecorded.
-            self._reserve_pace()
-            if budgeted:
-                self.used += reserve
-            else:
-                self.setup += reserve
-            slot = Slot(self, reserve, budgeted, operation)
-            try:
-                yield slot
-            finally:
-                self._reserve_pace()
-                _log(kind or ('query' if budgeted else 'setup'), slot.reserved, operation, self.clock())
+        while True:
+            with self._locked(_time_limit):
+                self.check()
+                if budgeted and self.used + reserve > self.budget:
+                    raise TwitterError(8, 'The request budget (--max-requests) is spent.',
+                                       'Run more: to continue, or rerun with a larger --max-requests.', reason='budget')
+                pace, slow = self._wait_for(operation)
+                if slow <= pace:
+                    if pace > 0:
+                        self.sleep(pace)
+                    _forget_reset_buckets(self.clock())
+                    # Reserve the next gap before the request too, so a killed process cannot leave pacing unrecorded.
+                    self._reserve_pace()
+                    if budgeted:
+                        self.used += reserve
+                    else:
+                        self.setup += reserve
+                    slot = Slot(self, reserve, budgeted, operation)
+                    try:
+                        yield slot
+                    finally:
+                        self._reserve_pace()
+                        _log(kind or ('query' if budgeted else 'setup'), slot.reserved, operation, self.clock())
+                    return
+            # This operation's slowdown is waited out without the lock, so other operations' commands go meanwhile;
+            # then everything (block, budget, limit, pacing) is weighed again.
+            self.sleep(slow)
 
     @contextmanager
     def observe(self, allow_blocked=False):
@@ -383,12 +391,14 @@ class Guard:
             self.checked = True
             record = _block()
             try:
-                wait = self._wait_for(operation)
+                wait = max(self._wait_for(operation))
             except TwitterError as error:
                 if error.reason == 'rate_limited':
                     raise refused('rate_limited', reset=error.details['reset'],
                                   next_allowed_at=error.details['next_allowed_at']) from None
-                raise refused('time_limit') from None
+                if error.reason == 'time_limit':
+                    raise refused('time_limit') from None
+                raise  # unreadable protection state is its own refusal
             if wait > 0:
                 self.sleep(wait)
             self._reserve_pace()
