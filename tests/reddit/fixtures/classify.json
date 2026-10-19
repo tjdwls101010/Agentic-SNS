@@ -88,9 +88,9 @@
     {"name": "me-nonstring-name", "item": "3", "fact": "A truthy name that is not a string is a malformed answer: failed.",
      "expect": "me", "envelope": {"status": 200, "url": "https://www.reddit.com/api/me.json?raw_json=1", "body": "{\"kind\": \"t2\", \"data\": {\"name\": 123}}", "ratelimit": {"used": "4", "remaining": "96", "reset": "300"}},
      "outcome": {"outcome": "failed"}},
-    {"name": "me-logged-out-shape", "item": "3", "fact": "A logged-out /api/me.json is {} (not a t2): the shape check fails.",
+    {"name": "me-logged-out-shape", "item": "3", "fact": "A logged-out /api/me.json is {} (not a t2): login is required.",
      "expect": "me", "envelope": {"status": 200, "url": "https://www.reddit.com/api/me.json?raw_json=1", "body": "{}", "ratelimit": {"used": "4", "remaining": "96", "reset": "300"}},
-     "outcome": {"outcome": "failed", "note": "after_recon: the old code reads {} as a shape change (6); P2 decides whether a logged-out me answer is {} and should be a login (4)"}},
+     "outcome": {"outcome": "login", "note": "P2: decided by inference (a logged-out me answer is {}); the old code read it as a shape change (6). See after_recon me-logged-out-is-login."}},
     {"name": "personal-listing-empty-modhash", "item": "3", "fact": "On a personal surface a Listing whose modhash is the empty string means logged out.",
      "expect": "listing", "personal": true, "envelope": {"status": 200, "url": "https://www.reddit.com/best.json?raw_json=1", "body": "{\"kind\": \"Listing\", \"data\": {\"modhash\": \"\", \"after\": null, \"children\": [{\"kind\": \"t3\", \"data\": {\"id\": \"aaa1\", \"name\": \"t3_aaa1\"}}]}}", "ratelimit": {"used": "4", "remaining": "96", "reset": "300"}},
      "outcome": {"outcome": "login"}},
@@ -168,7 +168,26 @@
      "outcome": {"outcome": "failed"}}
   ],
   "after_recon": {
-    "about": "Shapes the new surfaces answer with, filled from P2 captures (R4 wiki, R5 moderators and the pinned posts): wiki_page, wiki_index, moderators, and how a disabled or private wiki answers.",
-    "cases": []
+    "about": "Shapes of the new surfaces (P2 R4, R5) and the logged-out me answer.",
+    "cases": [
+      {"name": "wiki-page", "item": "R4", "fact": "A wiki page is {kind: wikipage, data: {content_md, content_html, revision_by (a t2), revision_date (epoch), revision_id, reason, may_revise}}.",
+       "expect": "wiki_page", "envelope": {"status": 200, "url": "https://www.reddit.com/r/example/wiki/index.json?raw_json=1", "body": "{\"kind\": \"wikipage\", \"data\": {\"content_md\": \"# Welcome\", \"content_html\": \"<h1>Welcome</h1>\", \"revision_by\": {\"kind\": \"t2\", \"data\": {\"name\": \"example_mod\"}}, \"revision_date\": 1682115934, \"revision_id\": \"6eb29c66-0000-11ed-8286-a2935fa5aba7\", \"reason\": \"add a page\", \"may_revise\": false}}", "ratelimit": {"used": "5", "remaining": "595.0", "reset": "492"}},
+       "outcome": {"outcome": "ok"}},
+      {"name": "wiki-index", "item": "R4", "fact": "The page list is {kind: wikipagelisting, data: [names]}, settings pages (config/...) included.",
+       "expect": "wiki_index", "envelope": {"status": 200, "url": "https://www.reddit.com/r/example/wiki/pages.json?raw_json=1", "body": "{\"kind\": \"wikipagelisting\", \"data\": [\"index\", \"faq\", \"config/sidebar\"]}", "ratelimit": {"used": "5", "remaining": "595.0", "reset": "492"}},
+       "outcome": {"outcome": "ok"}},
+      {"name": "wiki-page-not-found", "item": "R4", "fact": "A missing page is 404 with reason PAGE_NOT_FOUND: the target cannot be read (9).",
+       "expect": "wiki_page", "envelope": {"status": 404, "url": "https://www.reddit.com/r/example/wiki/nope.json?raw_json=1", "body": "{\"reason\": \"PAGE_NOT_FOUND\", \"message\": \"Not Found\"}", "ratelimit": {"used": "5", "remaining": "595.0", "reset": "492"}},
+       "outcome": {"outcome": "unavailable", "reason": "not_found"}},
+      {"name": "wiki-403-any-reason-is-unavailable", "item": "R4", "fact": "On a wiki route any JSON 403 means this account cannot read that wiki (disabled or private); the exact reason a disabled wiki sends was not seen, so the rule does not depend on it.",
+       "expect": "wiki_page", "envelope": {"status": 403, "url": "https://www.reddit.com/r/example/wiki/index.json?raw_json=1", "body": "{\"reason\": \"WIKI_DISABLED\", \"message\": \"Forbidden\"}", "ratelimit": {"used": "5", "remaining": "595.0", "reset": "492"}},
+       "outcome": {"outcome": "unavailable", "reason": "WIKI_DISABLED"}},
+      {"name": "wiki-page-wrong-kind", "item": "R4", "fact": "Another kind where a wikipage was expected is a shape change.",
+       "expect": "wiki_page", "envelope": {"status": 200, "url": "https://www.reddit.com/r/example/wiki/index.json?raw_json=1", "body": "{\"kind\": \"Listing\", \"data\": {\"children\": []}}", "ratelimit": {"used": "5", "remaining": "595.0", "reset": "492"}},
+       "outcome": {"outcome": "failed"}},
+      {"name": "moderators", "item": "R5", "fact": "about/moderators.json is {kind: UserList, data: {children: [{name, author_flair_text, date, id, mod_permissions, rel_id}]}}.",
+       "expect": "moderators", "envelope": {"status": 200, "url": "https://www.reddit.com/r/example/about/moderators.json?raw_json=1", "body": "{\"kind\": \"UserList\", \"data\": {\"children\": [{\"name\": \"example_mod\", \"author_flair_text\": null, \"date\": 1300000000.0, \"id\": \"t2_m1\", \"mod_permissions\": [\"all\"], \"rel_id\": \"rb_1\"}]}}", "ratelimit": {"used": "13", "remaining": "87.0", "reset": "483"}},
+       "outcome": {"outcome": "ok"}}
+    ]
   }
 }

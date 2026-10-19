@@ -1,5 +1,5 @@
 {
-  "about": "Comment trees (appendix A 21-26): how a response is walked and validated, how comments are put in place, how a gap (a more pointer) is expanded and merged, and what coverage says. Comments are written compactly: {id, parent (fullname), body?, replies: [...]} for a t1 and {more: [ids], parent, count} for a more pointer ({more: [], count > 0} is 'continue this thread'). The P3 tests turn these into Reddit's raw shapes. All ids are synthetic.",
+  "about": "Comment trees (appendix A 21-26): how a response is walked and validated, how comments are put in place, how a gap (a more pointer) is expanded and merged, and what coverage says. Comments are written compactly: {id, parent (fullname), body?, replies: [...]} for a t1 and {more: [ids], parent, count} for a more pointer ({more: [], count: 0} is 'continue this thread': Reddit sends it as a more with id '_' and no children, P2 R1). The P3 tests turn these into Reddit's raw shapes. All ids are synthetic.",
   "walk": {
     "item": "21",
     "fact": "A response is walked through arrays, Listings, t1, t3, more and the morechildren json envelope. Each item's parent_id is a string; a more's children are (t1_)?[A-Za-z0-9]+ strings and its count a non-negative integer; a t1's replies is '' or a Listing. Anything else is a malformed response (exit 6).",
@@ -49,16 +49,16 @@
        "expansions": [{"request": {"kind": "ids", "ids": ["c2", "c3"]}, "answer": [{"id": "c2", "parent": "t3_aaa1"}, {"id": "c3", "parent": "t3_aaa1", "replies": [{"id": "c5", "parent": "t1_c3"}]}]}],
        "expected": {"order": ["t1_c1", "t1_c2", "t1_c3", "t1_c5", "t1_c4"], "requested": ["c2", "c3"], "received": ["c2", "c3", "c5"], "missing": []}},
       {"name": "continue-this-thread", "post": "aaa1",
-       "initial": [{"id": "c1", "parent": "t3_aaa1", "replies": [{"id": "c2", "parent": "t1_c1", "replies": [{"more": [], "parent": "t1_c2", "count": 4}]}]}],
+       "initial": [{"id": "c1", "parent": "t3_aaa1", "replies": [{"id": "c2", "parent": "t1_c1", "replies": [{"more": [], "parent": "t1_c2", "count": 0}]}]}],
        "expansions": [{"request": {"kind": "subtree", "comment": "c2"}, "answer": [{"id": "c2", "parent": "t1_c1", "replies": [{"id": "c6", "parent": "t1_c2"}, {"id": "c7", "parent": "t1_c2"}]}]}],
        "expected": {"order": ["t1_c1", "t1_c2", "t1_c6", "t1_c7"], "gaps_left": 0}},
       {"name": "top-level-continue-unresolved", "post": "aaa1",
-       "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": [], "parent": "t3_aaa1", "count": 3}],
+       "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": [], "parent": "t3_aaa1", "count": 0}],
        "expected": {"unresolved": 1, "complete": false}},
       {"name": "missing-ids-counted", "post": "aaa1",
        "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": ["c2", "c3"], "parent": "t3_aaa1", "count": 2}],
        "expansions": [{"request": {"kind": "ids", "ids": ["c2", "c3"]}, "answer": [{"id": "c2", "parent": "t3_aaa1"}]}],
-       "expected": {"missing": ["c3"], "gaps_left": 0}}
+       "expected": {"missing": ["c3"], "gaps_left": 0, "requests": 3, "note": "new rule (P2 R1): c3 is asked for three times before it counts as missing; the old reader counted it missing after one reply"}}
     ]
   },
   "coverage": {
@@ -79,12 +79,12 @@
        "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": ["d1"], "parent": "t3_aaa1", "count": 1}, {"id": "c2", "parent": "t3_aaa1"}, {"more": ["c3"], "parent": "t3_aaa1", "count": 1}],
        "server": {"d1": null, "c3": {"id": "c3", "parent": "t3_aaa1"}},
        "old": {"stalled": true, "c3_read": false},
-       "expected": {"stalled": false, "c3_read": true, "missing": ["d1"], "complete": true}}
+       "expected": {"stalled": false, "c3_read": true, "missing": ["d1"], "complete": true, "requests": 3, "note": "d1 and c3 go in one batch (across gaps); d1 is asked for twice more alone"}}
     ]
   },
   "batching": {
-    "item": "24,25 (P2 R1 decides the numbers)",
-    "fact": "The new expansion plan: when no comment is left to show, take the first gap in depth-first order and gather not-yet-requested ids of the same post across gaps, up to 100, into one morechildren request; the descriptor remembers each id's gap and its order inside that gap; the reply's comments go back into their own gap's place, descendants under their parents. Progress is a new comment, a new gap or a requested id finished (received or missing). Only the same descriptor planned again without progress stalls, and only that gap. An id-less gap under a comment is that comment's subtree in one request.",
+    "item": "24,25 (P2 R1)",
+    "fact": "The new expansion plan: when no comment is left to show, take the first gap in depth-first order and gather not-yet-requested ids of the same post across gaps, up to 100, into one morechildren request; the descriptor remembers each id's gap and its order inside that gap; the reply's requested comments go back into their own gap's place in the gap's own id order (Reddit's reply order differs), descendants under their parents in reply order, a new more under its parent as a new gap. Reddit cuts a reply at about 100 things, so an id that did not come is put first in the next batch and counts as missing only after three requests (P2 R1: 31 of 38 absent ids came on the second request; the last 7 asked alone came back empty). Progress is a new comment, a new gap or a requested id finished (received or missing). Only the same descriptor planned again without progress stalls, and only that gap. An id-less gap under a comment is that comment's subtree in one request.",
     "scenarios": [
       {"name": "two-gaps-same-parent", "post": "aaa1",
        "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": ["a1", "a2"], "parent": "t3_aaa1", "count": 2}, {"id": "x1", "parent": "t3_aaa1"}, {"more": ["b1"], "parent": "t3_aaa1", "count": 1}],

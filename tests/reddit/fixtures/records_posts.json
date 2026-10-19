@@ -85,7 +85,22 @@
      "record": {"distinguished": "moderator", "pinned": true}, "new": true}
   ],
   "after_recon": {
-    "about": "Calibrated from P2 R8 captures (archived, locked, removed, galleries with failed media, polls after voting, a crosspost of a crosspost): fields whose shape the synthetic cases above guessed.",
-    "cases": []
+    "about": "Calibrated from P2 R8 captures: an ongoing poll sends no vote_count per option; a crosspost's own url is the original's relative permalink; a gallery item may be marked deleted; archived and locked are carried. A post's removed_by_category was not seen in a listing (removed posts do not show there for this account).",
+    "cases": [
+      {"name": "ongoing-poll", "item": "R8", "fact": "Options without vote_count while voting is open; the total is sent.",
+       "raw": {"id": "abd1", "name": "t3_abd1", "is_self": true, "poll_data": {"options": [{"text": "A", "id": "1"}, {"text": "B", "id": "2"}], "total_vote_count": 4, "voting_end_timestamp": 1793024494093}},
+       "record": {"post_type": "poll", "poll": {"options": [{"text": "A", "vote_count": null}, {"text": "B", "vote_count": null}], "total_vote_count": 4}}},
+      {"name": "crosspost-url-is-original", "item": "R8", "fact": "A crosspost's url is the original's relative permalink, made absolute.",
+       "raw": {"id": "abd2", "name": "t3_abd2", "subreddit": "second", "url": "/r/first/comments/abd0/title/", "num_crossposts": 0,
+               "crosspost_parent_list": [{"id": "abd0", "name": "t3_abd0", "subreddit": "first", "is_self": true, "num_crossposts": 1, "permalink": "/r/first/comments/abd0/title/"}]},
+       "record": {"post_type": "crosspost", "link_url": "https://www.reddit.com/r/first/comments/abd0/title/", "crosspost": {"num_crossposts": 1}}},
+      {"name": "gallery-deleted-item", "item": "R8", "fact": "A gallery item marked is_deleted has no media to show and is skipped.",
+       "raw": {"id": "abd3", "name": "t3_abd3", "is_gallery": true, "gallery_data": {"items": [{"media_id": "m1", "is_deleted": true}, {"media_id": "m2", "is_deleted": false}]},
+               "media_metadata": {"m2": {"status": "valid", "e": "Image", "s": {"u": "https://preview.redd.it/m2.jpg?s=sig"}}}},
+       "record": {"media": [{"url": "https://preview.redd.it/m2.jpg?s=sig", "caption": ""}]}},
+      {"name": "archived-locked", "item": "R8", "fact": "archived (no new comments or votes) and locked are carried.",
+       "raw": {"id": "abd4", "name": "t3_abd4", "is_self": true, "archived": true, "locked": true},
+       "record": {"archived": true, "locked": true}}
+    ]
   }
 }

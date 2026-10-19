@@ -51,7 +51,14 @@
      "record": {"removed": null}, "new": true}
   ],
   "after_recon": {
-    "about": "Calibrated from P2 R8 captures: collapsed reasons, removal markers on real removed and deleted comments, comment images.",
-    "cases": []
+    "about": "Calibrated from P2 R8 captures (793 comments of one thread): removal markers seen as written above; collapsed and its reason code are separate (a comment may carry LOW_SCORE without being collapsed). Comment images were not seen.",
+    "cases": [
+      {"name": "low-score-reason-without-collapse", "item": "R8", "fact": "collapsed false with collapsed_reason_code LOW_SCORE (collapsed_reason 'comment score below threshold'): the code is kept, collapsed stays false.",
+       "raw": {"id": "ccb1", "name": "t1_ccb1", "parent_id": "t3_aaa1", "link_id": "t3_aaa1", "body": "x", "collapsed": false, "collapsed_reason_code": "LOW_SCORE", "collapsed_reason": "comment score below threshold"},
+       "record": {"collapsed": false, "collapsed_reason": "LOW_SCORE"}},
+      {"name": "collapsed-deleted", "item": "R8", "fact": "A deleted comment that still has replies is sent collapsed with reason DELETED.",
+       "raw": {"id": "ccb2", "name": "t1_ccb2", "parent_id": "t3_aaa1", "link_id": "t3_aaa1", "body": "[deleted]", "author": "[deleted]", "collapsed": true, "collapsed_reason_code": "DELETED"},
+       "record": {"collapsed": true, "collapsed_reason": "DELETED", "removed": "deleted"}}
+    ]
   }
 }

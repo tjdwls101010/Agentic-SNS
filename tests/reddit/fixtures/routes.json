@@ -77,7 +77,19 @@
     "notes": "The old code sends sort only when given (its defaults live in the listing layer) and sends the search sort by name; the new requests name the default sort explicitly so the request says which order the result is in. The search sort comments is passed as is."
   },
   "after_recon": {
-    "about": "Paths, queries and buckets of the new surfaces (P2 R3-R5): wiki pages and page list, moderators, the pinned posts, and the bucket of every path (wiki vs general).",
-    "cases": []
+    "about": "Paths and buckets (P2 R3-R5). Reddit keeps separate request buckets: wiki pages in one (600 per ten minutes when measured), every other .json path in another (100). A share link is requested as a page, carries no rate-limit headers and does not count in the .json bucket: it is charged and paced but never metered.",
+    "cases": [
+      {"path": "/r/example/wiki/pages.json", "allowed": true, "bucket": "wiki"},
+      {"path": "/r/example/wiki/index.json", "allowed": true, "bucket": "wiki"},
+      {"path": "/r/example/wiki/faq/getting_started.json", "allowed": true, "bucket": "wiki", "fact": "wiki page names may hold one / level (401k/after-tax was seen)"},
+      {"path": "/r/example/about/moderators.json", "allowed": true, "bucket": "general"},
+      {"path": "/r/example/about/sticky.json", "allowed": false, "why": "pinned posts come from the hot listing's first page (one request with full records; sticky.json costs a redirect and a request per slot)"},
+      {"path": "/r/example/hot.json", "allowed": true, "bucket": "general"},
+      {"path": "/duplicates/aaa1.json", "allowed": true, "bucket": "general"},
+      {"path": "/subreddits/mine/subscriber.json", "allowed": true, "bucket": "general"},
+      {"path": "/api/me.json", "allowed": true, "bucket": "general"},
+      {"url": "https://www.reddit.com/r/example/s/AbC123", "allowed": true, "bucket": null, "fact": "a share link: no headers, not in the .json bucket"},
+      {"path": "/r/example+other_sub/wiki/index.json", "allowed": false, "why": "a wiki belongs to one community"}
+    ]
   }
 }
