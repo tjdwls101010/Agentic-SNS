@@ -1,5 +1,6 @@
 """Small readers shared by the record builders: Reddit's loose types become strict ones or None."""
 import math
+import unicodedata
 from datetime import datetime, timezone
 
 BASE = 'https://www.reddit.com'
@@ -10,7 +11,10 @@ def text(value):
 
 
 def optional(value):
-    return value if isinstance(value, str) and value else None
+    """A string with something visible in it, else None (Reddit sends flairs made of a zero-width space)."""
+    if not isinstance(value, str):
+        return None
+    return value if any(not c.isspace() and unicodedata.category(c) != 'Cf' for c in value) else None
 
 
 def number(value):
