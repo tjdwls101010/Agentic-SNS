@@ -103,8 +103,7 @@ class Client:
             try:
                 if entry and _host(entry['url']) == 'x.com':
                     self.tab = known
-                    self.unwatched = self._take_over()
-                    self.guard.log_unwatched(self.unwatched)  # made between commands: logged, not charged
+                    self._take_over(between=True)
                 else:
                     # An emptied tab is not sent back to X: Aside closes an emptied tab once nothing holds it, even
                     # while it loads, and a query would then open another one.
@@ -116,17 +115,21 @@ class Client:
         return self.account_id
 
     def _entry(self, target):
-        return next((t for t in self.browser.tabs(self._seconds()) if target and t['target_id'] == target), None)
+        return next((t for t in self._aside(self.browser.tabs, self._seconds()) if target and t['target_id'] == target),
+                    None)
 
-    def _take_over(self):
-        """Look at the recorded tab before using it (a block or login it shows is judged); returns what the page
-        requested since it was last looked at."""
+    def _take_over(self, between=False):
+        """Look at the recorded tab before using it (a block or login it shows is judged). between: what the page
+        requested since the last command is this command's to report (logged as unwatched, not charged) — before any
+        verdict, so a block does not hide it."""
         with self.guard.observe() as slot:
             state = self._state()
+            if between:
+                self.unwatched = _int(state.get('resources'))
+                self.guard.log_unwatched(self.unwatched)
             self._note(state)
             self._consume(state, slot)
             self._check(state)
-        return _int(state.get('resources'))
 
     def _reopen(self):
         """The tab vanished mid-command: use the one another command opened meanwhile, else open one (once)."""
@@ -145,10 +148,11 @@ class Client:
         try:
             return method(*args)
         except TwitterError as error:
-            if error.reason == 'lost' and self.guard.time_left() <= 1:
+            if error.reason == 'timeout' and self.guard.time_left() <= 1:
                 raise TwitterError(6, 'The command reached its time limit during a browser call; its request may have '
                                       'been made.', 'Run the command again (or its more: line); nothing is wrong with '
-                                                    'the account.', reason='time_limit') from None
+                                                    'the account. If it keeps happening, run doctor to check Aside.',
+                                   reason='time_limit') from None
             raise
 
     def _args(self, args):
@@ -167,9 +171,13 @@ class Client:
             with self.browser.opener(self._seconds()) as target:
                 self.tab = target
                 self.memory.set_tab(target)
-                armed = self._aside(self.browser.load, target, START, SNIPPETS['arm'], self._args({}),
-                                    self._seconds())
-            if not any(t['target_id'] == target for t in self.browser.tabs(self._seconds())):
+                armed = self._load(slot, target)
+            try:
+                listed = self._aside(self.browser.tabs, self._seconds())
+            except TwitterError:
+                slot.charge(OPEN_RESERVE)  # the tab loaded x.com, unmeasured
+                raise
+            if not any(t['target_id'] == target for t in listed):
                 slot.charge(OPEN_RESERVE)  # it loaded x.com before Aside closed it, unseen
                 raise TwitterError(3, 'Aside closed the new X tab when the session that opened it ended; Aside\'s '
                                       'behaviour has changed and the skill needs an update.',
@@ -187,9 +195,18 @@ class Client:
                                reason='recovery_budget')
         self.reloads += 1
         with self.memory.opening(), self.guard.request(reserve=1, budgeted=False, kind='tab_reload') as slot:
-            armed = self._aside(self.browser.load, self.tab, START, SNIPPETS['arm'], self._args({}), self._seconds())
+            armed = self._load(slot, self.tab)
             self.reopened = True
             self._settle_load(slot, armed)
+
+    def _load(self, slot, target):
+        """Send the tab to x.com with the kit armed; a load that fails once the tab was sent is charged the reserve."""
+        try:
+            return self._aside(self.browser.load, target, START, SNIPPETS['arm'], self._args({}), self._seconds())
+        except TwitterError as error:
+            if error.reason != 'tab_missing':
+                slot.charge(OPEN_RESERVE)
+            raise
 
     def _settle_load(self, slot, armed):
         """Wait for the loaded app, its store and login, checking each look for a block; charge what the load cost:
@@ -291,7 +308,8 @@ class Client:
                            account_id=account_id)
 
     def _gone(self):
-        tab = next((t for t in self.browser.tabs(max(5.0, self.guard.time_left())) if t['target_id'] == self.tab), None)
+        tab = next((t for t in self._aside(self.browser.tabs, max(5.0, self.guard.time_left()))
+                    if t['target_id'] == self.tab), None)
         return tab is None or not _host(tab['url'])
 
     def _empty(self):
@@ -357,12 +375,18 @@ class Client:
                     if sent:
                         self.nonce['sent'] += 1
                     self._note(result)
+                    unrecorded = None
                     if sent:  # its own limit is recorded before any signal can stop the command
-                        slot.observe(result.get('status'), result.get('headers'))
+                        try:
+                            slot.observe(result.get('status'), result.get('headers'))
+                        except TwitterError as error:
+                            unrecorded = error  # raised once the signals are judged: a lock must still empty the tab
                     if self.verbose:
                         diagnostic('request', operation=operation, count=self.guard.count, status=result.get('status'),
                                    source=(result.get('used') or {}).get('source'))
                     self._consume(result, slot)
+                    if unrecorded is not None:
+                        raise unrecorded
                     if result.get('stopped') == 'limit':
                         raise self._limit(operation)
                     if result.get('stopped'):
@@ -455,8 +479,8 @@ class Client:
         request."""
         hints = sorted({spec['chunk_hint'] for spec in OPERATIONS.values() if spec.get('chunk_hint')})
         with self.guard.observe() as slot:
-            result = self.browser.evaluate(self.tab, SNIPPETS['modules'], self._args({'names': READ_OPERATIONS,
-                                                                                       'hints': hints}), self._seconds())
+            result = self._aside(self.browser.evaluate, self.tab, SNIPPETS['modules'],
+                                 self._args({'names': READ_OPERATIONS, 'hints': hints}), self._seconds())
             if isinstance(result, dict):
                 slot.charge(_int(result.get('resources')))  # the page's own requests while this command ran
             self._consume(result, slot)

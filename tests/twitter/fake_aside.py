@@ -13,6 +13,7 @@ Responses come from TWITTER_FAKE_SCENARIO: {"tabs": [...], "responses": [{"op", 
 unused response whose op and match fit is used. Every call is appended to TWITTER_FAKE_LOG.
 A response may be {"__raw_stdout": "...", "__exit": n} to print exactly that, or {"__sleep": seconds}; with
 {"__write": {"<path>": "<text>"}} those files are written first (another command changing shared state meanwhile).
+With "tabs_fail_after_load" in the scenario, listing tabs fails once a tab has loaded a page.
 """
 import json
 import os
@@ -97,6 +98,9 @@ def main(argv):
     aside, args = const(program, 'ASIDE'), const(program, 'ARGS')
     if aside['op'] == 'tabs':
         log({'op': 'tabs', 'account': account})
+        if scenario.get('tabs_fail_after_load') and scenario.get('loaded'):
+            print('aside: daemon is not reachable', file=sys.stderr)
+            return 1
         emit([{'targetId': t['id'], 'url': t['url']} for t in scenario['tabs']])
         return 0
     snippet = re.search(r'// twitter-snippet: ([a-z_]+)', program).group(1)
@@ -109,6 +113,7 @@ def main(argv):
         if t['id'] == aside.get('tab'):
             if aside['op'] == 'load':
                 t['url'] = aside['url']
+                scenario['loaded'] = True
             elif snippet == 'blank':
                 t['url'] = 'about:blank'
     if snippet == 'close' and not scenario.get('close_fails'):

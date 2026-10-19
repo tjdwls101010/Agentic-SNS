@@ -15,6 +15,7 @@ import json
 import math
 import os
 import random
+import shutil
 import tempfile
 import time
 from contextlib import contextmanager
@@ -418,10 +419,12 @@ class Guard:
                 _log('unblock_check', slot.reserved, operation, self.clock())
 
     def _set_aside_unreadable(self):
-        """Inside the unblock check's lock: an unreadable state file is kept for a person as <name>.unreadable and,
-        failing closed, replaced by a block for an unknown account, which the check then lifts or keeps."""
+        """Inside the unblock check's lock: an unreadable state file is copied for a person as
+        <name>.unreadable-<time>, then replaced. A readable block stays as it is (its account decides who may lift it);
+        an unreadable or missing one becomes, atomically and before anything is removed, a block for an unknown
+        account, so requests stay refused until the check lifts it."""
         directory = _directory()
-        unreadable = []
+        broken = []
         for name, read in (('blocked.json', _block), ('buckets.json', lambda: _buckets(self.clock())),
                            ('pace.json', _next_allowed)):
             try:
@@ -429,14 +432,26 @@ class Guard:
             except TwitterError as error:
                 if error.reason != 'unreadable':
                     raise
-                unreadable.append(name)
-        for name in unreadable:
+                broken.append(name)
+        if not broken:
+            return
+        stamp = int(self.clock())
+        for name in broken:
+            target, extra = directory / f'{name}.unreadable-{stamp}', 1
+            while target.exists():
+                target, extra = directory / f'{name}.unreadable-{stamp}-{extra}', extra + 1
             try:
-                (directory / name).replace(directory / (name + '.unreadable'))
+                shutil.copyfile(directory / name, target)
             except OSError:
                 raise _UNREADABLE from None
-        if unreadable:
+        if 'blocked.json' in broken or not (directory / 'blocked.json').exists():
             _write('blocked.json', {'reason': 'account_locked', 'blocked_at': self.clock(), 'account_id': None})
+        for name in broken:
+            if name != 'blocked.json':
+                try:
+                    (directory / name).unlink()
+                except OSError:
+                    raise _UNREADABLE from None
 
     @property
     def checking(self):

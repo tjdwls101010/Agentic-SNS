@@ -217,3 +217,22 @@ def test_a_resume_state_that_cannot_be_saved_is_named_even_after_a_resumable_sto
         handles.chmod(0o700)
     envelope = json.loads(out)
     assert code == 8 and 'save a handle' in envelope['message'] and 'next' not in envelope
+
+
+def test_a_lock_in_the_same_report_is_acted_on_even_when_the_own_limit_cannot_be_recorded(browser, data_dir):
+    """The bucket write comes first; if protection state turns unreadable under it, the lock must still close the tab."""
+    lock = signal('ViewerBadgeCounts', 200, (326,))
+    buckets = data_dir / 'protection/buckets.json'
+    known_tab(browser, data_dir).respond('query', {**query_result(home(['1']), headers=RATE, signals=[lock]),
+                                                   '__write': {str(buckets): 'not json'}})
+    code, out, _ = run_cli(browser, 'feed')
+    assert code == 5 and 'close' in browser.ops()
+
+
+def test_an_aside_failure_near_the_deadline_is_still_an_aside_failure(browser, data_dir):
+    browser.tab('T1')
+    (data_dir / 'session').mkdir(parents=True)
+    (data_dir / 'session/default.json').write_text(json.dumps({'tab': 'T1'}))
+    browser.respond('state', {'__sleep': 1.9, '__raw_stdout': 'Error: other side closed\n', '__exit': 1})
+    code, out, _ = run_cli(browser, 'feed', env={'TWITTER_DEADLINE_SECONDS': '2.5'})
+    assert code == 3 and json.loads(out)['error'] == 'aside'

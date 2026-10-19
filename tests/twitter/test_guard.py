@@ -436,10 +436,57 @@ def test_the_unblock_check_sets_unreadable_state_aside_and_keeps_a_block_until_i
     write(data_dir, 'buckets.json', {'Viewer': 'broken'})
     with make(clock).verify_unblock() as slot:
         assert slot.block_record == {'reason': 'account_locked', 'blocked_at': 1000, 'account_id': None}
-    assert (data_dir / 'protection/blocked.json.unreadable').read_text() == 'not json'
-    assert (data_dir / 'protection/buckets.json.unreadable').exists() and read(data_dir, 'buckets.json') is None
+    kept = {p.name: p.read_text() for p in (data_dir / 'protection').glob('*.unreadable-*')}
+    assert sorted(kept) == ['blocked.json.unreadable-1000', 'buckets.json.unreadable-1000']
+    assert kept['blocked.json.unreadable-1000'] == 'not json' and read(data_dir, 'buckets.json') is None
     assert read(data_dir, 'blocked.json')['reason'] == 'account_locked'  # not cleared: the caller did not call clear()
     with pytest.raises(TwitterError) as error:
         with make(clock).request(operation='TweetDetail'):
             pytest.fail('still blocked')
     assert error.value.code == 5 and error.value.reason == 'account_locked'
+
+
+def test_a_readable_block_is_kept_as_it_is_when_only_other_state_is_unreadable(data_dir):
+    """Its account decides who may lift it; replacing it with an unknown-account block would let any account do so."""
+    record = {'reason': 'challenge', 'blocked_at': 1, 'account_id': '1000000098'}
+    write(data_dir, 'blocked.json', record)
+    write(data_dir, 'pace.json', 'broken')
+    with make(Clock(1000)).verify_unblock() as slot:
+        assert slot.block_record == record
+    assert read(data_dir, 'blocked.json') == record
+    assert (data_dir / 'protection/pace.json.unreadable-1000').read_text() == 'broken'
+
+
+def test_unreadable_state_with_no_block_gets_a_standing_one(data_dir):
+    write(data_dir, 'buckets.json', 'broken')
+    with make(Clock(1000)).verify_unblock() as slot:
+        assert slot.block_record['account_id'] is None
+    assert read(data_dir, 'blocked.json')['reason'] == 'account_locked'
+
+
+def test_a_failed_replacement_leaves_the_unreadable_block_in_place(data_dir, monkeypatch):
+    """There is never a moment without blocked.json: setting state aside must not fail open."""
+    write(data_dir, 'blocked.json', 'not json')
+
+    def refuse(name, value):
+        raise TwitterError(5, 'Account protection state could not be saved.', 'fix', reason='unwritable')
+
+    with monkeypatch.context() as patch:
+        patch.setattr(guard, '_write', refuse)
+        with pytest.raises(TwitterError):
+            with make(Clock(1000)).verify_unblock():
+                pytest.fail('no check may be sent')
+    assert (data_dir / 'protection/blocked.json').read_text() == 'not json'
+    with pytest.raises(TwitterError) as error:
+        with make(Clock(1000)).request(operation='TweetDetail'):
+            pytest.fail('still refused')
+    assert error.value.code == 5
+
+
+def test_evidence_set_aside_earlier_is_not_overwritten(data_dir):
+    for moment in (1000, 2000):
+        write(data_dir, 'buckets.json', f'broken at {moment}')
+        with make(Clock(moment)).verify_unblock():
+            pass
+    kept = sorted(p.read_text() for p in (data_dir / 'protection').glob('buckets.json.unreadable-*'))
+    assert kept == ['broken at 1000', 'broken at 2000']

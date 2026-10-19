@@ -90,6 +90,19 @@ def test_a_tab_that_closes_with_its_opener_is_reported_not_reopened_again_and_ag
     assert result['setup_requests'] == 20  # the page loaded x.com before it closed: charged the reserve, not 1
 
 
+def test_a_load_that_does_not_finish_is_charged_the_reserve(browser, data_dir):
+    browser.respond('opener', {'tabs': ['NEW1']})
+    browser.respond('load:arm', {'__raw_stdout': json.dumps({'kind': 'error', 'error': 'load_timeout', 'message': 'x'}) + '\n'})
+    code, result, _ = doctor(browser)
+    assert code == 3 and result['setup_requests'] == 20  # the tab was sent to x.com: its load went unmeasured
+
+
+def test_an_opening_that_fails_after_the_load_is_charged_the_reserve(browser, data_dir):
+    opening(browser).flag(tabs_fail_after_load=True)
+    code, result, _ = doctor(browser)
+    assert code == 3 and result['setup_requests'] == 20
+
+
 def test_an_opening_stopped_by_a_lock_is_charged_what_it_loaded(browser, data_dir):
     lock = {'path': '/i/api/graphql/abc/HomeTimeline', 'status': 200, 'codes': [326], 'html': False, 'rate': None,
             'at': 5}
@@ -211,7 +224,25 @@ def test_unblock_recovers_from_unreadable_protection_state_after_a_clean_check(b
     known_tab(browser, data_dir).respond('query', query_result(VIEWER, headers=RATE)).respond('modules', MODULES)
     code, result, _ = doctor(browser, '--unblock')
     assert code == 0, result
-    assert block_file(data_dir) is None and (path / 'blocked.json.unreadable').read_text() == '{broken'
+    assert block_file(data_dir) is None and [p.read_text() for p in path.glob('blocked.json.unreadable-*')] == ['{broken']
+
+
+def test_unblock_with_broken_limits_still_refuses_a_block_of_another_account(browser, data_dir):
+    block_file(data_dir, {**LOCK, 'account_id': '1000000098'})
+    (data_dir / 'protection/buckets.json').write_text('{broken')
+    known_tab(browser, data_dir).respond('query', query_result(VIEWER, headers=RATE))
+    code, result, _ = doctor(browser, '--unblock')
+    assert code == 5 and result['verification_reason'] == 'account_mismatch'
+    assert block_file(data_dir)['account_id'] == '1000000098'
+
+
+def test_requests_the_tab_made_between_commands_are_logged_even_when_it_shows_a_block(browser, data_dir):
+    lock = {'path': '/i/api/graphql/abc/HomeTimeline', 'status': 200, 'codes': [326], 'html': False, 'rate': None,
+            'at': 5}
+    known_tab(browser, data_dir, resources=7, signals=[lock])
+    code, result, _ = doctor(browser)
+    assert code == 5
+    assert ('unwatched', 7) in [(line['kind'], line['n']) for line in log(data_dir)]
 
 
 def test_unblock_without_room_in_the_viewer_limit_sends_nothing_and_keeps_the_block(browser, data_dir):

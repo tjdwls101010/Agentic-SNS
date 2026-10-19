@@ -146,7 +146,7 @@ class Aside:
         except subprocess.TimeoutExpired:
             raise TwitterError(3, f'Aside did not answer within {int(limit)} seconds.', 'Check Aside, then run doctor; '
                                                                                        'the request may have been '
-                                                                                       'made.', reason='lost') from None
+                                                                                       'made.', reason='timeout') from None
         except (OSError, UnicodeError):
             raise TwitterError(3, 'Aside could not run.', _CHECK) from None
         if result.returncode:
