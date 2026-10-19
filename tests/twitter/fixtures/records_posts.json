@@ -1,0 +1,754 @@
+{
+ "about": "Post records (appendix A 19-21, 33). parser post: one raw X tweet result (as found at tweet_results.result) to one record. expected lists only the fields the case is about; a field not named is free. Field names are the skill's own, shared with the threads skill where the concept is the same (author, text, like_count, repost_count, reply_to_id, root_post_id, quoted_post, reposted_post, is_pinned, unavailable); X-only ideas keep X's meaning (view_count, bookmark_count, is_long_post, limited_actions). A post's own URL is https://x.com/<author handle>/status/<id>, or /i/web/status/<id> when X sent no author. Counts X did not send are null. Times are UTC ISO. source: code (previous records.py), plan (a decided change), P2 (shape not yet seen live; the case is a placeholder until the recon captures fix it). All people, ids and links are synthetic.",
+ "users": {
+  "A": {
+   "__typename": "User",
+   "rest_id": "1000000001",
+   "core": {
+    "screen_name": "example_author",
+    "name": "Example Author"
+   },
+   "legacy": {}
+  },
+  "B": {
+   "__typename": "User",
+   "rest_id": "1000000002",
+   "core": {
+    "screen_name": "second_person",
+    "name": "Second Person"
+   },
+   "legacy": {}
+  },
+  "C": {
+   "__typename": "User",
+   "rest_id": "1000000003",
+   "core": {
+    "screen_name": "third_person",
+    "name": "Third Person"
+   },
+   "legacy": {}
+  }
+ },
+ "cases": [
+  {
+   "name": "basic-post",
+   "item": "19",
+   "source": "code",
+   "fact": "rest_id is the id; legacy carries the text, time, language and counts; favorite_count is the like count; the URL is built from the author's handle.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000001",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "A"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "A plain synthetic post",
+     "created_at": "Thu Oct 15 10:00:00 +0000 2026",
+     "lang": "en",
+     "reply_count": 4,
+     "retweet_count": 3,
+     "quote_count": 2,
+     "favorite_count": 10,
+     "bookmark_count": 1,
+     "conversation_id_str": "1850000000000000001",
+     "entities": {}
+    },
+    "views": {
+     "count": "1234",
+     "state": "EnabledWithCount"
+    }
+   },
+   "expected": {
+    "id": "1850000000000000001",
+    "url": "https://x.com/example_author/status/1850000000000000001",
+    "created_at": "2026-10-15T10:00:00+00:00",
+    "text": "A plain synthetic post",
+    "lang": "en",
+    "author": {
+     "id": "1000000001",
+     "username": "example_author"
+    },
+    "reply_count": 4,
+    "repost_count": 3,
+    "quote_count": 2,
+    "like_count": 10,
+    "bookmark_count": 1,
+    "view_count": 1234,
+    "is_reply": false,
+    "reply_to_id": null,
+    "root_post_id": "1850000000000000001",
+    "unavailable": false
+   }
+  },
+  {
+   "name": "counts-not-sent-are-null",
+   "item": "19,33",
+   "source": "code",
+   "fact": "A count X left out is null, and views count only when it is a number.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000002",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "A"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "No counts",
+     "created_at": "Thu Oct 15 10:00:00 +0000 2026",
+     "entities": {}
+    },
+    "views": {
+     "state": "Enabled"
+    }
+   },
+   "expected": {
+    "reply_count": null,
+    "repost_count": null,
+    "quote_count": null,
+    "like_count": null,
+    "bookmark_count": null,
+    "view_count": null
+   }
+  },
+  {
+   "name": "no-author-url",
+   "item": "19",
+   "source": "code",
+   "fact": "Without an author the URL uses /i/web/status/.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000003",
+    "legacy": {
+     "full_text": "Orphan",
+     "entities": {}
+    }
+   },
+   "expected": {
+    "url": "https://x.com/i/web/status/1850000000000000003",
+    "author": null
+   }
+  },
+  {
+   "name": "visibility-wrapper",
+   "item": "19",
+   "source": "code",
+   "fact": "TweetWithVisibilityResults wraps the post in tweet; it is unwrapped and marked restricted, and limitedActionResults lists the actions X restricts.",
+   "parser": "post",
+   "raw": {
+    "__typename": "TweetWithVisibilityResults",
+    "limitedActionResults": {
+     "limited_actions": [
+      {
+       "action": "Reply",
+       "prompt": {}
+      },
+      {
+       "action": "Retweet"
+      }
+     ]
+    },
+    "tweet": {
+     "rest_id": "1850000000000000004",
+     "core": {
+      "user_results": {
+       "result": {
+        "$user": "B"
+       }
+      }
+     },
+     "legacy": {
+      "full_text": "Limited post",
+      "entities": {}
+     }
+    }
+   },
+   "expected": {
+    "id": "1850000000000000004",
+    "restricted": true,
+    "limited_actions": [
+     "Reply",
+     "Retweet"
+    ],
+    "author": {
+     "username": "second_person"
+    }
+   }
+  },
+  {
+   "name": "tombstone",
+   "item": "19",
+   "source": "plan",
+   "fact": "A TweetTombstone (deleted, withheld, not visible to this account) is a record marked unavailable with X's tombstone text as the reason; the previous skill dropped it, which hid that a reply or parent existed. The id comes from the timeline entry when the caller knows it.",
+   "parser": "post",
+   "entry_id": "tweet-1850000000000000005",
+   "raw": {
+    "__typename": "TweetTombstone",
+    "tombstone": {
+     "text": {
+      "text": "This post was deleted by the post author. Learn more"
+     }
+    }
+   },
+   "expected": {
+    "id": "1850000000000000005",
+    "unavailable": true,
+    "unavailable_reason": "This post was deleted by the post author. Learn more"
+   }
+  },
+  {
+   "name": "long-post-note",
+   "item": "19",
+   "source": "code",
+   "fact": "A long post's whole text and its links are in note_tweet.note_tweet_results.result (text, entity_set); legacy.full_text is a clipped preview.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000006",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "A"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "Start of a long post… https://t.co/PREV0001",
+     "entities": {
+      "urls": [
+       {
+        "url": "https://t.co/PREV0001",
+        "expanded_url": "https://x.com/i/web/status/1850000000000000006"
+       }
+      ]
+     }
+    },
+    "note_tweet": {
+     "is_expandable": true,
+     "note_tweet_results": {
+      "result": {
+       "text": "Start of a long post and its whole remaining text, with https://t.co/NOTE0001 inside.",
+       "entity_set": {
+        "urls": [
+         {
+          "url": "https://t.co/NOTE0001",
+          "expanded_url": "https://example.org/long"
+         }
+        ],
+        "user_mentions": [],
+        "hashtags": []
+       }
+      }
+     }
+    }
+   },
+   "expected": {
+    "text": "Start of a long post and its whole remaining text, with https://example.org/long inside.",
+    "is_long_post": true,
+    "links": [
+     "https://example.org/long"
+    ]
+   }
+  },
+  {
+   "name": "links-expanded-media-link-removed",
+   "item": "19",
+   "source": "code",
+   "fact": "t.co links become their destinations; the t.co link X appends for attached media is removed from the text (the media list carries it).",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000007",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "A"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "Read https://t.co/LINK0001 today https://t.co/MEDIA001",
+     "entities": {
+      "urls": [
+       {
+        "url": "https://t.co/LINK0001",
+        "expanded_url": "https://news.example.com/story"
+       }
+      ],
+      "media": [
+       {
+        "url": "https://t.co/MEDIA001",
+        "type": "photo",
+        "media_url_https": "https://pbs.twimg.com/media/SYNTH1.jpg"
+       }
+      ]
+     },
+     "extended_entities": {
+      "media": [
+       {
+        "url": "https://t.co/MEDIA001",
+        "type": "photo",
+        "media_url_https": "https://pbs.twimg.com/media/SYNTH1.jpg",
+        "original_info": {
+         "width": 1200,
+         "height": 800
+        },
+        "ext_alt_text": "A synthetic chart"
+       }
+      ]
+     }
+    }
+   },
+   "expected": {
+    "text": "Read https://news.example.com/story today",
+    "links": [
+     "https://news.example.com/story"
+    ],
+    "media": [
+     {
+      "kind": "photo",
+      "url": "https://pbs.twimg.com/media/SYNTH1.jpg",
+      "width": 1200,
+      "height": 800,
+      "alt_text": "A synthetic chart"
+     }
+    ]
+   }
+  },
+  {
+   "name": "video-highest-bitrate",
+   "item": "19",
+   "source": "code",
+   "fact": "A video's URL is its highest-bitrate MP4 variant; a streaming playlist is not chosen.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000008",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "A"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "Clip https://t.co/VID00001",
+     "entities": {
+      "media": [
+       {
+        "url": "https://t.co/VID00001"
+       }
+      ]
+     },
+     "extended_entities": {
+      "media": [
+       {
+        "url": "https://t.co/VID00001",
+        "type": "video",
+        "media_url_https": "https://pbs.twimg.com/ext_tw_video_thumb/SYNTH/pu/img/thumb.jpg",
+        "original_info": {
+         "width": 1280,
+         "height": 720
+        },
+        "video_info": {
+         "variants": [
+          {
+           "content_type": "application/x-mpegURL",
+           "url": "https://video.twimg.com/SYNTH/pl.m3u8"
+          },
+          {
+           "content_type": "video/mp4",
+           "bitrate": 256000,
+           "url": "https://video.twimg.com/SYNTH/low.mp4"
+          },
+          {
+           "content_type": "video/mp4",
+           "bitrate": 2176000,
+           "url": "https://video.twimg.com/SYNTH/high.mp4"
+          }
+         ]
+        }
+       }
+      ]
+     }
+    }
+   },
+   "expected": {
+    "text": "Clip",
+    "media": [
+     {
+      "kind": "video",
+      "url": "https://video.twimg.com/SYNTH/high.mp4",
+      "width": 1280,
+      "height": 720,
+      "alt_text": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "mentions-hashtags",
+   "item": "21",
+   "source": "code",
+   "fact": "Mentions are handles without @, in the order they appear (by position), each once whatever its case; hashtags are their texts.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000009",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "A"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "@third_person @Second_Person @second_person hi #Synthetic",
+     "entities": {
+      "user_mentions": [
+       {
+        "screen_name": "second_person",
+        "indices": [
+         29,
+         43
+        ]
+       },
+       {
+        "screen_name": "Second_Person",
+        "indices": [
+         14,
+         28
+        ]
+       },
+       {
+        "screen_name": "third_person",
+        "indices": [
+         0,
+         13
+        ]
+       }
+      ],
+      "hashtags": [
+       {
+        "text": "Synthetic",
+        "indices": [
+         47,
+         57
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "expected": {
+    "mentions": [
+     "third_person",
+     "Second_Person"
+    ],
+    "hashtags": [
+     "Synthetic"
+    ]
+   }
+  },
+  {
+   "name": "reply-fields",
+   "item": "19",
+   "source": "code",
+   "fact": "in_reply_to_status_id_str is the post this one answers, in_reply_to_screen_name that post's author's handle, conversation_id_str the first post of the conversation.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000010",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "B"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "@example_author agreed",
+     "in_reply_to_status_id_str": "1850000000000000001",
+     "in_reply_to_screen_name": "example_author",
+     "conversation_id_str": "1850000000000000001",
+     "entities": {}
+    }
+   },
+   "expected": {
+    "is_reply": true,
+    "reply_to_id": "1850000000000000001",
+    "reply_to_author": "example_author",
+    "root_post_id": "1850000000000000001"
+   }
+  },
+  {
+   "name": "quote-two-voices",
+   "item": "19",
+   "source": "code",
+   "fact": "quoted_status_result is the quoted post, a record of its own with its own author: the quoter's words and the quoted author's are separate.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000011",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "B"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "This is wrong",
+     "quoted_status_id_str": "1850000000000000001",
+     "is_quote_status": true,
+     "entities": {}
+    },
+    "quoted_status_result": {
+     "result": {
+      "__typename": "Tweet",
+      "rest_id": "1850000000000000001",
+      "core": {
+       "user_results": {
+        "result": {
+         "$user": "A"
+        }
+       }
+      },
+      "legacy": {
+       "full_text": "Original claim",
+       "entities": {}
+      }
+     }
+    }
+   },
+   "expected": {
+    "text": "This is wrong",
+    "author": {
+     "username": "second_person"
+    },
+    "quoted_post_id": "1850000000000000001",
+    "quoted_post": {
+     "id": "1850000000000000001",
+     "text": "Original claim",
+     "author": {
+      "username": "example_author"
+     }
+    }
+   }
+  },
+  {
+   "name": "quote-without-body",
+   "item": "19,33",
+   "source": "code",
+   "fact": "When X leaves out the quoted post's body, its id is still known from quoted_status_id_str and post <id> opens it.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000012",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "B"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "See this",
+     "quoted_status_id_str": "1850000000000000099",
+     "is_quote_status": true,
+     "entities": {}
+    }
+   },
+   "expected": {
+    "quoted_post": null,
+    "quoted_post_id": "1850000000000000099"
+   }
+  },
+  {
+   "name": "quoted-tombstone",
+   "item": "19",
+   "source": "plan",
+   "fact": "A quoted post that is now a tombstone stays as an unavailable record, so the quote is not read as standing alone.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000013",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "B"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "Quoting a deleted post",
+     "quoted_status_id_str": "1850000000000000098",
+     "is_quote_status": true,
+     "entities": {}
+    },
+    "quoted_status_result": {
+     "result": {
+      "__typename": "TweetTombstone",
+      "tombstone": {
+       "text": {
+        "text": "This post is unavailable."
+       }
+      }
+     }
+    }
+   },
+   "expected": {
+    "quoted_post_id": "1850000000000000098",
+    "quoted_post": {
+     "id": "1850000000000000098",
+     "unavailable": true
+    }
+   }
+  },
+  {
+   "name": "repost-row",
+   "item": "20",
+   "source": "code + decision (P1, attribution; plan A20 updated)",
+   "fact": "A repost row is the reposter's act: its id and created_at are the repost's own (when it was reposted), its author is the reposter, its url is the original's, and the original is the reposted_post record that holds the words, media and counts. Decision (P1): the row's own text and counts are left empty instead of copying the original's, so a reposter is never shown as the writer of words they did not write (X's own legacy text on a repost is a clipped 'RT @...' preview).",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000014",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "C"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "RT @example_author: Original words that X clipped…",
+     "created_at": "Fri Oct 16 08:00:00 +0000 2026",
+     "retweet_count": 50,
+     "favorite_count": 0,
+     "entities": {},
+     "retweeted_status_result": {
+      "result": {
+       "__typename": "Tweet",
+       "rest_id": "1850000000000000001",
+       "core": {
+        "user_results": {
+         "result": {
+          "$user": "A"
+         }
+        }
+       },
+       "legacy": {
+        "full_text": "Original words that X clipped in the repost preview",
+        "created_at": "Thu Oct 15 10:00:00 +0000 2026",
+        "retweet_count": 50,
+        "favorite_count": 400,
+        "entities": {}
+       }
+      }
+     }
+    }
+   },
+   "expected": {
+    "id": "1850000000000000014",
+    "author": {
+     "username": "third_person"
+    },
+    "created_at": "2026-10-16T08:00:00+00:00",
+    "url": "https://x.com/example_author/status/1850000000000000001",
+    "text": "",
+    "like_count": null,
+    "repost_count": null,
+    "reposted_post": {
+     "id": "1850000000000000001",
+     "author": {
+      "username": "example_author"
+     },
+     "created_at": "2026-10-15T10:00:00+00:00",
+     "text": "Original words that X clipped in the repost preview",
+     "like_count": 400,
+     "repost_count": 50
+    }
+   }
+  },
+  {
+   "name": "nesting-depth-cut",
+   "item": "19",
+   "source": "code",
+   "fact": "Quote and repost nesting is cut below depth 5 (a bound on work for hostile or cyclic answers): the post at depth 6 is not built. Here: a chain of 7 posts (depths 0-6) builds 6 records; the post at depth 6 is dropped.",
+   "parser": "post",
+   "build": {
+    "quote_chain": 7,
+    "first_id": 1850000000000000200
+   },
+   "expected": {
+    "depth_built": 6,
+    "deepest_quoted_post": null
+   }
+  },
+  {
+   "name": "community-post",
+   "item": "19",
+   "source": "code",
+   "fact": "community_results.result names the community a post was made in.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000015",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "A"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "Posted in a community",
+     "entities": {}
+    },
+    "community_results": {
+     "result": {
+      "__typename": "Community",
+      "id_str": "1600000000000000001",
+      "name": "Synthetic Builders"
+     }
+    }
+   },
+   "expected": {
+    "community": {
+     "id": "1600000000000000001",
+     "name": "Synthetic Builders"
+    }
+   }
+  },
+  {
+   "name": "missing-rest-id",
+   "item": "19",
+   "source": "code",
+   "fact": "A result without rest_id is not a post the skill can name; it is skipped and counted by the caller.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "legacy": {
+     "full_text": "no id"
+    }
+   },
+   "expected": null
+  }
+ ],
+ "after_recon": {
+  "item": "X8, X12, R3",
+  "source": "P2",
+  "fact": "Community notes (birdwatch_pivot and the withBirdwatchNotes variable), polls and link cards (card.legacy.binding_values), article bodies (fieldToggles withArticlePlainText / withArticleRichContentState) and edit markers (edit_control: earlier version ids) have not been seen in a response yet. Their cases are written from the P2 captures, read by a person, not invented here.",
+  "cases": []
+ }
+}
