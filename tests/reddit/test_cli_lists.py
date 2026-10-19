@@ -56,7 +56,7 @@ def test_a_window_on_sort_new_closes_on_older_posts(reddit):
         post('new', epoch('2026-10-08T01:00:00')),
         post('in1', epoch('2026-10-07T14:59:00')),
         post('in2', epoch('2026-10-04T15:00:00')),
-        post('old', epoch('2026-10-04T14:59:00'))], after='t3_old'), query={'limit': '100'})
+        post('old', epoch('2026-10-04T13:00:00'))], after='t3_old'), query={'limit': '100'})
     code, out, _ = run_cli(reddit, 'sub', 'r/example', '--sort', 'new', '--since', '2026-10-05', '--until',
                            '2026-10-07', env={'TZ': 'Asia/Seoul'})
     assert code == 0

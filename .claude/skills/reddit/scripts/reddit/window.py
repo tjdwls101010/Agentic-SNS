@@ -4,11 +4,14 @@ A window keeps the dated records written on its local days (--since included, --
 without a date cannot be placed and is left out and counted. Its bounds are fixed when the window is made — the local
 midnights of --since and the day after --until, in the computer's time zone then — and saved with a continuation, so
 a later run continues the same span even if the time zone changed. Only a newest-first listing (sort new) can prove it
-passed --since: the first record older than the start closes the window, pinned records aside (a profile pins them to
-the top whatever their date), provided every record so far came newest first; once the order breaks, nothing closes
-it.
+passed --since: a record older than the start by more than JITTER closes the window, pinned records aside (a profile
+pins them to the top whatever their date), provided every record so far came newest first within JITTER; once the
+order breaks by more, nothing closes it. Reddit lists new posts in submission order, which can differ from their
+creation times by a minute or so (measured on 2026-10-20 in the home feed), hence the margin.
 """
 from datetime import date, datetime, time, timedelta, timezone
+
+JITTER = 600  # seconds a newest-first listing may be out of creation order without counting as unordered
 
 
 def _midnight(day):
@@ -72,12 +75,14 @@ class Window:
             if not record.get('created_at'):
                 continue
             times.append(_stamp(record['created_at']))
-        if any(a < b for a, b in zip(times, times[1:])) or (self.last is not None and times and times[0] > self.last):
-            self.unordered = True
-        if times:
-            self.last = times[-1]
+        lowest = self.last
+        for moment in times:
+            if lowest is not None and moment > lowest + JITTER:
+                self.unordered = True
+            lowest = moment if lowest is None else min(lowest, moment)
+        self.last = lowest
         start = self.bounds['start']
-        return start is not None and bool(times) and not self.unordered and min(times) < start
+        return start is not None and bool(times) and not self.unordered and min(times) < start - JITTER
 
     def describe(self):
         """The window as the result names it: local days, the zone they were judged in, and the UTC bounds."""

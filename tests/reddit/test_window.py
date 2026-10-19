@@ -61,3 +61,26 @@ def test_the_first_older_record_closes_unless_the_order_broke(zone):
     broken = Window('2026-10-05', None)
     assert not broken.closes([{'created_at': '2026-10-04T00:00:00+00:00'}, {'created_at': '2026-10-06T00:00:00+00:00'}])
     assert broken.unordered and 'did not come newest first' in ' '.join(broken.report())
+
+
+def test_a_minute_of_jitter_in_a_new_listing_still_closes_the_window(zone):
+    # measured 2026-10-20 in the home feed's new order: posts listed a minute out of created order
+    zone('UTC')
+    window = Window('2026-10-20', None)
+    page = [{'created_at': f'2026-10-20T00:{m:02d}:00+00:00'} for m in (35, 34, 23, 24, 10, 11, 3, 4, 1)]
+    assert not window.closes(page) and not window.unordered
+    assert window.closes([{'created_at': '2026-10-19T23:58:00+00:00'}, {'created_at': '2026-10-19T23:40:00+00:00'}])
+
+
+def test_a_record_just_past_the_start_does_not_close_while_jitter_could_hide_newer_ones(zone):
+    zone('UTC')
+    window = Window('2026-10-20', None)
+    assert not window.closes([{'created_at': '2026-10-19T23:58:00+00:00'}])
+    assert window.closes([{'created_at': '2026-10-19T23:40:00+00:00'}])
+
+
+def test_a_real_break_in_the_order_still_counts(zone):
+    zone('UTC')
+    window = Window('2026-10-20', None)
+    window.closes([{'created_at': '2026-10-20T00:01:00+00:00'}, {'created_at': '2026-10-20T05:00:00+00:00'}])
+    assert window.unordered
