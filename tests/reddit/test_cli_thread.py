@@ -78,6 +78,20 @@ def test_a_linked_comment_is_shown_from_the_snapshot_with_its_context(reddit):
     assert reddit.paths() == ['/api/me.json', '/comments/aaa1.json']
 
 
+def test_a_linked_comment_shows_what_hangs_under_it_even_after_the_post_showed_it(reddit):
+    # measured 2026-10-20: after a whole thread was collected, a comment link showed the comment alone
+    reddit.me().json('/comments/aaa1.json', pair(TREE))
+    run_cli(reddit, 'post', PERMALINK, '--depth', '5')
+    code, out, _ = run_cli(reddit, 'comments', PERMALINK + 'c2/', '--limit', '1')
+    assert code == 0 and 'requests=0/25' in out.splitlines()[0] and '· linked' in out
+    code, out, _ = run_cli(reddit, *more_line(out), '--limit', '10')
+    assert code == 0 and 'comment c3' in out and 'comment c4' in out and 'stopped=exhausted' in out
+    assert 'comment c5' not in out, 'the link reads its own subtree, not the rest of the thread'
+    assert reddit.paths() == ['/api/me.json', '/comments/aaa1.json'], 'no request, no gap outside the subtree'
+    code, out, _ = run_cli(reddit, 'comments', PERMALINK)
+    assert 'comment c3' not in out, "the post's own reading is left as it was"
+
+
 def test_a_linked_comment_not_yet_read_opens_its_subtree(reddit):
     reddit.me().json('/comments/aaa1/_/c9.json', pair([t1('c9', 't1_c8', [t1('c10', 't1_c9')])]),
                      query={'context': '0'})

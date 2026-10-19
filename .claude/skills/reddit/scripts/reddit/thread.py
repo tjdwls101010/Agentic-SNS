@@ -122,7 +122,8 @@ def order(state):
 
 def select(state, limit, depth, anchor=None):
     """The next batch: up to `limit` unshown comments within `depth` levels (relative to the anchor when there is
-    one), depth-first; the anchor always, with its ancestors as context rows that do not count."""
+    one), depth-first; the anchor first while it is unshown, with its ancestors as context rows that do not
+    count."""
     nodes, rows = state['nodes'], list(order(state))
     depths = {name: d for name, d, _ in rows}
     base = depths.get(anchor, 0) if anchor else 0
@@ -132,7 +133,7 @@ def select(state, limit, depth, anchor=None):
         if name in nodes and not nodes[name]['shown'] and level - base <= depth and within(name):
             chosen.append(name)
     chosen = chosen[:limit]
-    if anchor and anchor in nodes and anchor not in chosen:
+    if anchor and anchor in nodes and not nodes[anchor]['shown'] and anchor not in chosen:
         chosen = [anchor] + chosen[:max(0, limit - 1)]
     position = {name: index for index, (name, _, _) in enumerate(rows)}
     chosen.sort(key=lambda name: position.get(name, 0))
@@ -295,6 +296,7 @@ def _read(connection, options, command, target, sort, handle, out):
             target = connection.network().resolve(target)
         anchor = 't1_' + target.comment_id if target.comment_id else None
         state = _open(connection, snapshots, command, target, sort, handle, out, options)
+        anchor = anchor or state.get('anchor')  # a comment link's next batch stays under that comment
         if anchor and anchor not in state['nodes']:
             raise RedditError(9, 'The linked comment is not in this thread (deleted, removed or never sent).',
                               'Tell the user; open the post itself with post <url>.', reason='not_found')
@@ -365,16 +367,14 @@ def _open(connection, snapshots, command, target, sort, handle, out, options):
         state = snapshots.load(out.state['generation']) or _rebuild(out.state)
         return state
     anchor = 't1_' + target.comment_id if target.comment_id else None
+    sub_key = [target.post_id, target.comment_id, sort]
     if command == 'comments' and out is None:  # a new collection starts its own reading: it holds every comment
         latest = snapshots.latest(key)
         state = snapshots.load(latest) if latest else None
         if state is not None and (anchor is None or anchor in state['nodes']):
             connection.observed = state['reddit_account']
-            if anchor:
-                state['nodes'][anchor]['shown'] = False  # a comment link always shows its comment
-            return state
+            return _view(state, anchor, sub_key, snapshots.new(sub_key)) if anchor else state
     client = connection.network()
-    sub_key = [target.post_id, target.comment_id, sort]
     generation = snapshots.new(sub_key)
     context = options.get('context') if command == 'post' else (0 if target.comment_id else None)
     post_record, items = client.thread(target.post_id, sort, target.comment_id, context)
@@ -382,6 +382,35 @@ def _open(connection, snapshots, command, target, sort, handle, out, options):
         raise RedditError(9, 'Reddit answered with another post than the one asked for.', 'Check the link.',
                           reason='not_found')
     return create(post_record, items, sort, sub_key, generation, connection.reddit_account, anchor)
+
+
+def _view(state, anchor, key, generation):
+    """A comment link answered from the post's snapshot: a reading of its own, as a read of that link would be — the
+    comment's ancestors (already shown: context rows), the comment and what was received under it (unshown) and the
+    gaps under it. The post's reading is left as it was."""
+    nodes, children = state['nodes'], state['children']
+    under, stack = [], [anchor]
+    while stack:
+        name = stack.pop()
+        under.append(name)
+        stack.extend(child for child in children.get(name, []) if child in nodes)
+    chain, current = [], nodes[anchor]['parent']
+    while current in nodes:
+        chain.insert(0, current)
+        current = nodes[current]['parent']
+    view = create(state['post'], [], state['sort'], key, generation, state['reddit_account'], anchor)
+    view['observed_at'] = state['observed_at']
+    for name in chain + [anchor]:
+        view['nodes'][name] = {**nodes[name], 'shown': name in chain}
+        view['children'].setdefault(nodes[name]['parent'], []).append(name)
+    gaps = {gap_key: gap for gap_key, gap in state['gaps'].items() if gap['parent'] in under}
+    for name in under:
+        view['nodes'][name] = {**nodes[name], 'shown': False}
+        view['children'][name] = [child for child in children.get(name, []) if child in nodes or child in gaps]
+    view['gaps'] = {gap_key: {**gap, 'ids': list(gap['ids']), 'order': list(gap['order'])} for gap_key, gap in gaps.items()}
+    asked = {i for gap in gaps.values() for i in gap['ids']}
+    view['tries'] = {i: tries for i, tries in state['tries'].items() if i in asked}
+    return view
 
 
 def _rebuild(saved):
