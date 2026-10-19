@@ -129,7 +129,7 @@ COMMANDS = {
                       TIME, *WINDOW, *LIST],
         'epilog': ['A community\'s listing is that community\'s own; r/popular and r/all are Reddit-wide rankings. Pinned posts (moderators\' announcements, often old) sit at the top of hot; under new they sit at their own date.',
                    'A page asks Reddit for 100 posts and shows 25 (--limit); more: shows the rest of the page with no request, then reads the next page.',
-                   '--since/--until (local days, --until included) work with --sort new only: the window closes at the first page wholly older than --since; if the listing ends first, the result is partial (8) because the window was not covered.',
+                   '--since/--until (local days, --until included) work with --sort new only: the window closes at the first post more than ten minutes older than --since (Reddit\'s new order can be a minute off); if the listing ends first, the result is partial (8) because the window was not covered, and a listing that returns nothing is empty (7).',
                    'A private, quarantined or banned community is unavailable (exit 9), which is not the same as empty (7).',
                    'requests: 1 account check + 1 per page of 100; a more: that only shows what the last page already brought makes none.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),

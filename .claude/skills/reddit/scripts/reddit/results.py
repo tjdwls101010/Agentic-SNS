@@ -14,7 +14,8 @@ STOP_REASONS = {
     'budget': ('--max-requests was spent.', 'Run more: (or rerun the same --out command); raise --max-requests if one '
                                            'invocation should read further.'),
     'window_spent': ('Reddit\'s request window for this account is used up (the bucket the next request needs has no '
-                     'requests left until it resets); nothing more was sent.',
+                     'requests left until it resets, or pacing for a bucket that is running low would make this '
+                     'command wait more than 30 s in all); nothing more was sent.',
                      'Run more: (or rerun the same --out command) after the reset the result names.'),
     'probe_pending': ('Another invocation is making the first request of a new Reddit window; this one did not send to '
                       'the same bucket meanwhile.', 'Run more: (or rerun) a few seconds later.'),
