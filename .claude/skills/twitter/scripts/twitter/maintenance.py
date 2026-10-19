@@ -9,7 +9,7 @@ from twitter.results import describe as describe_result
 from twitter.results import finish
 from twitter.x_web import SCHEMAS
 
-SCHEMA_OBJECTS = ['result', 'out', 'post', 'account', 'trend']
+SCHEMA_OBJECTS = ['result', 'out', 'post', 'account', 'trend', 'list']
 
 
 def _verification(error):

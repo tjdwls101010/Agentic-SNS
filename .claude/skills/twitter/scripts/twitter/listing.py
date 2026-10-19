@@ -5,7 +5,7 @@ import json
 
 from twitter import connect
 from twitter.errors import TwitterError
-from twitter.x_web import parse_account, parse_post
+from twitter.x_web import parse_account, parse_list, parse_post
 
 # Both home feeds are X's choice of order: the following feed is not newest first (P2 R8), so neither closes a window.
 FEEDS = {'foryou': ('foryou', 'unordered'), 'following': ('following', 'unordered')}
@@ -28,7 +28,8 @@ def feed(options):
 # reposts, X14); media is UserMedia: photos, videos and GIFs (X's own Media tab now shows videos only).
 TABS = {'posts': ('UserTweets', 'newest_first'), 'replies': ('UserRepliesTimeline', 'newest_first'),
         'media': ('UserMedia', 'finite'), 'highlights': ('UserHighlightsTweets', 'finite'),
-        'articles': ('UserArticlesTweets', 'finite')}
+        'articles': ('UserArticlesTweets', 'finite'), 'lists': ('CombinedLists', None),
+        'memberships': ('ListMemberships', None)}
 
 
 def profile(options):
@@ -37,10 +38,9 @@ def profile(options):
     if tab and target.tab and tab != target.tab:
         raise TwitterError(2, f'The URL is the {target.tab} tab but --tab asks for {tab}.', 'Give one of them.')
     tab = tab or target.tab or 'posts'
-    if tab not in TABS:
-        raise TwitterError(2, f'The {tab} tab is not a list of posts.', 'Use --tab posts, replies, media, highlights or '
-                                                                        'articles.')
     operation, order = TABS[tab]
+    if order is None and (options.get('since') or options.get('until')):
+        raise TwitterError(2, f'The {tab} tab holds lists, which are not dated.', 'Drop --since and --until.')
     identity = {'tab': tab, 'since': options.get('since'), 'until': options.get('until')}
 
     def read(connection, state, out):
@@ -92,6 +92,26 @@ def graph(options):
         return reading
 
     return connect.run(options, command='graph', target=target.url, identity=identity, reader=read)
+
+
+# list tab → (operation, what it holds). X serves a list's posts in its own order (not verified newest first).
+LIST_TABS = {'posts': 'ListLatestTweetsTimeline', 'members': 'ListMembers'}
+
+
+def lists(options):
+    target = parse_list(options['target'])
+    tab = options['tab']
+    identity = {'tab': tab}
+
+    def read(connection, state, out):
+        client = connection.client
+        if tab == 'about':
+            return {'results': [client.x_list(target.list_id)], 'stop_reason': 'not_paginable'}
+        return connect.read_list(options, identity, state, out, order='unordered' if tab == 'posts' else None,
+                                 command='list', target=target.url, idle_limit=ACCOUNT_IDLE_PAGES,
+                                 fetch=lambda cursor: client.timeline(LIST_TABS[tab], {'listId': target.list_id}, cursor))
+
+    return connect.run(options, command='list', target=target.url, identity=identity, reader=read)
 
 
 def reposts(options):

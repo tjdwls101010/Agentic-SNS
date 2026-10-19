@@ -162,3 +162,14 @@ def test_post_pages(case):
         assert page.hidden_cursor == expected['hidden_cursor']
     if 'parent_shown' in expected:
         assert {r['id']: r['parent_shown'] for r in page.records if r['role'] == 'reply'} == expected['parent_shown']
+
+
+def test_a_list_record_and_the_stub_x_sends_for_a_list_that_does_not_exist():
+    list_record = x_web.list_record
+    owner = {'__typename': 'User', 'rest_id': '1000000001', 'core': {'screen_name': 'author_a', 'name': 'A'}}
+    record = list_record({'id_str': '15', 'name': 'L', 'mode': 'Private', 'member_count': 3, 'subscriber_count': 0,
+                          'created_at': 1767225600000, 'following': True, 'user_results': {'result': owner}})
+    assert record['private'] is True and record['follower_count'] == 0 and record['you_follow'] is True
+    assert record['created_at'] == '2026-01-01T00:00:00+00:00' and record['owner']['username'] == 'author_a'
+    assert record['url'] == 'https://x.com/i/lists/15' and record['you_are_member'] is None
+    assert list_record({'facepile_urls': [], 'id': 'TGlzdDox', 'id_str': '1'}) is None

@@ -124,12 +124,13 @@ COMMANDS = {
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
     },
     'profile': {
-        'help': 'Read a profile\'s tab: posts (with reposts), replies, media, highlights or articles.',
+        'help': 'Read a profile\'s tab: posts (with reposts), replies, media, highlights, articles, lists or memberships.',
         'run': listing.profile,
         'arguments': [(('target',), {'help': 'X @handle or profile URL; a tab URL such as /<handle>/with_replies reads that tab'}),
-                      (('--tab',), {'choices': ['posts', 'replies', 'media', 'highlights', 'articles'], 'help': 'The tab (default: the URL\'s tab, else posts)'}),
+                      (('--tab',), {'choices': ['posts', 'replies', 'media', 'highlights', 'articles', 'lists', 'memberships'], 'help': 'The tab (default: the URL\'s tab, else posts)'}),
                       'since', 'until'] + list(LIST),
         'epilog': ['posts holds the account\'s posts and reposts, newest first (X\'s own Posts tab now hides reposts); a repost row is dated when it was reposted. posts and replies are newest first, so a --since window closes at the first page wholly older than it (a pinned post sits first whatever its date and does not close it). media (photos, videos and GIFs), highlights and articles are not served in date order: a window covers them only when read to the end.',
+                   'lists are the lists the account made or follows, memberships the lists others put it in; both hold lists (list <url> reads one) and take no window.',
                    'A protected account this account does not follow is unavailable (exit 9), which is not the same as empty.',
                    'Without --limit, a window or --out it reads one page; more: continues.',
                    'requests: 1 to find the account, then 1 per page of about 20 posts.'],
@@ -161,6 +162,17 @@ COMMANDS = {
                    'Without --limit, a window or --out it reads one page; more: continues.',
                    'requests: 1 per page of about 20 posts.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
+    },
+    'list': {
+        'help': 'Read an X list: its posts, its members or its card.',
+        'run': listing.lists,
+        'arguments': [(('target',), {'metavar': 'URL', 'help': 'x.com/i/lists/<id> URL or the numeric list id'}),
+                      (('--tab',), {'choices': ['posts', 'members', 'about'], 'default': 'posts', 'help': 'posts (from its members), members, or about (the card)'})] + list(LIST),
+        'epilog': ['A list is a set of accounts someone curated; its posts are its members\' posts in X\'s order, so they are not the members\' whole output and no window closes on them. about is one record: name, owner, members, followers, private or public.',
+                   'A private list of someone else, or a deleted one, is unavailable (exit 9).',
+                   'Without --limit or --out posts and members read one page; more: continues.',
+                   'requests: 1 per page of about 20; about: 1.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
     },
     'reposts': {
         'help': 'Read the accounts that reposted one post.',
@@ -262,7 +274,7 @@ HIDDEN = {'idle': {'run': maintenance.idle,
                    'arguments': [(('--token',), {'required': True}), (('--after',), {'type': int, 'default': 300})]}}
 
 
-READS = ('feed', 'profile', 'about', 'graph', 'me', 'post', 'replies', 'reposts', 'search', 'quotes')
+READS = ('feed', 'profile', 'about', 'graph', 'me', 'list', 'post', 'replies', 'reposts', 'search', 'quotes')
 
 
 def epilog(name, spec):

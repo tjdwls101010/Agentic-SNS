@@ -213,6 +213,23 @@ def trend(record, label):
     return line
 
 
+def x_list(record, label):
+    owner = (record.get('owner') or {}).get('username')
+    parts = [_quote(record.get('name') or '') + (f' by @{owner}' if owner else '')]
+    if record.get('private') is not None:
+        parts.append('private' if record['private'] else 'public')
+    parts.append(f'members={_count(record.get("member_count"))} followers={_count(record.get("follower_count"))}')
+    parts += [text for key, text in (('you_follow', 'you follow it'), ('you_are_member', 'you are a member'))
+              if record.get(key)]
+    lines = [f'[{label}] ' + ' · '.join(parts)]
+    if record.get('description'):
+        lines.append('     about: ' + _quote(record['description']))
+    if record.get('created_at'):
+        lines.append('     created=' + _time(record['created_at'])[:10])
+    lines.append(f'     url: {_handle(record.get("url"))}')
+    return '\n'.join(lines)
+
+
 def _replies_line(replies):
     reported = '?' if replies.get('reported') is None else replies['reported']
     return (f'replies: {replies.get("direct_shown", 0)} direct and {replies.get("nested_shown", 0)} nested shown of '
@@ -250,9 +267,13 @@ def render_page(envelope, *, chars=None, command=None):
         lines.append(f'window {window.get("since") or ""}..{window.get("until") or ""} · {_line(window["coverage"])}')
     if envelope.get('replies'):
         lines.append(_replies_line(envelope['replies']))
-    labels, counts = {}, {'p': 0, 'r': 0, 'a': 0, 't': 0}
+    labels, counts = {}, {'p': 0, 'r': 0, 'a': 0, 't': 0, 'l': 0}
     for record in results:
         kind = record.get('kind')
+        if kind == 'list':
+            counts['l'] += 1
+            lines.append(x_list(record, f'l{counts["l"]}'))
+            continue
         if kind == 'account':
             counts['a'] += 1
             lines.append(account(record, f'a{counts["a"]}'))

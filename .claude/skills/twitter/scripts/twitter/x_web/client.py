@@ -21,7 +21,7 @@ from urllib.parse import urlsplit
 
 from twitter.errors import TwitterError, diagnostic
 from twitter.x_web import classify
-from twitter.x_web.records import account_record, list_page, post_page, post_record
+from twitter.x_web.records import account_record, list_page, list_record, post_page, post_record
 
 _SNIPPETS = Path(__file__).with_name('snippets')
 _KIT = (_SNIPPETS / 'kit.js').read_text(encoding='utf-8').strip()
@@ -565,6 +565,17 @@ class Client:
         records = [account_record(node) for node in (root if isinstance(root, list) else []) if isinstance(node, dict)]
         self.confirm()
         return [r for r in records if not r.get('unavailable') and r.get('id')]
+
+    def x_list(self, list_id):
+        """One list's card (one request); a list X does not return to this account is unavailable."""
+        gone = TwitterError(9, 'This list is unavailable: deleted, private or never existed.',
+                            'Check the list id; tell the user rather than retrying.', reason='unavailable')
+        root, warnings = self.query('ListByRestId', {'listId': list_id}, missing=gone)
+        record = list_record(root)
+        if record is None:
+            raise gone
+        self.confirm()
+        return record
 
     def search(self, text, product, cursor):
         """One page of X's search for `text` (posts Top or Latest, People, Media), operators as typed."""

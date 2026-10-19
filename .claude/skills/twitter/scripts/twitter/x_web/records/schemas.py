@@ -94,4 +94,23 @@ TREND = {
     },
 }
 
-SCHEMAS = {'post': POST, 'account': ACCOUNT, 'trend': TREND}
+LIST = {
+    'object': 'list',
+    'description': 'An X list: a set of accounts someone curated, with its own feed of their posts.',
+    'fields': {
+        'kind': 'string — list',
+        'id': 'string — the list id (list <id> reads it)',
+        'name': 'string|null',
+        'description': 'string|null',
+        'private': 'boolean|null — a private list is seen only by its owner',
+        'member_count': 'integer|null — ' + NULL,
+        'follower_count': 'integer|null — accounts following the list; ' + NULL,
+        'created_at': 'string|null — UTC ISO',
+        'owner': 'object|null — {id, username, name} of the account that made it',
+        'you_follow': 'boolean|null — this account follows the list',
+        'you_are_member': 'boolean|null — this account is one of its members',
+        'url': 'string — x.com/i/lists/<id>',
+    },
+}
+
+SCHEMAS = {'post': POST, 'account': ACCOUNT, 'trend': TREND, 'list': LIST}

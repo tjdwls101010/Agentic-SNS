@@ -5,6 +5,7 @@ A Bottom termination ends the timeline even when a Bottom cursor is still sent (
 """
 from dataclasses import dataclass, field
 
+from twitter.x_web.records.places import list_record
 from twitter.x_web.records.posts import account_record, post_record
 
 HIDDEN_CURSORS = ('ShowMoreThreads', 'ShowMoreThreadsPrompt')
@@ -164,6 +165,8 @@ def records_of(page):
             record = account_record(_dict(entry.node.get('user_results')).get('result'))
         elif entry.kind in ('trend', 'event'):
             record = trend_record(entry.node, entry.entry_id, entry.kind == 'event')
+        elif entry.kind == 'list':
+            record = list_record(entry.node.get('list'))
         else:
             continue
         if record is None:
