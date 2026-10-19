@@ -263,3 +263,40 @@ def test_a_space_that_does_not_exist_is_unavailable(browser, data_dir):
 def test_a_space_is_read_on_its_own(browser, data_dir):
     code, out, _ = run_cli(browser, 'about', 'author_a', 'https://x.com/i/spaces/1AbCdEfGhIjKl')
     assert code == 2 and 'on its own' in json.loads(out)['message'] and browser.calls() == []
+
+
+# --- notifications ---------------------------------------------------------------------------------------------------
+
+def notification(ident, icon='recommendation_icon', text='New post from Author A', stamp='1767225600000'):
+    return {'entryId': f'notification-{ident}', 'content': {'itemContent': {
+        'itemType': 'TimelineNotification', 'id': ident, 'notification_icon': icon,
+        'rich_message': {'text': text, 'entities': []}, 'timestamp_ms': stamp,
+        'notification_url': {'url': 'https://x.com/author_a/status/31', 'urlType': 'ExternalUrl'},
+        'template': {'__typename': 'TimelineNotificationAggregateUserActions',
+                     'from_users': [{'user_results': {'result': OWNER}}],
+                     'target_objects': [{'tweet_results': {'result': post('31')}}]}}}}
+
+
+def notifications(items, bottom=None):
+    return query_result({'data': {'viewer_v2': {'user_results': {'result': {'notification_timeline': {'timeline': {
+        'instructions': entries(items, bottom)}}}}}}}, headers=RATE)
+
+
+def test_my_notifications_say_what_happened_and_which_are_xs_suggestions(browser, data_dir):
+    known_tab(browser, data_dir).respond('query', notifications([notification('N1'), notification('N2', 'heart_icon', 'Author A liked your post')]))
+    code, out, _ = run_cli(browser, 'me', 'notifications')
+    assert code == 0, out
+    assert '[n1] suggested by X · 2026-01-01' in out and '"New post from Author A"' in out
+    assert '[n2] like · 2026-01-01' in out and 'accounts: @author_a' in out and 'posts: 31' in out
+    call = queries(browser)[-1]
+    assert call['name'] == 'NotificationsTimeline' and call['variables']['timeline_type'] == 'All'
+    assert call['chunk_hint'] == 'bundle.Notifications'
+    assert not [c for c in browser.calls() if c['op'] == 'load:arm' and 'notifications' in (c.get('url') or '')]
+
+
+def test_my_mentions_are_posts(browser, data_dir):
+    mention = {'entryId': 'tweet-41', 'content': {'itemContent': {'itemType': 'TimelineTweet', 'tweet_results': {'result': post('41')}}}}
+    known_tab(browser, data_dir).respond('query', notifications([mention]))
+    code, out, _ = run_cli(browser, 'me', 'mentions')
+    assert code == 0 and 'post 41' in out, out
+    assert queries(browser)[-1]['variables']['timeline_type'] == 'Mentions'

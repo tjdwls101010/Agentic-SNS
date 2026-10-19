@@ -276,6 +276,22 @@ def space(record, label):
     return '\n'.join(lines)
 
 
+def notification(record, label):
+    lines = [f'[{label}] {_line(record.get("event") or "notification")} · {_time(record.get("created_at"))}']
+    if record.get('message'):
+        lines.append('     ' + _quote(record['message']))
+    details = []
+    if record.get('accounts'):
+        details.append('accounts: ' + ' '.join('@' + name for name in record['accounts']))
+    if record.get('post_ids'):
+        details.append('posts: ' + ' '.join(record['post_ids']))
+    if details:
+        lines.append('     ' + '   '.join(details))
+    if record.get('url'):
+        lines.append(f'     url: {_handle(record["url"])}')
+    return '\n'.join(lines)
+
+
 def _replies_line(replies):
     reported = '?' if replies.get('reported') is None else replies['reported']
     return (f'replies: {replies.get("direct_shown", 0)} direct and {replies.get("nested_shown", 0)} nested shown of '
@@ -313,9 +329,13 @@ def render_page(envelope, *, chars=None, command=None):
         lines.append(f'window {window.get("since") or ""}..{window.get("until") or ""} · {_line(window["coverage"])}')
     if envelope.get('replies'):
         lines.append(_replies_line(envelope['replies']))
-    labels, counts = {}, {'p': 0, 'r': 0, 'a': 0, 't': 0, 'l': 0, 'c': 0, 's': 0}
+    labels, counts = {}, {'p': 0, 'r': 0, 'a': 0, 't': 0, 'l': 0, 'c': 0, 's': 0, 'n': 0}
     for record in results:
         kind = record.get('kind')
+        if kind == 'notification':
+            counts['n'] += 1
+            lines.append(notification(record, f'n{counts["n"]}'))
+            continue
         if kind == 'space':
             counts['s'] += 1
             lines.append(space(record, f's{counts["s"]}'))

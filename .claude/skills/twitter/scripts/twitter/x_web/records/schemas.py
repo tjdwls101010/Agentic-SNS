@@ -159,4 +159,23 @@ SPACE = {
     },
 }
 
-SCHEMAS = {'post': POST, 'account': ACCOUNT, 'trend': TREND, 'list': LIST, 'community': COMMUNITY, 'space': SPACE}
+NOTIFICATION = {
+    'object': 'notification',
+    'description': 'One of this account\'s notifications, as X words it. Only X\'s suggestions (suggested_by_x) were '
+                   'seen live while building the skill; the other event names follow X\'s icons and are unverified.',
+    'fields': {
+        'kind': 'string — notification',
+        'id': 'string',
+        'event': 'string|null — like, follow, repost, reply, suggested by X, from X, milestone, security alert, …; X\'s '
+                 'own icon name when it is another',
+        'suggested_by_x': 'boolean — X recommending something, not anyone\'s act',
+        'message': 'string|null — X\'s sentence (names other people)',
+        'created_at': 'string|null — UTC ISO',
+        'accounts': 'array — usernames of the accounts it is about',
+        'post_ids': 'array — the posts it is about (post <id> reads one)',
+        'url': 'string|null',
+    },
+}
+
+SCHEMAS = {'post': POST, 'account': ACCOUNT, 'trend': TREND, 'list': LIST, 'community': COMMUNITY, 'space': SPACE,
+           'notification': NOTIFICATION}

@@ -107,3 +107,33 @@ def space_record(node):
             'live_listener_count': _count(metadata.get('total_live_listeners')),
             'replay_view_count': _count(metadata.get('total_replay_watched')),
             'replay_available': replay if isinstance(replay, bool) else None, 'url': f'{ORIGIN}/i/spaces/{ident}'}
+
+
+# notification_icon → what happened. Only recommendation_icon was seen live (P2 R5); the others are the names X's app
+# uses for its notification icons and are read the same way, unverified.
+_EVENTS = {'recommendation_icon': 'suggested by X', 'heart_icon': 'like', 'person_icon': 'follow',
+           'retweet_icon': 'repost', 'reply_icon': 'reply', 'bird_icon': 'from X', 'milestone_icon': 'milestone',
+           'security_alert_icon': 'security alert', 'spaces_icon': 'space', 'list_icon': 'list'}
+
+
+def notification_record(node):
+    """One notification as X words it: what happened (or that X suggests something), when, who and which posts."""
+    node = _dict(node)
+    ident = _str(node.get('id'))
+    if not ident:
+        return None
+    template = _dict(node.get('template'))
+    accounts = [who['username'] for who in (_who(_dict(user).get('user_results')) for user in
+                                             template.get('from_users') or []) if who]
+    posts = []
+    for target in template.get('target_objects') or []:
+        result = _dict(_dict(_dict(target).get('tweet_results')).get('result'))
+        result = _dict(result.get('tweet')) if result.get('__typename') == 'TweetWithVisibilityResults' else result
+        if _str(result.get('rest_id')):
+            posts.append(result['rest_id'])
+    icon = _str(node.get('notification_icon'))
+    url = _str(_dict(node.get('notification_url')).get('url'))
+    return {'kind': 'notification', 'id': ident, 'event': _EVENTS.get(icon, icon),
+            'suggested_by_x': icon == 'recommendation_icon', 'message': _str(_dict(node.get('rich_message')).get('text')),
+            'created_at': _ms(node.get('timestamp_ms')), 'accounts': accounts, 'post_ids': posts,
+            'url': url if url and url.startswith('https://') else None}

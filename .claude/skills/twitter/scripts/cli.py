@@ -156,10 +156,11 @@ COMMANDS = {
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
     },
     'me': {
-        'help': 'Read your own bookmarks or likes.',
+        'help': 'Read your own bookmarks, likes, notifications or mentions.',
         'run': listing.me,
-        'arguments': [(('collection',), {'choices': ['bookmarks', 'likes'], 'help': 'bookmarks or likes (nobody else\'s likes are public on X)'})] + list(LIST),
+        'arguments': [(('collection',), {'choices': ['bookmarks', 'likes', 'notifications', 'mentions'], 'help': 'bookmarks, likes (nobody else\'s likes are public on X), notifications or mentions'})] + list(LIST),
         'epilog': ['In X\'s order (most recently saved or liked first, as X serves it); each post keeps its own date, not when you saved or liked it.',
+                   'notifications are X\'s notification tab as records (what happened, when, which accounts and posts); "suggested by X" marks X recommending something, which is not anyone\'s act. mentions are the posts that mention you. The skill only sends the read: it never opens X\'s notifications screen, which marks them as read. A notification\'s message names other people.',
                    'Without --limit, a window or --out it reads one page; more: continues.',
                    'requests: 1 per page of about 20 posts.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),

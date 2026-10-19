@@ -6,7 +6,7 @@ A Bottom termination ends the timeline even when a Bottom cursor is still sent (
 from dataclasses import dataclass, field
 from urllib.parse import parse_qs, urlsplit
 
-from twitter.x_web.records.places import community_record, list_record
+from twitter.x_web.records.places import community_record, list_record, notification_record
 from twitter.x_web.records.posts import account_record, post_record
 
 HIDDEN_CURSORS = ('ShowMoreThreads', 'ShowMoreThreadsPrompt')
@@ -14,7 +14,7 @@ HIDDEN_CURSORS = ('ShowMoreThreads', 'ShowMoreThreadsPrompt')
 
 @dataclass
 class Entry:
-    kind: str            # post | account | trend | event | list | community | branch
+    kind: str            # post | account | trend | event | notification | list | community | branch
     ident: str | None
     node: dict
     entry_id: str
@@ -107,7 +107,8 @@ def walk(instructions):
                 page.entries.append(Entry(kind, _ident(kind, content, identity), content, identity, module, index,
                                           pinned, _dict(content.get('socialContext'))))
                 return
-        kind = {'TimelineTrend': 'trend', 'TimelineEventSummary': 'event'}.get(content.get('itemType'))
+        kind = {'TimelineTrend': 'trend', 'TimelineEventSummary': 'event',
+                'TimelineNotification': 'notification'}.get(content.get('itemType'))
         if kind:
             page.entries.append(Entry(kind, identity, content, identity, module, index, pinned))
         else:
@@ -188,6 +189,8 @@ def records_of(page):
             record = trend_record(entry.node, entry.entry_id, entry.kind == 'event')
         elif entry.kind == 'list':
             record = list_record(entry.node.get('list'))
+        elif entry.kind == 'notification':
+            record = notification_record(entry.node)
         elif entry.kind == 'community':
             record = community_record(_dict(entry.node.get('community_results')).get('result'))
         else:

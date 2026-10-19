@@ -172,6 +172,10 @@ def me(options):
         client = connection.client
         if collection == 'likes':
             fetch = lambda cursor: client.timeline('Likes', {'userId': connection.account_id}, cursor)  # noqa: E731
+        elif collection in ('notifications', 'mentions'):
+            # only the read: X's notifications screen is never opened (opening it marks them read, P2 R5)
+            kind = 'Mentions' if collection == 'mentions' else 'All'
+            fetch = lambda cursor: client.timeline('NotificationsTimeline', {'timeline_type': kind}, cursor)  # noqa: E731
         else:
             fetch = lambda cursor: client.timeline('Bookmarks', {}, cursor)  # noqa: E731
         return connect.read_list(options, identity, state, out, order='unordered', command='me', target=None, words=[collection],
