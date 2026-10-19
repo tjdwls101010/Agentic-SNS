@@ -300,3 +300,11 @@ def test_my_mentions_are_posts(browser, data_dir):
     code, out, _ = run_cli(browser, 'me', 'mentions')
     assert code == 0 and 'post 41' in out, out
     assert queries(browser)[-1]['variables']['timeline_type'] == 'Mentions'
+
+
+def test_an_empty_timeline_object_is_empty_not_a_shape_change(browser, data_dir):
+    # measured 2026-10-19: ListMemberships for an account in no lists answers {"timeline": {}} under the user
+    empty = query_result({'data': {'user': {'result': {'__typename': 'User', 'timeline': {}}}}}, headers=RATE)
+    known_tab(browser, data_dir).respond('query', by_name()).respond('query', empty)
+    code, out, _ = run_cli(browser, 'profile', 'author_a', '--tab', 'memberships')
+    assert code == 7 and json.loads(out)['error'] == 'empty'

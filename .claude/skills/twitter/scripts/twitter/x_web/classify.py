@@ -136,6 +136,9 @@ def response(envelope, operation, root):
     if not isinstance(status, int) or status >= 400 or not body:
         return _failed('transient', f'X answered {operation} with HTTP {status} and no usable data.')
     value = at_root(body, root)
+    if value is None and root.endswith('.timeline.instructions') and \
+            at_root(body, root[:-len('.timeline.instructions')]) == {}:
+        value = []  # an empty timeline object: nothing in it (measured: ListMemberships for an account in no lists)
     data = body.get('data') if isinstance(body, dict) else None
     if (operation == 'UserByScreenName' and data == {}) or (isinstance(value, dict) and value.get('__typename') in
                                                             ('UserUnavailable', 'TweetTombstone')):
