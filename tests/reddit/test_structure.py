@@ -124,6 +124,15 @@ def test_import_direction():
     assert not problems, '\n'.join(problems)
 
 
+def exported(package):
+    """The names a package unit's __init__.py lists in __all__: its whole interface."""
+    tree = ast.parse((PACKAGE / package / '__init__.py').read_text(encoding='utf-8'))
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(getattr(t, 'id', None) == '__all__' for t in node.targets):
+            return set(ast.literal_eval(node.value))
+    return set()
+
+
 def interface_violations(path, own_unit):
     problems = []
     for module, names, _ in imports(path):
@@ -135,6 +144,9 @@ def interface_violations(path, own_unit):
             if len(parts) > 2:
                 problems.append(f'{path}: reaches past {unit} into {target}')
             problems += [f'{path}: takes private {name} from {target}' for name in taken if name.startswith('_')]
+            if unit in PACKAGES and len(parts) == 2:
+                problems += [f'{path}: takes {name} from {target}, which its __all__ does not export'
+                             for name in taken if not name.startswith('_') and name not in exported(unit)]
     return problems
 
 
@@ -165,3 +177,11 @@ def test_skill_does_not_import_test_or_maintenance_code():
     for path in python_files(SCRIPTS):
         for module, _, _ in imports(path):
             assert not module.startswith(('tests', 'conftest', 'fake_aside', 'contrast', 'ledger')), (path, module)
+
+
+def test_taking_a_package_module_by_name_is_reaching_past_it(tmp_path):
+    # Codex P7: a submodule taken by name from a package passed for its interface
+    path = tmp_path / 'probe.py'
+    path.write_text('from reddit.aside import repl\nfrom reddit.reddit_web import client\nfrom reddit.aside import Aside\n')
+    problems = interface_violations(path, None)
+    assert len(problems) == 2 and 'repl' in problems[0] and 'client' in problems[1]
