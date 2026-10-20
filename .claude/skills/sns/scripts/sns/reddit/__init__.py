@@ -14,7 +14,8 @@ from sns.window import WindowPolicy
 from sns.reddit import about, listing, render, search, thread, web, wiki
 from sns.reddit.snapshots import Snapshots
 
-POLICY = LimitPolicy(scope='bucket', slow='used', hold_seconds=600, person=('challenge',), pace=(1.0, 2.0))
+POLICY = LimitPolicy(scope='bucket', slow='used', hold_seconds=600, person=('challenge',), pace=(1.0, 2.0),
+                     unmetered=('share',))  # a share link is paced and holdable but Reddit reports no window for it
 
 
 def connect(connection):

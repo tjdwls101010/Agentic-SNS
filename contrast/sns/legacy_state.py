@@ -49,7 +49,8 @@ from sns.limits import LimitPolicy  # noqa: E402
 POLICIES = {
     'x': LimitPolicy(scope='operation', slow='fraction', hold_seconds=900, person=('challenge', 'account_locked'),
                      pace=(1.0, 2.0)),
-    'reddit': LimitPolicy(scope='bucket', slow='used', hold_seconds=600, person=('challenge',), pace=(1.0, 2.0)),
+    'reddit': LimitPolicy(scope='bucket', slow='used', hold_seconds=600, person=('challenge',), pace=(1.0, 2.0),
+                          unmetered=('share',)),
     'threads': LimitPolicy(scope='account', hold_seconds=1800, person=('checkpoint',), pace=(1.0, 2.0)),
     'facebook': LimitPolicy(scope='account', hold_seconds=1800, person=('checkpoint',), pace=(1.0, 2.0)),
     'naver_blog': LimitPolicy(scope='account', hold_seconds=1800, person=('network_blocked',), pace=(0.5, 0.8)),

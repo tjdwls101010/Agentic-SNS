@@ -322,6 +322,10 @@ class Guard:
     def _scoped(self, scope):
         return scope is not None and self.policy.scope != 'account'
 
+    def _metered(self, scope):
+        """A scope whose limit the platform reports (probed, reserved, shown); an unmetered one is only stoppable."""
+        return self._scoped(scope) and scope not in self.policy.unmetered
+
     def _wait(self, scope):
         """(pacing, scope wait): the seconds to wait before a request to `scope` may go, or raise the scope's stop or
         the deadline when the wait leaves less than CALL_SECONDS for the call."""
@@ -338,6 +342,10 @@ class Guard:
             raise self._scope_error(scope, entry['blocked_until'], entry['blocked_until'])
         if entry['status'] == 'known' and entry['remaining'] <= 0:
             raise self._scope_error(scope, entry['reset_at'], entry['reset_at'])
+        if not self._metered(scope):
+            if pace + CALL_SECONDS >= self.time_left():
+                raise self._time_limit()
+            return pace, 0.0
         wait = max(0.0, entry.get('slow_until', 0) - now)
         if entry['status'] == 'probe':
             # another live command's first request to this scope: never go before it is answered (pacing may not
@@ -358,7 +366,7 @@ class Guard:
         """Inside the lock, before sending: the next pacing time, the scope's reservation, one log line."""
         now = self.clock.time()
         self._write('pace.json', {'next_allowed_at': now + random.uniform(*self.policy.pace)})
-        if self._scoped(scope):
+        if self._metered(scope):
             entry = self._settle(self._scopes().get(scope), now)
             if entry['status'] == 'known':
                 entry = {**entry, 'remaining': max(0, entry['remaining'] - reserve)}
@@ -381,15 +389,15 @@ class Guard:
         except SnsError:
             pass  # the reservation before sending already spaced this request out
         for name, fact in slot.facts.items():
-            if self._scoped(name):
+            if self._metered(name):
                 self._apply_fact(name, fact, now)
-        if self._scoped(slot.scope) and slot.scope not in slot.facts:
+        if self._metered(slot.scope) and slot.scope not in slot.facts:
             entry = self._settle(self._scopes().get(slot.scope), now)
             if entry['status'] == 'probe' and entry.get('pid') == os.getpid() and slot.answered:
                 # answered without usable headers: the scope's limit stays unknown; pacing alone spaces requests (a
                 # lost answer keeps the probe: the request may still be in flight)
                 self._put_scope(slot.scope, {'status': 'unknown', **self._lasting(entry, now)})
-        if self._scoped(slot.scope):
+        if self._metered(slot.scope):
             self.seen[slot.scope] = self._settle(self._scopes().get(slot.scope), now)
         if slot.outcome != 'sent':
             line = {'id': slot.request_id, 'n': 0, 'outcome': slot.outcome}

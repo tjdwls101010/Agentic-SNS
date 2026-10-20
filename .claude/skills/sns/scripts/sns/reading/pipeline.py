@@ -362,7 +362,12 @@ def read_list(connection, state, out, *, order, fetch, command, target, identity
     if out is not None:
         start.update(seen=sorted(out.ids, key=str), pending=[])
     limit = options.get('limit')
-    if out is not None and limit is not None:
+    ended = out is not None and out.state is None and out.count and not out.complete
+    if ended:
+        # an earlier run reached the source's end and its final line was lost: judge that end again, no request
+        result = {'results': [], 'stop_reason': out.last_stop or 'exhausted', 'failure': None, 'state': None,
+                  'left_out': {}, 'reported_total': None}
+    elif out is not None and limit is not None:
         if out.count >= limit:
             return {'results': [], 'stop_reason': 'limit_reached', 'words': list(words),
                     'window': window.describe() if window.active else None}
@@ -371,9 +376,10 @@ def read_list(connection, state, out, *, order, fetch, command, target, identity
     reads_on = out is not None or limit is not None or (window.active and order in ('newest_first', 'server'))
     if not reads_on and show is not None:
         limit = show
-    result = paginate(counted, limit=limit, state=start, keep=window.keep, closes=closes,
-                      commit=commit if out is not None else None, whole_pages=out is not None,
-                      max_pages=None if reads_on else 1, idle_limit=idle_limit)
+    if not ended:
+        result = paginate(counted, limit=limit, state=start, keep=window.keep, closes=closes,
+                          commit=commit if out is not None else None, whole_pages=out is not None,
+                          max_pages=None if reads_on else 1, idle_limit=idle_limit)
     stop, failure = result['stop_reason'], result['failure']
     if stop == 'exhausted' and order == 'newest_first' and window.bounds['start'] is not None \
             and not end_covers_window and failure is None:

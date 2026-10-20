@@ -188,7 +188,7 @@ class OutFile:
         self.path, self.context, self.viewer = resolve(path), context, viewer
         self.ids, self.skipped = set(), set()
         self.count = 0
-        self.state, self.complete = None, False
+        self.state, self.complete, self.last_stop = None, False, None
         self.stream = None
         try:
             self.stream = os.fdopen(_open(self.path, os.O_RDWR | os.O_CREAT), 'r+b')
@@ -219,7 +219,7 @@ class OutFile:
         scan = _scan(data)
         _check_header(scan['header'], self.context, self.viewer, True)
         self.ids, self.skipped, self.count = scan['ids'], scan['skipped'], scan['count']
-        self.state, self.complete = scan['state'], scan['complete']
+        self.state, self.complete, self.last_stop = scan['state'], scan['complete'], scan['last_stop']
         self.stream.seek(scan['boundary'])
         self.stream.truncate()
 
@@ -257,7 +257,7 @@ class OutFile:
         self.ids |= new
         self.skipped |= set(skipped)
         self.count += len(page)
-        self.state = state
+        self.state, self.last_stop = state, stop_reason
 
     def conclude(self, stop_reason, verdict, window):
         """Mark the file final with the result its reading ended in (verdict {kind, message, fix, reason} or None for

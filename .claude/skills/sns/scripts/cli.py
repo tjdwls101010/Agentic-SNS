@@ -138,7 +138,7 @@ def shared_commands(platform):
                        'in the Aside browser first. SNS_ASIDE_ACCOUNT (or SNS_ASIDE_ACCOUNT_<PLATFORM>) picks the '
                        'Aside account; SNS_IDLE_SECONDS sets when an unused dedicated tab is emptied (default 300, '
                        'off to keep it).'],
-            'exits': (0, 2, 3, 4, 5, 6),
+            'exits': (0, 2, 3, 4, 5, 6, 10),
         },
         'schema': {
             'help': 'Describe results, --out files and record fields; always JSON, no request.',
@@ -236,8 +236,9 @@ def emit(kind, envelope, options, module):
     elif machine or (not envelope['ok'] and not envelope.get('results') and not envelope.get('sections')):
         print(json.dumps(envelope, ensure_ascii=False))
     else:
-        lines = module.PLATFORM.render(envelope, options.get('chars'), options['command'])
-        print(page(envelope, lines))
+        drawn = module.PLATFORM.render(envelope, options.get('chars'), options['command'])
+        lines, shown = drawn if isinstance(drawn, tuple) else (drawn, None)
+        print(page(envelope, lines, shown))
     return KIND_EXIT[kind]
 
 

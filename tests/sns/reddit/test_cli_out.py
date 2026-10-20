@@ -155,9 +155,6 @@ def test_a_window_the_listing_did_not_reach_stays_open_when_the_command_is_rerun
     assert len(reddit.fetches()) == before
 
 
-@pytest.mark.xfail(strict=True, reason='core gap: reading.read_list returns limit_reached at once when the file already '
-                                       'holds --limit records, before the source end the file reached is judged again '
-                                       '(old reddit kept `ending` in the page line for this; Codex P7 round 3)')
 def test_a_torn_completion_is_judged_again_even_when_the_limit_was_reached(reddit, tmp_path):
     out, args = window_file(reddit, tmp_path, '--limit', '1')
     code, _, _ = reddit.run(*args)

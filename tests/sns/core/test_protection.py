@@ -556,3 +556,20 @@ def test_a_cancelled_probe_is_not_a_lost_one(data_dir, clock):
     with g.request(scope='general') as slot:
         slot.cancel()  # the tab was gone: nothing was sent
     assert g.snapshot()['scopes']['general']['status'] == 'unknown'
+
+
+def test_an_unmetered_scope_is_paced_and_holdable_but_never_probed_or_reported(data_dir, clock):
+    g = guard('reddit', clock)
+    with g.request(scope='share') as slot:
+        assert 'share' not in json.loads((files(data_dir, 'reddit') / 'scopes.json').read_text() or '{}') \
+            if (files(data_dir, 'reddit') / 'scopes.json').exists() else True
+        slot.classify('ok')
+    assert 'share' not in g.limits()
+    with g.request(scope='share') as slot:
+        error = slot.hold(scope='share', until=clock.now + 300)
+    assert error.kind == 'scope_limit'
+    with pytest.raises(SnsError):
+        with guard('reddit', clock).request(scope='share'):
+            pass
+    with guard('reddit', clock).request(scope='general') as slot:  # the other buckets go on
+        slot.classify('ok')

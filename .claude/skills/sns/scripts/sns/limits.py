@@ -14,6 +14,8 @@ class LimitPolicy:
     hold_seconds: how long a 429 stops requests when the platform gives no reset.
     person: the block reasons only a person can clear (a checkpoint, a challenge, a locked account, a network block).
     pace: the random gap between two requests of one account, in seconds.
+    unmetered: scopes the platform never reports a limit for (Reddit's share links): paced and stoppable by a 429,
+      never probed and never shown as a limit.
     """
     scope: str
     hold_seconds: int
@@ -21,6 +23,7 @@ class LimitPolicy:
     pace: tuple
     slow: str | None = None
     slow_fraction: float = 0.2
+    unmetered: tuple = ()
 
 
 @dataclass(frozen=True)

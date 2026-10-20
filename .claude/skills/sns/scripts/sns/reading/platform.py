@@ -29,7 +29,8 @@ class Platform:
       check's scope uses the check's reservation) and raise unless the answer is clean and for the account the block
       names; keep learned query ids in the session with bounded recovery (a fixed number of relearns or reloads per
       command), so a failing page never loops.
-    render(envelope, chars, command) → the record lines of a text page.
+    render(envelope, chars, command) → the record lines of a text page, or (lines, shown) when the number of records
+      the header should name differs from len(results) (a post's context rows, a tree's parent lines).
     schemas: {object name: schema document} for its records.
     locate(url) → (command, argument) when the URL is this platform's and that command opens it, else None (pure).
     unblock_scope: the scope the unblock check's request is counted in (X Viewer, Reddit general), or None.
