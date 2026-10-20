@@ -6,6 +6,7 @@ import html
 import re
 import unicodedata
 
+from sns.render import image as image_line
 from sns.text import count, limit_of, quote, shown, time
 
 _URL = re.compile(r'(\()?(https?://[^\s)\]]+)(?(1)\))')
@@ -221,7 +222,8 @@ def _thread_line(thread):
             + (f', expanded {time(thread["expanded_at"])}' if thread.get('expanded_at') else ''))
 
 
-_LABELS = {'post': 'p', 'comment': 'c', 'subreddit': 's', 'user': 'u', 'wiki_page': 'w', 'wiki_index': 'w', 'reply': 'r'}
+_LABELS = {'post': 'p', 'comment': 'c', 'subreddit': 's', 'user': 'u', 'wiki_page': 'w', 'wiki_index': 'w', 'reply': 'r',
+           'image': 'i'}
 
 
 def reply(record, label, chars):
@@ -238,7 +240,7 @@ def render(envelope, chars, command):
     default length; 0: everything received."""
     limit = limit_of(chars)
     lines = [_thread_line(envelope['thread'])] if envelope.get('thread') else []
-    labels, counts = {}, {prefix: 0 for prefix in 'pcsuwr'}
+    labels, counts = {}, {prefix: 0 for prefix in 'pcsuwri'}
     for record in envelope.get('results') or []:
         kind = record.get('kind')
         prefix = _LABELS.get(kind, 'p')
@@ -253,6 +255,8 @@ def render(envelope, chars, command):
             lines.append(user(record, label, limit))
         elif kind == 'reply':
             lines.append(reply(record, label, limit))
+        elif kind == 'image':
+            lines.append(image_line(record, label))
         elif kind in ('wiki_page', 'wiki_index'):
             lines.append(wiki(record, label, None if chars is None else limit))
         else:

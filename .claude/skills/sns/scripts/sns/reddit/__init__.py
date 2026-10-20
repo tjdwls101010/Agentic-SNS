@@ -11,7 +11,7 @@ from sns import reading
 from sns.limits import LimitPolicy
 from sns.window import WindowPolicy
 
-from sns.reddit import about, listing, render, search, thread, web, wiki
+from sns.reddit import about, images, listing, render, search, thread, web, wiki
 from sns.reddit.snapshots import Snapshots
 
 POLICY = LimitPolicy(scope='bucket', slow='used', hold_seconds=600, person=('challenge',), pace=(1.0, 2.0),
@@ -117,7 +117,8 @@ RECORDS = {
 
 PLATFORM = reading.Platform(
     key='reddit', title='Reddit', site='reddit.com', transport='fetch', policy=POLICY,
-    window=WindowPolicy(jitter=600), connect=connect, render=render.render, schemas=RECORDS, locate=web.locate,
+    window=WindowPolicy(jitter=600), connect=connect, render=render.render,
+    schemas={**RECORDS, 'image': reading.IMAGE_SCHEMA}, locate=web.locate,
     unblock_scope='general', idle_action=None)
 
 # --- the commands --------------------------------------------------------------------------------------------------
@@ -331,6 +332,22 @@ COMMANDS = {
                    'snapshot expired. A tree whose last branches Reddit will not expand ends partial (8).',
                    'cost: the account check (/api/me.json) + 1 request per expansion (or 1 for a new read); the time limit '
                    'stops a large thread and more: continues.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+    },
+    'images': {
+        'help': 'Save the pictures of one post (a gallery, an image post, a video\'s preview) so they can be looked at.',
+        'run': _command(images.images),
+        'arguments': [(('target',), {'metavar': 'URL', 'help': 'A post URL, id or redd.it link (a comment link or a '
+                                                               'share link opens its post)'}),
+                      (('numbers',), {'nargs': '*', 'type': positive, 'metavar': 'N',
+                                      'help': 'The pictures to save, by the numbers the post shows (media N:)'}),
+                      (('--all',), {'action': 'store_true', 'help': 'Save every picture of the post'}), 'json'],
+        'epilog': ['The post is read again (preview links are signed and do not last), so N is the Nth picture as Reddit '
+                   'sends the post now; each saved line names its kind, size and media_id to match what the post '
+                   'showed. Only Reddit\'s own image hosts (i.redd.it, preview.redd.it) are fetched; a picture hosted '
+                   'elsewhere is named and skipped. Files go to the skill\'s data/images/ and are removed a day later; '
+                   'they are other people\'s pictures. A picture that could not be saved is named in coverage (exit 8).',
+                   'requests: 1 for the post (plus a share link\'s hops), then 1 per picture.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
     },
 }

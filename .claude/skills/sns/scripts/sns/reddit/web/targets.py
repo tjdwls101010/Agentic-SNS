@@ -18,6 +18,7 @@ ACCEPTS = {
     'sub': ('subreddit', 'subreddits'),
     'post': ('post', 'comment', 'share'),
     'comments': ('post', 'comment', 'share'),
+    'images': ('post', 'comment', 'share'),
     'profile': ('user',),
     'about': ('subreddit', 'user'),
     'related': ('post', 'comment'),

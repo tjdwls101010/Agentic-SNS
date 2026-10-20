@@ -89,6 +89,11 @@ def listing(sub, sort, time=None, after=None):
     return Request(f'/r/{sub}/{sort}.json', _query(limit=PAGE_SIZE, t=time, after=after))
 
 
+def post_alone(post_id):
+    """The post with as little of its thread as Reddit sends (for its pictures)."""
+    return Request(f'/comments/{post_id}.json', _query(limit=1, depth=1), expect='post_pair')
+
+
 def _comment_sort(sort):
     return 'confidence' if sort == 'best' else sort
 

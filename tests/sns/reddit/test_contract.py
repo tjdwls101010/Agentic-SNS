@@ -66,7 +66,7 @@ def test_a_comment_pages_extra_keys_are_described():
 
 def test_every_object_schema_describes_something_and_names_its_label():
     assert set(PLATFORM.schemas) == {'post', 'reply', 'comment', 'subreddit', 'user', 'moderator', 'wiki_page',
-                                     'wiki_index'}
+                                     'wiki_index', 'image'}
     for name, document in PLATFORM.schemas.items():
         assert document['object'] == name and document['fields'] and document['description'], name
 
@@ -74,6 +74,7 @@ def test_every_object_schema_describes_something_and_names_its_label():
 def test_schema_prints_each_object_through_the_cli(reddit):
     code, out, _ = reddit.run('reddit', 'schema')
     assert code == 0 and [r['object'] for r in json.loads(out)['results']] == [
-        'result', 'out', 'post', 'reply', 'comment', 'subreddit', 'user', 'moderator', 'wiki_page', 'wiki_index']
+        'result', 'out', 'post', 'reply', 'comment', 'subreddit', 'user', 'moderator', 'wiki_page', 'wiki_index',
+        'image']
     code, out, _ = reddit.run('reddit', 'schema', 'post')
     assert code == 0 and 'media_id' in json.dumps(json.loads(out)['results'][0])

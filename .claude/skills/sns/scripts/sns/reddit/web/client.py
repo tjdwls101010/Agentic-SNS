@@ -190,6 +190,10 @@ class Client:
             raise
         return page(body[1] if request.expect == 'duplicates' else body, inbox=request.inbox)
 
+    def post_alone(self, post_id):
+        """The post record alone, read lightly (one request)."""
+        return tree.thread(self.get(routes.post_alone(post_id)))[0]
+
     def thread(self, post_id, sort, comment_id=None, context=None):
         """(post record, items) of a post read, or of one comment's subtree (comment_id with context 0)."""
         return tree.thread(self.get(routes.post(post_id, sort, comment_id, context)))
