@@ -32,9 +32,10 @@ _ANSI = re.compile(r'\x1b\[[0-9;]*m')
 _ID = re.compile(r'[A-Za-z0-9_-]{1,64}')
 _CHECK = 'Check that Aside is running, then run doctor.'
 # One line: the interactive REPL runs each line on its own. The leading string names it for the test stand-in.
-_OPENER = ("'sns-opener'; const xsBefore = await listBrowserTabs(); await openTab('about:blank'); "
-           "const xsAfter = await listBrowserTabs(); console.log(JSON.stringify({kind: 'opened', tabs: "
-           "xsAfter.filter(t => !xsBefore.some(b => b.targetId === t.targetId)).map(t => t.targetId)}));\n")
+# openTab answers with the page it opened, target id included (measured 2026-10-21): a before/after diff of the tab
+# list would also catch a tab another command opened meanwhile.
+_OPENER = ("'sns-opener'; const opened = await openTab('about:blank'); "
+           "console.log(JSON.stringify({kind: 'opened', tabs: [opened && opened.targetId]}));\n")
 
 
 def active_account(stdout):
