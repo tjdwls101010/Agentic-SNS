@@ -5,11 +5,13 @@
 // would fetch an address the host check never saw) and an unreachable host is answered, not thrown: both are this
 // picture's failure, not the command's.
 async (args) => {
+  const network = (error) => ({status: 0, network: String(error && error.message ? error.name + ': ' + error.message
+                                                                                  : error).slice(0, 200)});
   let response;
   try {
     response = await fetch(args.url, {credentials: 'omit', redirect: 'manual'});
   } catch (error) {
-    return {status: 0, network: String(error && error.message ? error.name + ': ' + error.message : error).slice(0, 200)};
+    return network(error);
   }
   if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
     return {status: response.status, redirect: true};
@@ -17,7 +19,12 @@ async (args) => {
   const type = (response.headers.get('content-type') || '').split(';')[0].trim();
   const declared = Number(response.headers.get('content-length') || 0);
   if (declared > args.max) return {status: response.status, type, size: declared, data: null, too_large: true};
-  const bytes = new Uint8Array(await response.arrayBuffer());
+  let bytes;
+  try {
+    bytes = new Uint8Array(await response.arrayBuffer());  // the body can break off while it arrives
+  } catch (error) {
+    return network(error);
+  }
   if (bytes.length > args.max) return {status: response.status, type, size: bytes.length, data: null, too_large: true};
   let data;
   if (typeof Buffer !== 'undefined') {

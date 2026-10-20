@@ -85,6 +85,16 @@ def _is_result_piece(path, data):
     return tail is not None and (not tail or (len(tail) >= 1 and tail[0] in ('edges', 'nodes')))
 
 
+def _nest(keys, data):
+    """A deferred piece put back in the shape of the edge it belongs to, so its wrapper (a node, or the module's
+    rendering_strategy with its see-more type) is where an inline edge would have it."""
+    if not keys or type(keys[0]) is int:
+        return {'node': data}
+    for key in reversed(keys):
+        data = [data] if type(key) is int else {key: data}
+    return data
+
+
 def edges(chunks):
     """(connection index, its result edges) in index order, deferred pieces included; arrival order does not decide."""
     positions = {}
@@ -116,7 +126,7 @@ def edges(chunks):
                 connection({tail[0]: data})
             elif (len(tail) >= 2 and tail[0] in ('edges', 'nodes') and type(tail[1]) is int
                   and all(type(key) is int or key in WRAPPERS for key in tail[2:])):
-                positions.setdefault(tail[1], []).append({'node': data})
+                positions.setdefault(tail[1], []).append(_nest(tail[2:], data))
     for index in sorted(positions):
         yield index, positions[index]
 

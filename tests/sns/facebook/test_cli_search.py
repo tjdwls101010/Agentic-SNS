@@ -183,3 +183,16 @@ def test_an_entity_repeated_in_a_later_piece_is_listed_once(browser):
         module('browse_type_profile_with_biz_tools', [entity('User', '602')])], has_next=False)), piece]))
     code, out, _ = run(browser, 'search', 'sample', '--json')
     assert [(r['kind'], r['id']) for r in json.loads(out)['results']] == [('page', '602')]
+
+
+def test_a_modules_kind_that_arrives_in_a_later_piece_applies_to_its_entities(browser):
+    """Found by the second review: the module's see-more type itself came in a later piece (at the edge's
+    rendering_strategy), and the entity already delivered was called a person."""
+    edge = module('browse_type_profile_with_biz_tools', [entity('User', '602')])
+    edge['rendering_strategy']['view_model'].pop('see_more_model')
+    piece = {'path': ['serpResponse', 'results', 'edges', 0, 'rendering_strategy'],
+             'data': {'view_model': {'see_more_model': {'type': 'browse_type_profile_with_biz_tools'}}}}
+    known_tab(browser)
+    browser.respond('facebook.query', deferred([json.loads(results_body([edge], has_next=False)), piece]))
+    code, out, _ = run(browser, 'search', 'sample', '--json')
+    assert [(r['kind'], r['id']) for r in json.loads(out)['results']] == [('page', '602')], out

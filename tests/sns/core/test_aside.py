@@ -185,3 +185,11 @@ def test_a_redirect_or_an_unreachable_host_is_a_partial_failure_of_that_picture(
     with pytest.raises(SnsError) as caught:
         Aside('x', Deadline(30)).download('https://pbs.twimg.com/media/P1.jpg', 1024)
     assert caught.value.kind == 'partial' and caught.value.reason == reason
+
+
+@pytest.mark.skipif(not __import__('shutil').which('node'), reason='node is not installed')
+def test_a_picture_whose_body_breaks_off_is_that_pictures_failure(tmp_path):
+    """Found by the second review: an error while the body arrived escaped the catch and failed the whole command."""
+    out = _run_media(tmp_path, "  return {status: 200, type: 'basic', headers: new Headers({'content-type': 'image/jpeg'}), "
+                               "arrayBuffer: async () => { throw new TypeError('terminated'); }};")
+    assert out['answer']['status'] == 0 and 'terminated' in out['answer']['network']
