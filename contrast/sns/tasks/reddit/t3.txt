@@ -1,0 +1,1 @@
+${SNS_TASK_REDDIT_BIG_THREAD_URL} 댓글 여론이 어떻게 갈리는지 정리해줘.

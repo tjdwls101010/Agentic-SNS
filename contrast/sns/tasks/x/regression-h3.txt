@@ -1,0 +1,1 @@
+${SNS_TASK_X_NOTE_URL}의 사실관계를 정리해줘.

@@ -1,0 +1,1 @@
+이 블로그(${SNS_TASK_NAVER_BLOG2})의 ${SNS_TASK_NAVER_CATEGORY} 카테고리 글 목록을 전부 파일로 모아줘.

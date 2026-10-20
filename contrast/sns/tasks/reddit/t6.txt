@@ -1,0 +1,1 @@
+r/${SNS_TASK_REDDIT_SUB2}에서 지난 한 달 동안 ${SNS_TASK_REDDIT_TOPIC} 불만이 얼마나 나왔어?

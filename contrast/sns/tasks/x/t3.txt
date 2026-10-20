@@ -1,0 +1,1 @@
+${SNS_TASK_X_REPLIES_URL} 반응이 어떻게 갈리는지 정리해줘.

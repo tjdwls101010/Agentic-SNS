@@ -1,0 +1,1 @@
+${SNS_TASK_NAVER_PRODUCT} 써 본 사람들 평을 블로그에서 찾아줘.
