@@ -176,6 +176,15 @@ def test_an_interrupted_collection_resumes(capsys, browser, monkeypatch, tmp_pat
     assert code == 0 and '2 saved to' in out
 
 
+def test_a_stalled_collection_is_interrupted_not_final(capsys, browser, monkeypatch, tmp_path):
+    path = tmp_path / 'feed.ndjson'
+    me(browser)
+    feed(browser, None, [item(1)], 'C2', stop='pagination_stalled')  # the platform saw its pages repeat
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--out', path)
+    assert code == 8
+    assert json.loads(path.read_text().splitlines()[-1])['end'] == 'interrupted'
+
+
 def test_an_endless_surface_refuses_out_without_limit_before_any_call(capsys, browser, monkeypatch, tmp_path):
     code, out = run(capsys, browser, monkeypatch, 'alpha', 'ranked', '--out', tmp_path / 'r.ndjson')
     assert code == 2 and '--limit' in json.loads(out)['fix'] and browser.calls() == []

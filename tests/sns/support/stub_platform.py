@@ -78,7 +78,7 @@ class AlphaClient:
         body = self.get({'path': path, 'cursor': cursor})
         return Page(body.get('items') or [], next=body.get('next'), end=not body.get('next'),
                     left_out={'promoted': body['promoted']} if body.get('promoted') else {},
-                    reported_total=body.get('total'))
+                    reported_total=body.get('total'), stop=body.get('stop'))
 
     def verify(self, check):
         viewer = self.viewer()

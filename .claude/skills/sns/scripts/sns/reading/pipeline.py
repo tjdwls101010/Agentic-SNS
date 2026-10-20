@@ -313,9 +313,9 @@ def read_list(connection, state, out, *, order, fetch, command, target, identity
                'reported_total': result['reported_total']}
     if window.active:
         reading['window'] = window.describe()
-    if out is not None and ((result['state'] is None and failure is None)
-                            or (failure is not None and failure.reason == 'listing_ended')):
-        reading['ending'] = stop
+    if out is not None and stop in outfile.COMPLETE and (
+            (result['state'] is None and failure is None) or (failure is not None and failure.reason == 'listing_ended')):
+        reading['ending'] = stop  # only an end rereading would not change makes the file final
     if result['state'] is not None:
         reading['continuation'] = {'command': command, 'target': target, 'identity': identity, 'words': list(words),
                                    'state': {**result['state'], 'window': window.state(), **(extra or {})}}
