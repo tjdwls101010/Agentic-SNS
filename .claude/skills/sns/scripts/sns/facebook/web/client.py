@@ -522,6 +522,7 @@ class Client:
             if self.opened_now:
                 # no tab could be reused: opening one loaded the site as a person does and its first look was judged
                 # (checkpoint, login, account), which is the check; nothing more is sent while the block stands
+                check.cancel()  # the reserved check request was not sent: give it back, leave no probe
                 return
             self.query('newsfeed', {**FEED_SORTS['top'], 'cursor': None, 'count': 1}, route=HOME)
         except SnsError as error:

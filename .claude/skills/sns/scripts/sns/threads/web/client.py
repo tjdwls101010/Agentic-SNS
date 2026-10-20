@@ -599,6 +599,7 @@ class Client:
             if self.opened_now:
                 # no tab could be reused: opening one loaded the site as a person does and its first look was judged
                 # (checkpoint, login, account), which is the check; nothing more is sent while the block stands
+                check.cancel()  # the reserved check request was not sent: give it back, leave no probe
                 return
             answer = classify.document(self.page('/search', kind='unblock_check'))
             if answer.kind != 'ok':

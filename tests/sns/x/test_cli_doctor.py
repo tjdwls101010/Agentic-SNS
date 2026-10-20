@@ -399,3 +399,18 @@ def test_unblock_without_a_tab_takes_the_opening_as_its_one_check(browser):
     assert code == 0, out
     assert state_of()['person'] is None and json.loads(out)['results'][0]['unblocked'] is True
     assert queries(browser) == []
+
+
+def test_an_unblock_by_opening_leaves_no_viewer_probe_behind(browser):
+    """Found by the second review: the check slot reserved for the Viewer query stayed reserved when the opening was
+    the check, so Viewer looked like a probe in flight and the next check was refused without a request."""
+    stand_block('account_locked')
+    opening(browser).respond('x.modules', MODULES)
+    code, out, _ = run(browser, 'doctor', '--unblock')
+    assert code == 0, out
+    assert limits().get('Viewer', {}).get('status') != 'probe'
+    stand_block('account_locked')
+    browser.respond('x.state', state()).respond('x.query', query_result(VIEWER, headers=RATE))
+    browser.respond('x.modules', MODULES)
+    code, out, _ = run(browser, 'doctor', '--unblock')
+    assert code == 0, out

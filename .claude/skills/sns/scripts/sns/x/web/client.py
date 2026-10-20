@@ -546,6 +546,7 @@ class Client:
             if self.opened_now:
                 # no tab could be reused (the idle cleanup closes it): opening one loaded x.com as a person does and its
                 # first look was judged (lock, challenge, login, account), which is the check; nothing more is sent
+                check.cancel()  # the reserved check request was not sent: give it back, leave no probe
                 return
             root, _ = self.query('Viewer', {})
         except SnsError as error:
