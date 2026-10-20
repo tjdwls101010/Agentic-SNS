@@ -81,3 +81,14 @@ def test_the_record_is_written_at_once(tmp_path):
     path = tmp_path / 'record.tsv'
     ledger.add(path, 'P3 recon x', 4, 'notifications')
     assert path.read_text().splitlines()[1].split('\t')[1:] == ['P3 recon x', '4', 'notifications']
+
+
+def test_a_fake_run_gets_a_launcher_that_runs_the_fake_aside(tmp_path):
+    """The fake is a Python file without the executable bit; the run's SNS_ASIDE_BIN must be something the skill can
+    execute (found by the first fake rehearsal: PermissionError before the run started)."""
+    launcher = contrast.fake_launcher(tmp_path)
+    (tmp_path / 'scenario.json').write_text(json.dumps({'tabs': [], 'responses': []}))
+    done = subprocess.run([str(launcher), 'account', 'status'], capture_output=True, text=True, timeout=30,
+                          env={'SNS_FAKE_SCENARIO': str(tmp_path / 'scenario.json'), 'SNS_FAKE_LOG': str(tmp_path / 'log'),
+                               'PATH': '/usr/bin:/bin'})
+    assert done.returncode == 0 and 'u0' in done.stdout, done.stderr

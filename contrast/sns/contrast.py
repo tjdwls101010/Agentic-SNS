@@ -38,6 +38,14 @@ REPO = HERE.parents[1]
 SKILL = REPO / '.claude/skills/sns'
 DATA = SKILL / 'data'
 FAKE = REPO / 'tests/sns/fakes/fake_aside.py'
+
+
+def fake_launcher(directory):
+    """A one-line launcher for the fake Aside (a Python file without the executable bit), run by this Python."""
+    launcher = Path(directory) / 'aside'
+    launcher.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{FAKE}" "$@"\n')
+    launcher.chmod(0o755)
+    return launcher
 PLATFORMS = ('x', 'threads', 'reddit', 'facebook', 'naver_blog')
 TAB_PLATFORMS = ('x', 'threads', 'facebook')
 SHARED = ('protection', 'session')
@@ -166,7 +174,7 @@ def run(args):
         if args.data_template:
             shutil.copytree(args.data_template, data_dir, dirs_exist_ok=True)
         shutil.copy(args.fake, scratch / 'scenario.json')  # the fake marks responses used: never the original
-        env.update(SNS_ASIDE_BIN=str(FAKE), SNS_FAKE_SCENARIO=str(scratch / 'scenario.json'),
+        env.update(SNS_ASIDE_BIN=str(fake_launcher(scratch)), SNS_FAKE_SCENARIO=str(scratch / 'scenario.json'),
                    SNS_FAKE_LOG=str(scratch / 'fake-log.jsonl'), SNS_IDLE_SECONDS='off')
         account = resolve_account(env)
     else:
