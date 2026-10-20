@@ -83,6 +83,17 @@ def _keep_block(why, message, **details):
                     verification_reason=why, **details)
 
 
+def _first(*errors):
+    """The error a command ends with when several spoke at once: a person block, then a hold, then an account change,
+    then anything else (each already recorded); None when there is none."""
+    def rank(error):
+        if error.kind == 'blocked':
+            return 0 if error.reason != 'rate_limited' else 1
+        return 2 if error.reason == 'account_changed' else 3
+    found = [error for error in errors if error is not None]
+    return min(found, key=rank) if found else None
+
+
 class Client:
     """One invocation's connection to Threads, built from the pipeline's connection (aside, guard, session)."""
 
@@ -251,11 +262,22 @@ class Client:
         if isinstance(user, str) and user and user != '0':
             self.connection.seen(user)
 
-    def _consume(self, report, slot, defer_login=False):
+    def _changed(self, report):
+        """The account-changed error a page report shows, returned rather than raised so the answer is judged first."""
+        try:
+            self._seen(report)
+        except SnsError as error:
+            if error.reason != 'account_changed':
+                raise
+            return error
+        return None
+
+    def _consume(self, report, slot, defer_login=False, defer=False):
         """Judge everything one browser call reported, strongest first: a checkpoint, then a rate limit, then a login
         page. A block or hold is recorded and the tab emptied before the signals are acknowledged, so the tab drops
         them only once protection holds them; then the block, hold or login is raised (defer_login: a login is returned
-        instead, for a caller that has an answer of its own to judge first, which may be a hold to record)."""
+        instead, for a caller that has an answer of its own to judge first, which may be a hold to record; defer: any
+        of them is returned instead, with the block or hold already recorded)."""
         if not isinstance(report, dict):
             return None
         verdicts = []
@@ -271,19 +293,20 @@ class Client:
         strongest = classify.strongest(verdicts)
         moments = [s['at'] for s in signals if type(s.get('at')) in (int, float)]
         if strongest is not None and strongest.block:
-            self._stop(slot, strongest, moments, report.get('user_id'))
+            error = self._stop(slot, strongest, moments, report.get('user_id'), raise_=not defer)
+            return error
         if moments:
             self.session.acknowledge(max(moments))
         if strongest is not None:
             slot.classify(OUTCOMES[strongest.kind])
-            if defer_login:
+            if defer_login or defer:
                 return strongest.error
             raise strongest.error
         return None
 
-    def _stop(self, slot, verdict, moments=(), account_id=None):
+    def _stop(self, slot, verdict, moments=(), account_id=None, raise_=True):
         """Record a block (a checkpoint) or a hold (a 429), empty the tab so the app stops polling (even if it could not
-        be saved), acknowledge the signals it came from, then raise."""
+        be saved), acknowledge the signals it came from, then raise (raise_ False: return the error)."""
         account_id = account_id if isinstance(account_id, str) and account_id and account_id != '0' else self.account_id
         slot.classify(OUTCOMES[verdict.block])
         try:
@@ -292,6 +315,8 @@ class Client:
             self._empty()
         if moments:
             self.session.acknowledge(max(moments))
+        if not raise_:
+            return error
         raise error
 
     def _empty(self):
@@ -364,24 +389,27 @@ class Client:
                     if self.verbose:
                         diagnostic('request', label=label, count=self.guard.count, status=result.get('status'),
                                    source=(result.get('used') or {}).get('source'))
-                    self._seen(result)
-                    login = self._consume(result, slot, defer_login=True)
-                    if login is not None and not isinstance(result.get('status'), int):
-                        raise login  # nothing came back to judge: the signal is the answer
-                    if result.get('stopped') and not attempt:
+                    # Everything is judged and recorded before anything is raised: an account change, the tab's own
+                    # signals and the answer itself may all speak at once, and a block or hold in any of them must be
+                    # in protection whichever error the command ends with.
+                    changed = self._changed(result)
+                    pending = self._consume(result, slot, defer=True)
+                    if not isinstance(result.get('status'), int) and (pending or changed):
+                        raise _first(pending, changed)  # nothing came back to judge: the signals are the answer
+                    if result.get('stopped') and not attempt and not (pending or changed):
                         continue  # what stopped it was benign and is acknowledged now: send it once more
                     if result.get('refused'):
                         raise SnsError('argument', 'The browser refused a request this skill must not make: '
                                        + str(result['refused']) + '.', 'Report this as a skill bug.')
                     if result.get('network_error'):
                         slot.classify('network_error')
-                        raise SnsError('failed', 'The request to Threads did not complete.', classify.RETRY_FIX,
-                                       reason='network')
+                        raise _first(pending, changed) or SnsError('failed', 'The request to Threads did not complete.',
+                                                                   classify.RETRY_FIX, reason='network')
                     verdict = verdict_of(result)
-                    if verdict.block:
-                        self._stop(slot, verdict)  # a hold or block outranks a logout seen beside it
-                    if login is not None:
-                        raise login  # the own answer was judged first: what it said is recorded
+                    own = self._stop(slot, verdict, raise_=False) if verdict.block else None
+                    first = _first(own, pending, changed)
+                    if first is not None:
+                        raise first
                     if verdict.kind != 'ok':
                         slot.classify(OUTCOMES.get(verdict.kind) or verdict.reason or verdict.kind)
                     return result, verdict

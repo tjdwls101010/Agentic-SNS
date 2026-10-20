@@ -5,6 +5,8 @@ record only once protection holds it. The kit's record itself (it survives a rel
 doctor's view of the same scenes is test_cli_doctor.py."""
 import json
 
+import pytest
+
 from sns.session import Session
 from tests.sns.threads.scenes import (ASIDE, feed_body, known_tab, opening, post, query_result, queries, run,
                                       state, state_of)
@@ -126,3 +128,27 @@ def test_each_aside_account_has_its_own_session_and_tab(browser):
     opening(browser, target='NEW9').respond('threads.query', one_post())
     code, out, _ = run(browser, 'feed', env={'SNS_ASIDE_ACCOUNT': 'u1'})
     assert code == 0 and Session('threads', 'u1').tab == 'NEW9' and Session('threads', ASIDE).tab == 'T1'
+
+
+
+@pytest.mark.parametrize('signal', ['checkpoint', '429'])
+def test_a_block_in_an_answer_shown_to_another_account_is_still_recorded(browser, signal):
+    """Found by review: the account check ran before the answer was judged, so a checkpoint or a 429 in an answer that
+    came back under another account was never recorded (exit 4 with nothing in protection)."""
+    known_tab(browser)
+    response = (query_result(CHECKPOINT, user_id='1000000077') if signal == 'checkpoint'
+                else query_result('', status=429, statuses=[429], user_id='1000000077'))
+    browser.respond('threads.query', response)
+    code, out, _ = run(browser, 'feed', '--json')
+    recorded = state_of()
+    assert recorded['person' if signal == 'checkpoint' else 'hold'] is not None, (code, out, recorded)
+
+
+def test_a_checkpoint_in_the_answer_is_recorded_even_with_a_rate_limit_seen_beside_it(browser):
+    """Found by review: the tab's own 429 was recorded and raised first, and the answer's checkpoint never was."""
+    known_tab(browser)
+    browser.respond('threads.query', query_result(CHECKPOINT, resources=2, statuses=[200, 429]))
+    code, out, _ = run(browser, 'feed', '--json')
+    recorded = state_of()
+    assert recorded['person'] is not None and recorded['hold'] is not None
+    assert code == 5 and json.loads(out)['error'] == 'blocked', out
