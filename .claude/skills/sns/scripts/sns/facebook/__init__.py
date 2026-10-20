@@ -197,7 +197,8 @@ RECORDS = ('records: one block per record, labelled [p1] post, [c1] comment or r
            'replies <handle>); about prints one line per field as section: text.')
 TAB = ('the dedicated tab: the skill reads from its own www.facebook.com tab. Opening it costs about 30 requests the '
        'page makes itself while it loads, and moving it to the screen that loads a current query id (when Facebook no '
-       'longer accepts a stored one) about 10 more; both are shown as "tab opened" and counted apart from the reads, '
+       'longer accepts a stored one; notifications never does, since that screen marks them seen) about 10 more; '
+       'both are shown as "tab opened" and counted apart from the reads, '
        'and requests the page finishes later use up those reservations first. Requests the open tab made between '
        'commands are shown as unwatched=, not charged, but a rate limit or a checkpoint seen there stops the command '
        'before it sends anything. The tab is emptied (about:blank) about 5 minutes after the last command.')
