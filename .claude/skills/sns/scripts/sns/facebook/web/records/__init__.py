@@ -37,9 +37,10 @@ def comments_page(chunks, *, post_id, captured_at):
     return Batch(records, info, has_items(chunks, 'comments'), comments.issues(chunks), handles)
 
 
-def replies_page(chunks, *, post_id, parent_id, captured_at):
-    """One batch of replies to `parent_id`, with each reply's own reply handle in .handles."""
-    records, handles, info = comments.replies(chunks, post_id=post_id, parent_id=parent_id, captured_at=captured_at)
+def replies_page(chunks, *, post_id, parent_id, captured_at, depth=1):
+    """One batch of replies to `parent_id` (at `depth`), with each reply's own reply handle in .handles."""
+    records, handles, info = comments.replies(chunks, post_id=post_id, parent_id=parent_id, captured_at=captured_at,
+                                              depth=depth)
     return Batch(records, info, has_items(chunks, 'replies_connection'), comments.issues(chunks), handles)
 
 

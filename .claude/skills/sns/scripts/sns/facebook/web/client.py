@@ -448,7 +448,7 @@ class Client:
         """One batch of replies to one comment (depth 1) or to one reply (depth 2)."""
         variables = {'id': feedback_id, 'expansionToken': token, 'repliesAfterCursor': cursor}
         chunks = self.query('replies' if depth <= 1 else 'replies_deep', variables, route=url)
-        return replies_page(chunks, post_id=post_id, parent_id=parent_id, captured_at=_now())
+        return replies_page(chunks, post_id=post_id, parent_id=parent_id, captured_at=_now(), depth=depth)
 
     def search(self, text, vertical, cursor, *, recent=False, since=None, until=None, group_id=None, group_url=None):
         """One page of search results; recent, since and until are Facebook's post filters; group_id searches inside

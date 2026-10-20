@@ -154,10 +154,13 @@ def parents(chunks, *, post_id, captured_at):
     return records, handles, top_page_info(chunks, 'comments')
 
 
-def replies(chunks, *, post_id, parent_id, captured_at):
+def replies(chunks, *, post_id, parent_id, captured_at, depth=1):
     """(replies to `parent_id` from one expansion response, their own reply handles, the batch's page_info).
 
-    A reply without a parent link belongs to the comment that was expanded; a reply to another comment is left out.
+    At depth 1 a reply without a parent link belongs to the comment that was expanded and a reply to another comment is
+    left out (a deeper reply is read through its own handle). At depth 2, Facebook's last level, the expansion is the
+    reply's whole sub-thread: each node names the comment it answers (the top comment, a sibling, seldom the expanded
+    reply; observed 2026-10-21) and every one of them is kept with that parent.
     """
     records, handles = [], {}
     for node in nodes(chunks):
@@ -165,7 +168,7 @@ def replies(chunks, *, post_id, parent_id, captured_at):
         if record['id'] == parent_id or record['depth'] <= 0:
             continue
         record['parent_id'] = record['parent_id'] or parent_id
-        if record['parent_id'] == parent_id:
+        if record['parent_id'] == parent_id or (depth >= 2 and record['depth'] >= 2):
             records.append(record)
             handles[record['id']] = handle(node)
     return records, handles, top_page_info(chunks, 'replies_connection')

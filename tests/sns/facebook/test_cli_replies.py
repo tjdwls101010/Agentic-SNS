@@ -122,3 +122,21 @@ def test_reply_coverage_counts_what_an_earlier_out_run_saved(browser, tmp_path):
     result = json.loads(out)
     assert code == 0 and result['count'] == 4
     assert not any('were sent' in line for line in result.get('coverage', []))
+
+
+def test_the_replies_under_a_reply_are_its_whole_sub_thread_whoever_each_one_answers(browser):
+    """Observed 2026-10-21: the second-level list of a reply holds its sub-thread, every node at depth 2, and each node
+    names as its direct parent the comment it answers: the top comment or another reply in the sub-thread, seldom the
+    expanded reply itself. All of them are the replies under it."""
+    script_post(browser, [comment('C1', replies=12)], has_next=False)
+    code, out, _ = run(browser, 'post', URL)
+    serve(browser, 'C1', [comment('R1', replies=3, depth=1, parent='C1')], has_next=False)
+    code, out, _ = run(browser, 'replies', handle_of(out, 'c1'))
+    deeper = handle_of(out, 'r1')
+    serve(browser, 'R1', [comment('D1', replies=0, depth=2, parent='C1'), comment('D2', replies=0, depth=2, parent='D1'),
+                          comment('D3', replies=0, depth=2, parent='R1')],
+          name='Depth2CommentsListPaginationQuery', has_next=False)
+    code, out, _ = run(browser, 'replies', deeper, '--json')
+    result = json.loads(out)
+    assert code == 0, result
+    assert [(r['id'], r['parent_id']) for r in result['results']] == [('D1', 'C1'), ('D2', 'D1'), ('D3', 'R1')]
