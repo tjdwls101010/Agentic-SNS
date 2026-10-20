@@ -148,3 +148,40 @@ def test_the_opener_names_its_own_tab_when_another_command_opens_one_meanwhile(t
     done = subprocess.run(['node', str(script)], capture_output=True, text=True, timeout=30)
     assert done.returncode == 0, done.stderr
     assert json.loads(done.stdout.strip().splitlines()[-1]) == {'kind': 'opened', 'tabs': ['MINE']}
+
+
+def _run_media(tmp_path, fetch_body):
+    import subprocess
+    from sns.aside import MEDIA
+    script = tmp_path / 'media.mjs'
+    script.write_text("const requests = [];\nglobalThis.fetch = async (url, options) => {\n  requests.push({url, redirect: "
+                      "options.redirect});\n" + fetch_body + "\n};\nconst download = " + MEDIA + ";\n"
+                      "const answer = await download({url: 'https://pbs.twimg.com/media/P1.jpg', max: 1024});\n"
+                      "console.log(JSON.stringify({requests, answer}));\n")
+    done = subprocess.run(['node', str(script)], text=True, capture_output=True, timeout=30)
+    assert done.returncode == 0, done.stderr
+    return json.loads(done.stdout)
+
+
+@pytest.mark.skipif(not __import__('shutil').which('node'), reason='node is not installed')
+def test_a_picture_that_redirects_is_not_followed_to_another_host(tmp_path):
+    """Found by review (2026-10-21): with redirect 'follow' the browser fetched a second address after the host check,
+    off the platform's image hosts and outside the one request a picture is. A redirect is that picture's failure."""
+    out = _run_media(tmp_path, "  return {type: 'opaqueredirect', status: 0, headers: new Headers(), "
+                               "arrayBuffer: async () => new ArrayBuffer(0)};")
+    assert [r['redirect'] for r in out['requests']] == ['manual'] and out['answer']['redirect'] is True
+
+
+@pytest.mark.skipif(not __import__('shutil').which('node'), reason='node is not installed')
+def test_a_picture_the_browser_cannot_reach_is_that_pictures_failure(tmp_path):
+    out = _run_media(tmp_path, "  throw new TypeError('fetch failed');")
+    assert out['answer']['status'] == 0 and 'fetch failed' in out['answer']['network']
+
+
+@pytest.mark.parametrize('answer, reason', [({'status': 0, 'redirect': True}, 'redirect'),
+                                            ({'status': 0, 'network': 'TypeError: fetch failed'}, 'network')])
+def test_a_redirect_or_an_unreachable_host_is_a_partial_failure_of_that_picture(browser, monkeypatch, answer, reason):
+    browser.respond('aside.media', answer, url='https://pbs.twimg.com/media/P1.jpg').install(monkeypatch)
+    with pytest.raises(SnsError) as caught:
+        Aside('x', Deadline(30)).download('https://pbs.twimg.com/media/P1.jpg', 1024)
+    assert caught.value.kind == 'partial' and caught.value.reason == reason

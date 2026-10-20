@@ -135,10 +135,16 @@ class Aside:
     def download(self, url, max_bytes, seconds=60):
         """(bytes, content type) of one picture the browser fetches without cookies; a picture over max_bytes, an
         answer that is not 200 or one that is not a picture is a partial failure naming why (reason too_large,
-        status_<n>, not_image)."""
+        status_<n>, not_image, redirect, network)."""
         answer = self.run(MEDIA, {'url': url, 'max': max_bytes}, seconds)
         if not isinstance(answer, dict) or type(answer.get('status')) is not int:
             raise SnsError('aside', 'Aside returned a picture answer this skill cannot read.', _CHECK, reason='invalid')
+        if answer.get('redirect'):
+            raise SnsError('partial', 'the image host redirected it elsewhere, so it was not fetched',
+                           'Read the post again; a signed link may have expired.', reason='redirect')
+        if answer.get('network'):
+            raise SnsError('partial', f'the image host could not be reached ({answer["network"]})',
+                           'Run the command again later.', reason='network')
         if answer.get('too_large'):
             raise SnsError('partial', f'it is larger than {max_bytes // (1024 * 1024)} MB', 'Open it in the browser.',
                            reason='too_large')

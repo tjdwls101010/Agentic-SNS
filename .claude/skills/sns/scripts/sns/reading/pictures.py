@@ -24,7 +24,11 @@ def pictures(connection, *, key, media, numbers, hosts, fetch=None):
     """A reading of the saved pictures: numbers None takes every one; hosts are the platform's image hosts. fetch(url)
     -> (bytes, content type) replaces the cookie-less download for a platform that fetches pictures its own way (and
     guards those requests itself); a partial error from it is that picture's alone. A stop between pictures (the time
-    limit, a hold) keeps what was saved and offers the command for the numbers left."""
+    limit, a hold) keeps what was saved and offers the command for the numbers left; a stop that ends continuing (a
+    login wall, a person block) keeps what was saved and offers nothing."""
+    if not media and numbers:
+        raise SnsError('argument', 'This post has no pictures, so it has no picture ' + ', '.join(map(str, numbers)) + '.',
+                       'Read the post to see what it holds.')
     if not media:
         raise SnsError('empty', 'This post has no pictures to save.', 'Read the post to see what it holds.')
     by_number = {item.get('n'): item for item in media}
@@ -74,11 +78,14 @@ def pictures(connection, *, key, media, numbers, hosts, fetch=None):
                 'partial': bool(results)}
     if stop is not None:
         error, left = stop
-        if not results or stops_continuing(error):
+        if not results:
             raise error
+        reading_['failure'] = error
+        if stops_continuing(error):
+            return reading_
         # no handle: the post is read again anyway, so the command that saves the rest is enough
         invocation = connection.invocation
-        reading_.update(failure=error, continuable=True, next=command_line(invocation.cli_path, words(
+        reading_.update(continuable=True, next=command_line(invocation.cli_path, words(
             connection.platform.key, 'images', invocation.options.get('target'), [str(n) for n in left],
             invocation.options, limit=None)))
     return reading_

@@ -562,3 +562,38 @@ def test_a_platform_fetch_replaces_the_download_and_guards_itself(browser, monke
                               fetch=lambda url: (b'\x89PNG....', 'image/png'))
     assert result['results'][0]['content_type'] == 'image/png'
     assert connection.guard.count == 0 and not [c for c in browser.calls() if c['op'] == 'aside.media']
+
+
+def test_a_number_asked_of_a_post_without_pictures_is_an_argument_error(browser, monkeypatch, data_dir):
+    """Found by review: the empty check came first, so 'images <post> 1' on a text post was exit 7, not 2."""
+    from sns.errors import SnsError
+    me(browser)
+    browser.install(monkeypatch)
+    invocation = reading.Invocation({}, Deadline(30), {}, cli.__file__)
+    connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    with pytest.raises(SnsError) as caught:
+        reading.pictures(connection, key='i1', media=[], numbers=[1], hosts=('cdn.alpha.test',))
+    assert caught.value.kind == 'argument'
+
+
+def test_a_stop_that_ends_continuing_still_keeps_the_saved_pictures(browser, monkeypatch, data_dir):
+    """Found by review: a login wall or a person block after a saved picture dropped its record although the file was
+    on disk; it is kept, with the failure, and no command for the rest is offered (a login or block stops that)."""
+    from sns.errors import SnsError
+    me(browser)
+    browser.install(monkeypatch)
+    invocation = reading.Invocation({'target': 'https://alpha.test/p/i1', 'numbers': [1, 2]}, Deadline(30), {},
+                                    cli.__file__)
+    connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    asked = []
+
+    def fetch(url):
+        asked.append(url)
+        if len(asked) == 2:
+            raise SnsError('login', 'The account is logged out.', 'Log in.', reason='login_required')
+        return b'\xff\xd8\xff\xe0jpeg', 'image/jpeg'
+
+    result = reading.pictures(connection, key='i1', media=MEDIA, numbers=[1, 2], hosts=('cdn.alpha.test',),
+                              fetch=fetch)
+    assert [r['n'] for r in result['results']] == [1] and result['failure'].kind == 'login'
+    assert not result.get('next') and not result.get('continuable')
