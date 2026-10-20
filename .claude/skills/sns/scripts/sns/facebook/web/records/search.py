@@ -37,7 +37,11 @@ def filters(*, recent=False, since=None, until=None, today=None):
 
 
 FIRST_DAY = '2004-02-04'  # Facebook's first day: an open start of a date filter
-WRAPPERS = frozenset({'node', 'result', 'entity', 'profile', 'group', 'page', 'user', 'rendering_strategy', 'view_model'})
+WRAPPERS = frozenset({'node', 'result', 'entity', 'profile', 'group', 'page', 'user', 'rendering_strategy', 'view_model',
+                      'result_rendering_strategies'})
+# A top search lists entities in titled modules (groups, pages, people); the module's see-more type names their kind,
+# which the entities do not (a page arrives as a User). Observed 2026-10-21.
+MODULE_KINDS = {'browse_type_group': 'group', 'browse_type_profile_with_biz_tools': 'page', 'browse_type_user': 'person'}
 CONNECTIONS = ('results', 'search_results')
 _KIND_OF_VERTICAL = {'people': 'person', 'pages': 'page', 'groups': 'group'}
 
@@ -47,19 +51,27 @@ def _entity_shaped(obj):
             and isinstance(obj.get('name'), str) and isinstance(obj.get('url'), str))
 
 
-def _result_entities(node):
+def _module_kind(node):
+    model = node.get('view_model')
+    more = model.get('see_more_model') if isinstance(model, dict) else None
+    return MODULE_KINDS.get(more.get('type')) if isinstance(more, dict) else None
+
+
+def _result_entities(node, kind=None):
+    """(entity node, the kind its module names or None) for each result entity under `node`."""
     if not isinstance(node, dict):
         return
     if _entity_shaped(node):
-        yield node
+        yield node, kind
         return
     if node.get('__typename') in ('Story', 'Comment') or 'feedback' in node:
         return
+    kind = _module_kind(node) or kind
     # 성진: 아는 결과 래퍼만 따라간다. 캡처에서 다른 래퍼가 보이면 WRAPPERS에 더할 것
     for key, child in node.items():
         if key in WRAPPERS:
             for item in child if isinstance(child, list) else [child]:
-                yield from _result_entities(item)
+                yield from _result_entities(item, kind)
 
 
 def _result_tail(path):
@@ -109,9 +121,9 @@ def edges(chunks):
         yield from positions[index]
 
 
-def _entity(node, vertical, captured_at):
+def _entity(node, vertical, captured_at, module_kind=None):
     typename = node.get('__typename')
-    kind = {'Group': 'group', 'Page': 'page'}.get(typename, _KIND_OF_VERTICAL.get(vertical, 'person'))
+    kind = {'Group': 'group', 'Page': 'page'}.get(typename, module_kind or _KIND_OF_VERTICAL.get(vertical, 'person'))
     return {'kind': kind, 'id': str(node['id']), 'name': node['name'], 'url': node['url'],
             'created_at': None, 'verified': node['is_verified'] if isinstance(node.get('is_verified'), bool) else None,
             'captured_at': iso(captured_at)}
@@ -125,10 +137,10 @@ def results(chunks, *, vertical, captured_at):
         if vertical in ('top', 'posts'):
             candidates += posts.top_level([{'data': edge}], source='search', captured_at=captured_at)[0]
         if vertical != 'posts':
-            for node in _result_entities(edge):
+            for node, module_kind in _result_entities(edge):
                 if vertical == 'groups' and node.get('__typename') != 'Group':
                     continue
-                candidates.append(_entity(node, vertical, captured_at))
+                candidates.append(_entity(node, vertical, captured_at, module_kind))
         for record in candidates:
             key = (record.get('kind') or 'post', record['id'])
             if key not in seen:

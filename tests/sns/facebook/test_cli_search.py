@@ -124,3 +124,33 @@ def test_a_result_with_no_date_is_left_out_of_a_dated_search_and_counted(browser
     result = json.loads(out)
     assert [r['id'] for r in result['results']] == ['SF1']
     assert '1 undated record left out: no date places it in the window' in result['coverage']
+
+
+def module(kind, entities):
+    """A top search module (observed 2026-10-21): a titled list of entities whose kind Facebook names in the module's
+    see-more type, not in the entities (a page arrives as a User)."""
+    return {'node': {'role': 'MODULE', '__typename': 'SearchRenderable'}, 'rendering_strategy': {
+        '__typename': 'SearchListCellListModuleRenderingStrategy',
+        'view_model': {'__typename': 'SearchSimpleModuleViewModel', 'title': '그룹',
+                       'see_more_model': {'type': kind, 'label': 'See all'}},
+        'result_rendering_strategies': [
+            {'__typename': 'XFBSearchListCellProfileRenderingStrategy',
+             'view_model': {'__typename': 'SearchProfileViewModel', 'profile': profile}} for profile in entities]}}
+
+
+def entity(typename, identity):
+    return {'__typename': typename, 'id': identity, 'name': f'Name {identity}',
+            'url': f'https://www.facebook.com/e.{identity}'}
+
+
+def test_a_top_page_of_entity_modules_lists_each_entity_with_the_kind_its_module_names(browser):
+    known_tab(browser)
+    browser.respond('facebook.query', query_result(results_body([
+        module('browse_type_group', [entity('Group', '601')]),
+        module('browse_type_profile_with_biz_tools', [entity('User', '602'), entity('User', '603')]),
+        module('browse_type_user', [entity('User', '604')])], has_next=False)))
+    code, out, _ = run(browser, 'search', 'sample', '--json')
+    result = json.loads(out)
+    assert code == 0, result
+    assert [(r['kind'], r['id']) for r in result['results']] == [('group', '601'), ('page', '602'), ('page', '603'),
+                                                                  ('person', '604')]
