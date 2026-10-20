@@ -20,6 +20,15 @@ class Platform:
       verify(check) → make the unblock check's one request inside protection's verify_unblock and raise unless the
       answer is clean (the caller then clears); release_tab() → the idle cleanup: take in what the tab saw, then empty
       it (connection.empty_tab), True once nothing polls; doctor() → the platform's own doctor fields.
+      What every client must do, because the pipeline cannot see it: send each request inside guard.request() and
+      classify every answer (slot.classify — an unclassified one counts as lost); record what the answer said before
+      leaving the slot (slot.fact for limit headers, raise slot.hold(...) for a 429, raise slot.block(...) for a
+      person block); take in what an open tab saw on its own (background requests via slot.charge or
+      guard.log_unwatched, their block signals and limit headers) before its next request; pass every account a
+      response shows to connection.seen(); in verify, make exactly one request (the first non-setup request in the
+      check's scope uses the check's reservation) and raise unless the answer is clean and for the account the block
+      names; keep learned query ids in the session with bounded recovery (a fixed number of relearns or reloads per
+      command), so a failing page never loops.
     render(envelope, chars, command) → the record lines of a text page.
     schemas: {object name: schema document} for its records.
     locate(url) → (command, argument) when the URL is this platform's and that command opens it, else None (pure).

@@ -285,3 +285,122 @@ def test_alpha_schema_lists_shared_and_record_objects(capsys, browser, monkeypat
     code, out = run(capsys, browser, monkeypatch, 'alpha', 'schema', 'result')
     exits = {row['exit']: row['kinds'] for row in json.loads(out)['results'][0]['exit_codes']}
     assert exits[10] == ['scope_limit'] and exits[5] == ['blocked']
+
+
+# --- repairs from the core review (Codex, 2026-10-21) ---------------------------------------------------------------
+
+def test_a_stalled_read_keeps_where_to_continue(capsys, browser, monkeypatch):
+    me(browser)
+    feed(browser, None, [item(1)], 'C2', stop='pagination_stalled')
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed')
+    assert code == 8 and more_line(out)
+    me(browser)
+    feed(browser, 'C2', [item(2)], None)
+    code, out = run(capsys, browser, monkeypatch, *command_of(more_line(out)))
+    assert code == 0 and '[p1] i2' in out
+
+
+def test_out_refuses_a_file_of_another_window(capsys, browser, monkeypatch, tmp_path):
+    path = tmp_path / 'feed.ndjson'
+    me(browser)
+    feed(browser, None, [item(1, '2026-10-12')], None)
+    run(capsys, browser, monkeypatch, 'alpha', 'feed', '--since', '2026-10-10', '--out', path)
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--since', '2026-10-01', '--out', path)
+    assert code == 2
+
+
+def test_more_keeps_the_window_it_was_read_with(capsys, browser, monkeypatch):
+    me(browser)
+    feed(browser, None, [item(1, '2026-10-12')], 'C2')
+    _, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--since', '2026-10-10', '--limit', '1')
+    words = command_of(more_line(out))
+    assert words[words.index('--since') + 1] == '2026-10-10'
+
+
+def test_an_account_seen_changing_mid_command_is_exit_4(capsys, browser, monkeypatch):
+    me(browser, 'ann')
+    feed(browser, None, [item(1)], 'C2', viewer='ann')
+    feed(browser, 'C2', [item(2)], None, viewer='bob')
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--limit', '5', '--json')
+    envelope = json.loads(out)
+    assert code == 4 and envelope['error'] == 'login' and 'bob' in envelope['message']
+
+
+def test_a_handle_always_carries_the_account_even_from_an_unbound_read(capsys, browser, monkeypatch):
+    browser.respond('alpha.get', {'status': 200, 'body': {'items': [item(1)], 'next': 'R2'}}, path='/ranked',
+                    cursor=None)
+    me(browser, 'ann')
+    _, out = run(capsys, browser, monkeypatch, 'alpha', 'ranked')
+    me(browser, 'bob')
+    code, out = run(capsys, browser, monkeypatch, *command_of(more_line(out)))
+    assert code == 4
+
+
+def test_a_tab_platforms_unblock_makes_its_request_and_checks_the_account(capsys, browser, monkeypatch):
+    browser.respond('beta.state', {'viewer': 'alice'})
+    browser.respond('beta.query', {'status': 200, 'challenge': True, 'items': []}, cursor=None)
+    code, _ = run(capsys, browser, monkeypatch, 'beta', 'feed')
+    assert code == 5
+    browser.respond('beta.state', {'viewer': 'bob'})
+    browser.respond('beta.query', {'status': 200, 'items': [], 'viewer': 'bob'}, check=True)
+    code, out = run(capsys, browser, monkeypatch, 'beta', 'doctor', '--unblock')
+    assert code == 5 and json.loads(out)['verification_reason'] == 'account_mismatch'
+    browser.respond('beta.state', {'viewer': 'alice'})
+    browser.respond('beta.query', {'status': 200, 'items': [], 'viewer': 'alice'}, check=True)
+    before = browser.ops().count('beta.query')
+    code, out = run(capsys, browser, monkeypatch, 'beta', 'doctor', '--unblock')
+    assert code == 0 and browser.ops().count('beta.query') == before + 1
+
+
+def test_a_failed_section_that_blocks_stops_the_composite_and_its_continuation(capsys, browser, monkeypatch):
+    browser.respond('alpha.get', {'status': 200, 'body': {'id': 'i1', 'text': 't', 'url': 'u'}}, path='/p/i1')
+    browser.respond('alpha.get', {'status': 200, 'body': {'network_blocked': True}}, path='/p/i1/comments')
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'card', 'https://alpha.test/p/i1', '--json')
+    envelope = json.loads(out)
+    assert code == 5 and envelope['error'] == 'blocked' and 'next' not in envelope
+    assert [s['name'] for s in envelope['sections']] == ['post', 'comments']
+
+
+def test_saving_a_handle_waits_only_until_the_deadline(data_dir):
+    import subprocess as sp
+    import sys as system
+    from sns import handles
+    from sns.errors import SnsError
+    directory = data_dir / 'handles'
+    directory.mkdir(parents=True)
+    holder = sp.Popen([system.executable, '-c', 'import fcntl,time\n'
+                       f'f=open({str(directory / "counter")!r},"a"); fcntl.flock(f, fcntl.LOCK_EX)\n'
+                       'print("held", flush=True); time.sleep(30)'], stdout=sp.PIPE, text=True)
+    try:
+        assert holder.stdout.readline().strip() == 'held'
+        with pytest.raises(SnsError) as caught:
+            handles.save({'a': 1}, {}, deadline=Deadline(0.3))
+        assert caught.value.reason == 'time_limit'
+    finally:
+        holder.kill()
+        holder.wait()
+
+
+def test_account_resolution_cut_by_the_deadline_is_the_time_limit(browser, monkeypatch):
+    from sns.aside import Aside
+    from sns.errors import SnsError
+    browser.flag(account_status_sleep=3).install(monkeypatch)
+    with pytest.raises(SnsError) as caught:
+        Aside('alpha', Deadline(0.5))
+    assert caught.value.reason == 'time_limit'
+
+
+def test_idle_retries_a_cleanup_that_failed(capsys, browser, monkeypatch):
+    from tests.sns.support import stub_platform
+    browser.respond('beta.state', {'viewer': 'carl'})
+    beta_page(browser, None, [item(1)], None)
+    run(capsys, browser, monkeypatch, 'beta', 'feed')
+    attempts = []
+    real = stub_platform.BetaClient.release_tab
+
+    def flaky(self):
+        attempts.append(1)
+        return False if len(attempts) == 1 else real(self)
+    monkeypatch.setattr(stub_platform.BetaClient, 'release_tab', flaky)
+    invocation = reading.Invocation({}, Deadline(30), {}, cli.__file__)
+    assert reading.idle(BETA.PLATFORM, invocation, 'u0', 'any', 0) == 'emptied' and len(attempts) == 2

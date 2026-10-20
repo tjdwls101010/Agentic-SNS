@@ -60,6 +60,18 @@ class Connection:
             self._viewer = self.client.viewer()
         return self._viewer
 
+    def seen(self, viewer):
+        """A response showed the account the browser is logged in to: a different one than this invocation started
+        with is a changed login (records of two accounts never mix in one result)."""
+        if not viewer:
+            return
+        if self._viewer is None:
+            self._viewer = viewer
+        elif viewer != self._viewer:
+            raise SnsError('login', f'The browser\'s {self.platform.title} account changed from {self._viewer} to '
+                                    f'{viewer} during this command.', 'Run the command again to read as the current '
+                                                                      'account.', reason='account_changed')
+
     def confirm(self, saved):
         """A continued reading must be read as the account it was read with: a different one is a changed login."""
         if saved is None:
@@ -116,6 +128,8 @@ def run(platform, invocation, *, command, target, identity, reader, window=None,
     """
     options = invocation.options
     out_path = options.get('out')
+    public = identity
+    identity = with_window(identity, options)  # a different window is a different query for handles and files
     connection, reading = None, None
     try:
         if out_path:
@@ -143,8 +157,23 @@ def run(platform, invocation, *, command, target, identity, reader, window=None,
     if window is not None and 'window' not in reading:
         reading['window'] = window
     report = connection.report() if connection is not None else None
-    return finish(reading, platform=platform.key, command=command, report=report, identity=_public(identity),
+    return finish(reading, platform=platform.key, command=command, report=report, identity=_public(public),
                   out=str(outfile.resolve(out_path)) if out_path else None)
+
+
+def with_window(identity, options):
+    """The identity with the date window the options name."""
+    window = {key: options[key] for key in ('since', 'until') if options.get(key)}
+    return {**(identity or {}), **window} if window else identity
+
+
+def window_words(words, options):
+    """The words with --since/--until the options name and the words do not already carry."""
+    words = list(words)
+    for key in ('since', 'until'):
+        if options.get(key) and f'--{key}' not in words:
+            words += [f'--{key}', options[key]]
+    return words
 
 
 def _public(identity):
@@ -191,6 +220,7 @@ def _read(connection, command, target, identity, reader, out_path, bound):
     reading = None
     try:
         reading = reader(connection, state, out)
+        _promote_sections(reading)
         if out is not None:
             _conclude(out, reading)
             reading['count'] = out.count
@@ -199,12 +229,41 @@ def _read(connection, command, target, identity, reader, out_path, bound):
             stopped = out.complete or stops_continuing(failure)
             if not stopped:
                 reading['next'] = command_line(connection.invocation.cli_path, command_words(
-                    platform.key, command, target, reading.get('words', []), options, out=out_path))
+                    platform.key, command, target, window_words(reading.get('words', []), options), options,
+                    out=out_path))
     finally:
         if out is not None:
             out.close()
     _continue(connection, reading)
     return reading
+
+
+# Which failed section a composite command reports first: what says something about the account or the target, then
+# what passes by itself, then the rest.
+_SECTION_ORDER = ('person', 'login', 'unavailable', 'hold', 'scope_limit', 'aside', 'failed', 'partial', 'empty',
+                  'argument')
+
+
+def _section_rank(error):
+    kind = error['kind']
+    if kind == 'blocked':
+        kind = 'hold' if error.get('reason') == 'rate_limited' else 'person'
+    return _SECTION_ORDER.index(kind) if kind in _SECTION_ORDER else len(_SECTION_ORDER)
+
+
+def _promote_sections(reading):
+    """A composite command's failed sections become its failure (the worst one), so continuations, --out endings
+    and the result kind treat them like any other; what the other sections read stays beside it."""
+    sections = reading.get('sections')
+    if not sections or reading.get('failure') is not None:
+        return
+    failed = [s['error'] for s in sections if not s.get('ok')]
+    if not failed:
+        return
+    worst = min(failed, key=_section_rank)
+    reading['failure'] = SnsError(worst['kind'], worst['message'], worst['fix'], reason=worst.get('reason'),
+                                  **(worst.get('details') or {}))
+    reading['partial'] = any(s.get('ok') and s.get('data') for s in sections)
 
 
 def _conclude(out, reading):
@@ -235,19 +294,20 @@ def _continue(connection, reading):
     if not continuation or options.get('out') or stops_continuing(failure):
         return
     platform = connection.platform
-    bound = context(platform, continuation['command'], continuation['target'], continuation['identity'],
-                    connection.account)
+    bound = context(platform, continuation['command'], continuation['target'],
+                    with_window(continuation['identity'], options), connection.account)
     try:
-        viewer = connection.observed or connection.known_viewer
-        number = handles.save(bound, continuation['state'], viewer=viewer)
+        # a handle always carries the account it was read with (a fetch platform asks now if it has not yet)
+        viewer = connection.observed or connection.known_viewer or connection.viewer()
+        number = handles.save(bound, continuation['state'], viewer=viewer, deadline=connection.deadline)
     except SnsError as error:
         current = reading.get('failure')
         reading['failure'] = error if current is None else current
         return
     reading['continuable'] = True
     reading['next'] = command_line(connection.invocation.cli_path, command_words(
-        platform.key, continuation['command'], continuation['target'], continuation['words'], options, after=number,
-        limit=continuation.get('limit', ...)))
+        platform.key, continuation['command'], continuation['target'], window_words(continuation['words'], options),
+        options, after=number, limit=continuation.get('limit', ...)))
 
 
 def read_list(connection, state, out, *, order, fetch, command, target, identity, words=(), extra=None, show=None,
@@ -330,7 +390,8 @@ def section(sections, name, produce, *, primary=False):
         if primary:
             raise
         sections.append({'name': name, 'ok': False, 'error': {'kind': error.kind, 'message': error.message,
-                                                              'fix': error.fix, 'reason': error.reason}})
+                                                              'fix': error.fix, 'reason': error.reason,
+                                                              'details': error.details}})
         return None
     sections.append({'name': name, 'ok': True, 'primary': primary, 'data': data})
     return data

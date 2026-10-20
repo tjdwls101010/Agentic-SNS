@@ -90,7 +90,9 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
                                                         'have changed its answer.', 'Update the skill or report it.',
                                               reason='stale_query'))
             following = _cursor_of(page)
-            if page.stop:
+            if page.stop == 'pagination_stalled' and following not in (None, END):
+                cursor, stop = following, page.stop  # a robustness stop: later reading may go on from here
+            elif page.stop:
                 cursor, stop = END, page.stop
             elif following is None:
                 damaged = True
@@ -126,6 +128,8 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
         results.extend(page_records)
         if damaged:
             reason = None
+        elif stop and cursor != END:
+            reason = stop
         elif cursor == END and not waiting:
             reason = stop or ('window_reached' if closed else 'exhausted')
         elif full or (max_pages is not None and served >= max_pages):

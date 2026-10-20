@@ -143,17 +143,10 @@ def failure_envelope(error, platform=None, command=None):
 
 
 def _sections_kind(sections):
-    """A composite command (several sections, one primary): a failed primary section is the result's failure; a
-    failed secondary one keeps its own kind when it says something about the account or the target (aside, login,
-    blocked, unavailable) and is partial otherwise."""
-    failed = [s for s in sections if not s.get('ok')]
-    if not failed:
-        return ('records' if any(s.get('data') for s in sections) or any(s.get('primary') for s in sections)
-                else 'empty'), None
-    order = ('aside', 'login', 'blocked', 'scope_limit', 'unavailable', 'failed', 'partial', 'argument', 'empty')
-    worst = min(failed, key=lambda s: order.index(s['error']['kind']) if s['error']['kind'] in order else 99)
-    kind = worst['error']['kind']
-    return (kind if kind in ('aside', 'login', 'blocked', 'unavailable') else 'partial'), worst['error']
+    """A composite command whose sections all succeeded (the pipeline has already made a failed section the
+    reading's failure): records when any section read something or the primary one succeeded, else empty."""
+    return ('records' if any(s.get('data') for s in sections) or any(s.get('primary') for s in sections)
+            else 'empty'), None
 
 
 def finish(reading, *, platform, command, report=None, identity=None, out=None):

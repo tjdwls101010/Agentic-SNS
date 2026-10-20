@@ -194,6 +194,8 @@ def main(argv):
         with locked():
             scenario = load()
             log({'op': 'account_status', 'account': account})
+        if scenario.get('account_status_sleep'):
+            time.sleep(scenario['account_status_sleep'])
         sys.stdout.write(scenario.get('account_status', '* u0  viewer@example.com  signed in  profiles: Profile 0\n'))
         return scenario.get('account_status_exit', 0)
     if argv == ['repl']:

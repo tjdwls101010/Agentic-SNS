@@ -77,10 +77,12 @@ class Aside:
                     raise SnsError('argument', f'{name} is not an Aside account id (such as u0).',
                                    'Set it to an id `aside account list` shows, or unset it.')
                 return named
+        limit, clamped = self._limit(None, STATUS_SECONDS)
         try:
-            done = subprocess.run([self.binary, 'account', 'status'], capture_output=True, text=True,
-                                  timeout=max(1.0, self.deadline.clamp(STATUS_SECONDS)))
+            done = subprocess.run([self.binary, 'account', 'status'], capture_output=True, text=True, timeout=limit)
         except subprocess.TimeoutExpired:
+            if clamped:
+                raise time_limit() from None
             raise SnsError('aside', 'Aside did not say which account is active in time.', _CHECK) from None
         except (OSError, UnicodeError):
             raise SnsError('aside', 'Aside could not run.', _CHECK) from None
@@ -100,7 +102,7 @@ class Aside:
         left = self.deadline.left()
         if left <= 0:
             raise time_limit()
-        return max(0.5, min(wanted, left)), left < wanted
+        return max(0.05, min(wanted, left)), left < wanted
 
     # --- calls ---------------------------------------------------------------------------------------------------
 
@@ -167,10 +169,10 @@ class Aside:
             except OSError:
                 pass
             try:
-                process.wait(timeout=10)
+                process.wait(timeout=max(0.5, min(10, self.deadline.left())))
             except subprocess.TimeoutExpired:
                 process.kill()
-                process.wait(timeout=5)
+                process.wait(timeout=5)  # killed: it ends at once
 
     @staticmethod
     def _opened(process, until, clamped):

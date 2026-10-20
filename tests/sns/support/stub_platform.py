@@ -41,6 +41,7 @@ def render(envelope, chars, command):
 
 class AlphaClient:
     def __init__(self, connection):
+        self.connection = connection
         self.aside, self.guard = connection.aside, connection.guard
 
     def start(self):
@@ -66,7 +67,9 @@ class AlphaClient:
                 slot.classify('failed')
                 raise SnsError('failed', f'Alpha answered {status}.', 'Retry later.')
             slot.classify('ok')
-            return body
+        if path_viewer := (body.get('viewer') if args.get('path') != '/me' else None):
+            self.connection.seen(path_viewer)  # an answer that names the account must be the same account
+        return body
 
     def viewer(self):
         viewer = self.get({'path': '/me'}).get('viewer')
@@ -136,7 +139,7 @@ def alpha_ranked(invocation):
     window = {'since': options.get('since'), 'until': options.get('until'), 'order': 'ranked'} \
         if options.get('since') or options.get('until') else None
     return reading.run(ALPHA_PLATFORM, invocation, command='ranked', target=None, identity={}, reader=reader,
-                       endless=True, window=window)
+                       endless=True, window=window, bound=False)
 
 
 def alpha_post(invocation):
@@ -151,6 +154,21 @@ def alpha_post(invocation):
                        bound=False)
 
 
+def alpha_card(invocation):
+    """A composite command: the post (primary) and its comments (secondary) as sections."""
+    target = invocation.options['target']
+
+    def reader(connection, state, out):
+        sections = []
+        path = urlsplit(target).path
+        reading.section(sections, 'post', lambda: connection.client.get({'path': path}), primary=True)
+        reading.section(sections, 'comments', lambda: connection.client.get({'path': path + '/comments'}))
+        return {'sections': sections, 'stop_reason': 'exhausted',
+                'continuation': {'command': 'card', 'target': target, 'identity': {}, 'words': [], 'state': {}}}
+    return reading.run(ALPHA_PLATFORM, invocation, command='card', target=target, identity={}, reader=reader,
+                       bound=False)
+
+
 LIST = ['limit', 'chars', 'after', 'out', 'json']
 ALPHA = SimpleNamespace(
     PLATFORM=ALPHA_PLATFORM, CHOICES={},
@@ -161,6 +179,9 @@ ALPHA = SimpleNamespace(
                  'exits': (0, 2, 3, 4, 5, 6, 7, 8)},
         'ranked': {'help': 'Read the ranked alpha feed.', 'run': alpha_ranked, 'arguments': ['since', 'until', *LIST],
                    'epilog': ['It never ends by itself: --out needs --limit.'], 'exits': (0, 2, 3, 4, 5, 6, 7, 8)},
+        'card': {'help': 'Read one alpha post and its comments.', 'run': alpha_card,
+                 'arguments': [(('target',), {'metavar': 'URL', 'help': 'https://alpha.test/p/<id>'}), 'json'],
+                 'exits': (0, 2, 3, 4, 5, 6, 8, 9)},
         'post': {'help': 'Read one alpha post.', 'run': alpha_post,
                  'arguments': [(('target',), {'metavar': 'URL', 'help': 'https://alpha.test/p/<id>'}), 'chars', 'json'],
                  'exits': (0, 2, 3, 4, 5, 6, 9)},
@@ -211,11 +232,24 @@ class BetaClient:
             if answer.get('status') == 429:
                 slot.classify('rate_limited')
                 raise slot.hold(scope='general')
+            if answer.get('challenge'):
+                slot.classify('challenge')
+                raise slot.block('challenge', viewer=self.viewer_id)
             slot.classify('ok')
         return Page(answer.get('items') or [], next=answer.get('next'), end=not answer.get('next'))
 
     def verify(self, check):
-        self.start()
+        """The check: the page's account, then one request; clean only for the account the block was recorded for."""
+        viewer = self.start()
+        with self.guard.request(scope='general') as slot:
+            answer = self.aside.evaluate(self.tab, QUERY, {'check': True})
+            slot.classify('ok' if answer.get('status') == 200 and not answer.get('challenge') else 'challenge')
+        named = (check.person or {}).get('viewer')
+        if answer.get('status') != 200 or answer.get('challenge') or answer.get('viewer') != viewer or (
+                named and named != viewer):
+            raise SnsError('blocked', 'The block stays: the check was not clean for the account it was recorded '
+                                      'for.', 'A person should check the browser.', reason='verification',
+                           verification_reason='account_mismatch')
 
     def release(self):
         if self.token:

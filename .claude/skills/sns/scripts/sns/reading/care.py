@@ -71,7 +71,10 @@ def idle(platform, invocation, account, token, after):
                     continue  # a command still running uses the tab
                 if not session.tab or (token not in ('any', session.released) and not session.dirty):
                     return 'newer command'
-                return 'emptied' if connection.client.release_tab() else 'not emptied'
+                if connection.client.release_tab():
+                    return 'emptied'
+                session.set_dirty(True)  # it still polls: look again after the next wait
         except SnsError as error:
-            return error.reason or error.kind
-    return 'busy'
+            if error.reason not in ('time_limit', 'tab_missing', 'timeout', 'lost', 'failed'):
+                return error.reason or error.kind
+    return 'busy or not emptied'

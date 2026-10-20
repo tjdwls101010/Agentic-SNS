@@ -11,6 +11,7 @@ import fcntl
 import json
 import os
 import time
+from contextlib import contextmanager
 
 from sns.errors import SnsError
 from sns.paths import data_dir, shared
@@ -29,14 +30,29 @@ def _directory():
                        'Make the skill\'s data/ directory writable, then rerun the command.') from None
 
 
-def save(context, state, viewer=None):
+@contextmanager
+def _counter(directory, deadline):
+    """The counter file, locked; waited for only until `deadline` (None: as long as it takes)."""
+    fd = os.open(directory / 'counter', os.O_RDWR | os.O_CREAT, 0o600)
+    with os.fdopen(fd, 'r+b') as counter:
+        while True:
+            try:
+                fcntl.flock(counter, fcntl.LOCK_EX | (fcntl.LOCK_NB if deadline is not None else 0))
+                break
+            except BlockingIOError:
+                if deadline.left() <= 0.05:
+                    raise SnsError('failed', 'The command reached its time limit while saving where to continue.',
+                                   'Run the command again.', reason='time_limit') from None
+                deadline.clock.sleep(0.05)
+        yield counter
+
+
+def save(context, state, viewer=None, deadline=None):
     """Store `state` for the query `context` (and the platform account it was read with); returns the new number."""
     directory = _directory()
     _prune(directory)
     try:
-        fd = os.open(directory / 'counter', os.O_RDWR | os.O_CREAT, 0o600)
-        with os.fdopen(fd, 'r+b') as counter:
-            fcntl.flock(counter, fcntl.LOCK_EX)
+        with _counter(directory, deadline) as counter:
             text = counter.read().strip()
             number = max(int(text or b'0') + 1, FIRST)
             counter.seek(0)
