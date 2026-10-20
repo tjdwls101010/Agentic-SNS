@@ -590,6 +590,8 @@ class Client:
         root, warnings = self.query('TweetResultsByRestIds', {'tweetIds': list(ids)})
         records, unreadable = [], 0
         for node in root if isinstance(root, list) else []:
+            if node is None:
+                continue  # X answers null for an id it does not know (observed): not returned, not unreadable
             record = post_record(node) if isinstance(node, dict) else None
             if record is None:
                 unreadable += 1

@@ -193,6 +193,17 @@ def test_replies_that_cannot_be_read_are_reported_on_the_post_page(browser):
     assert code == 0 and 'could not read' in out, out
 
 
+def test_ids_x_does_not_know_are_unavailable_not_a_shape_change(browser):
+    """Observed 2026-10-21: X answers one entry per id and null for an id it does not know; that is an id not returned,
+    not an answer this skill could not read (it was exit 6)."""
+    batch = {'data': {'tweetResult': [None, None]}}
+    known_tab(browser).respond('x.query', query_result(batch, headers=RATE))
+    code, out, _ = post(browser, '201', '202', '--json')
+    envelope = json.loads(out)
+    assert code == 7 and envelope['error'] == 'empty', out
+    assert envelope['unresolved'] == ['201', '202'] and 'could not read' not in out
+
+
 def test_a_batch_names_what_it_could_not_read_apart_from_what_x_did_not_return(browser):
     batch = {'data': {'tweetResult': [{'result': tweet('201')}, {'result': {'__typename': 'Tweet'}}]}}
     known_tab(browser).respond('x.query', query_result(batch, headers=RATE))
