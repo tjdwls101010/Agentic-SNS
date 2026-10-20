@@ -148,7 +148,7 @@ COMMANDS = {
         'arguments': [(('collection',), {'choices': ME_COLLECTIONS, 'help': 'bookmarks, likes (nobody else\'s likes are public on X), notifications or mentions'}),
                       *LIST],
         'epilog': ['In X\'s order (most recently saved or liked first, as X serves it); each post keeps its own date, not when you saved or liked it. There is no date window: X does not serve these in date order.',
-                   'notifications are X\'s notification tab as records (what happened, when, which accounts and posts); "suggested by X" marks X recommending something, which is not anyone\'s act. mentions are the posts that mention you. The skill only sends the read and never opens X\'s notifications screen, which marks them as read; whether X counts the read alone as seen is not known. A notification\'s message names other people.',
+                   'notifications are X\'s notification tab as records (what happened, when, which accounts and posts); "suggested by X" marks X recommending something, which is not anyone\'s act. mentions are the posts that mention you. The skill only sends the read and never opens X\'s notifications screen, which marks them as read; the unread count X shows stayed the same for two minutes after a read when this was measured, though X\'s own refresh of that count was not observed. A notification\'s message names other people.',
                    'Without --limit or --out it reads one page; more: continues.',
                    'requests: 1 per page of about 20 posts.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
