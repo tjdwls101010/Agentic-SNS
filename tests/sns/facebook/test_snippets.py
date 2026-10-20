@@ -129,7 +129,7 @@ def test_a_query_with_no_allowed_list_is_refused(tmp_path):
 def test_the_queries_the_client_may_send_are_exactly_the_ones_queries_json_names():
     """The allowlist is the client's, built from queries.json: no second list in the page function to drift from it."""
     named = sorted(spec['name'] for spec in web.QUERIES.values())
-    assert web.READ_NAMES == named and len(named) == 12
+    assert web.READ_NAMES == named and len(named) == 14
     assert named == sorted(spec['name'] for spec in REQUESTS['query_names']['queries'].values())
     assert 'CometNewsFeedPaginationQuery' not in web.snippet('query')  # no name is spelled in the page function
 

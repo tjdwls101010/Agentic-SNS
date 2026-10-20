@@ -12,7 +12,7 @@ from tests.sns.support.policies import POLICIES
 
 PACKAGE = Path(facebook.__file__).resolve().parent
 WEB = PACKAGE / 'web'
-FEATURES = {'listing', 'thread', 'search', 'about', 'images', 'render'}
+FEATURES = {'listing', 'thread', 'search', 'about', 'images', 'notifications', 'render'}
 
 
 def sources(root=PACKAGE):
@@ -29,7 +29,7 @@ def test_the_interface_is_platform_commands_and_choices():
     assert facebook.PLATFORM.key == 'facebook' and facebook.PLATFORM.word == 'facebook'
     assert facebook.PLATFORM.transport == 'tab' and facebook.PLATFORM.site == 'facebook.com'
     assert list(facebook.COMMANDS) == ['feed', 'profile', 'group', 'post', 'comments', 'replies', 'search', 'about',
-                                       'images']
+                                       'images', 'notifications']
     assert set(facebook.CHOICES) and all(key.split('.')[0] in facebook.COMMANDS for key in facebook.CHOICES)
 
 
@@ -38,7 +38,7 @@ def test_the_platform_adapter_says_how_this_tab_behaves():
     assert platform.idle_action == 'blank'  # window.close() does not take on Facebook's tab (measured)
     assert platform.unblock_scope is None   # an account-wide platform: the check is counted in no named scope
     assert platform.window.tz is None and platform.window.unit_key is None  # the local zone; every post is its own unit
-    assert callable(platform.locate) and platform.schemas.keys() == {'post', 'entity', 'about', 'group', 'comment', 'doctor', 'image'}
+    assert callable(platform.locate) and platform.schemas.keys() == {'post', 'entity', 'about', 'group', 'comment', 'notification', 'doctor', 'image'}
 
 
 def test_the_adapters_policy_is_the_facebook_row_of_the_plans_table():
@@ -78,7 +78,7 @@ def test_the_system_never_imports_a_feature_module_or_the_pipeline():
     for path in sources(WEB):
         for module in re.findall(r'^(?:from|import) (sns[\w.]*)', path.read_text(encoding='utf-8'), re.M):
             assert module.split('.')[1:2] != ['reading'] and not re.match(
-                r'sns\.facebook\.(listing|thread|search|about|render)\b', module), (path.name, module)
+                r'sns\.facebook\.(listing|thread|search|about|notifications|render)\b', module), (path.name, module)
 
 
 def test_no_platform_unit_reaches_the_stores_directly():
@@ -91,6 +91,6 @@ def test_no_platform_unit_reaches_the_stores_directly():
 
 def test_queries_json_is_well_formed_and_has_no_secret_looking_value():
     data = json.loads((WEB / 'queries.json').read_text(encoding='utf-8'))
-    assert set(data['queries']) == set(web.QUERIES) and len(data['queries']) == 12
+    assert set(data['queries']) == set(web.QUERIES) and len(data['queries']) == 14
     for spec in data['queries'].values():
         assert spec['doc_id'] is None or re.fullmatch(r'\d+', spec['doc_id'])

@@ -24,8 +24,8 @@ from urllib.parse import quote, urlsplit
 
 from sns.errors import SnsError, diagnostic
 from sns.facebook.web import classify, targets
-from sns.facebook.web.records import (comments_page, group_about, group_card, permalink_post, posts_page,
-                                      replies_page, search_page)
+from sns.facebook.web.records import (comments_page, group_about, group_card, notifications_page, permalink_post,
+                                      posts_page, replies_page, search_page)
 from sns.facebook.web.records.search import VERTICALS
 from sns.facebook.web.records.search import filters as search_filters
 from sns.facebook.web.snippets import SNIPPETS
@@ -467,6 +467,24 @@ class Client:
             HOME + 'search/' + vertical + '/?q=' + quote(text)
         chunks = self.query('search', {'args': args, **variables}, route=route)
         return search_page(chunks, vertical=vertical, captured_at=_now())
+
+    def notifications(self, cursor):
+        """One page of the viewer's notification list. route=None: a refused id is never relearned, because the screen
+        that loads these queries is the notifications screen, and rendering it makes the app send the seen-state
+        mutations; the command ends instead."""
+        try:
+            if cursor is None:
+                chunks = self.query('notifications', {}, route=None)
+            else:
+                chunks = self.query('notifications_page', {'cursor': cursor}, route=None)
+        except SnsError as error:
+            if error.reason != 'stale':
+                raise
+            raise SnsError('failed', 'Facebook no longer accepts the stored notifications query ('
+                           + error.message.rstrip('.') + '). The skill does not open the notifications screen to '
+                             'relearn it, because opening that screen makes Facebook mark notifications seen.',
+                           classify.STALE_FIX, reason='stale') from None
+        return notifications_page(chunks, captured_at=_now())
 
     def about(self, profile_id, collection, *, url):
         """The decoded About response of the overview (collection None) or of one About tab."""

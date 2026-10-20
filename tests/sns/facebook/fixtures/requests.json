@@ -90,7 +90,7 @@
   },
   "query_names": {
     "item": "16",
-    "fact": "All 12 read queries in the 2026-10-16 snapshot; friendly name, response root and cursor variable must match READ_QUERIES. No real ids are copied here. Depth2 has no snapshot id and must be learned.",
+    "fact": "All 14 read queries (12 from the 2026-10-16 snapshot, the two notifications queries added 2026-10-21); friendly name, response root and cursor variable must match READ_QUERIES. No real ids are copied here. Depth2 has no snapshot id and must be learned.",
     "queries": {
       "about": {"name": "ProfileCometAboutAppSectionQuery", "expected_key": "about_app_sections", "kind": "connection", "cursor_var": null},
       "timeline": {"name": "ProfileCometTimelineFeedRefetchQuery", "expected_key": "timeline_list_feed_units", "kind": "connection", "cursor_var": "cursor"},
@@ -103,7 +103,9 @@
       "replies": {"name": "Depth1CommentsListPaginationQuery", "expected_key": "replies_connection", "kind": "connection", "cursor_var": "repliesAfterCursor"},
       "replies_deep": {"name": "Depth2CommentsListPaginationQuery", "expected_key": "replies_connection", "kind": "connection", "cursor_var": "repliesAfterCursor"},
       "group_root": {"name": "CometGroupRootQuery", "expected_key": "group", "kind": "object", "cursor_var": null},
-      "group_about": {"name": "CometGroupAboutRootQuery", "expected_key": "group", "kind": "object", "cursor_var": null}
+      "group_about": {"name": "CometGroupAboutRootQuery", "expected_key": "group", "kind": "object", "cursor_var": null},
+      "notifications": {"name": "CometNotificationsRootQuery", "expected_key": "notifications_page", "kind": "connection", "cursor_var": null},
+      "notifications_page": {"name": "CometNotificationsListPaginationQuery", "expected_key": "notifications_page", "kind": "connection", "cursor_var": "cursor"}
     },
     "requires_live_learning": ["replies_deep"]
   },

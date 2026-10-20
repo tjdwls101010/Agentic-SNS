@@ -59,6 +59,10 @@ def parse(case):
     if case['parser'] == 'search':
         page = web.search_page(case['body_lines'], vertical=args['search_type'], captured_at=NOW)
         return {'records': page.records, 'page_info': page.page_info, 'issues': page.issues}
+    if case['parser'] == 'notifications':
+        page = web.notifications_page(case['body_lines'], captured_at=NOW)
+        return {'records': page.records, 'page_info': page.page_info, 'issues': page.issues,
+                'has_items': page.has_items}
     if case['parser'] == 'about_collections':
         return {'collections': web.about_collections(case['body_lines'])}
     if case['parser'] == 'about':
@@ -95,6 +99,11 @@ def test_about_records(case):
     assert subset(case['expected'], parse(case)) == []
 
 
+@pytest.mark.parametrize('case', cases('records_notifications.json'))
+def test_notification_records(case):
+    assert subset(case['expected'], parse(case)) == []
+
+
 def test_comment_records_carry_every_documented_field():
     record = parse(fixture('records_comments.json')['cases'][0])['records'][0]
     assert set(record) == {key for key in web.SCHEMAS['comment']['fields'] if '[' not in key}
@@ -119,7 +128,8 @@ def test_page_reports_whether_the_connection_had_items():
 def every_record():
     """One record of every parser case of the fixtures, shared posts and group-about details left out of the count."""
     found = []
-    for name in ('records_posts.json', 'records_comments.json', 'records_search_about.json'):
+    for name in ('records_posts.json', 'records_comments.json', 'records_search_about.json',
+                 'records_notifications.json'):
         for case in fixture(name)['cases']:
             if case['parser'] == 'group_about':
                 continue  # the extra fields a card takes from the About screen, not a record
@@ -151,7 +161,7 @@ def test_every_record_carries_kind_id_url_and_created_at():
 
 def test_every_kind_of_record_is_one_the_schemas_know():
     kinds = {r['kind'] for r in every_record()}
-    assert kinds == {'post', 'comment', 'about', 'person', 'page', 'group'}
+    assert kinds == {'post', 'comment', 'about', 'person', 'page', 'group', 'notification'}
 
 
 def test_every_key_a_record_exports_is_described_by_its_schema():

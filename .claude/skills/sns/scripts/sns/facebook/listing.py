@@ -19,6 +19,7 @@ ISSUES = {
     'unsupported_path_patch': 'part of a response could not be placed on any record; some records may lack fields',
     'graphql_errors': 'Facebook reported errors for part of a response; some records may lack fields',
     'cyclic_shared_story': 'a chain of shares looped back on itself and was cut there',
+    'unknown_seen_state': 'a notification had a seen state this skill does not know; its seen is null',
 }
 
 

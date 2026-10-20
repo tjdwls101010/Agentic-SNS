@@ -5,7 +5,7 @@ import argparse
 
 from sns import reading
 from sns.errors import SnsError
-from sns.facebook import about, images, listing, search, thread, web
+from sns.facebook import about, images, listing, notifications, search, thread, web
 from sns.facebook.render import render
 from sns.limits import LimitPolicy
 from sns.window import WindowPolicy
@@ -177,11 +177,22 @@ COMMANDS = {
                    'requests: 2 for the post (its page, then the post), then 1 per picture.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
+    'notifications': {
+        'help': 'Read your notification list, a page at a time, without marking anything seen.',
+        'run': _run(notifications.notifications),
+        'arguments': [*LIST],
+        'epilog': ['Reads the notifications of the account the tab is logged in to, in Facebook\'s order. Each record is [n1] time · type word · unseen, seen or read, then the text Facebook wrote, then url: what it points at (a post permalink opens with post <url>). Bucket headers and the see-previous button are layout and are left out.',
+                   'Reading the list sends no seen or read change (those are separate requests this skill never sends); whether Facebook counts a read as seen by itself was not observable when this was measured (no unseen notification at the time). If Facebook stops accepting the stored notifications query the command ends with exit 6 and does not open the notifications screen to relearn it, because opening that screen is what makes the app mark notifications seen.',
+                   'Without --limit or --out it reads one page (about 15 notifications); more: continues.',
+                   'requests: 1 per page of about 15 notifications.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8),
+    },
 }
 
 # What every reading command's output holds beyond the shared description (the core's text names no Facebook record
 # kinds and knows nothing of the dedicated tab).
-RECORDS = ('records: one block per record, labelled [p1] post, [c1] comment or reply, [e1] person, page or group, each '
+RECORDS = ('records: one block per record, labelled [p1] post, [c1] comment or reply, [e1] person, page or group, '
+           '[n1] notification, each '
            'ending with the arguments of the next command (url: post <url> opens that one post; author: profile <url>; '
            'replies <handle>); about prints one line per field as section: text.')
 TAB = ('the dedicated tab: the skill reads from its own www.facebook.com tab. Opening it costs about 30 requests the '
@@ -190,6 +201,6 @@ TAB = ('the dedicated tab: the skill reads from its own www.facebook.com tab. Op
        'and requests the page finishes later use up those reservations first. Requests the open tab made between '
        'commands are shown as unwatched=, not charged, but a rate limit or a checkpoint seen there stops the command '
        'before it sends anything. The tab is emptied (about:blank) about 5 minutes after the last command.')
-for _name in ('feed', 'profile', 'group', 'post', 'comments', 'replies', 'search', 'about'):
+for _name in ('feed', 'profile', 'group', 'post', 'comments', 'replies', 'search', 'about', 'notifications'):
     COMMANDS[_name]['epilog'] = [*COMMANDS[_name]['epilog'], RECORDS, TAB]
 COMMANDS['images']['epilog'] = [*COMMANDS['images']['epilog'], TAB]

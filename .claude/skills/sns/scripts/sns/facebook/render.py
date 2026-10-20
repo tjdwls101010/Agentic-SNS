@@ -88,6 +88,13 @@ def entity(record, index):
             f'· {verified} · url: {_handle(record.get("url"))}')
 
 
+def notification(record, index, chars):
+    kind, seen = _line(record.get('notification_type') or 'unknown'), record.get('seen') or 'seen=?'
+    return (f'[n{index}] {_time(record.get("created_at"))} · {kind} · {seen}\n'
+            f'     {_shown(record.get("text"), chars)}\n'
+            f'     url: {_handle(record.get("url"))}')
+
+
 def about(record):
     return (f'{_line(record["section"])}: {_line(record["text"])}'
             + (f' ({_quote(record["url"])})' if record.get('url') else ''))
@@ -113,6 +120,9 @@ def render(envelope, chars, command):
             lines.append(image_line(record, f'i{counts["i"]}'))
         elif kind == 'about':
             lines.append(about(record))
+        elif kind == 'notification':
+            counts['n'] = counts.get('n', 0) + 1
+            lines.append(notification(record, counts['n'], limit))
         elif kind in ('person', 'page', 'group'):
             counts['e'] += 1
             lines.append(entity(record, counts['e']))

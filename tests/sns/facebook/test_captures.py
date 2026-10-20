@@ -97,3 +97,17 @@ def test_real_group_about_details():
     assert all(rule['title'] for rule in details['rules'])
     assert isinstance(details['posts_last_day'], int) and details['created_at'] and details['member_count_text']
     assert issues == []
+
+
+NOTIFICATIONS = CAPTURES / 'd4_notifications_first.json'
+
+
+@pytest.mark.skipif(not NOTIFICATIONS.exists(), reason='no local notifications capture')
+def test_real_notifications_page():
+    """The capture is the list of chunks the client's query returned (not an observed-responses wrapper)."""
+    page = web.notifications_page(json.loads(NOTIFICATIONS.read_text()), captured_at=NOW)
+    assert page.records and page.issues == [] and isinstance(page.page_info, dict)
+    for record in page.records:
+        assert all(key in record for key in HEAD) and record['kind'] == 'notification'
+        assert record['id'] and record['created_at'] and record['seen'] in ('unseen', 'seen', 'read')
+    assert any(r['text'] and r['url'] and r['notification_type'] for r in page.records)

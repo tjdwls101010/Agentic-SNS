@@ -1,4 +1,4 @@
-"""How requests to Facebook are named and sorted (fixtures/requests.json): the twelve read queries of queries.json, the
+"""How requests to Facebook are named and sorted (fixtures/requests.json): the 14 read queries of queries.json, the
 tokens of each sort, the search verticals, and the one query that has no stored id."""
 import json
 
@@ -13,13 +13,22 @@ REQUESTS = fixture('requests.json')
 DEEP = 'Depth2CommentsListPaginationQuery'
 
 
-def test_the_twelve_read_queries_are_the_bundled_snapshot_the_fixture_describes():
+def test_the_fourteen_read_queries_are_the_bundled_snapshot_the_fixture_describes():
     described = REQUESTS['query_names']['queries']
     assert set(web.QUERIES) == set(described)
     for key, spec in described.items():
         mine = web.QUERIES[key]
         assert {'name': mine['name'], 'expected_key': mine['expected_key'], 'kind': mine['kind'],
                 'cursor_var': mine['cursor_var']} == spec, key
+
+
+def test_no_query_the_skill_may_send_is_a_mutation_and_none_marks_notifications_seen():
+    """Reading the notifications list sends no seen or read change: the allow-list is built from queries.json, which
+    names read queries only, so these three requests (the app's own seen-state writes) can never go out."""
+    seen_state = {'CometNotificationsUpdateSeenStateMutation', 'CometFeedsNotificationsUpdateSeenStateMutation',
+                  'CometHomepageBadgeCountClearingMutation'}
+    assert not [name for name in web.READ_NAMES if 'Mutation' in name]
+    assert not seen_state & set(web.READ_NAMES)
 
 
 def test_the_depth_two_replies_query_has_no_stored_id_and_must_be_learned():

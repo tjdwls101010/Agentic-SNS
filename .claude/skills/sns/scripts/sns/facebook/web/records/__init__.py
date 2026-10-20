@@ -5,7 +5,7 @@ also says where it was read from (a post: source) or what it belongs to (a comme
 """
 from dataclasses import dataclass, field
 
-from sns.facebook.web.records import about, comments, groups, posts, search
+from sns.facebook.web.records import about, comments, groups, notifications, posts, search
 from sns.facebook.web.records.parse import find_page_info, has_items
 
 
@@ -50,6 +50,12 @@ def search_page(chunks, *, vertical, captured_at):
     return Batch(records, find_page_info(chunks, 'results'), has_items(chunks, 'results'), issues)
 
 
+def notifications_page(chunks, *, captured_at):
+    """One page of the viewer's notification list (notification records; layout rows are left out)."""
+    records, info, has_items, issues = notifications.page(chunks, captured_at=captured_at)
+    return Batch(records, info, has_items, issues)
+
+
 def about_collections(chunks):
     """The About tabs the overview lists, as [{name, id}]."""
     return about.collections(chunks)
@@ -91,6 +97,8 @@ SCHEMAS = {
     'entity': {'object': 'entity', 'description': 'A person, page or group from search.', 'fields': search.FIELDS},
     'about': {'object': 'about', 'description': 'One visible About field from about.', 'fields': about.FIELDS},
     'group': {'object': 'group', 'description': 'A group\'s card from about <group URL>.', 'fields': groups.FIELDS},
+    'notification': {'object': 'notification', 'description': 'A notification from notifications.',
+                     'fields': notifications.FIELDS},
     'comment': {'object': 'comment', 'description': 'A comment or reply from post, comments or replies.',
                 'fields': comments.FIELDS},
     'doctor': DOCTOR,

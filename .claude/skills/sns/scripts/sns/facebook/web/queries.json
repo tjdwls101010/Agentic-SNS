@@ -323,6 +323,35 @@
    "expected_key": "group",
    "kind": "object",
    "cursor_var": null
+  },
+  "notifications": {
+   "name": "CometNotificationsRootQuery",
+   "doc_id": "28794040086922073",
+   "variables": {
+    "count": 15,
+    "environment": "MAIN_SURFACE",
+    "filter_tokens": [],
+    "scale": 2
+   },
+   "expected_key": "notifications_page",
+   "kind": "connection",
+   "cursor_var": null
+  },
+  "notifications_page": {
+   "name": "CometNotificationsListPaginationQuery",
+   "doc_id": "28368359382859755",
+   "variables": {
+    "count": 15,
+    "cursor": null,
+    "environment": "MAIN_SURFACE",
+    "filter_tokens": [],
+    "notif_cache_ids": [],
+    "notif_query_flags": [],
+    "scale": 2
+   },
+   "expected_key": "notifications_page",
+   "kind": "connection",
+   "cursor_var": "cursor"
   }
  }
 }
