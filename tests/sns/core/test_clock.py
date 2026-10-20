@@ -5,8 +5,10 @@ from sns.clock import Clock
 
 
 def virtual(monkeypatch, data_dir):
+    launcher = data_dir.parent / 'aside'
+    launcher.write_text('#!/bin/sh\nexec python3 tests/sns/fakes/fake_aside.py "$@"\n')  # what the suite's launcher is
     monkeypatch.setenv('SNS_TEST_NO_WAIT', '1')
-    monkeypatch.setenv('SNS_ASIDE_BIN', '/bin/false')
+    monkeypatch.setenv('SNS_ASIDE_BIN', str(launcher))
     monkeypatch.setenv('SNS_FAKE_SCENARIO', str(data_dir / 'scenario.json'))
     return Clock()
 
@@ -37,6 +39,21 @@ def test_an_aside_that_is_not_the_fake_always_waits_for_real(monkeypatch, data_d
     monkeypatch.setenv('SNS_TEST_NO_WAIT', '1')
     monkeypatch.setenv('SNS_ASIDE_BIN', 'aside')
     monkeypatch.delenv('SNS_FAKE_SCENARIO', raising=False)
+    waited = []
+    monkeypatch.setattr('sns.clock.time.sleep', waited.append)
+    clock = Clock()
+    clock.sleep(30)
+    assert waited == [30] and not clock.virtual
+
+
+def test_a_real_aside_with_a_leftover_scenario_still_waits_for_real(monkeypatch, data_dir, tmp_path):
+    """Found by the second review: a stray SNS_FAKE_SCENARIO beside the real aside still switched virtual time on.
+    Only a backend that is the fake itself may move time without waiting."""
+    real = tmp_path / 'real-aside'
+    real.write_text('#!/bin/sh\nexec /usr/local/bin/aside "$@"\n')
+    monkeypatch.setenv('SNS_TEST_NO_WAIT', '1')
+    monkeypatch.setenv('SNS_ASIDE_BIN', str(real))
+    monkeypatch.setenv('SNS_FAKE_SCENARIO', str(tmp_path / 'old-scenario.json'))
     waited = []
     monkeypatch.setattr('sns.clock.time.sleep', waited.append)
     clock = Clock()
