@@ -21,6 +21,16 @@ class Clock:
         self.virtual = bool(os.environ.get('SNS_TEST_NO_WAIT') and os.environ.get('SNS_ASIDE_BIN'))
         self.offset = 0.0
         self.slept = 0.0  # seconds this invocation waited, virtual or real
+        # Virtual time goes on from where earlier commands in this data directory left it, as real time would: a
+        # command started right after one cut short by its deadline must not find that one's requests in its future.
+        self._mark = os.path.join(os.environ['SNS_DATA_DIR'], '.virtual-clock') \
+            if self.virtual and os.environ.get('SNS_DATA_DIR') else None
+        if self._mark:
+            try:
+                with open(self._mark) as file:
+                    self.offset = max(0.0, float(file.read()) - time.time())
+            except (OSError, ValueError):
+                pass
 
     def time(self):
         return time.time() + self.offset
@@ -34,6 +44,13 @@ class Clock:
         self.slept += seconds
         if self.virtual:
             self.offset += seconds
+            if self._mark:
+                try:
+                    os.makedirs(os.path.dirname(self._mark), exist_ok=True)
+                    with open(self._mark, 'w') as file:
+                        file.write(repr(self.time()))
+                except OSError:
+                    pass
         else:
             time.sleep(seconds)
 
