@@ -444,3 +444,74 @@ def test_a_reader_saves_pictures_through_its_connection(browser, monkeypatch, da
     connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
     path = connection.save_image(b'\x89PNG....', 'image/png', key='i1', number=2)
     assert path.parent == data_dir / 'images' and path.name.startswith('alpha-i1-2-') and path.suffix == '.png'
+
+
+# --- pictures (S12) -------------------------------------------------------------------------------------------------
+
+MEDIA = [{'n': 1, 'kind': 'photo', 'image_url': 'https://cdn.alpha.test/a.jpg', 'video_url': None, 'width': 10,
+          'height': 20, 'alt': 'a cat', 'media_id': 'm1'},
+         {'n': 2, 'kind': 'video', 'image_url': 'https://cdn.alpha.test/poster.jpg', 'video_url': 'https://v/x.mp4',
+          'width': 30, 'height': 40, 'alt': None, 'media_id': 'm2'},
+         {'n': 3, 'kind': 'photo', 'image_url': 'https://elsewhere.test/b.jpg', 'video_url': None, 'width': 1,
+          'height': 1, 'alt': None, 'media_id': 'm3'}]
+
+
+def download(browser, url, data=b'\xff\xd8\xff\xe0jpeg', content_type='image/jpeg', status=200):
+    import base64
+    browser.respond('aside.media', {'status': status, 'type': content_type, 'size': len(data),
+                                    'data': base64.b64encode(data).decode()}, url=url)
+
+
+def test_pictures_are_saved_by_number_with_what_they_show(browser, monkeypatch, data_dir):
+    me(browser)
+    download(browser, 'https://cdn.alpha.test/poster.jpg')
+    browser.install(monkeypatch)
+    invocation = reading.Invocation({}, Deadline(30), {}, cli.__file__)
+    connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    result = reading.pictures(connection, key='i1', media=MEDIA, numbers=[2], hosts=('cdn.alpha.test',))
+    record = result['results'][0]
+    assert record['kind'] == 'image' and record['n'] == 2 and record['media_kind'] == 'video'
+    assert record['media_id'] == 'm2' and record['content_type'] == 'image/jpeg' and record['bytes'] == 8
+    assert record['path'].startswith(str(data_dir / 'images')) and result['failure'] is None
+    assert connection.guard.count == 1
+
+
+def test_pictures_name_what_they_could_not_save_and_are_partial(browser, monkeypatch, data_dir):
+    me(browser)
+    download(browser, 'https://cdn.alpha.test/a.jpg', data=b'<html>', content_type='text/html')
+    browser.install(monkeypatch)
+    invocation = reading.Invocation({}, Deadline(30), {}, cli.__file__)
+    connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    result = reading.pictures(connection, key='i1', media=MEDIA, numbers=[1, 3, 9], hosts=('cdn.alpha.test',))
+    assert result['results'] == [] and result['failure'].kind == 'partial'
+    notes = ' '.join(result['coverage'])
+    assert 'picture 1' in notes and 'not a picture' in notes
+    assert 'picture 3' in notes and 'elsewhere.test' in notes
+    assert 'picture 9' in notes and 'has 3' in notes
+    assert connection.guard.count == 1  # only the one allowed host was asked
+
+
+def test_all_takes_every_picture_and_none_is_an_argument_error(browser, monkeypatch, data_dir):
+    me(browser)
+    download(browser, 'https://cdn.alpha.test/a.jpg')
+    download(browser, 'https://cdn.alpha.test/poster.jpg')
+    browser.install(monkeypatch)
+    invocation = reading.Invocation({}, Deadline(30), {}, cli.__file__)
+    connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    result = reading.pictures(connection, key='i1', media=MEDIA[:2], numbers=None, hosts=('cdn.alpha.test',))
+    assert [r['n'] for r in result['results']] == [1, 2]
+    from sns.errors import SnsError
+    with pytest.raises(SnsError) as caught:
+        reading.pictures(connection, key='i1', media=[], numbers=None, hosts=('cdn.alpha.test',))
+    assert caught.value.kind == 'empty'
+
+
+def test_a_picture_over_the_size_cap_is_refused_in_the_browser(browser, monkeypatch, data_dir):
+    me(browser)
+    browser.respond('aside.media', {'status': 200, 'type': 'image/jpeg', 'size': 11 * 1024 * 1024, 'data': None,
+                                    'too_large': True}, url='https://cdn.alpha.test/a.jpg')
+    browser.install(monkeypatch)
+    invocation = reading.Invocation({}, Deadline(30), {}, cli.__file__)
+    connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    result = reading.pictures(connection, key='i1', media=MEDIA, numbers=[1], hosts=('cdn.alpha.test',))
+    assert result['failure'].kind == 'partial' and 'larger than 10 MB' in ' '.join(result['coverage'])

@@ -10,6 +10,7 @@ by a second call before the opener ends, so Aside does not close it, and the pag
 installed). Tab-less reads (Reddit, Naver) `run` a function in the REPL itself, which fetches with the browser's
 cookies. Nothing here uses `aside exec` (the browser agent).
 """
+import base64
 import json
 import os
 import re
@@ -23,6 +24,7 @@ from pathlib import Path
 from sns.errors import SnsError
 
 PROGRAM = (Path(__file__).with_name('program.js')).read_text(encoding='utf-8')
+MEDIA = (Path(__file__).with_name('media.js')).read_text(encoding='utf-8')
 REPL_SECONDS = 120          # aside repl's own limit
 OPEN_SECONDS = 30           # opening a tab, and the opener's first answer
 STATUS_SECONDS = 15         # `aside account status`
@@ -128,6 +130,28 @@ class Aside:
         """Call `function` (an async function expression) with `args` in the REPL itself, without a tab; returns what
         it returned. For fetches that need only the browser's cookies."""
         return self._repl({'op': 'run'}, function, args, seconds)
+
+    def download(self, url, max_bytes, seconds=60):
+        """(bytes, content type) of one picture the browser fetches without cookies; a picture over max_bytes, an
+        answer that is not 200 or one that is not a picture is a partial failure naming why (reason too_large,
+        status_<n>, not_image)."""
+        answer = self.run(MEDIA, {'url': url, 'max': max_bytes}, seconds)
+        if not isinstance(answer, dict) or type(answer.get('status')) is not int:
+            raise SnsError('aside', 'Aside returned a picture answer this skill cannot read.', _CHECK, reason='invalid')
+        if answer.get('too_large'):
+            raise SnsError('partial', f'it is larger than {max_bytes // (1024 * 1024)} MB', 'Open it in the browser.',
+                           reason='too_large')
+        if answer['status'] != 200:
+            raise SnsError('partial', f'the image host answered {answer["status"]}', 'Read the post again; a signed '
+                                                                                      'link may have expired.',
+                           reason=f'status_{answer["status"]}')
+        if not str(answer.get('type') or '').startswith('image/') or not isinstance(answer.get('data'), str):
+            raise SnsError('partial', 'the answer was not a picture', 'Open it in the browser.', reason='not_image')
+        try:
+            return base64.b64decode(answer['data'], validate=True), answer['type']
+        except ValueError:
+            raise SnsError('aside', 'Aside returned picture bytes this skill cannot read.', _CHECK,
+                           reason='invalid') from None
 
     def open(self, url, seconds=None):
         """Open `url` in a new persistent tab (`aside <url>`) and wait for Aside to finish opening it."""

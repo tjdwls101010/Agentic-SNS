@@ -176,4 +176,4 @@ def test_a_posts_pictures_are_numbered_and_a_videos_poster_is_kept_beside_its_fi
         (2, 'video', 'https://pbs.twimg.com/media/B.jpg', 'https://video.twimg.com/B.mp4', None, '9002')]
     known_tab(browser).respond('x.query', by_name(user())).respond('x.query', timeline([clip]))
     code, text, _ = run(browser, 'profile', 'author_a')
-    assert 'media: photo alt="A chart" · video' in text  # the text names the kind and the alt as before
+    assert 'media: [image 1] photo alt="A chart" · [image 2] video' in text  # numbered for x images

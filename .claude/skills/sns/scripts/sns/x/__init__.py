@@ -7,7 +7,7 @@ from sns import reading
 from sns.errors import SnsError
 from sns.limits import LimitPolicy
 from sns.window import WindowPolicy
-from sns.x import about, explore, listing, search, thread, web
+from sns.x import about, explore, images, listing, search, thread, web
 from sns.x.render import render
 
 FEED_CHOICES = ['foryou', 'following']
@@ -35,7 +35,8 @@ PLATFORM = reading.Platform(
     # X's windows are per operation (15 minutes), slowed below 20% left; a 429 without a reset waits one window
     policy=LimitPolicy(scope='operation', slow='fraction', slow_fraction=0.2, hold_seconds=900,
                        person=('challenge', 'account_locked'), pace=(1.0, 2.0)),
-    window=WindowPolicy(unit_key='unit'), connect=web.Client, render=render, schemas=web.SCHEMAS,
+    window=WindowPolicy(unit_key='unit'), connect=web.Client, render=render,
+    schemas={**web.SCHEMAS, 'image': reading.IMAGE_SCHEMA},
     locate=web.locate, unblock_scope='Viewer', idle_action='close')
 
 LIST = ['limit', 'chars', 'after', 'out', 'json']
@@ -253,6 +254,21 @@ COMMANDS = {
                    'requests: 1 for foryou (its first page comes with the Explore answer, and only that page is read); 2 for the other tabs (the Explore answer names their timeline), then 1 per further page.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
     },
+    'images': {
+        'help': 'Save the pictures of one post (a video by its poster) so they can be looked at.',
+        'run': _run(images.images),
+        'arguments': [(('target',), {'metavar': 'URL', 'help': 'x.com post URL or numeric id'}),
+                      (('numbers',), {'nargs': '*', 'type': _positive, 'metavar': 'N',
+                                      'help': 'The pictures to save, by the numbers the post shows ([image N])'}),
+                      (('--all',), {'action': 'store_true', 'help': 'Save every picture of the post'}), 'json'],
+        'epilog': ['The post is read again (its picture links do not last), so N is the Nth picture as X sends the post '
+                   'now; each saved line names its kind, size, alt text and media_id to match what the post showed. A '
+                   'video is saved as its poster image, not the video. Files go to the skill\'s data/images/ and are '
+                   'removed a day later; they are other people\'s pictures. A picture that could not be saved is named '
+                   'in coverage (exit 8).',
+                   'requests: 1 for the post, then 1 per picture.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+    },
 }
 
 
@@ -269,3 +285,4 @@ TAB = ('the dedicated tab: the skill reads from its own x.com tab. Opening it (o
 for _name in ('feed', 'profile', 'about', 'graph', 'me', 'list', 'community', 'post', 'replies', 'reposts', 'quotes',
               'search', 'trends'):
     COMMANDS[_name]['epilog'] = [*COMMANDS[_name]['epilog'], RECORDS, TAB]
+COMMANDS['images']['epilog'] = [*COMMANDS['images']['epilog'], TAB]

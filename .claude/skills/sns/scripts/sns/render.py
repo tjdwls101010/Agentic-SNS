@@ -1,5 +1,7 @@
 """The text page's frame, the same for every platform: a header naming scope and cost, the window, the platform's
 record lines, coverage, an incomplete-read line, more:. The records themselves are drawn by the platform."""
+import json
+
 from sns.clock import local
 from sns.text import line
 
@@ -23,6 +25,20 @@ def _limits(envelope):
         elif state.get('status') == 'unknown':
             parts.append(f'{line(scope)} window not reported')
     return parts
+
+
+def image(record, label):
+    """One saved picture: its number in the post, what it is, and the file to Read."""
+    kind = record.get('media_kind') or 'picture'
+    parts = [f'[{label}] [image {record.get("n")}] ' + ('video poster' if kind == 'video' else kind)]
+    if record.get('width') and record.get('height'):
+        parts.append(f'{record["width"]}x{record["height"]}')
+    parts.append(f'{max(1, round((record.get("bytes") or 0) / 1024))} KB')
+    if record.get('alt'):
+        parts.append('alt=' + json.dumps(line(record['alt']), ensure_ascii=False))
+    if record.get('media_id'):
+        parts.append(f'media_id={record["media_id"]}')
+    return ' · '.join(parts) + f'\n     saved: {record.get("path")}'
 
 
 def header(envelope, shown):

@@ -1,6 +1,7 @@
 """X's record lines: the dense text of a post, an account, a trend, a list, a community, a space or a notification. The
 page frame (header, window, coverage, more:) is the core's; all clipping and labels live here, the records themselves
 are never shortened."""
+from sns.render import image as image_line
 from sns.text import clip, count as _count, limit_of, line as _line, quote as _quote, shown as _shown, time as _time
 
 
@@ -38,8 +39,8 @@ def _who(account):
 
 def _media(record):
     parts = []
-    for item in record.get('media') or []:
-        part = item.get('kind', 'photo')
+    for index, item in enumerate(record.get('media') or [], 1):
+        part = f'[image {item.get("n") or index}] ' + item.get('kind', 'photo')
         if item.get('alt'):
             part += ' alt=' + _quote(item['alt'])
         parts.append(part)
@@ -270,6 +271,10 @@ def render(envelope, chars, command):
     labels, counts = {}, {'p': 0, 'r': 0, 'a': 0, 't': 0, 'l': 0, 'c': 0, 's': 0, 'n': 0}
     for record in envelope.get('results') or []:
         kind = record.get('kind')
+        if kind == 'image':
+            counts['i'] = counts.get('i', 0) + 1
+            lines.append(image_line(record, f'i{counts["i"]}'))
+            continue
         if kind == 'notification':
             counts['n'] += 1
             lines.append(notification(record, f'n{counts["n"]}'))

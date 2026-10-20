@@ -116,3 +116,13 @@ def test_the_cores_own_page_functions_compile_inside_the_program(header, tmp_pat
         path.write_text(program(header, snippet.replace('{platform}', 'x'), {}))
         done = subprocess.run(['node', '--check', str(path)], capture_output=True, text=True)
         assert done.returncode == 0, (action, done.stderr[-500:])
+
+
+@pytest.mark.skipif(not __import__('shutil').which('node'), reason='node is not installed')
+def test_the_picture_download_compiles_inside_the_program(tmp_path):
+    import subprocess
+    from sns.aside import MEDIA, program
+    path = tmp_path / 'media.mjs'
+    path.write_text(program({'op': 'run'}, MEDIA, {'url': 'u', 'max': 1}))
+    done = subprocess.run(['node', '--check', str(path)], capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr[-500:]

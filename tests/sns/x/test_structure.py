@@ -25,7 +25,7 @@ def test_the_x_package_is_its_interface_its_feature_modules_and_the_system_web()
 def test_the_interface_is_platform_commands_and_choices():
     assert x.PLATFORM.key == 'x' and x.PLATFORM.word == 'x' and x.PLATFORM.transport == 'tab'
     assert list(x.COMMANDS) == ['feed', 'profile', 'about', 'graph', 'me', 'list', 'community', 'post', 'replies',
-                                'reposts', 'quotes', 'search', 'trends']
+                                'reposts', 'quotes', 'search', 'trends', 'images']
     assert set(x.CHOICES) and all(key.split('.')[0] in x.COMMANDS for key in x.CHOICES)
 
 

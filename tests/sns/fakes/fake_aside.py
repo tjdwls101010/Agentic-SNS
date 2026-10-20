@@ -155,7 +155,8 @@ def answer(program, account):
         emit([{'targetId': t['id'], 'url': t['url']} for t in scenario['tabs']])
         return 0
     # a page function may carry a shared library first (X's kit): its own marker is the last one in the program
-    names = [n for n in re.findall(r'// sns-snippet: ([a-z_]+\.[a-z_]+)', program) if not n.startswith('aside.')]
+    found = re.findall(r'// sns-snippet: ([a-z_]+\.[a-z_]+)', program)
+    names = [n for n in found if not n.startswith('aside.')] or [n for n in found if n != 'aside.program']
     snippet = names[-1] if names else 'unnamed'
     op = 'load:' + snippet if aside['op'] == 'load' else snippet
     log({'op': op, 'tab': aside.get('tab'), 'args': args, 'url': aside.get('url'), 'account': account})
