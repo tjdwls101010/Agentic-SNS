@@ -1,4 +1,6 @@
 """Cursor and page-number pagination in the server's order (paging.paginate)."""
+import pytest
+
 from sns.errors import SnsError
 from sns.page import Page
 from sns.paging import paginate, record_key
@@ -127,3 +129,20 @@ def test_record_key_falls_back_to_username_then_url():
     assert record_key({'id': '1', 'username': 'A'}) == '1'
     assert record_key({'username': 'Alice'}) == '@alice'
     assert record_key({'url': 'https://x'}) == 'https://x'
+
+
+def test_a_natural_stop_on_a_page_split_by_the_limit_survives_into_the_continuation():
+    """Found by review (facebook depth-2 replies, 2026-10-21): the page that ends the source with a natural stop
+    (server_capped) was split by --limit; the continuation served the rest from the saved state and called it
+    exhausted. The saved state carries the stop."""
+    from sns.page import Page
+    from sns.paging import paginate
+
+    def fetch(cursor):
+        return Page([{'id': 'a'}, {'id': 'b'}], stop='server_capped')
+
+    first = paginate(fetch, limit=1)
+    assert first['stop_reason'] == 'limit_reached' and first['state'] is not None
+    rest = paginate(lambda cursor: pytest.fail('nothing more is requested'), limit=5, state=first['state'])
+    assert [r['id'] for r in rest['results']] == ['b'] and rest['stop_reason'] == 'server_capped'
+    assert rest['state'] is None

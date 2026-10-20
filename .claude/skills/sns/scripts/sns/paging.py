@@ -35,7 +35,8 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
              max_pages=None, idle_limit=2):
     """Read pages until the limit, the end, a boundary, a platform's stop or a failure.
 
-    state: where an earlier reading stopped ({cursor, pending, seen, closed, visited, idle}). keep(record) filters what
+    state: where an earlier reading stopped ({cursor, pending, seen, closed, visited, idle, ended}); ended is the
+    natural stop that ended the source while records were still waiting, so the continuation ends with it. keep(record) filters what
     is shown; skip(record) leaves a record out and counts it; closes(records) ends the source after that page.
     commit(records, state, reason, skipped) is called once per complete page (--out); with whole_pages a page is never
     split at the limit. max_pages counts pages served, an unshown tail from an earlier reading included. idle_limit is
@@ -48,14 +49,16 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
     cursor, waiting = state.get('cursor'), list(state.get('pending') or [])
     seen, closed = set(state.get('seen') or []), bool(state.get('closed'))
     visited, idle = set(state.get('visited') or []), int(state.get('idle') or 0)
+    ended = state.get('ended')
     results, skipped, pages, served = [], [], 0, 0
     left_out, reported = {}, {'total': None}
 
     def snapshot():
         if cursor == END and not waiting:
             return None
-        return {'cursor': cursor, 'pending': waiting, 'seen': sorted(seen, key=str), 'closed': closed,
-                'visited': sorted(visited), 'idle': idle}
+        saved = {'cursor': cursor, 'pending': waiting, 'seen': sorted(seen, key=str), 'closed': closed,
+                 'visited': sorted(visited), 'idle': idle}
+        return {**saved, 'ended': ended} if ended else saved
 
     def outcome(reason, failure=None):
         return {'results': results, 'stop_reason': reason, 'failure': failure, 'state': snapshot(),
@@ -66,7 +69,7 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
         if waiting:
             records, waiting, fetched = waiting, [], False
         elif cursor == END:
-            return outcome('exhausted')
+            return outcome(ended or 'exhausted')
         elif max_pages is not None and served >= max_pages:
             return outcome('limit_reached')
         else:
@@ -94,6 +97,7 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
                 cursor, stop = following, page.stop  # a robustness stop: later reading may go on from here
             elif page.stop:
                 cursor, stop = END, page.stop
+                ended = page.stop
             elif following is None:
                 damaged = True
             else:
@@ -131,7 +135,7 @@ def paginate(fetch, *, limit=None, state=None, keep=None, skip=None, closes=None
         elif stop and cursor != END:
             reason = stop
         elif cursor == END and not waiting:
-            reason = stop or ('window_reached' if closed else 'exhausted')
+            reason = stop or ended or ('window_reached' if closed else 'exhausted')
         elif full or (max_pages is not None and served >= max_pages):
             reason = 'limit_reached'
         else:

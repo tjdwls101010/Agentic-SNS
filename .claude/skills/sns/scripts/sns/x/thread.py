@@ -155,7 +155,8 @@ def _replies(platform, connection, invocation, start, out):
 
     first = start.get('cursor')  # a branch handle starts at its first page (no cursor), a later one where it stopped
     state = dict(out.state) if out is not None and out.state else {
-        'cursor': first, 'pending': start.get('pending') or [], 'seen': start.get('seen') or []}
+        'cursor': first, 'pending': start.get('pending') or [], 'seen': start.get('seen') or [],
+        'ended': start.get('ended')}
     limit = options.get('limit')
     if out is not None:
         state.update(seen=sorted(out.ids, key=str), pending=[])
@@ -182,7 +183,8 @@ def _replies(platform, connection, invocation, start, out):
     if result['state'] is not None and out is None and not reading.stops_continuing(result['failure']):
         following = _handle(connection, unsaved, {**start, 'cursor': result['state']['cursor'],
                                                   'pending': result['state']['pending'],
-                                                  'seen': result['state']['seen']})
+                                                  'seen': result['state']['seen'],
+                                                  'ended': result['state'].get('ended')})
         if following is not None:
             reading_['next'] = command_line(invocation.cli_path, words(platform.key, 'replies', str(following), [], options))
             reading_['continuable'] = True
