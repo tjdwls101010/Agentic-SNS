@@ -1,5 +1,5 @@
 {
-  "p4": {"status": "P4가 실행해야 함", "behavior": "29 scenarios는 test_paging.py가 전부 실행. rate-window-before/after-records(종료10), budget-before/after-records는 S2로 P4 변경; 자연 종료·천장·중복·반복·기한을 유지."},
+  "p4": {"status": "test_paging_scenarios.py가 전부 실행(진짜 cli 경유). 의도한 변경(S2·계획 자연 종료 규칙): rate-window·budget·single-page·since-after-until·restricted 시나리오는 뺐다(예산·10분 창·종료 10은 없고, 날짜 순서 오류는 코어 validate, single 표면은 쪽을 넘기지 않으며, 제한된 질의는 test_cli_search가 고정). server_capped는 자연 끝이라 종료 0, 429는 레코드 뒤에도 풀리는 hold라 재개 가능한 정지(0), 로그인 실패의 정지 사유는 query_failure."},
  "about": "Paging, windows and stops (appendix A 33-40, 53-55, 62, and the plan's stop table). A scenario serves pages in order to one walk. policy: plain (page+1; a short page ends it; a ceiling makes a short page near it capped), marked (the page names the last page: marker), single (one page). A page is {count, start} (ids r<start>.. in order), {count, repeat} (consecutive runs), {ids}, {dated: [KST minutes or null]} (ids d1, d2.. across the scenario), optional marker and reported_total, or {error: {code, reason}} with kept records for a restriction. options: limit (records to show), since/until (KST days), monotonic (the surface is newest first). expect: shown ids or shown_count, stop_reason, exit, pending (read, not shown, kept in the handle), pages_fetched, reported_total, undated. continue resumes from the first walk's state.",
  "scenarios": [
   {
@@ -80,7 +80,7 @@
    "expect": {
     "shown_count": 1000,
     "stop_reason": "server_capped",
-    "exit": 8,
+    "exit": 0,
     "pages_fetched": 34
    }
   },
@@ -109,7 +109,7 @@
    "expect": {
     "shown_count": 990,
     "stop_reason": "server_capped",
-    "exit": 8,
+    "exit": 0,
     "pages_fetched": 34
    }
   },
@@ -134,7 +134,7 @@
    "expect": {
     "shown_count": 1000,
     "stop_reason": "server_capped",
-    "exit": 8,
+    "exit": 0,
     "pages_fetched": 100
    }
   },
@@ -588,7 +588,7 @@
   {
    "name": "block-after-records",
    "item": "38, plan 정지 판정표",
-   "fact": "A block after records keeps them and still exits 5.",
+   "fact": "A 429 after records keeps them and stops where more: resumes: a hold passes by itself.",
    "policy": {
     "pagination": "plain",
     "page_size": 30,
@@ -605,14 +605,14 @@
     {
      "error": {
       "code": 5,
-      "reason": "rate_limit"
+      "reason": "rate_limited"
      }
     }
    ],
    "expect": {
     "shown_count": 30,
-    "stop_reason": "blocked",
-    "exit": 5
+    "stop_reason": "rate_limited",
+    "exit": 0
    }
   },
   {
@@ -640,169 +640,8 @@
    ],
    "expect": {
     "shown_count": 30,
-    "stop_reason": "blocked",
+    "stop_reason": "query_failure",
     "exit": 4
-   }
-  },
-  {
-   "name": "rate-window-before-records",
-   "item": "plan 정지 판정표",
-   "fact": "The local 10-minute window is not an account block: exit 10 before records, 8 after, stop_reason rate_window.",
-   "policy": {
-    "pagination": "plain",
-    "page_size": 30,
-    "ceiling": null
-   },
-   "options": {
-    "limit": 10
-   },
-   "pages": [
-    {
-     "error": {
-      "code": 10,
-      "reason": "rate_window"
-     }
-    }
-   ],
-   "expect": {
-    "shown_count": 0,
-    "stop_reason": "rate_window",
-    "exit": 10
-   }
-  },
-  {
-   "name": "rate-window-after-records",
-   "item": "plan 정지 판정표",
-   "policy": {
-    "pagination": "plain",
-    "page_size": 30,
-    "ceiling": null
-   },
-   "options": {
-    "limit": 100
-   },
-   "pages": [
-    {
-     "count": 30,
-     "start": 1
-    },
-    {
-     "error": {
-      "code": 10,
-      "reason": "rate_window"
-     }
-    }
-   ],
-   "expect": {
-    "shown_count": 30,
-    "stop_reason": "rate_window",
-    "exit": 8
-   }
-  },
-  {
-   "name": "budget-after-records",
-   "item": "38",
-   "policy": {
-    "pagination": "plain",
-    "page_size": 30,
-    "ceiling": null
-   },
-   "options": {
-    "limit": 100
-   },
-   "pages": [
-    {
-     "count": 30,
-     "start": 1
-    },
-    {
-     "error": {
-      "code": 8,
-      "reason": "budget"
-     }
-    }
-   ],
-   "expect": {
-    "shown_count": 30,
-    "stop_reason": "budget",
-    "exit": 8
-   }
-  },
-  {
-   "name": "budget-before-records",
-   "item": "plan 정지 판정표",
-   "policy": {
-    "pagination": "plain",
-    "page_size": 30,
-    "ceiling": null
-   },
-   "options": {
-    "limit": 100
-   },
-   "pages": [
-    {
-     "error": {
-      "code": 8,
-      "reason": "budget"
-     }
-    }
-   ],
-   "expect": {
-    "shown_count": 0,
-    "stop_reason": "budget",
-    "exit": 8
-   }
-  },
-  {
-   "name": "restricted-keeps-what-arrived",
-   "item": "4",
-   "policy": {
-    "pagination": "plain",
-    "page_size": 30,
-    "ceiling": null
-   },
-   "options": {
-    "limit": 100
-   },
-   "pages": [
-    {
-     "error": {
-      "code": 8,
-      "reason": "query_restricted"
-     },
-     "kept": {
-      "count": 3,
-      "start": 1
-     }
-    }
-   ],
-   "expect": {
-    "shown_count": 3,
-    "stop_reason": "query_restricted",
-    "exit": 8
-   }
-  },
-  {
-   "name": "single-page-keeps-its-terminal",
-   "item": "62",
-   "fact": "A finished walk keeps its own stop at the display limit: one page only is not 'more available'.",
-   "policy": {
-    "pagination": "single"
-   },
-   "options": {
-    "limit": 5
-   },
-   "pages": [
-    {
-     "count": 10,
-     "start": 1
-    }
-   ],
-   "expect": {
-    "shown_count": 5,
-    "stop_reason": "not_paginable",
-    "exit": 0,
-    "pending": 5
    }
   },
   {
@@ -828,29 +667,11 @@
    ],
    "expect": {
     "shown_count": 995,
-    "stop_reason": "server_capped",
-    "exit": 8,
+    "stop_reason": "limit_reached",
+    "exit": 0,
     "pending": 5
    }
-  },
-  {
-   "name": "since-after-until",
-   "item": "37",
-   "policy": {
-    "pagination": "plain",
-    "page_size": 30,
-    "ceiling": null
-   },
-   "options": {
-    "limit": 10,
-    "since": "2026-10-15",
-    "until": "2026-10-10"
-   },
-   "pages": [],
-   "expect": {
-    "exit": 2,
-    "pages_fetched": 0
-   }
   }
+
  ]
 }

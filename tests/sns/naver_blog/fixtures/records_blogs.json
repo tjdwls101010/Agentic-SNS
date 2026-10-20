@@ -131,6 +131,7 @@
   ],
   "expect": [
    {
+    "kind": "category",
     "id": "category:sample_blog/0",
     "blog_id": "sample_blog",
     "category_no": "0",
@@ -138,9 +139,12 @@
     "parent_no": null,
     "depth": 0,
     "post_count": 120,
-    "open": true
+    "open": true,
+    "url": "https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=0",
+    "created_at": null
    },
    {
+    "kind": "category",
     "id": "category:sample_blog/1",
     "blog_id": "sample_blog",
     "category_no": "1",
@@ -148,9 +152,12 @@
     "parent_no": null,
     "depth": 0,
     "post_count": 80,
-    "open": true
+    "open": true,
+    "url": "https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=1",
+    "created_at": null
    },
    {
+    "kind": "category",
     "id": "category:sample_blog/2",
     "blog_id": "sample_blog",
     "category_no": "2",
@@ -158,9 +165,12 @@
     "parent_no": "1",
     "depth": 1,
     "post_count": 50,
-    "open": true
+    "open": true,
+    "url": "https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=2",
+    "created_at": null
    },
    {
+    "kind": "category",
     "id": "category:sample_blog/3",
     "blog_id": "sample_blog",
     "category_no": "3",
@@ -168,9 +178,12 @@
     "parent_no": "2",
     "depth": 2,
     "post_count": 20,
-    "open": true
+    "open": true,
+    "url": "https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=3",
+    "created_at": null
    },
    {
+    "kind": "category",
     "id": "category:sample_blog/5",
     "blog_id": "sample_blog",
     "category_no": "5",
@@ -178,7 +191,9 @@
     "parent_no": null,
     "depth": 0,
     "post_count": 7,
-    "open": false
+    "open": false,
+    "url": "https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=5",
+    "created_at": null
    }
   ]
  },
@@ -269,22 +284,31 @@
   ],
   "expect": [
    {
+    "kind": "topic",
     "id": "topic:5",
     "seq": "5",
     "name": "문학·책",
-    "group": "엔터테인먼트·예술"
+    "group": "엔터테인먼트·예술",
+    "url": null,
+    "created_at": null
    },
    {
+    "kind": "topic",
     "id": "topic:6",
     "seq": "6",
     "name": "영화",
-    "group": "엔터테인먼트·예술"
+    "group": "엔터테인먼트·예술",
+    "url": null,
+    "created_at": null
    },
    {
+    "kind": "topic",
     "id": "topic:20",
     "seq": "20",
     "name": "맛집",
-    "group": "생활·노하우·쇼핑"
+    "group": "생활·노하우·쇼핑",
+    "url": null,
+    "created_at": null
    }
   ]
  },
