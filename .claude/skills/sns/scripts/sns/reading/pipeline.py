@@ -450,8 +450,10 @@ def leave_idle(platform, invocation, account, token):
         pass  # without it the tab stays open until the next command or a person closes it
 
 
-_EMPTY = {'close': '() => { window.close(); return true; } // sns-snippet: {platform}.close',
-          'blank': '() => { location.replace("about:blank"); return true; } // sns-snippet: {platform}.blank'}
+# The marker goes on its own line: a page function is pasted inside a call, where a trailing // comment would swallow
+# the rest of that call.
+EMPTY_SNIPPETS = {'close': '// sns-snippet: {platform}.close\n() => { window.close(); return true; }',
+                  'blank': '// sns-snippet: {platform}.blank\n() => { location.replace("about:blank"); return true; }'}
 
 
 def empty_tab(platform, aside, tab):
@@ -459,7 +461,7 @@ def empty_tab(platform, aside, tab):
     not take; True once the tab is gone or blank. Makes no request to the platform."""
     first = platform.idle_action or 'blank'
     for action in (first, 'blank' if first == 'close' else 'close', 'blank'):
-        snippet = _EMPTY[action].replace('{platform}', platform.key)
+        snippet = EMPTY_SNIPPETS[action].replace('{platform}', platform.key)
         try:
             aside.evaluate(tab, snippet, {}, seconds=10)
         except SnsError as error:

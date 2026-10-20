@@ -100,3 +100,19 @@ def test_output_that_cannot_be_read_is_an_aside_failure():
     with pytest.raises(SnsError):
         parse('\n'.join(lines))
     assert parse('\x1b[2mlog\x1b[0m\n' + json.dumps({'kind': 'result', 'chunks': 0, 'body': '[1]'})) == [1]
+
+
+@pytest.mark.skipif(not __import__('shutil').which('node'), reason='node is not installed')
+@pytest.mark.parametrize('header', [{'op': 'evaluate', 'tab': 'T'}, {'op': 'load', 'tab': 'T', 'url': 'u', 'seconds': 5},
+                                    {'op': 'run'}])
+def test_the_cores_own_page_functions_compile_inside_the_program(header, tmp_path):
+    """The fake Aside never runs JavaScript, so a page function that breaks the program (a trailing // comment
+    swallowing the rest of the call) passes every other test; node checks the real text."""
+    import subprocess
+    from sns import reading
+    from sns.aside import program
+    for action, snippet in reading.EMPTY_SNIPPETS.items():
+        path = tmp_path / f'{action}.mjs'
+        path.write_text(program(header, snippet.replace('{platform}', 'x'), {}))
+        done = subprocess.run(['node', '--check', str(path)], capture_output=True, text=True)
+        assert done.returncode == 0, (action, done.stderr[-500:])

@@ -209,16 +209,14 @@ class Aside:
 
     def _repl(self, header, function, args, seconds=None):
         try:
-            program = ('const ASIDE = ' + json.dumps(header, ensure_ascii=True) + ';\nconst ARGS = '
-                       + json.dumps(args, ensure_ascii=True) + ';\n'
-                       + PROGRAM.replace('PAGE_FUNCTION', function or 'null'))
+            text = program(header, function, args)
         except (TypeError, ValueError):
             raise SnsError('aside', 'A browser call had arguments that cannot be sent.',
                            'Report this as a skill bug.') from None
         limit, clamped = self._limit(seconds, REPL_SECONDS + 5)
         started = time.monotonic()
         try:
-            result = subprocess.run(self._command('repl', program), capture_output=True, text=True, timeout=limit)
+            result = subprocess.run(self._command('repl', text), capture_output=True, text=True, timeout=limit)
         except subprocess.TimeoutExpired:
             if clamped:
                 raise time_limit() from None
@@ -233,6 +231,12 @@ class Aside:
                 raise SnsError('aside', 'Aside lost its connection or reached its time limit.', _CHECK, reason='lost')
             raise SnsError('aside', 'Aside failed to run the browser call.', _CHECK, reason='failed')
         return parse(result.stdout)
+
+
+def program(header, function, args):
+    """The REPL program of one call: the header and arguments, then program.js with the page function in place."""
+    return ('const ASIDE = ' + json.dumps(header, ensure_ascii=True) + ';\nconst ARGS = '
+            + json.dumps(args, ensure_ascii=True) + ';\n' + PROGRAM.replace('PAGE_FUNCTION', function or 'null'))
 
 
 def parse(stdout):
