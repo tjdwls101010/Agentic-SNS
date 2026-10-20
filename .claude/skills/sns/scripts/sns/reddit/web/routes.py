@@ -18,7 +18,10 @@ PROFILE_SORTS = ('new', 'hot', 'top', 'controversial')
 SEARCH_TYPES = ('posts', 'subs', 'users')
 SEARCH_SORTS = ('relevance', 'hot', 'top', 'new', 'comments')
 TIMES = ('hour', 'day', 'week', 'month', 'year', 'all')
-ME_COLLECTIONS = ('subs', 'saved', 'upvoted')
+ME_COLLECTIONS = ('subs', 'saved', 'upvoted', 'comment-replies', 'post-replies', 'mentions')
+# What others sent the account, read with mark=false so reading never marks it read (measured 2026-10-21: the unread
+# count and each item's `new` stayed); /message/inbox is not used because it carries private messages too.
+_INBOX = {'comment-replies': 'comments', 'post-replies': 'selfreply', 'mentions': 'mentions'}
 PAGE_SIZE = 100          # what a listing page asks for; what is not shown waits in the handle
 THREAD_LIMIT = 500       # comments a post read asks for
 THREAD_DEPTH = 10
@@ -36,6 +39,7 @@ _ROUTES = (
     (rf'/duplicates/{_ID}\.json', GENERAL),
     (r'/user/[A-Za-z0-9_-]+/(about|overview|submitted|comments|saved|upvoted)\.json', GENERAL),
     (r'/(search|subreddits/search|subreddits/mine/subscriber|api/me|api/morechildren)\.json', GENERAL),
+    (r'/message/(comments|selfreply|mentions)\.json', GENERAL),
 )
 
 
@@ -46,6 +50,7 @@ class Request:
     expect: str = 'listing'      # the response shape (see classify)
     personal: bool = False       # the user's own surface: an empty modhash there means logged out
     url: str | None = None       # a share link, requested as a page
+    inbox: bool = False          # a /message listing: its t1 children are replies sent to the account
 
     @property
     def bucket(self):
@@ -128,6 +133,9 @@ def related(post_id, after=None):
 
 def mine(collection, name, after=None):
     """The user's own lists; saved and upvoted are read under the logged-in name the account check returned."""
+    if collection in _INBOX:
+        return Request(f'/message/{_INBOX[collection]}.json', _query(limit=PAGE_SIZE, after=after, mark='false'),
+                       personal=True, inbox=True)
     path = '/subreddits/mine/subscriber.json' if collection == 'subs' else f'/user/{name}/{collection}.json'
     return Request(path, _query(limit=PAGE_SIZE, after=after), personal=True)
 

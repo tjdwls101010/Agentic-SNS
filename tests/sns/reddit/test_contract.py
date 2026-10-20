@@ -33,6 +33,9 @@ def built():
                       'wiki_page': lambda: ('wiki_page', web.wiki_page(raw['subreddit'], raw['page'], raw['data'])),
                       'wiki_index': lambda: ('wiki_index', web.wiki_index(raw['subreddit'], raw['data'])),
                       'rule': lambda: ('rule', None)}[case['kind']]())
+    found.append(('reply', web.reply({'id': 'm1', 'name': 't1_m1', 'author': 'a', 'body': 'b', 'type': 'comment_reply',
+                                      'context': '/r/x/comments/p/t/m1/?context=3', 'created_utc': 1792000000,
+                                      'link_title': 'T', 'subreddit': 'x', 'parent_id': 't1_p', 'new': True})))
     return [(name, record) for name, record in found if record is not None]
 
 
@@ -62,7 +65,8 @@ def test_a_comment_pages_extra_keys_are_described():
 
 
 def test_every_object_schema_describes_something_and_names_its_label():
-    assert set(PLATFORM.schemas) == {'post', 'comment', 'subreddit', 'user', 'moderator', 'wiki_page', 'wiki_index'}
+    assert set(PLATFORM.schemas) == {'post', 'reply', 'comment', 'subreddit', 'user', 'moderator', 'wiki_page',
+                                     'wiki_index'}
     for name, document in PLATFORM.schemas.items():
         assert document['object'] == name and document['fields'] and document['description'], name
 
@@ -70,6 +74,6 @@ def test_every_object_schema_describes_something_and_names_its_label():
 def test_schema_prints_each_object_through_the_cli(reddit):
     code, out, _ = reddit.run('reddit', 'schema')
     assert code == 0 and [r['object'] for r in json.loads(out)['results']] == [
-        'result', 'out', 'post', 'comment', 'subreddit', 'user', 'moderator', 'wiki_page', 'wiki_index']
+        'result', 'out', 'post', 'reply', 'comment', 'subreddit', 'user', 'moderator', 'wiki_page', 'wiki_index']
     code, out, _ = reddit.run('reddit', 'schema', 'post')
     assert code == 0 and 'media_id' in json.dumps(json.loads(out)['results'][0])

@@ -221,7 +221,16 @@ def _thread_line(thread):
             + (f', expanded {time(thread["expanded_at"])}' if thread.get('expanded_at') else ''))
 
 
-_LABELS = {'post': 'p', 'comment': 'c', 'subreddit': 's', 'user': 'u', 'wiki_page': 'w', 'wiki_index': 'w'}
+_LABELS = {'post': 'p', 'comment': 'c', 'subreddit': 's', 'user': 'u', 'wiki_page': 'w', 'wiki_index': 'w', 'reply': 'r'}
+
+
+def reply(record, label, chars):
+    head = [f'u/{record.get("author")}' if record.get('author') != '[deleted]' else '[deleted]',
+            f'r/{record.get("subreddit")}', time(record.get('created_at')), (record.get('type') or '').replace('_', ' ')]
+    if record.get('unread'):
+        head.append('unread')
+    return '\n'.join([f'[{label}] ' + ' · '.join(head), f'     on: {quote(record.get("post_title") or "")}',
+                      '     ' + _text(record.get('text'), chars), f'     url: {record.get("url")}'])
 
 
 def render(envelope, chars, command):
@@ -229,7 +238,7 @@ def render(envelope, chars, command):
     default length; 0: everything received."""
     limit = limit_of(chars)
     lines = [_thread_line(envelope['thread'])] if envelope.get('thread') else []
-    labels, counts = {}, {prefix: 0 for prefix in 'pcsuw'}
+    labels, counts = {}, {prefix: 0 for prefix in 'pcsuwr'}
     for record in envelope.get('results') or []:
         kind = record.get('kind')
         prefix = _LABELS.get(kind, 'p')
@@ -242,6 +251,8 @@ def render(envelope, chars, command):
             lines.append(community(record, label, limit))
         elif kind == 'user':
             lines.append(user(record, label, limit))
+        elif kind == 'reply':
+            lines.append(reply(record, label, limit))
         elif kind in ('wiki_page', 'wiki_index'):
             lines.append(wiki(record, label, None if chars is None else limit))
         else:

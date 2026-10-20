@@ -188,7 +188,7 @@ class Client:
             if error.kind == 'empty':
                 return [], None
             raise
-        return page(body[1] if request.expect == 'duplicates' else body)
+        return page(body[1] if request.expect == 'duplicates' else body, inbox=request.inbox)
 
     def thread(self, post_id, sort, comment_id=None, context=None):
         """(post record, items) of a post read, or of one comment's subtree (comment_id with context 0)."""

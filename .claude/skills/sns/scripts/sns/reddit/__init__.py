@@ -52,6 +52,15 @@ RECORDS = {
                  'null)}]; nothing is downloaded',
         'poll': 'object|null — {options [{text, vote_count|null}], total_vote_count, voting_ends_at}',
         'crosspost': 'object|null — the original post (its own author, community and media numbering)'}},
+    'reply': {'object': 'reply', 'description': 'Something another account sent this one: a reply to its comment, a reply '
+              'to its post, or a mention of its name ([r] label; me comment-replies, post-replies, mentions).',
+              'fields': {
+        'kind, id, url, created_at': 'string — kind reply; the replying comment\'s fullname t1_<id>; its permalink with '
+                                     'context (comments <url> opens it with what surrounds it); UTC ISO-8601 or null',
+        'type': 'string — comment_reply, post_reply or username_mention, as Reddit names it',
+        'author, subreddit': 'string — who replied, where', 'post_title': 'string — the post the reply sits under',
+        'parent_id': 'string — the fullname it answers', 'text': 'string — the reply as received',
+        'unread': 'boolean — still unread in the account\'s inbox; reading it here does not mark it read'}},
     'comment': {'object': 'comment', 'description': 'A comment ([c] label).', 'fields': {
         'kind, id, url, created_at': 'string — kind comment; the Reddit fullname t1_<id>; the comment\'s permalink '
                                      '(comments <url> opens it in full with what hangs under it); UTC ISO-8601 or '
@@ -254,12 +263,17 @@ COMMANDS = {
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
     },
     'me': {
-        'help': 'Read your own subscriptions, saved or upvoted items.',
+        'help': 'Read your own subscriptions, saved or upvoted items, or the replies and mentions others sent you.',
         'run': _command(listing.me),
-        'arguments': [(('collection',), {'choices': web.ME_COLLECTIONS, 'help': 'subs (subscribed communities), saved or '
-                                                                                'upvoted'}), *LIST],
+        'arguments': [(('collection',), {'choices': web.ME_COLLECTIONS, 'help': 'subs (subscribed communities), saved, '
+                                                                                'upvoted, comment-replies (replies to '
+                                                                                'your comments), post-replies (replies '
+                                                                                'to your posts) or mentions (of your '
+                                                                                'name)'}), *LIST],
         'epilog': ['Lists of the Reddit account the Aside browser is logged in to (the account check names it). saved '
-                   'and upvoted hold posts and comments, newest saved or upvoted first.', PAGE, ACCOUNT],
+                   'and upvoted hold posts and comments, newest saved or upvoted first. comment-replies, post-replies and '
+                   'mentions are what other accounts sent you, newest first; reading them never marks them read '
+                   '(unread says which are still new). Private messages are not read.', PAGE, ACCOUNT],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
     },
     'post': {

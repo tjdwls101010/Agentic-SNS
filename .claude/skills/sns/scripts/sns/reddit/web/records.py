@@ -179,6 +179,16 @@ def comment(data, depth=None):
     }
 
 
+def reply(data):
+    """A /message item (a t1 shaped as a message) → a reply sent to the account: a reply to its comment or post, or
+    a mention of its name."""
+    return {'kind': 'reply', 'id': fullname(data, 't1'), 'url': absolute(data.get('context')),
+            'created_at': timestamp(data.get('created_utc')), 'type': text(data.get('type')),
+            'author': text(data.get('author')) or '[deleted]', 'subreddit': text(data.get('subreddit')),
+            'post_title': text(data.get('link_title')), 'parent_id': text(data.get('parent_id')),
+            'text': text(data.get('body')), 'unread': data.get('new') is True}
+
+
 # --- communities, users, moderators, wiki --------------------------------------------------------------------------
 
 def community(data):
@@ -241,7 +251,7 @@ def _malformed(what):
                     reason='shape_changed')
 
 
-def page(listing):
+def page(listing, inbox=False):
     """(records, after): every child as a record in Reddit's order; after is the next page's fullname or None. An id
     that disagrees with its fullname or an after that is not a fullname is malformed."""
     data = listing['data']
@@ -260,5 +270,5 @@ def page(listing):
                 raise _malformed('an item\'s id')
         elif not isinstance(raw.get('id'), str) or not re.fullmatch(r'[a-z0-9]+', raw['id']):
             raise _malformed('an account\'s id')
-        records.append(_BUILDERS[kind](raw))
+        records.append(reply(raw) if inbox and kind == 't1' else _BUILDERS[kind](raw))
     return records, after

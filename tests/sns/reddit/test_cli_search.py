@@ -1,6 +1,8 @@
 """search, related and me through the real cli."""
 import json
 
+import pytest
+
 from tests.sns.reddit.scene import VIEWER
 from tests.sns.reddit.shapes import listing, post
 from tests.sns.support.cli import command_of, more_line
@@ -95,3 +97,34 @@ def test_me_shows_what_it_held_back_without_a_listing_request(reddit):
     code, out, _ = reddit.run(*command_of(more))
     assert code == 0 and 'sub2' in out and len(reddit.fetches()) == before + 1
     assert reddit.paths()[-1] == '/api/me.json'
+
+
+def message(kind_of_reply, n=1, new=True):
+    """A synthetic inbox item as Reddit's /message listings send it (a t1 shaped as a message)."""
+    return {'kind': 't1', 'data': {
+        'id': f'm{n}', 'name': f't1_m{n}', 'author': f'replier{n}', 'body': f'reply text {n}',
+        'context': f'/r/example/comments/aaa1/title/m{n}/?context=3', 'created_utc': 1792000000 + n,
+        'link_title': 'A post title', 'subreddit': 'example', 'parent_id': 't1_parent', 'new': new,
+        'type': kind_of_reply, 'was_comment': True, 'subject': 'comment reply'}}
+
+
+@pytest.mark.parametrize('collection,path,kind_of_reply', [
+    ('comment-replies', '/message/comments.json', 'comment_reply'),
+    ('post-replies', '/message/selfreply.json', 'post_reply'),
+    ('mentions', '/message/mentions.json', 'username_mention')])
+def test_me_reads_what_others_sent_you_without_marking_it_read(reddit, collection, path, kind_of_reply):
+    reddit.me().json(path, listing([message(kind_of_reply)]), query={'mark': 'false'})
+    code, out, _ = reddit.run('reddit', 'me', collection, '--json')
+    envelope = json.loads(out)
+    record = envelope['results'][0]
+    assert code == 0 and reddit.paths() == ['/api/me.json', path]
+    assert record['kind'] == 'reply' and record['type'] == kind_of_reply and record['unread'] is True
+    assert record['author'] == 'replier1' and record['post_title'] == 'A post title'
+    assert record['url'] == 'https://www.reddit.com/r/example/comments/aaa1/title/m1/?context=3'
+    assert record['created_at'] and record['id'] == 't1_m1'
+
+
+def test_me_inbox_text_names_who_replied_where(reddit):
+    reddit.me().json('/message/comments.json', listing([message('comment_reply', new=False)]))
+    code, out, _ = reddit.run('reddit', 'me', 'comment-replies')
+    assert code == 0 and 'u/replier1' in out and 'r/example' in out and 'A post title' in out
