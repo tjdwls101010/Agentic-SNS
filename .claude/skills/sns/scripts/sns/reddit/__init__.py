@@ -346,7 +346,7 @@ COMMANDS = {
                    'sends the post now; each saved line names its kind, size and media_id to match what the post '
                    'showed. Only Reddit\'s own image hosts (i.redd.it, preview.redd.it) are fetched; a picture hosted '
                    'elsewhere is named and skipped. Files go to the skill\'s data/images/ and are removed a day later; '
-                   'they are other people\'s pictures. A picture that could not be saved is named in coverage (exit 8).',
+                   'they are other people\'s pictures. A picture that could not be saved is named in coverage (exit 8); a number the post does not have is refused before any picture is fetched (exit 2). A stop between pictures (the time limit, a hold) keeps the saved ones and ends with more: naming the numbers left.',
                    'requests: 1 for the post (plus a share link\'s hops), then 1 per picture.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
     },

@@ -482,13 +482,26 @@ def test_pictures_name_what_they_could_not_save_and_are_partial(browser, monkeyp
     browser.install(monkeypatch)
     invocation = reading.Invocation({}, Deadline(30), {}, cli.__file__)
     connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
-    result = reading.pictures(connection, key='i1', media=MEDIA, numbers=[1, 3, 9], hosts=('cdn.alpha.test',))
+    result = reading.pictures(connection, key='i1', media=MEDIA, numbers=[1, 3], hosts=('cdn.alpha.test',))
     assert result['results'] == [] and result['failure'].kind == 'partial'
     notes = ' '.join(result['coverage'])
     assert 'picture 1' in notes and 'not a picture' in notes
     assert 'picture 3' in notes and 'elsewhere.test' in notes
-    assert 'picture 9' in notes and 'has 3' in notes
     assert connection.guard.count == 1  # only the one allowed host was asked
+
+
+def test_a_number_the_post_does_not_have_is_an_argument_error_before_any_picture(browser, monkeypatch, data_dir):
+    """Asking for a picture the post does not have is the caller's mistake (naver's rule, now every platform's): the
+    range is named and no picture is fetched."""
+    from sns.errors import SnsError
+    me(browser)
+    browser.install(monkeypatch)
+    invocation = reading.Invocation({}, Deadline(30), {}, cli.__file__)
+    connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    with pytest.raises(SnsError) as caught:
+        reading.pictures(connection, key='i1', media=MEDIA, numbers=[1, 9], hosts=('cdn.alpha.test',))
+    assert caught.value.kind == 'argument' and '1-3' in caught.value.fix
+    assert connection.guard.count == 0
 
 
 def test_all_takes_every_picture_and_none_is_an_argument_error(browser, monkeypatch, data_dir):
@@ -515,3 +528,37 @@ def test_a_picture_over_the_size_cap_is_refused_in_the_browser(browser, monkeypa
     connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
     result = reading.pictures(connection, key='i1', media=MEDIA, numbers=[1], hosts=('cdn.alpha.test',))
     assert result['failure'].kind == 'partial' and 'larger than 10 MB' in ' '.join(result['coverage'])
+
+
+def test_a_stop_between_pictures_keeps_the_saved_ones_and_offers_the_rest(browser, monkeypatch, data_dir):
+    """The time limit or a hold between two pictures is a stop, not a lost read: the saved pictures are reported (their
+    files exist) and the command for the numbers left is offered (naver's rule, now every platform's)."""
+    from sns.errors import SnsError
+    me(browser)
+    browser.install(monkeypatch)
+    invocation = reading.Invocation({'target': 'https://alpha.test/p/i1', 'numbers': [1, 2], 'json': True},
+                                    Deadline(30), {}, cli.__file__)
+    connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    asked = []
+
+    def fetch(url):
+        asked.append(url)
+        if len(asked) == 2:
+            raise SnsError('failed', 'The command reached its time limit.', 'Run it again.', reason='time_limit')
+        return b'\xff\xd8\xff\xe0jpeg', 'image/jpeg'
+
+    result = reading.pictures(connection, key='i1', media=MEDIA, numbers=[1, 2], hosts=('cdn.alpha.test',),
+                              fetch=fetch)
+    assert [r['n'] for r in result['results']] == [1] and result['failure'].reason == 'time_limit'
+    assert result['continuable'] and result['next'].endswith('alpha images https://alpha.test/p/i1 2 --json')
+
+
+def test_a_platform_fetch_replaces_the_download_and_guards_itself(browser, monkeypatch, data_dir):
+    me(browser)
+    browser.install(monkeypatch)
+    invocation = reading.Invocation({}, Deadline(30), {}, cli.__file__)
+    connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    result = reading.pictures(connection, key='i1', media=MEDIA, numbers=[1], hosts=('cdn.alpha.test',),
+                              fetch=lambda url: (b'\x89PNG....', 'image/png'))
+    assert result['results'][0]['content_type'] == 'image/png'
+    assert connection.guard.count == 0 and not [c for c in browser.calls() if c['op'] == 'aside.media']

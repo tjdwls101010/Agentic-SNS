@@ -52,11 +52,11 @@ def test_all_saves_every_picture_and_json_names_each(browser, data_dir):
     assert records[0]['alt'] == 'a chart'
 
 
-def test_a_number_the_post_does_not_have_is_named_and_partial(browser, data_dir):
+def test_a_number_the_post_does_not_have_is_an_argument_error_naming_the_range(browser, data_dir):
     known_tab(browser).respond('x.query', batch([PHOTO]))
     code, out, _ = run(browser, 'images', '201', '4')
     browser_calls = [c for c in browser.calls() if c['op'] == 'aside.media']
-    assert code == 8 and 'picture 4: this post has 1' in out and len(browser_calls) == 0
+    assert code == 2 and '1-1' in json.loads(out)['fix'] and len(browser_calls) == 0
 
 
 def test_numbers_or_all_must_be_given(browser, data_dir):

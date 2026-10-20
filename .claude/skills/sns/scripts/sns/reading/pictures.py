@@ -8,7 +8,9 @@ match them with the [image N] lines of the post it read before (the numbers are 
 post did not change)."""
 from urllib.parse import urlsplit
 
+from sns.cmdline import command_line, words
 from sns.errors import SnsError
+from sns.reading.pipeline import stops_continuing
 
 MAX_BYTES = 10 * 1024 * 1024
 
@@ -18,18 +20,22 @@ def _allowed(url, hosts):
     return bool(host) and any(host == h or host.endswith('.' + h) for h in hosts)
 
 
-def pictures(connection, *, key, media, numbers, hosts):
-    """A reading of the saved pictures: numbers None takes every one; hosts are the platform's image hosts."""
+def pictures(connection, *, key, media, numbers, hosts, fetch=None):
+    """A reading of the saved pictures: numbers None takes every one; hosts are the platform's image hosts. fetch(url)
+    -> (bytes, content type) replaces the cookie-less download for a platform that fetches pictures its own way (and
+    guards those requests itself); a partial error from it is that picture's alone. A stop between pictures (the time
+    limit, a hold) keeps what was saved and offers the command for the numbers left."""
     if not media:
         raise SnsError('empty', 'This post has no pictures to save.', 'Read the post to see what it holds.')
     by_number = {item.get('n'): item for item in media}
     chosen = sorted(by_number) if numbers is None else list(dict.fromkeys(numbers))
-    results, skipped = [], []
-    for number in chosen:
-        item = by_number.get(number)
-        if item is None:
-            skipped.append(f'picture {number}: this post has {len(media)} (numbers 1–{len(media)})')
-            continue
+    unknown = [n for n in chosen if n not in by_number]
+    if unknown:
+        raise SnsError('argument', f'This post has no picture {", ".join(map(str, unknown))}.',
+                       f'Pass numbers from 1-{max(by_number)} (the post shows them as [image N]), or --all.')
+    results, skipped, stop = [], [], None
+    for position, number in enumerate(chosen):
+        item = by_number[number]
         url = item.get('image_url')
         if not url:
             skipped.append(f'picture {number}: no picture link was sent for this {item.get("kind") or "item"}')
@@ -39,17 +45,21 @@ def pictures(connection, *, key, media, numbers, hosts):
                            'image hosts, so it was not fetched')
             continue
         try:
-            with connection.guard.request(kind='image') as slot:
-                try:
-                    data, content_type = connection.aside.download(url, MAX_BYTES)
-                except SnsError:
-                    slot.classify('image_failed')
-                    raise
-                slot.classify('ok')
+            if fetch is not None:
+                data, content_type = fetch(url)
+            else:
+                with connection.guard.request(kind='image') as slot:
+                    try:
+                        data, content_type = connection.aside.download(url, MAX_BYTES)
+                    except SnsError:
+                        slot.classify('image_failed')
+                        raise
+                    slot.classify('ok')
             path = connection.save_image(data, content_type, key=key, number=number)
         except SnsError as error:
             if error.kind != 'partial':
-                raise
+                stop = (error, chosen[position:])
+                break
             skipped.append(f'picture {number}: {error.message}')
             continue
         results.append({'kind': 'image', 'id': f'{key}#{number}', 'url': url, 'created_at': None, 'n': number,
@@ -60,8 +70,18 @@ def pictures(connection, *, key, media, numbers, hosts):
     if skipped:
         failure = SnsError('partial', f'{len(skipped)} of {len(chosen)} pictures were not saved.',
                            'coverage says which and why.', reason='pictures_skipped')
-    return {'results': results, 'stop_reason': 'exhausted', 'failure': failure, 'coverage': skipped,
-            'partial': bool(results)}
+    reading_ = {'results': results, 'stop_reason': 'exhausted', 'failure': failure, 'coverage': skipped,
+                'partial': bool(results)}
+    if stop is not None:
+        error, left = stop
+        if not results or stops_continuing(error):
+            raise error
+        # no handle: the post is read again anyway, so the command that saves the rest is enough
+        invocation = connection.invocation
+        reading_.update(failure=error, continuable=True, next=command_line(invocation.cli_path, words(
+            connection.platform.key, 'images', invocation.options.get('target'), [str(n) for n in left],
+            invocation.options, limit=None)))
+    return reading_
 
 
 IMAGE_SCHEMA = {'object': 'image', 'description': 'One saved picture of a post ([i] label; <platform> images). The file '
@@ -72,6 +92,7 @@ IMAGE_SCHEMA = {'object': 'image', 'description': 'One saved picture of a post (
                     'n': 'integer — its number in the post as this read numbered it ([image N])',
                     'media_kind': 'string — photo, video (its poster), gif or the platform\'s own kind',
                     'media_id': 'string|null — the platform\'s id for it, to match the post read before',
-                    'alt': 'string|null — the description the post gives it', 'width, height': 'integer|null',
-                    'bytes': 'integer', 'content_type': 'string — image/jpeg, image/png, …',
+                    'alt': 'string|null — the description the post gives it',
+                    'width, height': 'integer|null — its size in pixels, when the platform says',
+                    'bytes': 'integer — the saved file\'s size', 'content_type': 'string — image/jpeg, image/png, …',
                     'path': 'string — the saved file; Read it to look at the picture'}}

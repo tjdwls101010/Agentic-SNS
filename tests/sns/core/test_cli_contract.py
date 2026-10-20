@@ -77,3 +77,11 @@ def test_the_real_entry_point_prints_its_help():
 def test_bad_arguments_are_one_json_envelope_and_exit_2():
     done = subprocess.run([sys.executable, str(CLI), 'nowhere', 'feed'], capture_output=True, text=True)
     assert done.returncode == 2 and '"error": "argument"' in done.stdout
+
+
+def test_every_images_help_says_how_numbers_and_stops_work():
+    """reading.pictures is shared: what it does with a number the post lacks and with a stop is told the same way."""
+    import importlib
+    for key in ('x', 'reddit', 'threads', 'facebook', 'naver_blog'):
+        text = ' '.join(importlib.import_module(f'sns.{key}').COMMANDS['images']['epilog'])
+        assert 'more:' in text and 'numbers left' in text, key
