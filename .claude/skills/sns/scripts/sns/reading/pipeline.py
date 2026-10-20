@@ -11,7 +11,7 @@ import os
 import subprocess
 import sys
 
-from sns import handles, outfile, protection
+from sns import handles, images, outfile, protection
 from sns.aside import Aside
 from sns.cmdline import command_line, words as command_words
 from sns.errors import SnsError
@@ -87,6 +87,11 @@ class Connection:
         self.observed = viewer
         self.confirm(viewer)
         return state
+
+    def save_image(self, data, content_type, key, number):
+        """Save one picture of a post (key: the post on this platform, number: its picture number) in the skill's
+        picture store (removed after a day); returns the path to Read."""
+        return images.save(data, content_type, platform=self.platform.key, key=key, number=number)
 
     def confirm(self, saved):
         """A continued reading must be read as the account it was read with: a different one is a changed login."""

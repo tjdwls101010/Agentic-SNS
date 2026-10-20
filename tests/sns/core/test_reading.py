@@ -435,3 +435,12 @@ def test_a_worse_section_failure_wins_over_a_top_level_one(capsys, browser, monk
     code, out = run(capsys, browser, monkeypatch, 'alpha', 'card', 'https://alpha.test/p/i1', '--json',
                     '--chars', '5')  # --chars 5 makes the stub report a soft failure of its own beside the sections
     assert code == 5 and json.loads(out)['error'] == 'blocked'
+
+
+def test_a_reader_saves_pictures_through_its_connection(browser, monkeypatch, data_dir):
+    me(browser, 'ann')
+    browser.install(monkeypatch)
+    invocation = reading.Invocation({}, Deadline(30), {}, cli.__file__)
+    connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    path = connection.save_image(b'\x89PNG....', 'image/png', key='i1', number=2)
+    assert path.parent == data_dir / 'images' and path.name.startswith('alpha-i1-2-') and path.suffix == '.png'
