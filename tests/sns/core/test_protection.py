@@ -288,9 +288,10 @@ def dead_pid():
 
 def test_an_unknown_scope_is_probed_and_the_probe_is_recorded_before_sending(data_dir, clock):
     g = guard('reddit', clock)
-    with g.request(scope='general'):
+    with g.request(scope='general') as slot:
         scopes = json.loads((files(data_dir, 'reddit') / 'scopes.json').read_text())
         assert scopes['general']['status'] == 'probe' and scopes['general']['pid'] == os.getpid()
+        slot.classify('ok')
     assert g.snapshot()['scopes']['general']['status'] == 'unknown'  # answered without headers: unknown again
 
 
@@ -386,6 +387,7 @@ def test_one_check_per_invocation_and_a_failed_check_keeps_the_block(data_dir, c
 def test_requests_inside_the_check_share_its_critical_section(data_dir, clock):
     g = guard('x', clock)
     with g.request(scope='Viewer') as slot:
+        slot.classify('challenge')
         slot.block('challenge', viewer='42')
     checker = guard('x', clock)
     with checker.verify_unblock(scope='Viewer') as check:
@@ -458,3 +460,75 @@ def test_accounts_keep_separate_state(data_dir, clock):
     with guard('threads', clock, account='u0').request() as slot:
         slot.block('checkpoint')
     guard('threads', clock, account='u1').check()
+
+
+# --- repairs from the core review (Codex, 2026-10-21) ---------------------------------------------------------------
+
+def test_a_lost_answer_keeps_the_probe_until_it_can_be_reclaimed(data_dir, clock):
+    g = guard('reddit', clock)
+    with pytest.raises(RuntimeError):
+        with g.request(scope='general'):
+            raise RuntimeError('the connection dropped: no answer')
+    entry = g.snapshot()['scopes']['general']
+    assert entry['status'] == 'probe'  # the request may still be in flight in the browser
+    started = entry['started_at']
+    later = guard('reddit', clock, seconds=200)
+    with later.request(scope='general') as slot:
+        slot.classify('ok')
+    assert clock.now >= started + protection.PROBE_SECONDS
+
+
+def test_an_answered_probe_without_headers_is_unknown_again(data_dir, clock):
+    g = guard('reddit', clock)
+    with g.request(scope='general') as slot:
+        slot.classify('ok')
+    assert g.snapshot()['scopes']['general']['status'] == 'unknown'
+
+
+def test_a_live_owners_probe_is_waited_for_even_past_the_longest_call(data_dir, clock):
+    directory = files(data_dir, 'reddit')
+    directory.mkdir(parents=True)
+    alive = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])
+    try:
+        (directory / 'scopes.json').write_text(json.dumps(
+            {'general': {'status': 'probe', 'pid': alive.pid, 'started_at': clock.now - 500}}))
+        with pytest.raises(SnsError) as caught:
+            with guard('reddit', clock, seconds=10).request(scope='general'):
+                pass
+        assert caught.value.kind == 'scope_limit'
+    finally:
+        alive.kill()
+        alive.wait()
+
+
+def test_a_later_fact_does_not_lift_a_spent_scope_before_its_reset(data_dir, clock):
+    g = guard('x', clock)
+    with g.request(scope='SearchTimeline') as slot:
+        slot.fact('SearchTimeline', Fact(limit=50, remaining=0, reset_at=clock.now + 600))
+    with g.request(scope='UserTweets') as slot:  # another request reports a fresh window for the same scope
+        slot.fact('SearchTimeline', Fact(limit=50, remaining=40, reset_at=clock.now + 60))
+    with pytest.raises(SnsError) as caught:
+        with guard('x', clock).request(scope='SearchTimeline'):
+            pass
+    assert caught.value.kind == 'scope_limit' and caught.value.details['reset'] >= clock.now + 590
+
+
+def test_charged_and_cancelled_requests_reach_the_log(data_dir, clock):
+    g = guard('threads', clock)
+    with g.request(setup=True) as slot:
+        slot.charge(30)
+    with g.request() as slot:
+        slot.cancel()
+    assert g.count == 30 and g.recent()['last_day'] == 30
+
+
+def test_the_checks_own_request_is_counted_once(data_dir, clock):
+    g = guard('naver_blog', clock)
+    with g.request() as slot:
+        slot.block('network_blocked')
+    checker = guard('naver_blog', clock)
+    with checker.verify_unblock() as check:
+        with checker.request() as inner:  # the client's one verification request
+            inner.classify('ok')
+        check.clear()
+    assert checker.count == 1 and checker.recent()['last_day'] == 2  # the block's request and the check

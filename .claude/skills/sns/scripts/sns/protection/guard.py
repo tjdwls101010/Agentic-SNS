@@ -59,14 +59,20 @@ def _alive(pid):
 class Slot:
     """One request (or one look at a tab) in progress, inside the lock."""
 
-    def __init__(self, guard, scope, reserved, setup, request_id):
+    def __init__(self, guard, scope, reserved, setup, request_id, logged=True):
         self._guard = guard
         self.scope = scope
         self.reserved = reserved
         self.setup = setup
         self.request_id = request_id
+        self.logged = logged      # whether charges go to the request log now (a look's are logged once, at its end)
         self.outcome = 'sent'
         self.facts = {}
+
+    @property
+    def answered(self):
+        """Whether an answer came back (it was classified or stated facts); a lost one leaves the request 'sent'."""
+        return self.outcome != 'sent' or bool(self.facts)
 
     def fact(self, scope, fact):
         """What the answer's rate-limit headers stated about `scope` (a limits.Fact)."""
@@ -90,12 +96,12 @@ class Slot:
     def charge(self, count):
         """Record how many requests this slot actually made, when more than were reserved (a tab load)."""
         if type(count) is int and count > self.reserved:
-            self._guard._add(count - self.reserved, self.setup)
+            self._guard._recount(self, count - self.reserved)
             self.reserved = count
 
     def cancel(self):
         """Nothing was sent (the tab was gone before the request): give the reservation back."""
-        self._guard._add(-self.reserved, self.setup)
+        self._guard._recount(self, -self.reserved)
         self.reserved = 0
 
 
@@ -106,6 +112,7 @@ class CheckSlot(Slot):
     def __init__(self, guard, scope, request_id, person):
         super().__init__(guard, scope, 1, True, request_id)
         self.person = person
+        self.used_inside = False  # the client's one verification request consumes this reservation
 
     def clear(self):
         self._guard._clear_person(self.person)
@@ -141,6 +148,20 @@ class Guard:
             self.setup += count
         else:
             self.used += count
+
+    def _recount(self, slot, extra):
+        """A slot made more requests than it reserved (a tab load), or none (cancelled): the counts, the request log
+        and a known scope's remaining follow."""
+        self._add(extra, slot.setup)
+        if slot.logged and extra:
+            line = {'id': slot.request_id, 'n': extra, 'outcome': 'sent' if extra > 0 else 'cancelled'}
+            if slot.scope is not None:
+                line['scope'] = slot.scope
+            self._log(line)
+        if self._scoped(slot.scope):
+            entry = self._scopes().get(slot.scope)
+            if entry and entry['status'] == 'known':
+                self._put_scope(slot.scope, {**entry, 'remaining': max(0, entry['remaining'] - extra)})
 
     def _unreadable(self, what='is unreadable'):
         return SnsError('blocked', f'Account protection state {what}, so requests are refused.',
@@ -318,7 +339,9 @@ class Guard:
             raise self._scope_error(scope, entry['reset_at'], entry['reset_at'])
         wait = max(0.0, entry.get('slow_until', 0) - now)
         if entry['status'] == 'probe':
-            wait = max(wait, entry['started_at'] + PROBE_SECONDS - now)
+            # another live command's first request to this scope: look again shortly; a dead or lost one counts as
+            # sent until the longest Aside call could have ended
+            wait = max(wait, 1.0 if _alive(entry['pid']) else entry['started_at'] + PROBE_SECONDS - now)
         if max(pace, wait) + CALL_SECONDS >= self.time_left():
             if wait > 0 and wait >= pace:
                 reset = entry.get('reset_at') or now + wait
@@ -357,8 +380,9 @@ class Guard:
                 self._apply_fact(name, fact, now)
         if self._scoped(slot.scope) and slot.scope not in slot.facts:
             entry = self._settle(self._scopes().get(slot.scope), now)
-            if entry['status'] == 'probe' and entry.get('pid') == os.getpid():
-                # answered without usable headers: the scope's limit stays unknown; pacing alone spaces requests
+            if entry['status'] == 'probe' and entry.get('pid') == os.getpid() and slot.answered:
+                # answered without usable headers: the scope's limit stays unknown; pacing alone spaces requests (a
+                # lost answer keeps the probe: the request may still be in flight)
                 self._put_scope(slot.scope, {'status': 'unknown', **self._lasting(entry, now)})
         if self._scoped(slot.scope):
             self.seen[slot.scope] = self._settle(self._scopes().get(slot.scope), now)
@@ -371,9 +395,15 @@ class Guard:
     def _apply_fact(self, name, fact, now):
         if not all(_number(v) for v in (fact.limit, fact.remaining, fact.reset_at)):
             return
-        current = self._scopes().get(name)
+        current = self._settle(self._scopes().get(name), now)
         entry = {'status': 'known', 'limit': fact.limit, 'remaining': fact.remaining, 'reset_at': fact.reset_at,
-                 'observed_at': now, **{k: v for k, v in self._lasting(current, now).items() if k == 'blocked_until'}}
+                 'observed_at': now}
+        # a stop in force outlives a later fact: an explicit one, and a spent window until its reset
+        stops = [current.get('blocked_until', 0)]
+        if current['status'] == 'known' and current['remaining'] <= 0:
+            stops.append(current['reset_at'])
+        if max(stops) > now:
+            entry['blocked_until'] = max(stops)
         remaining, limit = fact.remaining, fact.limit
         low = (self.policy.slow == 'fraction' and 0 < remaining < limit * self.policy.slow_fraction) or \
             (self.policy.slow == 'used' and 0 < remaining <= limit - remaining)
@@ -421,6 +451,11 @@ class Guard:
         """The critical section of one request (see the module docstring). setup=True counts it apart (opening a tab,
         recovery). Inside an unblock check it is part of that check: the same critical section, the block standing."""
         if self._held is not None:
+            held = self._held
+            if not held.used_inside and not setup and scope == held.scope:
+                held.used_inside = True  # the check's own request: already reserved, counted and logged
+                yield held
+                return
             request_id = self._reserve(None, kind, reserve, True)
             slot = Slot(self, scope, reserve, True, request_id)
             try:
@@ -448,7 +483,7 @@ class Guard:
     def observe(self, allow_blocked=False):
         """The critical section of looking at a tab without a request: a standing block stops it unless allow_blocked
         (emptying the tab, which sends nothing); a block the look sees is recorded before the lock is released."""
-        slot = Slot(self, None, 0, False, None)
+        slot = Slot(self, None, 0, False, None, logged=False)
         if self._held is not None:
             yield slot
             return

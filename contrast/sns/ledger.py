@@ -61,8 +61,8 @@ def request_logs(data_dir, platforms=None):
 
 def logged(logs, since):
     """Requests the skill sent at or after `since`."""
-    return sum(int(entry.get('n', 1)) for entry in _entries(logs, since) if entry.get('outcome') == 'sent'
-               or 'outcome' not in entry)
+    return sum(int(entry.get('n', 1)) for entry in _entries(logs, since)
+               if entry.get('outcome') in ('sent', 'cancelled', 'seen') or 'outcome' not in entry)
 
 
 def block_signal(logs, since):
