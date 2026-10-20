@@ -169,18 +169,24 @@
             "type": "photo",
             "media": [
               {
-                "kind": "image",
-                "url": "https://scontent.example.fbcdn.net/a.jpg",
+                "n": 1,
+                "kind": "photo",
+                "image_url": "https://scontent.example.fbcdn.net/a.jpg",
+                "video_url": null,
                 "width": 10,
                 "height": 20,
-                "alt": null
+                "alt": null,
+                "media_id": null
               },
               {
-                "kind": "image",
-                "url": "https://scontent.example.fbcdn.net/b.jpg",
+                "n": 2,
+                "kind": "photo",
+                "image_url": "https://scontent.example.fbcdn.net/b.jpg",
+                "video_url": null,
                 "width": 30,
                 "height": 40,
-                "alt": null
+                "alt": null,
+                "media_id": null
               }
             ]
           }
@@ -1161,11 +1167,14 @@
             "type": "photo",
             "media": [
               {
-                "kind": "image",
-                "url": "https://scontent.example.fbcdn.net/p1.jpg",
+                "n": 1,
+                "kind": "photo",
+                "image_url": "https://scontent.example.fbcdn.net/p1.jpg",
+                "video_url": null,
                 "width": 800,
                 "height": 600,
-                "alt": null
+                "alt": null,
+                "media_id": null
               }
             ]
           },
@@ -1174,18 +1183,14 @@
             "type": "video",
             "media": [
               {
-                "kind": "image",
-                "url": "https://scontent.example.fbcdn.net/poster.jpg",
+                "n": 1,
+                "kind": "video",
+                "image_url": "https://scontent.example.fbcdn.net/poster.jpg",
+                "video_url": "https://video.example.fbcdn.net/v1-hd.mp4",
                 "width": 1280,
                 "height": 720,
-                "alt": null
-              },
-              {
-                "kind": "video",
-                "url": "https://video.example.fbcdn.net/v1-hd.mp4",
-                "width": null,
-                "height": null,
-                "alt": null
+                "alt": null,
+                "media_id": null
               }
             ]
           }
@@ -1258,11 +1263,14 @@
             "type": "photo",
             "media": [
               {
-                "kind": "image",
-                "url": "https://scontent.example.fbcdn.net/one.jpg",
+                "n": 1,
+                "kind": "photo",
+                "image_url": "https://scontent.example.fbcdn.net/one.jpg",
+                "video_url": null,
                 "width": 960,
                 "height": 720,
-                "alt": "May be an image of text"
+                "alt": "May be an image of text",
+                "media_id": "M1"
               }
             ]
           }
@@ -1365,25 +1373,24 @@
             "type": "video",
             "media": [
               {
-                "kind": "image",
-                "url": "https://scontent.example.fbcdn.net/a1.jpg",
+                "n": 1,
+                "kind": "photo",
+                "image_url": "https://scontent.example.fbcdn.net/a1.jpg",
+                "video_url": null,
                 "width": 1280,
                 "height": 720,
-                "alt": "May be an image of 1 person"
+                "alt": "May be an image of 1 person",
+                "media_id": "M1"
               },
               {
-                "kind": "image",
-                "url": "https://scontent.example.fbcdn.net/poster.jpg",
-                "width": 1280,
-                "height": 720,
-                "alt": null
-              },
-              {
+                "n": 2,
                 "kind": "video",
-                "url": null,
-                "width": null,
-                "height": null,
-                "alt": null
+                "image_url": "https://scontent.example.fbcdn.net/poster.jpg",
+                "video_url": null,
+                "width": 1280,
+                "height": 720,
+                "alt": null,
+                "media_id": "M2"
               }
             ]
           }

@@ -1,0 +1,328 @@
+{
+ "about": "Bundled snapshot of the read queries: friendly name, default variables, the part of the response each must return, its cursor variable, and a doc_id last seen working. The live tab supplies newer ids and provider flags; these are the fallback.",
+ "snapshot_date": "2026-10-16",
+ "relay_provider_flags": {
+  "__relay_internal__pv__CometFeedShareMedia_shouldPrefetchShareImagerelayprovider": false,
+  "__relay_internal__pv__CometFeedStory_enable_post_permalink_white_space_clickrelayprovider": false,
+  "__relay_internal__pv__CometFeedStory_enable_reactor_facepilerelayprovider": false,
+  "__relay_internal__pv__CometFeedStory_enable_social_bubblesrelayprovider": false,
+  "__relay_internal__pv__CometImmersivePhotoCanUserDisable3DMotionrelayprovider": false,
+  "__relay_internal__pv__CometUFICommentActionLinksRewriteEnabledrelayprovider": true,
+  "__relay_internal__pv__CometUFICommentAutoTranslationTyperelayprovider": "AUTO_TRANSLATE",
+  "__relay_internal__pv__CometUFICommentAvatarStickerAnimatedImagerelayprovider": false,
+  "__relay_internal__pv__CometUFIReactionsEnableShortNamerelayprovider": false,
+  "__relay_internal__pv__CometUFIShareActionMigrationrelayprovider": true,
+  "__relay_internal__pv__CometUFISingleLineUFIrelayprovider": true,
+  "__relay_internal__pv__CometUFI_dedicated_comment_routable_dialog_gkrelayprovider": true,
+  "__relay_internal__pv__FBProfile_enable_perf_improv_gkrelayprovider": true,
+  "__relay_internal__pv__FBReelsIFUTileContent_reelsIFUPlayOnHoverrelayprovider": true,
+  "__relay_internal__pv__FBReelsMediaFooter_comet_enable_reels_ads_gkrelayprovider": true,
+  "__relay_internal__pv__FBReels_deprecate_short_form_video_context_gkrelayprovider": true,
+  "__relay_internal__pv__FBReels_enable_view_dubbed_audio_type_gkrelayprovider": true,
+  "__relay_internal__pv__FBUnifiedVideoFeedbackBar_comet_reels_save_button_gkrelayprovider": false,
+  "__relay_internal__pv__FBUnifiedVideoMediaContentContainer_comet_reels_video_footer_defer_loading_gkrelayprovider": true,
+  "__relay_internal__pv__FBUnifiedVideoMediaContentContainer_comet_video_document_picture_in_picture_gkrelayprovider": false,
+  "__relay_internal__pv__FBUnifiedVideoMediaContentContainer_enable_chapters_pill_gkrelayprovider": true,
+  "__relay_internal__pv__FBUnifiedVideoMediaFooter_comet_enable_reels_ads_gkrelayprovider": true,
+  "__relay_internal__pv__FBUnifiedVideoMediaFooter_enable_ai_embodiment_chat_pill_gkrelayprovider": false,
+  "__relay_internal__pv__FBUnifiedVideoMediaFooter_enable_group_character_ai_info_pill_gkrelayprovider": true,
+  "__relay_internal__pv__FBUnifiedVideoMediaFooter_enable_meta_ai_pill_gkrelayprovider": true,
+  "__relay_internal__pv__FBUnifiedVideoMediaFooter_enable_video_augment_pills_gkrelayprovider": true,
+  "__relay_internal__pv__FBUnifiedVideoMediaHeaderControls_enable_chapters_pill_gkrelayprovider": true,
+  "__relay_internal__pv__FBUnifiedVideoMenu_fb_reels_ranking_debug_tool_gkrelayprovider": false,
+  "__relay_internal__pv__GHLShouldChangeAdIdFieldNamerelayprovider": false,
+  "__relay_internal__pv__GHLShouldChangeSponsoredAuctionDistanceFieldNamerelayprovider": false,
+  "__relay_internal__pv__GHLShouldChangeSponsoredDataFieldNamerelayprovider": false,
+  "__relay_internal__pv__GHLShouldUseSponsoredAuctionLabelFieldNameV1relayprovider": false,
+  "__relay_internal__pv__GHLShouldUseSponsoredAuctionLabelFieldNameV2relayprovider": false,
+  "__relay_internal__pv__GroupsCometGYSJFeedItemHeightrelayprovider": 206,
+  "__relay_internal__pv__IsMergQAPollsrelayprovider": false,
+  "__relay_internal__pv__IsWorkUserrelayprovider": false,
+  "__relay_internal__pv__ProfileCometSeoIsViewerLoggedOutrelayprovider": false,
+  "__relay_internal__pv__ReelsIFUCard_reelsIFULikeCountrelayprovider": false,
+  "__relay_internal__pv__ShouldEnableBakedInTextStoriesrelayprovider": false,
+  "__relay_internal__pv__ShouldEnableBakedInTextUnifiedVideorelayprovider": false,
+  "__relay_internal__pv__StoriesShouldIncludeFbNotesrelayprovider": true,
+  "__relay_internal__pv__TestPilotShouldIncludeDemoAdUseCaserelayprovider": false,
+  "__relay_internal__pv__WorkCometIsEmployeeGKProviderrelayprovider": false,
+  "__relay_internal__pv__relay_provider_comet_ufi_ssr_seo_deferrelayprovider": true,
+  "__relay_internal__pv__usePushPipEngagementCounts_comet_video_document_picture_in_picture_gkrelayprovider": false,
+  "__relay_internal__pv__StoriesShouldEnablePhotosensitiveContentWarningrelayprovider": false,
+  "__relay_internal__pv__StoriesTrayTileCoverImageWidthrelayprovider": 110,
+  "__relay_internal__pv__StoriesTrayTileCoverImageHeightrelayprovider": 160,
+  "__relay_internal__pv__StoriesTrayTileShouldSkipPrefetchImageURIrelayprovider": false,
+  "__relay_internal__pv__StoriesTrayProfessionalInset3DEnabledrelayprovider": true,
+  "__relay_internal__pv__StoriesShouldEnableVideoAutoplayrelayprovider": true,
+  "__relay_internal__pv__GHLShouldChangeRHCSideFeedFieldNamerelayprovider": false,
+  "__relay_internal__pv__GHLShouldChangeRHCAdsFieldNamerelayprovider": false,
+  "__relay_internal__pv__GHLShouldChangeRHCFieldNamerelayprovider": false,
+  "__relay_internal__pv__WebPixelRatiorelayprovider": 2,
+  "__relay_internal__pv__GroupsCometGroupChatLazyLoadLastMessageSnippetrelayprovider": false,
+  "__relay_internal__pv__ProfileCometFeaturedHighlightsPortraitAspectRatioGKrelayprovider": true,
+  "__relay_internal__pv__FBUnifiedVideoCometVideoMedia_comet_photosensitive_content_warning_gkrelayprovider": false,
+  "__relay_internal__pv__FBUnifiedVideoMediaFooter_organic_ad_cta_on_comet_gkrelayprovider": false,
+  "__relay_internal__pv__FBUnifiedVideoPlayerScrubber_fb_comet_vpv_heatmap_gkrelayprovider": false,
+  "__relay_internal__pv__FBUnifiedVideoDescriptionWithEntities_comet_translations_revamp_sync_caption_with_audio_gkrelayprovider": false,
+  "__relay_internal__pv__CometAudioLanguageUtils_comet_translations_revamp_preferred_languages_gkrelayprovider": false,
+  "__relay_internal__pv__groups_comet_use_glvrelayprovider": false,
+  "__relay_internal__pv__GroupsCometGYSJUnifiedUnitCardImageHeightrelayprovider": 150
+ },
+ "queries": {
+  "newsfeed": {
+   "name": "CometNewsFeedPaginationQuery",
+   "doc_id": "28836147086016259",
+   "variables": {
+    "RELAY_INCREMENTAL_DELIVERY": true,
+    "clientSession": null,
+    "connectionClass": "EXCELLENT",
+    "count": 5,
+    "cursor": null,
+    "experimentalValues": null,
+    "feedLocation": "NEWSFEED",
+    "feedStyle": "DEFAULT",
+    "feedbackSource": 1,
+    "focusCommentID": null,
+    "orderby": [
+     "TOP_STORIES"
+    ],
+    "privacySelectorRenderLocation": "COMET_STREAM",
+    "recentVPVs": [],
+    "referringStoryRenderLocation": null,
+    "refreshMode": "AUTO",
+    "renderLocation": "homepage_stream",
+    "scale": 2,
+    "shouldChangeBRSLabelFieldName": false,
+    "shouldObfuscateCategoryField": false,
+    "shouldUseBRSLabelFieldNameV1": false,
+    "shouldUseBRSLabelFieldNameV2": false,
+    "useDefaultActor": false
+   },
+   "expected_key": "news_feed",
+   "kind": "connection",
+   "cursor_var": "cursor"
+  },
+  "timeline": {
+   "name": "ProfileCometTimelineFeedRefetchQuery",
+   "doc_id": "28178456998478510",
+   "variables": {
+    "afterTime": null,
+    "beforeTime": null,
+    "count": 5,
+    "cursor": null,
+    "feedLocation": "TIMELINE",
+    "feedbackSource": 0,
+    "focusCommentID": null,
+    "memorializedSplitTimeFilter": null,
+    "omitPinnedPost": false,
+    "postedBy": null,
+    "privacy": null,
+    "privacySelectorRenderLocation": "COMET_STREAM",
+    "referringStoryRenderLocation": null,
+    "renderLocation": "timeline",
+    "scale": 2,
+    "stream_count": 1,
+    "taggedInOnly": null,
+    "trackingCode": null,
+    "useDefaultActor": false
+   },
+   "expected_key": "timeline_list_feed_units",
+   "kind": "connection",
+   "cursor_var": "cursor"
+  },
+  "about": {
+   "name": "ProfileCometAboutAppSectionQuery",
+   "doc_id": "28116814231271102",
+   "variables": {
+    "appSectionFeedKey": null,
+    "collectionToken": null,
+    "pageID": null,
+    "rawSectionToken": null,
+    "scale": 2,
+    "sectionToken": null,
+    "showReactions": true,
+    "userID": null
+   },
+   "expected_key": "about_app_sections",
+   "kind": "connection",
+   "cursor_var": null
+  },
+  "group": {
+   "name": "GroupsCometFeedRegularStoriesPaginationQuery",
+   "doc_id": "28210515818590156",
+   "variables": {
+    "count": 5,
+    "cursor": null,
+    "feedLocation": "GROUP",
+    "feedType": "DISCUSSION",
+    "feedbackSource": 0,
+    "filterTopicId": null,
+    "focusCommentID": null,
+    "privacySelectorRenderLocation": "COMET_STREAM",
+    "referringStoryRenderLocation": null,
+    "renderLocation": "group",
+    "scale": 2,
+    "sortingSetting": "TOP_POSTS",
+    "stream_initial_count": 1,
+    "useDefaultActor": false
+   },
+   "expected_key": "group_feed",
+   "kind": "connection",
+   "cursor_var": "cursor"
+  },
+  "search": {
+   "name": "SearchCometResultsPaginatedResultsQuery",
+   "doc_id": "28673333072332198",
+   "variables": {
+    "allow_streaming": false,
+    "args": {
+     "callsite": "COMET_GLOBAL_SEARCH",
+     "config": {
+      "exact_match": false,
+      "high_confidence_config": null,
+      "intercept_config": null,
+      "sts_disambiguation": null,
+      "watch_config": null
+     },
+     "context": {
+      "bsid": null,
+      "tsid": null
+     },
+     "experience": {
+      "client_defined_experiences": [
+       "ADS_PARALLEL_FETCH"
+      ],
+      "encoded_server_defined_params": null,
+      "fbid": null,
+      "type": "GLOBAL_SEARCH"
+     },
+     "filters": [],
+     "text": ""
+    },
+    "count": 5,
+    "cursor": null,
+    "feedLocation": "SEARCH",
+    "feedbackSource": 23,
+    "fetch_filters": true,
+    "focusCommentID": null,
+    "locale": null,
+    "privacySelectorRenderLocation": "COMET_STREAM",
+    "referringStoryRenderLocation": null,
+    "renderLocation": "search_results_page",
+    "scale": 2,
+    "stream_initial_count": 0,
+    "useDefaultActor": false
+   },
+   "expected_key": "results",
+   "kind": "connection",
+   "cursor_var": "cursor"
+  },
+  "post": {
+   "name": "CometSinglePostDialogContentQuery",
+   "doc_id": "39514461348200004",
+   "variables": {
+    "feedLocation": "POST_PERMALINK_DIALOG",
+    "feedbackSource": 2,
+    "focusCommentID": null,
+    "privacySelectorRenderLocation": "COMET_STREAM",
+    "renderLocation": "permalink",
+    "scale": 2,
+    "shouldChangeNodeFieldName": true,
+    "useDefaultActor": false
+   },
+   "expected_key": "node_v2",
+   "kind": "object",
+   "cursor_var": null
+  },
+  "comments": {
+   "name": "CommentListComponentsRootQuery",
+   "doc_id": "28391659633867197",
+   "variables": {
+    "commentsIntentToken": null,
+    "feedLocation": "POST_PERMALINK_DIALOG",
+    "feedbackSource": 2,
+    "focusCommentID": null,
+    "scale": 2,
+    "useDefaultActor": false
+   },
+   "expected_key": "comments",
+   "kind": "connection",
+   "cursor_var": null
+  },
+  "comments_page": {
+   "name": "CommentsListComponentsPaginationQuery",
+   "doc_id": "39047933001517366",
+   "variables": {
+    "commentsAfterCount": -1,
+    "commentsAfterCursor": null,
+    "commentsBeforeCount": null,
+    "commentsBeforeCursor": null,
+    "commentsIntentToken": null,
+    "feedLocation": "POST_PERMALINK_DIALOG",
+    "focusCommentID": null,
+    "scale": 2,
+    "useDefaultActor": false
+   },
+   "expected_key": "comments",
+   "kind": "connection",
+   "cursor_var": "commentsAfterCursor"
+  },
+  "replies": {
+   "name": "Depth1CommentsListPaginationQuery",
+   "doc_id": "28470247145991012",
+   "variables": {
+    "clientKey": null,
+    "expansionToken": null,
+    "feedLocation": "POST_PERMALINK_DIALOG",
+    "focusCommentID": null,
+    "repliesAfterCount": null,
+    "repliesAfterCursor": null,
+    "repliesBeforeCount": null,
+    "repliesBeforeCursor": null,
+    "scale": 2,
+    "useDefaultActor": false
+   },
+   "expected_key": "replies_connection",
+   "kind": "connection",
+   "cursor_var": "repliesAfterCursor"
+  },
+  "replies_deep": {
+   "name": "Depth2CommentsListPaginationQuery",
+   "doc_id": null,
+   "variables": {
+    "clientKey": null,
+    "expansionToken": null,
+    "feedLocation": "POST_PERMALINK_DIALOG",
+    "focusCommentID": null,
+    "repliesAfterCount": null,
+    "repliesAfterCursor": null,
+    "repliesBeforeCount": null,
+    "repliesBeforeCursor": null,
+    "scale": 2,
+    "useDefaultActor": false
+   },
+   "expected_key": "replies_connection",
+   "kind": "connection",
+   "cursor_var": "repliesAfterCursor"
+  },
+  "group_root": {
+   "name": "CometGroupRootQuery",
+   "doc_id": "28847195208215631",
+   "variables": {
+    "scale": 2
+   },
+   "expected_key": "group",
+   "kind": "object",
+   "cursor_var": null
+  },
+  "group_about": {
+   "name": "CometGroupAboutRootQuery",
+   "doc_id": "28729876439996579",
+   "variables": {
+    "scale": 2
+   },
+   "expected_key": "group",
+   "kind": "object",
+   "cursor_var": null
+  }
+ }
+}
