@@ -38,7 +38,7 @@ def call(tmp_path, args, answer=None):
 @pytest.mark.parametrize('args, reason', [
     ({'host': 'evil.example', 'path': '/PostView.naver', 'accept': 'html'}, 'host'),
     ({'host': 'm.blog.naver.com', 'path': '/api/../PostWrite.naver', 'accept': 'json'}, 'path'),
-    ({'host': 'm.blog.naver.com', 'path': '/api/%2e%2e/PostWrite.naver', 'accept': 'json'}, 'path'),
+    ({'host': 'postfiles.pstatic.net', 'path': '/a/%2e%2e/b.jpg', 'accept': 'image'}, 'path'),  # the one broad pattern
     ({'host': 'm.blog.naver.com', 'path': '//evil.example/x', 'accept': 'json'}, 'path'),
     ({'host': 'm.blog.naver.com', 'path': '/PostView.naver', 'accept': 'image'}, 'accept'),
 ], ids=['host', 'dot-dot', 'encoded-dot-dot', 'scheme-relative', 'image-accept-on-a-page-host'])
