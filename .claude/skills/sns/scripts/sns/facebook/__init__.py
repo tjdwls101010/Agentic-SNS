@@ -5,7 +5,7 @@ import argparse
 
 from sns import reading
 from sns.errors import SnsError
-from sns.facebook import about, listing, search, thread, web
+from sns.facebook import about, images, listing, search, thread, web
 from sns.facebook.render import render
 from sns.limits import LimitPolicy
 from sns.window import WindowPolicy
@@ -23,7 +23,7 @@ PLATFORM = reading.Platform(
     # Facebook announces no limit: a 429 on any of the tab's requests holds the account for 30 minutes; a checkpoint
     # is the one block only a person clears
     policy=LimitPolicy(scope='account', hold_seconds=1800, person=('checkpoint',), pace=(1.0, 2.0)),
-    window=WindowPolicy(), connect=web.Client, render=render, schemas=web.SCHEMAS, locate=web.locate,
+    window=WindowPolicy(), connect=web.Client, render=render, schemas={**web.SCHEMAS, 'image': reading.IMAGE_SCHEMA}, locate=web.locate,
     unblock_scope=None, idle_action='blank')   # window.close() does not take on Facebook's tab (measured): empty it
 
 LIST = ['limit', 'chars', 'after', 'out', 'json']
@@ -161,6 +161,21 @@ COMMANDS = {
                    'requests: 1 to find the numeric id (none for a numeric id), 1 for the overview, then 1 per About tab; --section stops at the first tab that shows it.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
     },
+    'images': {
+        'help': 'Save the pictures of one post (a video by its poster) so they can be looked at.',
+        'run': _run(images.images),
+        'arguments': [(('target',), {'help': 'Post permalink URL'}),
+                      (('numbers',), {'nargs': '*', 'type': _positive, 'metavar': 'N',
+                                      'help': 'The pictures to save, by the numbers the post shows ([image N])'}),
+                      (('--all',), {'action': 'store_true', 'help': 'Save every picture of the post'}), 'json'],
+        'epilog': ['The post is read again (its picture links are signed and do not last), so N is the Nth picture as '
+                   'Facebook sends the post now; each saved line names its kind, size and media_id to match what the '
+                   'post showed. A video is saved as its poster image. Files go to the skill\'s data/images/ and are '
+                   'removed a day later; they are other people\'s pictures. A picture that could not be saved is named '
+                   'in coverage (exit 8).',
+                   'requests: 2 for the post (its page, then the post), then 1 per picture.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8),
+    },
 }
 
 # What every reading command's output holds beyond the shared description (the core's text names no Facebook record
@@ -176,3 +191,4 @@ TAB = ('the dedicated tab: the skill reads from its own www.facebook.com tab. Op
        'before it sends anything. The tab is emptied (about:blank) about 5 minutes after the last command.')
 for _name in ('feed', 'profile', 'group', 'post', 'comments', 'replies', 'search', 'about'):
     COMMANDS[_name]['epilog'] = [*COMMANDS[_name]['epilog'], RECORDS, TAB]
+COMMANDS['images']['epilog'] = [*COMMANDS['images']['epilog'], TAB]

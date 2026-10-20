@@ -1,6 +1,7 @@
 """Facebook's record lines: the dense text of a post, a comment, a person, page or group, an About field and a group
 card. The page frame (header, window, coverage, more:) is the core's; all clipping and labels live here, the records
 themselves are never shortened."""
+from sns.render import image as image_line
 from sns.text import count as _count, limit_of, line as _line, quote as _quote, shown as _shown, time as _time
 
 
@@ -10,8 +11,8 @@ def _handle(value):
 
 def _media(record):
     parts = []
-    for item in record.get('media') or []:
-        part = item.get('kind', 'photo')
+    for index, item in enumerate(record.get('media') or [], 1):
+        part = f'[image {item.get("n") or index}] ' + item.get('kind', 'photo')
         if item.get('alt'):
             part += ' alt=' + _quote(item['alt'])
         parts.append(part)
@@ -107,6 +108,9 @@ def render(envelope, chars, command):
         if kind == 'comment':
             counts['c'] += 1
             lines.append(comment(record, counts['c'], labels.get(record.get('parent_id')), limit))
+        elif kind == 'image':
+            counts['i'] = counts.get('i', 0) + 1
+            lines.append(image_line(record, f'i{counts["i"]}'))
         elif kind == 'about':
             lines.append(about(record))
         elif kind in ('person', 'page', 'group'):

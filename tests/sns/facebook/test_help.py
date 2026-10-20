@@ -75,7 +75,12 @@ def test_a_share_link_is_refused_by_the_help_before_the_command():
     assert 'Share links' in help_of('post') and 'fb.watch' in help_of('post')
 
 
-@pytest.mark.parametrize('name', list(COMMANDS))
+@pytest.mark.parametrize('name', [name for name in COMMANDS if name != 'images'])
 def test_every_command_names_its_records_and_its_tab(name):
     text = help_of(name)
     assert 'records: one block per record' in text and 'the dedicated tab' in text
+
+
+def test_images_names_the_tab_and_how_its_numbers_match_the_post():
+    text = help_of('images')
+    assert 'the dedicated tab' in text and '[image N]' in text
