@@ -129,6 +129,7 @@ COMMANDS = {
                       'chars', 'out', 'json'],
         'epilog': ['A handle names a batch: the first batch of a comment\'s replies, or the batch after one already shown (more: prints that one). It is not used up: running it again reads the same batch again, live.',
                    'Each reply that has replies of its own ends with replies <handle>, which reads that deeper branch. Facebook\'s reply count includes those deeper replies.',
+                   'A deeper branch (the replies under a reply, Facebook\'s last level) is one batch: asked for more, Facebook sends the same replies again, so it ends with stopped=server_capped and a coverage line counting what was not sent. Each of its replies names the comment it answers as its parent, which can be the top comment or another reply in the branch.',
                    'requests: 1 per batch of about 10 replies.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
         'check': check_replies,

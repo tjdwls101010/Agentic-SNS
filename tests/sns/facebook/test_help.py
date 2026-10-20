@@ -84,3 +84,7 @@ def test_every_command_names_its_records_and_its_tab(name):
 def test_images_names_the_tab_and_how_its_numbers_match_the_post():
     text = help_of('images')
     assert 'the dedicated tab' in text and '[image N]' in text
+
+
+def test_replies_says_a_deeper_branch_is_one_batch():
+    assert 'stopped=server_capped' in help_of('replies')

@@ -140,3 +140,20 @@ def test_the_replies_under_a_reply_are_its_whole_sub_thread_whoever_each_one_ans
     result = json.loads(out)
     assert code == 0, result
     assert [(r['id'], r['parent_id']) for r in result['results']] == [('D1', 'C1'), ('D2', 'D1'), ('D3', 'R1')]
+
+
+def test_the_replies_under_a_reply_are_one_batch_because_facebook_repeats_it_when_asked_for_more(browser):
+    """Observed 2026-10-21 (D6): asked for the next batch of a reply's replies (after or before cursor, with or without
+    a count), Facebook sends the first batch again. The first batch is all a reply's replies can give, said so; no
+    more: that would return the same replies."""
+    script_post(browser, [comment('C1', replies=50)], has_next=False)
+    code, out, _ = run(browser, 'post', URL)
+    serve(browser, 'C1', [comment('R1', replies=30, depth=1, parent='C1')], has_next=False)
+    code, out, _ = run(browser, 'replies', handle_of(out, 'c1'))
+    serve(browser, 'R1', [comment(f'D{i}', replies=0, depth=2, parent='C1') for i in range(1, 11)],
+          name='Depth2CommentsListPaginationQuery', has_next=True, cursor='DC1')
+    code, out, _ = run(browser, 'replies', handle_of(out, 'r1'))
+    assert code == 0, out
+    assert out.splitlines()[0] == 'facebook replies · 10 shown · stopped=server_capped · requests=1'
+    assert 'coverage: Facebook reports 30 replies under this comment (deeper ones included); 10 were sent' in out
+    assert 'more:' not in out

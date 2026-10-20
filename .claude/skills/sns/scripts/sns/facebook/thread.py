@@ -125,7 +125,13 @@ def _replies(platform, connection, invocation, start, out):
                                                                    start['post_url'], 2))
                 if number is not None:
                     record['replies_handle'] = number
-        return _page(batch)
+        page = _page(batch)
+        if start['depth'] >= 2 and page.next is not None:
+            # Asked for the next batch of a reply's replies (after or before cursor, with or without a count), Facebook
+            # sends the first one again (D6, observed 2026-10-21): the first batch is all there is to read.
+            # 성진: 둘째 단계 다음 묶음을 받는 길(화면의 '답글 더 보기'가 보내는 요청)을 찾으면 이 정지를 걷을 것
+            page.next, page.stop = None, 'server_capped'
+        return page
 
     def commit(records, page_state, reason, skipped):
         out.commit(records, page_state, reason, skipped)
