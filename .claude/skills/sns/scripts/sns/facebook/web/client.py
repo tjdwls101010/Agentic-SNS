@@ -506,8 +506,9 @@ class Client:
     # --- maintenance -----------------------------------------------------------------------------------------
 
     def verify(self, check):
-        """The one request that may lift a person block: the tab's own account, read with one feed query inside the
-        check (pacing and the deadline still hold, and nothing is retried or relearned: the answer decides). Clean
+        """The one check that may lift a person block: the tab's own account, read with one feed query inside the
+        check (pacing and the deadline still hold, and nothing is retried or relearned: the answer decides); when no
+        tab could be reused, opening one is the check and no query follows. Clean
         only when Facebook answers for the account the tab is logged in to and the block was recorded for it (or for
         no known account); anything else keeps the block and says why."""
         try:
@@ -518,6 +519,10 @@ class Client:
                 raise _keep_block('account_mismatch', f'it was recorded for Facebook account {blocked_for}, and the '
                                                       f'browser is logged in to {viewer}. A person should check which '
                                                       'account was blocked.')
+            if self.opened_now:
+                # no tab could be reused: opening one loaded the site as a person does and its first look was judged
+                # (checkpoint, login, account), which is the check; nothing more is sent while the block stands
+                return
             self.query('newsfeed', {**FEED_SORTS['top'], 'cursor': None, 'count': 1}, route=HOME)
         except SnsError as error:
             if error.reason == 'verification':

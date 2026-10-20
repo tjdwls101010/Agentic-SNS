@@ -133,7 +133,11 @@ def shared_commands(platform):
                        'is reported as exit 5 without touching the browser.',
                        '--unblock keeps the block while it checks with one request; only an answer for the account '
                        'the block was recorded for lifts it, and anything else leaves it (exit 5 with '
-                       'verification_reason). A rate limit (a hold, or a limit on one operation or bucket) is never '
+                       'verification_reason). '
+                       + ('When the dedicated tab is gone, opening it is the check (the site loads as when a person '
+                          'opens it, and its first look is judged) and nothing more is sent. '
+                          if platform.transport == 'tab' else '')
+                       + 'A rate limit (a hold, or a limit on one operation or bucket) is never '
                        'lifted by it: it passes at its time. It means nothing unless a person has looked at the site '
                        'in the Aside browser first. SNS_ASIDE_ACCOUNT (or SNS_ASIDE_ACCOUNT_<PLATFORM>) picks the '
                        'Aside account; SNS_IDLE_SECONDS sets when an unused dedicated tab is emptied (default 300, '

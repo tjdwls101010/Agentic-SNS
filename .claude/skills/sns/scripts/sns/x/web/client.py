@@ -532,8 +532,9 @@ class Client:
         return result if isinstance(result, dict) else {}
 
     def verify(self, check):
-        """The one request that may lift a person block: the tab's own account, read with one Viewer query inside the
-        check (X's Viewer limit, pacing and the deadline still hold). Clean only when X answers for this tab's account
+        """The one check that may lift a person block: the tab's own account, read with one Viewer query inside the
+        check (X's Viewer limit, pacing and the deadline still hold); when no tab could be reused, opening one is the
+        check. Clean only when X answers for this tab's account
         and the block was recorded for it (or for no known account); anything else keeps the block and says why."""
         try:
             viewer = self.start()
@@ -542,6 +543,10 @@ class Client:
                 raise _keep_block('account_mismatch', f'it was recorded for X account {blocked_for}, and the browser is '
                                                       f'logged in to {viewer}. A person should check which account was '
                                                       'locked.')
+            if self.opened_now:
+                # no tab could be reused (the idle cleanup closes it): opening one loaded x.com as a person does and its
+                # first look was judged (lock, challenge, login, account), which is the check; nothing more is sent
+                return
             root, _ = self.query('Viewer', {})
         except SnsError as error:
             if error.reason == 'verification':

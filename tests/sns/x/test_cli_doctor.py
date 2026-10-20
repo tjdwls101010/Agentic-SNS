@@ -12,7 +12,7 @@ import time
 from sns.session import Session
 from tests.sns.support.cli import CLI, run_cli
 from tests.sns.x.scenes import (ACCOUNT, ASIDE, ENVIRONMENT, MODULES, START, guard, known_tab, limits, opening,
-                                query_result, run, stand_block, stand_limit, state, state_of)
+                                queries, query_result, run, stand_block, stand_limit, state, state_of)
 
 OTHER = '1000000098'
 VIEWER = {'data': {'viewer': {'user_results': {'result': {'__typename': 'User', 'rest_id': ACCOUNT,
@@ -387,3 +387,15 @@ def test_help_explains_doctor_on_its_own():
     assert done.returncode == 0
     for word in ('--unblock', 'verification_reason', 'exit codes', '  5  '):
         assert word in done.stdout, word
+
+
+def test_unblock_without_a_tab_takes_the_opening_as_its_one_check(browser):
+    """Found by review (Threads and Facebook; X closes its idle tab, so this is X's usual case): with no tab to reuse,
+    --unblock opened one and then sent a Viewer query as well while the block stood. The opening, judged as it loads,
+    is the check; nothing more is sent."""
+    stand_block('account_locked')
+    opening(browser).respond('x.modules', MODULES)
+    code, out, _ = run(browser, 'doctor', '--unblock')
+    assert code == 0, out
+    assert state_of()['person'] is None and json.loads(out)['results'][0]['unblocked'] is True
+    assert queries(browser) == []

@@ -358,3 +358,14 @@ def test_the_idle_cleanup_empties_the_tab_even_while_a_block_stands(browser):
     browser.respond('threads.state', state())
     code, out, _ = idle(browser, '--token', 'any', '--after', '0')
     assert out['outcome'] == 'emptied' and 'threads.blank' in browser.ops()
+
+
+def test_unblock_without_a_tab_takes_the_opening_as_its_one_check(browser):
+    """Found by review: with no tab to reuse, --unblock opened one (the page's own ~33 requests) and then read /search
+    as well while the block stood. The opening, judged as it loads, is the check; nothing more is sent."""
+    stand_block('checkpoint')
+    opening(browser).respond('threads.modules', MODULES)
+    code, result, _ = doctor(browser, '--unblock')
+    assert code == 0, result
+    assert state_of()['person'] is None and result['results'][0]['unblocked'] is True
+    assert not [c for c in browser.calls() if c['op'] in ('threads.page', 'threads.query')]

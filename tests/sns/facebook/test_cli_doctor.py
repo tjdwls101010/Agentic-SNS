@@ -292,3 +292,22 @@ def test_help_explains_doctor_on_its_own():
     assert done.returncode == 0
     for word in ('--unblock', 'verification_reason', 'exit codes', '  5  '):
         assert word in done.stdout, word
+
+
+def test_unblock_without_a_tab_takes_the_opening_as_its_one_check(browser):
+    """Found by review: with no tab to reuse, --unblock opened one (the page's own ~30 requests) and then sent a feed
+    query as well, while the block stood. Opening the tab loads the site the way a person does and its first look is
+    judged (checkpoint, login, account): that is the check, and nothing more is sent."""
+    stand_block()
+    opening(browser).respond('facebook.modules', MODULES)
+    code, result, _ = doctor(browser, '--unblock')
+    assert code == 0, result
+    assert not state_of()['blocked'] and result['results'][0]['unblocked']
+    assert queries(browser) == []
+
+
+def test_unblock_without_a_tab_keeps_the_block_when_the_opened_page_is_a_checkpoint(browser):
+    stand_block()
+    opening(browser, location='https://www.facebook.com/checkpoint/123/', user_id=None)
+    code, result, _ = doctor(browser, '--unblock')
+    assert code == 5 and state_of()['person'] is not None and queries(browser) == []

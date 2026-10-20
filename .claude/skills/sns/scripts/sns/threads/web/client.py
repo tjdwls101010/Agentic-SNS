@@ -582,8 +582,8 @@ class Client:
         return (result or {}).get('live') or {}
 
     def verify(self, check):
-        """The one request that may lift a person block: the tab's own account, read through one document (/search)
-        inside the check (pacing and the deadline still hold). Clean only when Threads answers for this tab's account
+        """The one check that may lift a person block: the tab's own account, read through one document (/search)
+        inside the check (pacing and the deadline still hold); when no tab could be reused, opening one is the check. Clean only when Threads answers for this tab's account
         and the block was recorded for it (or for no known account); anything else keeps the block and says why."""
         try:
             viewer = self.start()
@@ -592,6 +592,10 @@ class Client:
                 raise _keep_block('account_mismatch', f'it was recorded for Threads account {blocked_for}, and the '
                                                       f'browser is logged in to {viewer}. A person should check which '
                                                       'account was blocked.')
+            if self.opened_now:
+                # no tab could be reused: opening one loaded the site as a person does and its first look was judged
+                # (checkpoint, login, account), which is the check; nothing more is sent while the block stands
+                return
             answer = classify.document(self.page('/search', kind='unblock_check'))
             if answer.kind != 'ok':
                 raise answer.error or SnsError('failed', 'The check did not show this account logged in.',
