@@ -5,3 +5,5 @@ __pycache__/
 tests/threads/captures/
 tests/twitter/captures/
 tests/reddit/captures/
+tests/sns/captures/
+contrast/sns/triggers/evals/results/
