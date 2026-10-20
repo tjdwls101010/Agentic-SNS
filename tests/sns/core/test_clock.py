@@ -1,12 +1,15 @@
 """The invocation clock in the suite's virtual mode (a stand-in Aside and SNS_TEST_NO_WAIT): sleeping moves time forward
 without waiting, and a later command in the same data directory starts where the earlier ones left time, as real time
 would (a resume right after a run cut short by its deadline must not find its own requests in the future)."""
+import pytest
+
 from sns.clock import Clock
 
 
 def virtual(monkeypatch, data_dir):
     launcher = data_dir.parent / 'aside'
     launcher.write_text('#!/bin/sh\nexec python3 tests/sns/fakes/fake_aside.py "$@"\n')  # what the suite's launcher is
+    launcher.chmod(0o755)
     monkeypatch.setenv('SNS_TEST_NO_WAIT', '1')
     monkeypatch.setenv('SNS_ASIDE_BIN', str(launcher))
     monkeypatch.setenv('SNS_FAKE_SCENARIO', str(data_dir / 'scenario.json'))
@@ -15,9 +18,10 @@ def virtual(monkeypatch, data_dir):
 
 def test_sleeping_moves_virtual_time_without_waiting(monkeypatch, data_dir):
     clock = virtual(monkeypatch, data_dir)
+    monkeypatch.setattr('sns.clock.time.sleep', lambda seconds: pytest.fail('a real sleep in virtual mode'))
     start = clock.time()
     clock.sleep(30)
-    assert clock.time() - start >= 30 and clock.slept == 30
+    assert clock.virtual and clock.time() - start >= 30 and clock.slept == 30
 
 
 def test_a_later_command_starts_where_earlier_ones_left_virtual_time(monkeypatch, data_dir):

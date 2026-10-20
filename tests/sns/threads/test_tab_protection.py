@@ -175,3 +175,30 @@ def test_a_checkpoint_and_a_rate_limit_among_the_tabs_signals_are_both_recorded(
                                                   signals=signals))
     code, out, _ = run(browser, 'feed', '--json')
     assert code == 5 and state_of()['person'] is not None and state_of()['hold'] is not None, out
+
+
+@pytest.mark.parametrize('failed_write', [1, 2])
+def test_the_tabs_signals_are_acknowledged_only_once_every_stop_they_name_is_saved(browser, monkeypatch, failed_write):
+    """Found by the third review: with a hold and a checkpoint among the signals, the hold's save acknowledged them, so
+    a failed save of the checkpoint left it acknowledged (the tab drops it) and recorded nowhere."""
+    import errno
+    import os
+    from pathlib import Path
+    known_tab(browser)
+    signals = [{'url': 'https://www.threads.com/graphql/query', 'status': 200, 'summary': CHECKPOINT, 'at': 101}]
+    browser.respond('threads.query', query_result(feed_body([], False, None), resources=2, statuses=[200, 429],
+                                                  signals=signals))
+    original, writes = os.replace, []
+
+    def replace(source, destination):
+        if Path(destination).name == 'blocks.json':
+            writes.append(1)
+            if len(writes) == failed_write:
+                raise OSError(errno.ENOSPC, 'simulated full disk')
+        return original(source, destination)
+
+    browser.install(monkeypatch)
+    monkeypatch.setattr('os.replace', replace)
+    import cli
+    code = cli.main(['threads', 'feed', '--json'])
+    assert code == 5 and Session('threads', ASIDE).ack == 0
