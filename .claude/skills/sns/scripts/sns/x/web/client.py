@@ -456,7 +456,7 @@ class Client:
                             stop = slot.hold(until=verdict.reset, scope=operation)  # recorded either way
                             raise login or stop  # a logout outranks the limit (the exit priority: block, login, limit)
                         if verdict.block:
-                            self._stop(slot, verdict)
+                            self._stop(slot, verdict, account_id=result.get('user_id'))  # the account that answered
                     if login is not None:
                         raise login  # the own answer was judged first: a block it met outranks a logout seen beside it
                     return result, verdict

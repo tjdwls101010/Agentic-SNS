@@ -344,3 +344,10 @@ def test_a_lock_in_an_answer_shown_to_another_account_is_still_recorded(browser)
                                                        user_id='1000000077'))
     code, out, _ = run(browser, 'feed')
     assert code == 5 and state_of()['person'] is not None, out
+
+
+def test_a_lock_in_an_answer_is_recorded_for_the_account_that_answered(browser):
+    known_tab(browser).respond('x.query', query_result('{"errors":[{"code":326,"message":"locked"}]}', status=403,
+                                                       user_id='1000000077'))
+    code, out, _ = run(browser, 'feed')
+    assert code == 5 and state_of()['person']['viewer'] == '1000000077', out

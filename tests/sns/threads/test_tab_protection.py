@@ -152,3 +152,26 @@ def test_a_checkpoint_in_the_answer_is_recorded_even_with_a_rate_limit_seen_besi
     recorded = state_of()
     assert recorded['person'] is not None and recorded['hold'] is not None
     assert code == 5 and json.loads(out)['error'] == 'blocked', out
+
+
+@pytest.mark.parametrize('with_signal', [False, True])
+def test_a_block_in_an_answer_is_recorded_for_the_account_that_answered(browser, with_signal):
+    """Found by the second review: the answer's checkpoint was recorded for the command's starting account, not the
+    one the answer came back under, so a later unblock checked the wrong account."""
+    known_tab(browser)
+    signals = [{'url': 'https://www.threads.com/graphql/query', 'status': 200, 'summary': CHECKPOINT, 'at': 101}] \
+        if with_signal else []
+    browser.respond('threads.query', query_result(CHECKPOINT, user_id='1000000077', signals=signals))
+    code, out, _ = run(browser, 'feed', '--json')
+    assert code == 5 and state_of()['person']['viewer'] == '1000000077', out
+
+
+def test_a_checkpoint_and_a_rate_limit_among_the_tabs_signals_are_both_recorded(browser):
+    """Found by the second review: only the strongest of the tab's signals was recorded; the hold beside the
+    checkpoint was lost, and an unblock would not have waited for it."""
+    known_tab(browser)
+    signals = [{'url': 'https://www.threads.com/graphql/query', 'status': 200, 'summary': CHECKPOINT, 'at': 101}]
+    browser.respond('threads.query', query_result(feed_body([], False, None), resources=2, statuses=[200, 429],
+                                                  signals=signals))
+    code, out, _ = run(browser, 'feed', '--json')
+    assert code == 5 and state_of()['person'] is not None and state_of()['hold'] is not None, out

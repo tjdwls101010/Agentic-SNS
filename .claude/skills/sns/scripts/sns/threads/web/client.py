@@ -293,6 +293,9 @@ class Client:
         strongest = classify.strongest(verdicts)
         moments = [s['at'] for s in signals if type(s.get('at')) in (int, float)]
         if strongest is not None and strongest.block:
+            # a hold beside a checkpoint is recorded too (the strongest decides only which error is raised)
+            for other in {v.block: v for v in verdicts if v.block and v.block != strongest.block}.values():
+                self._stop(slot, other, moments, report.get('user_id'), raise_=False)
             error = self._stop(slot, strongest, moments, report.get('user_id'), raise_=not defer)
             return error
         if moments:
@@ -406,7 +409,8 @@ class Client:
                         raise _first(pending, changed) or SnsError('failed', 'The request to Threads did not complete.',
                                                                    classify.RETRY_FIX, reason='network')
                     verdict = verdict_of(result)
-                    own = self._stop(slot, verdict, raise_=False) if verdict.block else None
+                    own = self._stop(slot, verdict, account_id=result.get('user_id'), raise_=False) \
+                        if verdict.block else None  # recorded for the account the answer came back under
                     first = _first(own, pending, changed)
                     if first is not None:
                         raise first
