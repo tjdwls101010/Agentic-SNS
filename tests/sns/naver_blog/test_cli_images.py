@@ -33,10 +33,10 @@ def test_images_saves_the_numbered_pictures_and_prints_their_paths(naver, data_d
     code, out, _ = naver.run('naver-blog', 'images', POST, '1', '4')
     assert code == 0, out
     assert 'requests=3' in first_line(out)
-    paths = [line.split(' · ')[-2] for line in out.splitlines() if line.startswith('[i')]
+    paths = [line.split('saved: ', 1)[1] for line in out.splitlines() if line.strip().startswith('saved: ')]
     assert len(paths) == 2 and all(p.startswith(str(data_dir / 'images') + '/naver-blog-') for p in paths)
     assert open(paths[0], 'rb').read() == PICTURE and paths[1].endswith('.png')
-    assert 'removed once 24 hours old' in out
+    assert out.splitlines()[1].startswith('[i1] [image 1] photo · ')  # the line every platform's images prints
     assert naver.fetches()[1]['query'] == {'type': 'w800'}
 
 
@@ -45,9 +45,9 @@ def test_a_saved_picture_is_a_record_with_the_shared_head(naver, data_dir):
     image(naver, path='/MjAyNjEw/two.jpg')
     code, out, _ = naver.run('naver-blog', 'images', POST, '2', '--json')
     record, = json.loads(out)['results']
-    assert (record['kind'], record['id'], record['url'], record['created_at']) == (
-        'image', 'image:cafe_note/224000000001#2', 'https://blog.naver.com/cafe_note/224000000001', None)
-    assert record['n'] == 2 and record['picture_kind'] == 'photo' and record['caption'] == '창가 자리'
+    assert (record['kind'], record['id'], record['created_at']) == ('image', 'cafe_note/224000000001#2', None)
+    assert record['url'].startswith('https://postfiles.pstatic.net/MjAyNjEw/two.jpg')  # the picture it was fetched from
+    assert record['n'] == 2 and record['media_kind'] == 'photo' and record['alt'] == '창가 자리'
     assert record['bytes'] == len(PICTURE) and record['content_type'] == 'image/jpeg'
 
 
@@ -104,7 +104,7 @@ def test_one_missing_photo_does_not_stop_the_others(naver, data_dir):
     naver.respond('postfiles.pstatic.net', '/MjAyNjEw/one.jpg', status=404, body='', content_type='text/html')
     image(naver, path='/MjAyNjEw/two.jpg')
     code, out, _ = naver.run('naver-blog', 'images', POST, '1', '2')
-    assert code == 8 and '[i1] image 2' in out and 'image 1 not saved' in out
+    assert code == 8 and '[i1] [image 2]' in out and 'picture 1:' in out
     assert 'coverage: incomplete' in out
 
 
@@ -113,7 +113,7 @@ def test_a_picture_over_ten_megabytes_is_named_and_not_saved(naver, data_dir):
     image(naver, path='/MjAyNjEw/one.jpg', b64=None, oversize=11 * 1024 * 1024)
     image(naver, path='/MjAyNjEw/two.jpg')
     code, out, _ = naver.run('naver-blog', 'images', POST, '1', '2')
-    assert code == 8 and 'image 1 not saved' in out and 'larger than 10 MB' in out and '[i1] image 2' in out
+    assert code == 8 and 'picture 1:' in out and 'larger than 10 MB' in out and '[i1] [image 2]' in out
 
 
 def test_a_picture_hosted_outside_naver_is_named_and_skipped(naver, data_dir):
@@ -121,7 +121,7 @@ def test_a_picture_hosted_outside_naver_is_named_and_skipped(naver, data_dir):
     naver.respond(M, '/PostView.naver', body=html, content_type='text/html')
     image(naver, host='dthumb-phinf.pstatic.net', path='/')
     code, out, _ = naver.run('naver-blog', 'images', 'popup_blog/224000000002', '1', '2')
-    assert code == 8 and '[i1] image 2' in out and 'image 1 not saved' in out and 'www.reviewplace.example' in out
+    assert code == 8 and '[i1] [image 2]' in out and 'picture 1:' in out and 'www.reviewplace.example' in out
     assert 'more:' not in out and [c['args']['host'] for c in naver.calls() if c['op'] == 'naver_blog.fetch'] == [
         'm.blog.naver.com', 'dthumb-phinf.pstatic.net']
 

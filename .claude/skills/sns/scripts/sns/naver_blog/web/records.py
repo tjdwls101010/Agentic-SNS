@@ -426,21 +426,6 @@ class Resolved(Record):
     post: str | None = None
 
 
-@dataclass
-class Saved(Record):
-    """One picture images saved: Read its path to look at it."""
-    kind: str = 'image'
-    id: str | None = None
-    url: str | None = None
-    created_at: str | None = None
-    n: int | None = None
-    picture_kind: str | None = None
-    caption: str | None = None
-    path: str | None = None
-    bytes: int = 0
-    content_type: str | None = None
-
-
 # What each field means to a reader, beside its type; schema prints these.
 _HEAD = {'kind': 'the record type', 'created_at': 'an ISO time with its offset (KST), or null when there is none'}
 NOTES = {
@@ -493,11 +478,6 @@ NOTES = {
              'post': 'blogId/logNo when the destination is a Naver Blog post'},
     'group': {'__doc__': 'One of the logged-in account\'s neighbor groups (buddies --groups).', 'url': 'null',
               'created_at': 'null', 'group_id': 'what buddies --group and feed --group take'},
-    'image': {'__doc__': 'One picture images saved: other people\'s photos, removed 24 hours after saving.',
-              'id': 'image:<blogId>/<logNo>#<n>', 'url': 'the post the picture is in', 'created_at': 'null',
-              'n': 'the picture number post shows ([image N])',
-              'picture_kind': 'photo, sticker, cover, thumbnail or map',
-              'path': 'the local file; Read it to look at the picture'},
 }
 
 

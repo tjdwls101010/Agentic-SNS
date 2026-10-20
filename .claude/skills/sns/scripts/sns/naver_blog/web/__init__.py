@@ -13,7 +13,7 @@ ROUTES, OPERATIONS = routes.ROUTES, routes.OPERATIONS
 
 Post, Comment, Blog, Category, Buddy, Topic = (records.Post, records.Comment, records.Blog, records.Category,
                                                records.Buddy, records.Topic)
-Clip, Keyword, Group, Resolved, Saved = records.Clip, records.Keyword, records.Group, records.Resolved, records.Saved
+Clip, Keyword, Group, Resolved = records.Clip, records.Keyword, records.Group, records.Resolved
 post_record, comment_record, thread_comments, comment_counts = (records.post_record, records.comment_record,
                                                                 records.thread_comments, records.comment_counts)
 blog_record, categories = records.blog_record, records.categories
@@ -25,7 +25,7 @@ parse_post, link_of, PostDoc = body.parse, body.link_of, body.PostDoc
 POST_READ_NOTES = body.NOTES
 
 __all__ = ['Blog', 'Buddy', 'Category', 'Client', 'Clip', 'Comment', 'Fetched', 'Group', 'OPERATIONS', 'Policy', 'Post',
-           'PostDoc', 'POST_READ_NOTES', 'RECORD_NOTES', 'ROUTES', 'Resolved', 'Saved', 'Target', 'Topic', 'UNKNOWN',
+           'PostDoc', 'POST_READ_NOTES', 'RECORD_NOTES', 'ROUTES', 'Resolved', 'Target', 'Topic', 'UNKNOWN',
            'allowed', 'at', 'blog_record', 'build_request', 'buddy_record', 'categories', 'classify', 'clean',
            'clip_record', 'comment_counts', 'comment_record', 'encoded', 'frame_blog_id', 'group_record',
            'keyword_records', 'link_of', 'locate', 'numbered', 'parse_post', 'parse_target', 'policy', 'post_record',

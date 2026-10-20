@@ -4,6 +4,7 @@ command. All clipping lives here; records are never shortened (--json and --out 
 silence; a field this reader could not determine says unknown. The page's frame (first line, window, coverage, more:)
 is the shared render's.
 """
+from sns.render import image as image_line
 from sns.text import limit_of, line, quote
 
 # The label of each kind: [p1] posts, [c1] comments, [b1] blogs and neighbors, [k1] keywords ...
@@ -153,8 +154,7 @@ def record_lines(record, label, chars):
     if kind == 'link':
         return link_lines(record, label)
     if kind == 'image':
-        return [_join([f'[{label}] image {record.get("n")}', record.get('picture_kind'), record.get('caption'),
-                       record.get('path'), f'{round(record.get("bytes", 0) / 1000)}KB'])]
+        return image_line(record, label).split('\n')
     if kind == 'topic':
         return [_join([f'[{record.get("seq")}] {record.get("name")}', record.get('group')])]
     return [f'[{label}] ' + _join(str(value) for key, value in record.items() if key != 'id' and value not in (None, ''))]

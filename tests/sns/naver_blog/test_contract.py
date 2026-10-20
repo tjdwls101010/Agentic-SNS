@@ -16,7 +16,7 @@ KIND = {'post_read': 'post', 'link': 'link', 'image': 'image'}
 
 
 def described(name):
-    return set(PLATFORM.schemas[name]['fields'])
+    return {key for entry in PLATFORM.schemas[name]['fields'] for key in entry.split(', ')}
 
 
 def built():
@@ -37,7 +37,9 @@ def built():
     found += [('keyword', k.to_dict()) for k in web.keyword_records([{'keyword': 'a'}, 'b'])]
     found += [('group', web.group_record({'groupId': 3, 'groupName': 'g'}).to_dict())]
     found += [('link', web.Resolved(id='link:naver.me/x', url='naver.me/x', link='naver.me/x', status=302).to_dict())]
-    found += [('image', web.Saved(id='image:b/1#1', url='https://blog.naver.com/b/1', n=1).to_dict())]
+    found += [('image', {'kind': 'image', 'id': 'b/1#1', 'url': 'https://postfiles.pstatic.net/a.jpg', 'created_at': None,
+                         'n': 1, 'media_kind': 'photo', 'media_id': None, 'alt': None, 'width': None, 'height': None,
+                         'bytes': 1, 'content_type': 'image/jpeg', 'path': '/tmp/a.jpg'})]  # the shared image record
     body = fixture('body.json')['full']
     html = (FIXTURES / body['file']).read_text(encoding='utf-8')
     found += [('post_read', web.parse_post(html, **body['request']).to_dict())]
@@ -58,7 +60,7 @@ def test_every_object_schema_describes_its_record_and_the_listing_is_complete():
     assert set(PLATFORM.schemas) == {'post', 'post_read', 'comment', 'blog', 'category', 'buddy', 'topic', 'clip',
                                      'keyword', 'group', 'link', 'image'}
     for name, document in PLATFORM.schemas.items():
-        assert document['object'] == name and document['description'] and HEAD <= set(document['fields']), name
+        assert document['object'] == name and document['description'] and HEAD <= described(name), name
         assert all(' — ' in text for text in document['fields'].values()), name
 
 
