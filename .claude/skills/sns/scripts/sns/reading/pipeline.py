@@ -72,6 +72,22 @@ class Connection:
                                     f'{viewer} during this command.', 'Run the command again to read as the current '
                                                                       'account.', reason='account_changed')
 
+    def handle(self, command, state, target=None, identity=None):
+        """Save a numbered handle another command continues from (a reply's branch, the next batch, hidden replies):
+        bound to this platform, `command`, `target`, `identity` and the Aside account, and carrying the account it was
+        read with. Returns the number to print (e.g. `replies <number>`)."""
+        bound = context(self.platform, command, target, identity or {}, self.account)
+        viewer = self.observed or self._viewer or self.viewer()
+        return handles.save(bound, state, viewer=viewer, deadline=self.deadline)
+
+    def resume(self, number, command, target=None, identity=None):
+        """The state a handle saved for `command` (and target, identity); a handle of another command is an argument
+        error naming where it belongs, one read as another account a changed login."""
+        state, viewer = handles.load(number, context(self.platform, command, target, identity or {}, self.account))
+        self.observed = viewer
+        self.confirm(viewer)
+        return state
+
     def confirm(self, saved):
         """A continued reading must be read as the account it was read with: a different one is a changed login."""
         if saved is None:
@@ -255,12 +271,16 @@ def _promote_sections(reading):
     """A composite command's failed sections become its failure (the worst one), so continuations, --out endings
     and the result kind treat them like any other; what the other sections read stays beside it."""
     sections = reading.get('sections')
-    if not sections or reading.get('failure') is not None:
+    if not sections:
         return
     failed = [s['error'] for s in sections if not s.get('ok')]
     if not failed:
         return
     worst = min(failed, key=_section_rank)
+    current = reading.get('failure')
+    if isinstance(current, SnsError) and _section_rank({'kind': current.kind, 'reason': current.reason}) <= \
+            _section_rank(worst):
+        return  # the reading's own failure is at least as grave
     reading['failure'] = SnsError(worst['kind'], worst['message'], worst['fix'], reason=worst.get('reason'),
                                   **(worst.get('details') or {}))
     reading['partial'] = any(s.get('ok') and s.get('data') for s in sections)

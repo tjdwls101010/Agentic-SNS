@@ -163,8 +163,11 @@ def alpha_card(invocation):
         path = urlsplit(target).path
         reading.section(sections, 'post', lambda: connection.client.get({'path': path}), primary=True)
         reading.section(sections, 'comments', lambda: connection.client.get({'path': path + '/comments'}))
-        return {'sections': sections, 'stop_reason': 'exhausted',
-                'continuation': {'command': 'card', 'target': target, 'identity': {}, 'words': [], 'state': {}}}
+        result = {'sections': sections, 'stop_reason': 'exhausted',
+                  'continuation': {'command': 'card', 'target': target, 'identity': {}, 'words': [], 'state': {}}}
+        if invocation.options.get('chars') == 5:  # a test switch: the reader reports a failure of its own too
+            result['failure'] = SnsError('failed', 'A soft failure.', 'Retry.')
+        return result
     return reading.run(ALPHA_PLATFORM, invocation, command='card', target=target, identity={}, reader=reader,
                        bound=False)
 
@@ -180,7 +183,8 @@ ALPHA = SimpleNamespace(
         'ranked': {'help': 'Read the ranked alpha feed.', 'run': alpha_ranked, 'arguments': ['since', 'until', *LIST],
                    'epilog': ['It never ends by itself: --out needs --limit.'], 'exits': (0, 2, 3, 4, 5, 6, 7, 8)},
         'card': {'help': 'Read one alpha post and its comments.', 'run': alpha_card,
-                 'arguments': [(('target',), {'metavar': 'URL', 'help': 'https://alpha.test/p/<id>'}), 'json'],
+                 'arguments': [(('target',), {'metavar': 'URL', 'help': 'https://alpha.test/p/<id>'}), 'chars',
+                               'json'],
                  'exits': (0, 2, 3, 4, 5, 6, 8, 9)},
         'post': {'help': 'Read one alpha post.', 'run': alpha_post,
                  'arguments': [(('target',), {'metavar': 'URL', 'help': 'https://alpha.test/p/<id>'}), 'chars', 'json'],

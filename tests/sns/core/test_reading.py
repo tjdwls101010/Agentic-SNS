@@ -404,3 +404,34 @@ def test_idle_retries_a_cleanup_that_failed(capsys, browser, monkeypatch):
     monkeypatch.setattr(stub_platform.BetaClient, 'release_tab', flaky)
     invocation = reading.Invocation({}, Deadline(30), {}, cli.__file__)
     assert reading.idle(BETA.PLATFORM, invocation, 'u0', 'any', 0) == 'emptied' and len(attempts) == 2
+
+
+def test_a_reader_can_save_and_resume_handles_of_its_own(browser, monkeypatch):
+    """A thread command names several handles at once (the next batch, hidden replies, each reply's branch); they are
+    bound to the platform, command, target and Aside account, and carry the account they were read with."""
+    me(browser, 'ann')
+    me(browser, 'ann')  # each new connection of a fetch platform asks once
+    browser.install(monkeypatch)
+    invocation = reading.Invocation({}, Deadline(30), {}, cli.__file__)
+    connection = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    number = connection.handle('replies', {'kind': 'branch', 'cursor': 'B1'}, target='i1')
+    again = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    assert again.resume(number, 'replies', target='i1') == {'kind': 'branch', 'cursor': 'B1'}
+    from sns.errors import SnsError
+    with pytest.raises(SnsError) as caught:
+        again.resume(number, 'feed')
+    assert caught.value.kind == 'argument' and 'alpha replies' in caught.value.message
+    me(browser, 'bob')
+    browser.install(monkeypatch)
+    other = reading.Connection(ALPHA.PLATFORM, invocation).start()
+    with pytest.raises(SnsError) as caught:
+        other.resume(number, 'replies', target='i1')
+    assert caught.value.kind == 'login'
+
+
+def test_a_worse_section_failure_wins_over_a_top_level_one(capsys, browser, monkeypatch):
+    browser.respond('alpha.get', {'status': 200, 'body': {'id': 'i1', 'text': 't', 'url': 'u'}}, path='/p/i1')
+    browser.respond('alpha.get', {'status': 200, 'body': {'network_blocked': True}}, path='/p/i1/comments')
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'card', 'https://alpha.test/p/i1', '--json',
+                    '--chars', '5')  # --chars 5 makes the stub report a soft failure of its own beside the sections
+    assert code == 5 and json.loads(out)['error'] == 'blocked'

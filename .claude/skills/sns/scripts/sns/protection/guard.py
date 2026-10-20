@@ -103,6 +103,7 @@ class Slot:
         """Nothing was sent (the tab was gone before the request): give the reservation back."""
         self._guard._recount(self, -self.reserved)
         self.reserved = 0
+        self.outcome = 'cancelled'  # an answer of sorts: nothing is in flight
 
 
 class CheckSlot(Slot):
@@ -339,9 +340,13 @@ class Guard:
             raise self._scope_error(scope, entry['reset_at'], entry['reset_at'])
         wait = max(0.0, entry.get('slow_until', 0) - now)
         if entry['status'] == 'probe':
-            # another live command's first request to this scope: look again shortly; a dead or lost one counts as
-            # sent until the longest Aside call could have ended
-            wait = max(wait, 1.0 if _alive(entry['pid']) else entry['started_at'] + PROBE_SECONDS - now)
+            # another live command's first request to this scope: never go before it is answered (pacing may not
+            # cover it), look again shortly; a dead or lost one counts as sent until the longest Aside call could
+            # have ended
+            if _alive(entry['pid']):
+                wait = max(wait, 1.0, pace + 0.001)
+            else:
+                wait = max(wait, entry['started_at'] + PROBE_SECONDS - now)
         if max(pace, wait) + CALL_SECONDS >= self.time_left():
             if wait > 0 and wait >= pace:
                 reset = entry.get('reset_at') or now + wait

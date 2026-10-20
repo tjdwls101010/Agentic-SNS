@@ -532,3 +532,27 @@ def test_the_checks_own_request_is_counted_once(data_dir, clock):
             inner.classify('ok')
         check.clear()
     assert checker.count == 1 and checker.recent()['last_day'] == 2  # the block's request and the check
+
+
+def test_pacing_never_lets_a_request_take_over_a_live_commands_probe(data_dir, clock):
+    directory = files(data_dir, 'reddit')
+    directory.mkdir(parents=True)
+    alive = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])
+    try:
+        (directory / 'scopes.json').write_text(json.dumps(
+            {'general': {'status': 'probe', 'pid': alive.pid, 'started_at': clock.now}}))
+        (directory / 'pace.json').write_text(json.dumps({'next_allowed_at': clock.now + 1.9}))
+        with pytest.raises(SnsError):
+            with guard('reddit', clock, seconds=8).request(scope='general'):
+                pass
+        assert json.loads((directory / 'scopes.json').read_text())['general']['pid'] == alive.pid
+    finally:
+        alive.kill()
+        alive.wait()
+
+
+def test_a_cancelled_probe_is_not_a_lost_one(data_dir, clock):
+    g = guard('reddit', clock)
+    with g.request(scope='general') as slot:
+        slot.cancel()  # the tab was gone: nothing was sent
+    assert g.snapshot()['scopes']['general']['status'] == 'unknown'
