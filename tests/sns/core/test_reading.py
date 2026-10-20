@@ -198,11 +198,21 @@ def test_a_newest_first_window_closes_at_since(capsys, browser, monkeypatch):
     assert '[p1] i2' in out and '[p2] i3' in out and 'i4' not in out and 'i1 ' not in out
 
 
+def test_a_window_on_a_ranked_surface_reads_one_page_as_a_sample(capsys, browser, monkeypatch):
+    me(browser)
+    browser.respond('alpha.get', {'status': 200, 'body': {'items': [item(1, '2026-10-12'), item(2, '2026-10-10')],
+                                                          'next': 'R2'}}, path='/ranked', cursor=None)
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'ranked', '--since', '2026-10-10')
+    lines = out.splitlines()
+    assert code == 0 and lines[1].endswith('· sample (not in date order)') and more_line(out)
+    assert len(requests_sent(browser)) == 2  # the account, then one page
+
+
 def test_a_listing_that_ends_before_the_window_is_partial(capsys, browser, monkeypatch):
     me(browser)
     feed(browser, None, [item(1, '2026-10-12')], None)
     code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--since', '2026-10-01')
-    assert code == 7 or code == 8
+    assert code == 8 and "[p1] i1" in out
     assert 'not covered' in out
 
 

@@ -8,7 +8,8 @@ It understands every call the skill makes:
   "opener" response, then waits for stdin to close; with "opener_end_closes_tab" the tab disappears then.
 - `aside --account A repl <program>`: the program starts with `const ASIDE = {...};` and `const ARGS = {...};`.
   ASIDE.op tabs lists the scenario's tabs; evaluate, load and run answer from the scripted responses. A function names
-  itself with `// sns-snippet: <platform>.<name>`; the response op is that name ("load:" in front for load). A snippet
+  itself with `// sns-snippet: <platform>.<name>` (the last such marker, after any shared library it carries); the
+  response op is that name ("load:" in front for load). A snippet
   named *.blank empties its tab, *.close removes it unless "close_fails".
 Responses come from SNS_FAKE_SCENARIO: {"tabs": [...], "responses": [{"op", "match", "response"}], ...}; the first
 unused response whose op fits and whose match is a subset of ARGS is used. A response may be {"__raw_stdout": "...",
@@ -153,8 +154,9 @@ def answer(program, account):
             return 1
         emit([{'targetId': t['id'], 'url': t['url']} for t in scenario['tabs']])
         return 0
+    # a page function may carry a shared library first (X's kit): its own marker is the last one in the program
     names = [n for n in re.findall(r'// sns-snippet: ([a-z_]+\.[a-z_]+)', program) if not n.startswith('aside.')]
-    snippet = names[0] if names else 'unnamed'
+    snippet = names[-1] if names else 'unnamed'
     op = 'load:' + snippet if aside['op'] == 'load' else snippet
     log({'op': op, 'tab': aside.get('tab'), 'args': args, 'url': aside.get('url'), 'account': account})
     if aside['op'] != 'run':

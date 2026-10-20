@@ -132,8 +132,11 @@ def alpha_ranked(invocation):
     def reader(connection, state, out):
         return reading.read_list(connection, state, out, order='ranked', command='ranked', target=None, identity={},
                                  fetch=lambda cursor: connection.client.page('/ranked', cursor))
+    options = invocation.options
+    window = {'since': options.get('since'), 'until': options.get('until'), 'order': 'ranked'} \
+        if options.get('since') or options.get('until') else None
     return reading.run(ALPHA_PLATFORM, invocation, command='ranked', target=None, identity={}, reader=reader,
-                       endless=True)
+                       endless=True, window=window)
 
 
 def alpha_post(invocation):
@@ -156,7 +159,7 @@ ALPHA = SimpleNamespace(
                  'arguments': ['since', 'until', *LIST], 'epilog': ['Without --limit, a window or --out it reads one '
                                                                     'page; more: continues.'],
                  'exits': (0, 2, 3, 4, 5, 6, 7, 8)},
-        'ranked': {'help': 'Read the ranked alpha feed.', 'run': alpha_ranked, 'arguments': list(LIST),
+        'ranked': {'help': 'Read the ranked alpha feed.', 'run': alpha_ranked, 'arguments': ['since', 'until', *LIST],
                    'epilog': ['It never ends by itself: --out needs --limit.'], 'exits': (0, 2, 3, 4, 5, 6, 7, 8)},
         'post': {'help': 'Read one alpha post.', 'run': alpha_post,
                  'arguments': [(('target',), {'metavar': 'URL', 'help': 'https://alpha.test/p/<id>'}), 'chars', 'json'],
