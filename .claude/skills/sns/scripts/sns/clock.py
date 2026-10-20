@@ -13,12 +13,15 @@ KST = timezone(timedelta(hours=9), 'KST')
 
 
 class Clock:
-    """Wall and monotonic time and sleep. With a stand-in Aside (SNS_ASIDE_BIN) and SNS_TEST_NO_WAIT, sleeping moves a
-    virtual offset instead of the process: waits keep their order and their effect on the deadline, the suite does not
-    spend minutes. Against the real browser the switch does nothing."""
+    """Wall and monotonic time and sleep. With the suite's fake Aside (SNS_ASIDE_BIN and SNS_FAKE_SCENARIO) and
+    SNS_TEST_NO_WAIT, sleeping moves a virtual offset instead of the process: waits keep their order and their effect on
+    the deadline, the suite does not spend minutes. Against the real browser the switch does nothing."""
 
     def __init__(self):
-        self.virtual = bool(os.environ.get('SNS_TEST_NO_WAIT') and os.environ.get('SNS_ASIDE_BIN'))
+        # only the suite's fake Aside (which needs its scenario) may move time without waiting: a real aside named in
+        # SNS_ASIDE_BIN with a stray SNS_TEST_NO_WAIT still paces for real
+        self.virtual = bool(os.environ.get('SNS_TEST_NO_WAIT') and os.environ.get('SNS_ASIDE_BIN')
+                            and os.environ.get('SNS_FAKE_SCENARIO'))
         self.offset = 0.0
         self.slept = 0.0  # seconds this invocation waited, virtual or real
         # Virtual time goes on from where earlier commands in this data directory left it, as real time would: a
