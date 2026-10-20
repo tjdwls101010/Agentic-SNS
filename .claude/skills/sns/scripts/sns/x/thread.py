@@ -14,13 +14,6 @@ from sns.paging import paginate
 from sns.x import web
 
 
-def _stops_continuing(failure):
-    """After a login wall, a person block or a deleted post a further handle would only invite the same refusal; a stop
-    that passes by itself (a limit, the time limit) does not."""
-    return isinstance(failure, SnsError) and (failure.kind in ('login', 'unavailable') or (
-        failure.kind == 'blocked' and failure.reason != 'rate_limited'))
-
-
 def _handle(connection, result, state):
     """A handle of the command replies for `state`; when it cannot be saved, None, and the failure stays on `result`
     beside what was read (a partial result, not a lost one)."""
@@ -186,7 +179,7 @@ def _replies(platform, connection, invocation, start, out):
     if unread[0]:
         reading_['coverage'] = [*(reading_.get('coverage') or []), f'{unread[0]} replies this skill could not read '
                                 'were left out (X may have changed its answer)']
-    if result['state'] is not None and out is None and not _stops_continuing(result['failure']):
+    if result['state'] is not None and out is None and not reading.stops_continuing(result['failure']):
         following = _handle(connection, unsaved, {**start, 'cursor': result['state']['cursor'],
                                                   'pending': result['state']['pending'],
                                                   'seen': result['state']['seen']})

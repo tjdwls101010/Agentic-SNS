@@ -48,13 +48,14 @@ def read_json(path, fail):
 
 
 @contextmanager
-def locked(path, deadline, fail, sleep=time.sleep):
+def locked(path, deadline, fail, sleep=time.sleep, unavailable=None):
     """An exclusive lock on `path`, waited for until `deadline` runs out (`deadline` None: as long as it takes);
-    `fail()` is raised when the file cannot be opened or the lock does not come in time."""
+    `fail()` is raised when the lock does not come in time, `unavailable()` (default: `fail()`) when the file cannot
+    be opened at all."""
     try:
         stream = open(path, 'a')
     except OSError:
-        raise fail() from None
+        raise (unavailable or fail)() from None
     try:
         while True:
             try:

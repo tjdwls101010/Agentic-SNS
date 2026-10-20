@@ -83,9 +83,13 @@ class Window:
         """Whether this newest-first page proves the window's start was passed (see the module docstring)."""
         units = {}
         for index, record in enumerate(records):
-            if record.get(self.policy.pinned_key) or record.get('unavailable') or not record.get('created_at'):
+            if record.get(self.policy.pinned_key) or record.get('unavailable'):
                 continue
             key = record.get(self.policy.unit_key) if self.policy.unit_key else None
+            if not record.get('created_at'):
+                if key is not None:
+                    self.unordered = True  # a grouped unit with an undated record has no knowable newest time
+                continue
             units.setdefault(key if key is not None else ('#', index), []).append(stamp(record['created_at']))
         times = [max(moments) for moments in units.values()]
         lowest = self.last

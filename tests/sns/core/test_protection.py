@@ -573,3 +573,21 @@ def test_an_unmetered_scope_is_paced_and_holdable_but_never_probed_or_reported(d
             pass
     with guard('reddit', clock).request(scope='general') as slot:  # the other buckets go on
         slot.classify('ok')
+
+
+def test_a_block_seen_while_looking_at_a_tab_reaches_the_request_log(data_dir, clock):
+    g = guard('x', clock)
+    with g.observe() as slot:
+        slot.classify('challenge')
+        slot.block('challenge')
+    assert [line['outcome'] for line in log_lines(data_dir, 'x')][-1] == 'challenge'
+
+
+def test_a_lock_that_cannot_be_opened_is_unreadable_state_not_a_time_limit(data_dir, clock):
+    directory = files(data_dir)
+    directory.mkdir(parents=True)
+    (directory / 'lock').mkdir()  # a directory where the lock file should be
+    with pytest.raises(SnsError) as caught:
+        with guard('threads', clock).request():
+            pass
+    assert caught.value.kind == 'blocked' and caught.value.reason == 'unreadable'

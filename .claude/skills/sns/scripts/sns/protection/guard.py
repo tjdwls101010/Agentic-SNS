@@ -303,7 +303,8 @@ class Guard:
 
     @contextmanager
     def _locked(self, fail):
-        with locked(self.directory / 'lock', self.deadline, fail, sleep=self.clock.sleep):
+        with locked(self.directory / 'lock', self.deadline, fail, sleep=self.clock.sleep,
+                    unavailable=lambda: self._unreadable('cannot be locked')):
             yield
 
     # --- the checks ----------------------------------------------------------------------------------------------
@@ -506,6 +507,8 @@ class Guard:
             yield slot
         if slot.reserved:  # requests the page made on its own that the look saw and charged to this command
             self._log({'id': secrets.token_hex(6), 'kind': 'background', 'n': slot.reserved, 'outcome': 'seen'})
+        if slot.outcome != 'sent':  # what the look found (a block signal) belongs in the log a run is watched by
+            self._log({'id': secrets.token_hex(6), 'kind': 'look', 'n': 0, 'outcome': slot.outcome})
 
     def log_unwatched(self, count):
         """Requests an open tab made while no command watched it: logged, never charged to a command."""

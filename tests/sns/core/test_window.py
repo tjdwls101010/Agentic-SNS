@@ -87,3 +87,16 @@ def test_describe_names_days_zone_and_utc_bounds():
 def test_an_inactive_window_keeps_everything():
     window = Window(None, None, order='ranked')
     assert not window.active and window.keep({'id': '1', 'created_at': None})
+
+
+def test_a_grouped_unit_with_an_undated_record_proves_no_order():
+    """A platform that groups records into units (a conversation module) cannot say a unit is older than --since when
+    one of its records has no date: nothing closes the window after that."""
+    window = Window('2026-10-10', None, order='newest_first', policy=WindowPolicy(tz=UTC, unit_key='unit'))
+    page = [{'id': 'a', 'unit': 'u1', 'created_at': at('2026-10-01')}, {'id': 'b', 'unit': 'u1', 'created_at': None}]
+    assert not window.closes(page) and window.unordered
+
+
+def test_without_units_an_undated_record_is_only_left_out():
+    window = Window('2026-10-10', None, order='newest_first', policy=WindowPolicy(tz=UTC, jitter=600))
+    assert window.closes([{'id': 'a', 'created_at': None}, {'id': 'b', 'created_at': at('2026-10-01')}])

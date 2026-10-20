@@ -158,16 +158,11 @@ def coverage_of(envelope):
     return (window['coverage'].startswith('closed') if window else None), undated
 
 
-UNDATED_PROOF = pytest.mark.xfail(strict=True, reason='core gap: sns.window.Window.closes skips an undated record, so an '
-                                  'undated group no longer makes the order unknown and the window closes (the old skill '
-                                  'read on to the end); the scenario pins the old behaviour until the core decides')
-
-
 def scenario_params():
     for name in SCENARIOS:
         if name in DROPPED or name == 'resume-tail-then-end':
             continue
-        yield pytest.param(name, marks=[UNDATED_PROOF] if name == 'undated-group-stops-proof' else [])
+        yield pytest.param(name)
 
 
 @pytest.mark.parametrize('name', list(scenario_params()))
