@@ -36,7 +36,7 @@ def test_no_help_speaks_of_a_request_budget():
 
 
 def test_the_default_read_is_one_page_and_the_help_says_so():
-    for name in ('feed', 'profile', 'group', 'comments', 'search', 'notifications'):
+    for name in ('feed', 'profile', 'group', 'comments', 'search'):
         body = help_of(name).split('exit codes:')[0]
         assert 'Without --limit or --out it reads one page' in body, name
     assert 'until the source ends' not in help_of('feed')
@@ -94,5 +94,5 @@ def test_notifications_say_that_reading_marks_nothing_and_what_was_not_observed(
     text = ' '.join(help_of('notifications').split())
     assert 'Reading the list sends no seen or read change' in text
     assert 'whether Facebook counts a read as seen by itself was not observable when this was measured' in text
-    assert 'more: continues' in text and 'requests: 1 per page of about 15 notifications' in text
+    assert 'stopped=server_capped' in text and 'instead of more:' in text and 'requests: 1.' in text
     assert '[n1] notification' in text

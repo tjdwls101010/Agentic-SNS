@@ -55,7 +55,7 @@
     }
   },
   "large_body": {
-    "item": "14",
+    "item": "13",
     "fact": "The program serializes the whole page result to JSON; over 2 MiB characters it emits ordered {kind: chunk, index, body} lines of at most 512 KiB characters, then {kind: result, chunks, body: \"\"}. A chunk never splits a surrogate pair.",
     "chunk_chars": 524288,
     "threshold_chars": 2097152,
@@ -90,7 +90,7 @@
   },
   "query_names": {
     "item": "16",
-    "fact": "All 14 read queries (12 from the 2026-10-16 snapshot, the two notifications queries added 2026-10-21); friendly name, response root and cursor variable must match READ_QUERIES. No real ids are copied here. Depth2 has no snapshot id and must be learned.",
+    "fact": "All 13 read queries (12 from the 2026-10-16 snapshot, the notifications list query added 2026-10-21; its next-page query answered nothing live and is not used); friendly name, response root and cursor variable must match READ_QUERIES. No real ids are copied here. Depth2 has no snapshot id and must be learned.",
     "queries": {
       "about": {"name": "ProfileCometAboutAppSectionQuery", "expected_key": "about_app_sections", "kind": "connection", "cursor_var": null},
       "timeline": {"name": "ProfileCometTimelineFeedRefetchQuery", "expected_key": "timeline_list_feed_units", "kind": "connection", "cursor_var": "cursor"},
@@ -104,8 +104,7 @@
       "replies_deep": {"name": "Depth2CommentsListPaginationQuery", "expected_key": "replies_connection", "kind": "connection", "cursor_var": "repliesAfterCursor"},
       "group_root": {"name": "CometGroupRootQuery", "expected_key": "group", "kind": "object", "cursor_var": null},
       "group_about": {"name": "CometGroupAboutRootQuery", "expected_key": "group", "kind": "object", "cursor_var": null},
-      "notifications": {"name": "CometNotificationsRootQuery", "expected_key": "notifications_page", "kind": "connection", "cursor_var": null},
-      "notifications_page": {"name": "CometNotificationsListPaginationQuery", "expected_key": "notifications_page", "kind": "connection", "cursor_var": "cursor"}
+      "notifications": {"name": "CometNotificationsRootQuery", "expected_key": "notifications_page", "kind": "connection", "cursor_var": null}
     },
     "requires_live_learning": ["replies_deep"]
   },

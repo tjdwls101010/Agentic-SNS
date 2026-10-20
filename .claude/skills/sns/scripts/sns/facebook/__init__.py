@@ -178,13 +178,15 @@ COMMANDS = {
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
     'notifications': {
-        'help': 'Read your notification list, a page at a time, without marking anything seen.',
+        'help': 'Read your notification list (its first page) without marking anything seen.',
         'run': _run(notifications.notifications),
         'arguments': [*LIST],
         'epilog': ['Reads the notifications of the account the tab is logged in to, in Facebook\'s order. Each record is [n1] time · type word · unseen, seen or read, then the text Facebook wrote, then url: what it points at (a post permalink opens with post <url>). Bucket headers and the see-previous button are layout and are left out.',
                    'Reading the list sends no seen or read change (those are separate requests this skill never sends); whether Facebook counts a read as seen by itself was not observable when this was measured (no unseen notification at the time). If Facebook stops accepting the stored notifications query the command ends with exit 6 and does not open the notifications screen to relearn it, because opening that screen is what makes the app mark notifications seen.',
-                   'Without --limit or --out it reads one page (about 15 notifications); more: continues.',
-                   'requests: 1 per page of about 15 notifications.'],
+                   'It reads the first page (about 15 notifications), which is all it can: asked for the page after, '
+                   'Facebook answered nothing when this was measured, so when Facebook says older ones follow it ends '
+                   'with stopped=server_capped and a coverage line instead of more:.',
+                   'requests: 1.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
 }

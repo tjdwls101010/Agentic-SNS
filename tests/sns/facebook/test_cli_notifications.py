@@ -1,6 +1,7 @@
-"""notifications through the real cli.py and a fake Aside: the record lines, what layout rows do, the seen mapping, the
-continuation with the pagination query, and the one failure that must not move the tab (a refused stored query id is
-never relearned by opening the notifications screen, which is what makes the app mark notifications seen)."""
+"""notifications through the real cli.py and a fake Aside: the record lines, what layout rows do, the seen mapping, one
+page as all there is to read (the next-page query answered nothing live), and the one failure that must not move the tab
+(a refused stored query id is never relearned by opening the notifications screen, which makes the app mark notifications
+seen)."""
 import json
 import re
 from datetime import datetime
@@ -8,9 +9,9 @@ from datetime import datetime
 import pytest
 
 from sns.facebook import web
-from tests.sns.facebook.scenes import known_tab, look, queries, query_result, rerun, run, sent
+from tests.sns.facebook.scenes import known_tab, queries, query_result, run, sent
 
-FIRST, LATER = 'CometNotificationsRootQuery', 'CometNotificationsListPaginationQuery'
+FIRST = 'CometNotificationsRootQuery'
 REJECTED = json.dumps({'errors': [{'message': 'PersistedQueryNotFound', 'code': 1675002}]})
 TRACKING = 'TRACKING-SENTINEL-DO-NOT-OUTPUT'
 
@@ -42,7 +43,7 @@ def routes(browser):
     return [c for c in browser.calls() if c['op'] == 'facebook.route']
 
 
-def test_one_page_of_notifications_skips_layout_rows_and_says_how_to_go_on(browser):
+def test_one_page_of_notifications_skips_layout_rows_and_is_all_there_is_to_read(browser):
     known_tab(browser)
     browser.respond('facebook.query', page([layout('BUCKET_HEADER'), notif('N1'), notif('N2', seen='UNSEEN',
                                             text='Sample Person tagged you', kind='tagged'),
@@ -50,38 +51,35 @@ def test_one_page_of_notifications_skips_layout_rows_and_says_how_to_go_on(brows
     code, out, _ = run(browser, 'notifications')
     assert code == 0, out
     lines = out.splitlines()
-    assert lines[0] == 'facebook notifications · 2 shown · stopped=limit_reached · requests=1'
+    assert lines[0] == 'facebook notifications · 2 shown · stopped=server_capped · requests=1'
     assert lines[1] == '[n1] 2026-09-12T03:00+00:00 · feed_comment_reply · read'
     assert lines[2] == '     text[37 of 37 chars shown]: "Sample Person replied to your comment"'
     assert lines[3] == '     url: "https://www.facebook.com/example/posts/N1"'
     assert lines[4] == '[n2] 2026-09-12T03:00+00:00 · tagged · unseen'
-    assert re.fullmatch(r'more: uv run ".*cli\.py" facebook notifications --after \d+', lines[-1])
+    assert 'more:' not in out and any(line.startswith('coverage: Facebook says older notifications follow') for line in lines)
     assert TRACKING not in out
     first = queries(browser)[0]['args']
     assert first['name'] == FIRST and first['variables'] == {'count': 15, 'environment': 'MAIN_SURFACE',
                                                              'filter_tokens': [], 'scale': 2}
 
 
-def test_more_continues_with_the_pagination_query_from_the_end_cursor(browser):
-    known_tab(browser)
-    browser.respond('facebook.query', page([notif('N1')], cursor='NC1'))
-    code, out, _ = run(browser, 'notifications')
-    look(browser).respond('facebook.query', page([notif('N2')], has_next=False))
-    code, out, _ = rerun(browser, out.splitlines()[-1])
-    assert code == 0 and '[n1]' in out and sent(browser) == [FIRST, LATER]
-    assert queries(browser)[1]['args']['variables'] == {
-        'count': 15, 'cursor': 'NC1', 'environment': 'MAIN_SURFACE', 'filter_tokens': [], 'notif_cache_ids': [],
-        'notif_query_flags': [], 'scale': 2}
-
-
-def test_a_limit_reads_on_across_pages(browser):
+def test_a_limit_above_one_page_still_reads_one_page(browser):
+    """Observed 2026-10-21: the next-page query (CometNotificationsListPaginationQuery with the end cursor) answered no
+    rows although the first page said more follow, so the first page is all this skill reads, and it says so."""
     known_tab(browser)
     browser.respond('facebook.query', page([notif('N1'), notif('N2')], cursor='NC1'))
-    browser.respond('facebook.query', page([notif('N3'), notif('N4')], cursor='NC2'))
-    code, out, _ = run(browser, 'notifications', '--limit', '3', '--json')
+    code, out, _ = run(browser, 'notifications', '--limit', '30', '--json')
     result = json.loads(out)
-    assert code == 0 and [r['id'] for r in result['results']] == ['N1', 'N2', 'N3']
-    assert sent(browser) == [FIRST, LATER] and result['request_count'] == 2
+    assert code == 0 and [r['id'] for r in result['results']] == ['N1', 'N2'] and result['stop_reason'] == 'server_capped'
+    assert sent(browser) == [FIRST] and 'next' not in result
+
+
+def test_a_last_page_is_the_end(browser):
+    known_tab(browser)
+    browser.respond('facebook.query', page([notif('N1')], has_next=False))
+    code, out, _ = run(browser, 'notifications', '--json')
+    result = json.loads(out)
+    assert code == 0 and result['stop_reason'] == 'exhausted' and not any('older' in c for c in result.get('coverage', []))
 
 
 def test_records_carry_the_shared_head_the_seen_words_and_nothing_opaque(browser):
@@ -124,16 +122,6 @@ def test_a_refused_first_query_ends_the_command_without_moving_the_tab(browser):
     result = json.loads(out)
     assert code == 6 and 'no longer accepts the stored notifications query' in result['message']
     assert routes(browser) == [] and sent(browser) == [FIRST]
-
-
-def test_a_refused_pagination_query_ends_the_command_without_moving_the_tab(browser):
-    known_tab(browser)
-    browser.respond('facebook.query', page([notif('N1')], cursor='NC1'))
-    code, out, _ = run(browser, 'notifications')
-    look(browser).respond('facebook.query', query_result(REJECTED, source='live', doc_id='111'))
-    code, out, _ = rerun(browser, out.splitlines()[-1])
-    assert code == 6 and 'no longer accepts the stored notifications query' in json.loads(out)['message']
-    assert routes(browser) == [] and sent(browser) == [FIRST, LATER]
 
 
 @pytest.mark.parametrize('flag', ['--since', '--until'])

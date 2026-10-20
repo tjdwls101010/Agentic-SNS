@@ -91,6 +91,6 @@ def test_no_platform_unit_reaches_the_stores_directly():
 
 def test_queries_json_is_well_formed_and_has_no_secret_looking_value():
     data = json.loads((WEB / 'queries.json').read_text(encoding='utf-8'))
-    assert set(data['queries']) == set(web.QUERIES) and len(data['queries']) == 14
+    assert set(data['queries']) == set(web.QUERIES) and len(data['queries']) == 13
     for spec in data['queries'].values():
         assert spec['doc_id'] is None or re.fullmatch(r'\d+', spec['doc_id'])

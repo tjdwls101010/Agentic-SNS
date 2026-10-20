@@ -1,4 +1,4 @@
-"""How requests to Facebook are named and sorted (fixtures/requests.json): the 14 read queries of queries.json, the
+"""How requests to Facebook are named and sorted (fixtures/requests.json): the 13 read queries of queries.json, the
 tokens of each sort, the search verticals, and the one query that has no stored id."""
 import json
 
@@ -13,7 +13,7 @@ REQUESTS = fixture('requests.json')
 DEEP = 'Depth2CommentsListPaginationQuery'
 
 
-def test_the_fourteen_read_queries_are_the_bundled_snapshot_the_fixture_describes():
+def test_the_thirteen_read_queries_are_the_bundled_snapshot_the_fixture_describes():
     described = REQUESTS['query_names']['queries']
     assert set(web.QUERIES) == set(described)
     for key, spec in described.items():
