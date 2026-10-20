@@ -207,7 +207,7 @@ RECORDS = ('records: one block per record, labelled [p1] post, [r1] reply, [a1] 
 TAB = ('the dedicated tab: the skill reads from its own threads.com tab. Opening it (or loading it again after it was '
        'emptied) costs about 34-40 requests the page makes itself, shown as "tab opened" and counted apart from the '
        'reads; learning a query Threads refused reads one document per try (at most 3 tries and one reload a command); '
-       'requests the open tab made between commands are shown as unwatched=, not charged, but a block seen there stops '
+       'requests the page itself sends while a read runs are counted with that read, so requests= can be a few more than the requests: line of a command says; requests the open tab made between commands are shown as unwatched=, not charged, but a block seen there stops '
        'the command before it sends anything; static files do not count. The tab is emptied (about:blank) about 5 '
        'minutes after the last command.')
 for _name in ('feed', 'profile', 'about', 'graph', 'me', 'search', 'post', 'replies', 'quotes', 'reposts'):
