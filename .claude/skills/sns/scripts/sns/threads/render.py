@@ -1,5 +1,6 @@
 """Threads' record lines: the dense text of a post, a reply, a parent or an account. The page frame (header, window,
 coverage, more:) is the core's; all clipping and labels live here, the records themselves are never shortened."""
+from sns.render import image as image_line
 from sns.text import count as _count, limit_of, line as _line, quote as _quote, shown as _shown, time as _time
 
 
@@ -22,8 +23,8 @@ def _who(account):
 
 def _media(record):
     parts = []
-    for item in record.get('media') or []:
-        part = item.get('kind', 'photo')
+    for index, item in enumerate(record.get('media') or [], 1):
+        part = f'[image {item.get("n") or index}] ' + item.get('kind', 'photo')
         if item.get('alt'):
             part += ' alt=' + _quote(item['alt'])
         parts.append(part)
@@ -108,6 +109,10 @@ def render(envelope, chars, command):
     lines = [_replies_line(envelope['replies'])] if envelope.get('replies') else []
     labels, counts = {}, {'p': 0, 'r': 0, 'a': 0}
     for record in envelope.get('results') or []:
+        if record.get('kind') == 'image':
+            counts['i'] = counts.get('i', 0) + 1
+            lines.append(image_line(record, f'i{counts["i"]}'))
+            continue
         if record.get('kind') == 'account':
             counts['a'] += 1
             lines.append(account(record, f'a{counts["a"]}'))

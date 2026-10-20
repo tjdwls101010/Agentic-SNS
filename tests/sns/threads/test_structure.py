@@ -10,7 +10,7 @@ from tests.sns.support.policies import POLICIES
 
 PACKAGE = Path(threads.__file__).resolve().parent
 WEB = PACKAGE / 'web'
-FEATURES = {'listing', 'thread', 'search', 'about', 'render'}
+FEATURES = {'listing', 'thread', 'search', 'about', 'images', 'render'}
 
 
 def sources(root=PACKAGE):
@@ -27,7 +27,7 @@ def test_the_interface_is_platform_commands_and_choices():
     assert threads.PLATFORM.key == 'threads' and threads.PLATFORM.word == 'threads' and threads.PLATFORM.transport == 'tab'
     assert threads.PLATFORM.title == 'Threads' and threads.PLATFORM.site == 'threads.com'
     assert list(threads.COMMANDS) == ['feed', 'profile', 'about', 'graph', 'me', 'search', 'post', 'replies', 'quotes',
-                                      'reposts']
+                                      'reposts', 'images']
     assert set(threads.CHOICES) and all(key.split('.')[0] in threads.COMMANDS for key in threads.CHOICES)
 
 

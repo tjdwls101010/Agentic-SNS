@@ -6,7 +6,7 @@ import argparse
 from sns import reading
 from sns.errors import SnsError
 from sns.limits import LimitPolicy
-from sns.threads import about, listing, search, thread, web
+from sns.threads import about, images, listing, search, thread, web
 from sns.threads.render import render
 from sns.window import WindowPolicy
 
@@ -28,7 +28,8 @@ PLATFORM = reading.Platform(
     key='threads', title='Threads', site='threads.com', transport='tab',
     # Threads announces no limit windows: a 429 holds the account for 30 minutes; a checkpoint needs a person
     policy=LimitPolicy(scope='account', hold_seconds=1800, person=('checkpoint',), pace=(1.0, 2.0)),
-    window=WindowPolicy(unit_key='unit'), connect=web.Client, render=render, schemas=web.SCHEMAS,
+    window=WindowPolicy(unit_key='unit'), connect=web.Client, render=render,
+    schemas={**web.SCHEMAS, 'image': reading.IMAGE_SCHEMA},
     locate=web.locate, unblock_scope=None, idle_action='blank')
 
 LIST = ['limit', 'chars', 'after', 'out', 'json']
@@ -181,6 +182,21 @@ COMMANDS = {
                    'requests: 1.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
+    'images': {
+        'help': 'Save the pictures of one post (a video by its poster) so they can be looked at.',
+        'run': _run(images.images),
+        'arguments': [(('target',), {'metavar': 'URL', 'help': 'threads.com (or threads.net) post URL'}),
+                      (('numbers',), {'nargs': '*', 'type': _positive, 'metavar': 'N',
+                                      'help': 'The pictures to save, by the numbers the post shows ([image N])'}),
+                      (('--all',), {'action': 'store_true', 'help': 'Save every picture of the post'}), 'json'],
+        'epilog': ['The post is read again (its picture links are signed and do not last), so N is the Nth picture as '
+                   'Threads sends the post now; each saved line names its kind, size and media_id to match what the '
+                   'post showed. A video is saved as its poster image. Files go to the skill\'s data/images/ and are '
+                   'removed a day later; they are other people\'s pictures. A picture that could not be saved is named '
+                   'in coverage (exit 8).',
+                   'requests: 3 for the post (as post reads it), then 1 per picture.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
+    },
 }
 
 
@@ -196,3 +212,4 @@ TAB = ('the dedicated tab: the skill reads from its own threads.com tab. Opening
        'minutes after the last command.')
 for _name in ('feed', 'profile', 'about', 'graph', 'me', 'search', 'post', 'replies', 'quotes', 'reposts'):
     COMMANDS[_name]['epilog'] = [*COMMANDS[_name]['epilog'], RECORDS, TAB]
+COMMANDS['images']['epilog'] = [*COMMANDS['images']['epilog'], TAB]
