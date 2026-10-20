@@ -33,7 +33,7 @@
        "page_info": {"has_next_page": false, "end_cursor": null}}},
      "expected": {"ids": ["3000000000000000105", "3000000000000000106"], "unavailable": ["3000000000000000105"], "has_next": false}},
     {"name": "profile-tab-with-pinned", "item": "15,24",
-     "fact": "A profile tab page is mediaData edges of thread units; a pinned post carries is_pinned.",
+     "fact": "A profile tab page is mediaData edges of thread units; a pinned post is marked pinned.",
      "surface": "profile_tab", "policy": "relay",
      "data": {"mediaData": {"edges": [
        {"node": {"thread_items": [{"post": {"pk": "3000000000000000111", "code": "CmiJBr2LABv", "taken_at": 1735689600, "user": {"$user": "A"}, "text_post_app_info": {"pinned_post_info": {"is_pinned_to_profile": true}}}}]}},

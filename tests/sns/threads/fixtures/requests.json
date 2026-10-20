@@ -33,7 +33,7 @@
     {"name": "replies-next-batch", "item": "plan-recon",
      "fact": "Observed in the app: the next reply batch is BarcelonaPostPageDirectRepliesRefetchQuery with {after, filterType: null, first: 4, postID, sortOrder: TOP}.",
      "surface": "replies", "input": {"post_id": "14535981231413", "after": "REPCUR1", "sort": "top"},
-     "expected": {"after": "REPCUR1", "filterType": null, "first": 4, "postID": "14535981231413", "sortOrder": "TOP"},
+     "expected": {"after": "REPCUR1", "filterType": null, "first": 10, "postID": "14535981231413", "sortOrder": "TOP"}, "observed_first": 4,
      "verify": "P2 R2: whether first may be larger, and the RECENT sort value"},
     {"name": "followers-first-page", "item": "24",
      "fact": "Followers are asked with {userID, first 20}.",

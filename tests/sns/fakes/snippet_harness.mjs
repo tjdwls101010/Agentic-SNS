@@ -43,7 +43,8 @@ function makeWindow() {
   const sessionStorage = {getItem: k => storage.has(k) ? storage.get(k) : null, setItem: (k, v) => storage.set(k, String(v))};
   const realFetch = async (url, init = {}) => {
     const absolute = new URL(url, location.href).href;
-    fetches.push({url: absolute, method: init.method || 'GET', headers: init.headers || {}, credentials: init.credentials || null});
+    fetches.push({url: absolute, method: init.method || 'GET', headers: init.headers || {}, credentials: init.credentials || null,
+                  body: init.body || null, redirect: init.redirect || null});
     act();
     const entryName = pageSpec.fragment === false ? absolute.split('#')[0] : absolute;
     if (ownEntry) pending.push({url: entryName, status: 200});

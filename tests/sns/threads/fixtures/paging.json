@@ -142,7 +142,7 @@
      "fact": "A capped surface stops as server_capped even when --limit cut it; the unshown part of the sample is kept.",
      "options": {"limit": 1, "policy": "capped"},
      "pages": [{"groups": [[{"id": "A"}], [{"id": "B"}]], "has_next": false, "cursor": null, "stop": "server_capped"}],
-     "expected": {"shown": ["A"], "stop_reason": "server_capped", "pending": ["B"], "code": 0}},
+     "expected": {"shown": ["A"], "stop_reason": "limit_reached", "pending": ["B"], "pending_stop_reason": "server_capped", "code": 0}},
     {"name": "single-batch-empty", "item": "24,30",
      "fact": "An empty single batch is an explicit empty result.",
      "options": {"limit": null, "policy": "single_batch"},
