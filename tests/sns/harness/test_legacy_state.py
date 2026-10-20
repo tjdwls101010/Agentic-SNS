@@ -189,3 +189,41 @@ def test_the_old_readers_stop_on_what_export_writes(world, monkeypatch):
         with pytest.raises(Exception) as caught:
             check()
         assert getattr(caught.value, 'code', None) == 5, caught.value
+
+
+# --- repairs from the core review (Codex, 2026-10-21) ---------------------------------------------------------------
+
+def test_export_upgrades_an_old_hold_to_a_person_block(world):
+    now = time.time()
+    write(old(world, 'threads'), {'reason': 'rate_limit', 'blocked_at': now - 10, 'expires_at': now + 60})
+    legacy_state.import_all(world)
+    legacy_state.guard_for('threads', 'u3').merge(person={'reason': 'checkpoint', 'at': now})  # sns saw a checkpoint
+    legacy_state.export_all(world)
+    assert json.loads(old(world, 'threads').read_text())['reason'] == 'checkpoint'
+
+
+def test_export_lengthens_an_old_shorter_hold_but_never_shortens_one(world):
+    now = time.time()
+    write(old(world, 'facebook'), {'reason': 'rate_limit', 'blocked_at': now - 10, 'expires_at': now + 60})
+    legacy_state.import_all(world)
+    legacy_state.guard_for('facebook', 'u0').merge(hold={'until': now + 900, 'at': now})
+    legacy_state.export_all(world)
+    assert json.loads(old(world, 'facebook').read_text())['expires_at'] >= now + 899
+    write(old(world, 'naver_blog'), {'reason': 'rate_limit', 'blocked_at': now, 'expires_at': now + 5000})
+    with legacy_state.guard_for('naver_blog', 'u0').request() as slot:
+        slot.hold(until=now + 100)
+    legacy_state.export_all(world)
+    assert json.loads(old(world, 'naver_blog').read_text())['expires_at'] == now + 5000
+
+
+def test_export_reaches_a_reddit_account_the_old_skill_never_used(world, data_dir):
+    with legacy_state.guard_for('reddit', 'u8').request() as slot:
+        slot.block('challenge')
+    legacy_state.export_all(world)
+    assert json.loads((world.skill('reddit') / 'u8/blocked.json').read_text())['reason'] == 'challenge'
+
+
+def test_the_cli_attributes_old_state_to_the_active_account_not_sns_variables(world, monkeypatch):
+    monkeypatch.setenv('SNS_ASIDE_ACCOUNT', 'u1')
+    sources = legacy_state.Sources(repo=world.repo, home=world.home, active=lambda: 'u0', environ={})
+    assert [account for platform, account, _ in sources.entries() if platform in ('threads', 'x')] == ['u0', 'u0']

@@ -38,6 +38,7 @@ if __name__ == '__main__' and str(SCRIPTS) not in sys.path:
 from sns import protection  # noqa: E402
 from sns.aside import active_account  # noqa: E402
 from sns.clock import Deadline  # noqa: E402
+from sns.paths import data_dir  # noqa: E402
 
 TITLES = {'x': ('X', 'x.com'), 'threads': ('Threads', 'threads.com'), 'reddit': ('Reddit', 'reddit.com'),
           'facebook': ('Facebook', 'facebook.com'), 'naver_blog': ('Naver Blog', 'blog.naver.com')}
@@ -96,9 +97,13 @@ class Sources:
                  ('x', self.environ.get('TWITTER_ASIDE_ACCOUNT') or self.active(), self.skill('twitter')),
                  ('facebook', 'u0', self.cache('FACEBOOK_HOME', 'facebook-skill')),
                  ('naver_blog', 'u0', self.cache('NAVER_BLOG_HOME', 'naver-blog-skill'))]
+        # Reddit keeps one folder per Aside account: the old skill's, and those sns has state for (an export must
+        # reach an account the old skill never used yet)
         reddit = self.skill('reddit')
-        if reddit.is_dir():
-            found += [('reddit', path.name, path) for path in sorted(reddit.iterdir()) if path.is_dir()]
+        accounts = {path.name for path in reddit.iterdir() if path.is_dir()} if reddit.is_dir() else set()
+        mine = data_dir() / 'reddit'
+        accounts |= {path.name for path in mine.iterdir() if (path / 'protection').is_dir()} if mine.is_dir() else set()
+        found += [('reddit', account, reddit / account) for account in sorted(accounts)]
         return found
 
 
@@ -222,6 +227,18 @@ def _old_record(platform, person, hold):
     return None
 
 
+def _strength(platform, record, now):
+    """How strongly an old blocked.json stops its reader: a person block, then a longer live hold; an unreadable
+    record stops it closed and is left alone."""
+    if record is None:
+        return (0, 0)
+    try:
+        person, hold = _old_block(platform, record, now)
+    except ValueError:
+        return (3, 0)
+    return (2, 0) if person else ((1, hold['until']) if hold else (0, 0))
+
+
 def _write(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     data = json.dumps(value).encode()
@@ -241,10 +258,12 @@ def export_all(sources, now=None):
         snapshot = guard.snapshot()
         exported = {e['path']: e['sha256'] for e in snapshot['provenance'] if e['kind'] == 'exported'}
         path = directory / 'blocked.json'
-        data, _ = _read_old(path)
+        data, record = _read_old(path)
         ours = data is not None and exported.get(str(path)) == _sha(data)
         wanted = _old_record(platform, snapshot['person'], snapshot['hold'])
-        if wanted is not None and (data is None or ours):
+        stronger = wanted is not None and (data is None or (record is not None and _strength(platform, wanted, now)
+                                                            > _strength(platform, record, now)))
+        if wanted is not None and (ours or stronger):
             guard.note_export(path, _sha(_write(path, wanted)))
             report.append({'platform': platform, 'account': account, 'file': str(path), 'done': 'wrote block'})
         elif wanted is None and ours:
@@ -289,7 +308,7 @@ def main(argv=None):
     if argv not in (['import'], ['export']):
         print('usage: legacy_state.py import|export', file=sys.stderr)
         return 2
-    sources = Sources(active=os.environ.get('SNS_ASIDE_ACCOUNT'))
+    sources = Sources()  # the Aside account the old skills used, never sns's own SNS_ASIDE_ACCOUNT* choice
     report = import_all(sources) if argv == ['import'] else export_all(sources)
     print(json.dumps({'action': argv[0], 'at': time.time(), 'report': report}, ensure_ascii=False, indent=1))
     return 0
