@@ -1,0 +1,442 @@
+{
+ "about": "Fallback operation table for when the live tab cannot give an operation (snapshot of 2026-10-19 P2 recon). The live module index wins for queryId, featureSwitches and the fieldToggles list; this file holds what the index does not: where the data sits (root), the variables the app sends (without target ids or cursor), the fieldToggles values the app sends, the chunk-name hint for operations in lazily loaded chunks, and a last-resort queryId. source app = copied from the app's own request; direct = sent by the skill in recon and answered 200.",
+ "operations": {
+  "Viewer": {
+   "query_id": "TpQxQtWMTMnIAMPlMGMqNw",
+   "root": "data.viewer.user_results.result",
+   "variables": {
+    "withCommunitiesMemberships": true
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "HomeTimeline": {
+   "query_id": "svLglq6U2wlTyZMGDDcLYQ",
+   "root": "data.home.home_timeline_urt.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": true,
+    "requestContext": "launch",
+    "withCommunity": true
+   },
+   "field_toggles": {
+    "withPayments": false
+   },
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "HomeLatestTimeline": {
+   "query_id": "NmDBT3APtNxDpMqIEauu7A",
+   "root": "data.home.home_timeline_urt.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": true,
+    "requestContext": "launch",
+    "withCommunity": true
+   },
+   "field_toggles": {
+    "withPayments": false
+   },
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "UserByScreenName": {
+   "query_id": "AMIBMjtxEEATh4z8V9GtRg",
+   "root": "data.user.result",
+   "variables": {
+    "withGrokTranslatedBio": true
+   },
+   "field_toggles": {
+    "withPayments": false,
+    "withAuxiliaryUserLabels": true
+   },
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "UsersByScreenNames": {
+   "query_id": "cACg_kWQkzNQ74lcK5rksQ",
+   "root": "data.users[].result",
+   "variables": {
+    "withGrokTranslatedBio": true
+   },
+   "field_toggles": {
+    "withPayments": false,
+    "withAuxiliaryUserLabels": true
+   },
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "UserTweets": {
+   "query_id": "7_KBXBpG0zBPRN6UCIV0-w",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": true,
+    "withQuickPromoteEligibilityTweetFields": true,
+    "withVoice": true
+   },
+   "field_toggles": {
+    "withPayments": false,
+    "withArticlePlainText": false
+   },
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "UserRepliesTimeline": {
+   "query_id": "X9Te-FyiGcoV2qNrnx9w3w",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": true,
+    "withCommunity": true,
+    "withVoice": true
+   },
+   "field_toggles": {
+    "withPayments": false,
+    "withArticlePlainText": false
+   },
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "UserMedia": {
+   "query_id": "QWOimofaocjeRda7Tm5pNA",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": false,
+    "withClientEventToken": false,
+    "withBirdwatchNotes": false,
+    "withVoice": true
+   },
+   "field_toggles": {
+    "withPayments": false,
+    "withArticlePlainText": false
+   },
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "UserHighlightsTweets": {
+   "query_id": "Ducf_uu7enyuuE2kjOwFcw",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": true,
+    "withVoice": true
+   },
+   "field_toggles": {
+    "withPayments": false,
+    "withArticlePlainText": false
+   },
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "UserArticlesTweets": {
+   "query_id": "G9ehBUadUrsNfz-XnAcV4A",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": false,
+    "withClientEventToken": false,
+    "withBirdwatchNotes": false,
+    "withVoice": true
+   },
+   "field_toggles": {
+    "withPayments": false,
+    "withArticlePlainText": false
+   },
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "CombinedLists": {
+   "query_id": "HoclSXITeTmRfg1TF3G-RQ",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 100
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "ListMemberships": {
+   "query_id": "4xBNevulxGhaqiO6-pCJMA",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 20
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "TweetDetail": {
+   "query_id": "3BlMtudy4N-d78ch7zTLZQ",
+   "root": "data.threaded_conversation_with_injections_v2.instructions",
+   "variables": {
+    "referrer": "tweet",
+    "with_rux_injections": false,
+    "includePromotedContent": true,
+    "withCommunity": true,
+    "withQuickPromoteEligibilityTweetFields": true,
+    "withBirdwatchNotes": true,
+    "withVoice": true
+   },
+   "field_toggles": {
+    "withArticleRichContentState": true,
+    "withArticleSummaryText": true,
+    "withArticleVoiceOver": true
+   },
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "TweetResultsByRestIds": {
+   "query_id": "aiX7QIJ4jp1QR8wT32vkHQ",
+   "root": "data.tweetResult[].result",
+   "variables": {
+    "includePromotedContent": false,
+    "withBirdwatchNotes": true,
+    "withVoice": true,
+    "withCommunity": true
+   },
+   "field_toggles": {
+    "withArticleRichContentState": true,
+    "withArticleSummaryText": true,
+    "withArticleVoiceOver": true
+   },
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "SearchTimeline": {
+   "query_id": "irezafrnzav4Ulf1vDkEBg",
+   "root": "data.search_by_raw_query.search_timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "querySource": "typed_query",
+    "withQuickPromoteEligibilityTweetFields": false
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "Retweeters": {
+   "query_id": "9gzvtg9l4CmhrfO6KMgKCA",
+   "root": "data.retweeters_timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "enableRanking": true,
+    "includePromotedContent": true
+   },
+   "field_toggles": {},
+   "chunk_hint": "bundle.TweetActivity",
+   "source": "app"
+  },
+  "Following": {
+   "query_id": "ath0FIohYC_c3Hj3SsxoCg",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": false,
+    "withGrokTranslatedBio": true
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "Followers": {
+   "query_id": "stpzFPAIZ2qv8s2lRzPOnQ",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": false,
+    "withGrokTranslatedBio": true
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "BlueVerifiedFollowers": {
+   "query_id": "1fjk4lmK45a-giaZTubqbg",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": false,
+    "withGrokTranslatedBio": true
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "FollowersYouKnow": {
+   "query_id": "479-dF4nq3sH1uu0n4Wdxg",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": false,
+    "withGrokTranslatedBio": true
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "ConnectTabTimeline": {
+   "query_id": "IMQS8zyOjCLnWBkm6wNcQg",
+   "root": "data.connect_tab_timeline.timeline.instructions",
+   "variables": {
+    "count": 20
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "ListLatestTweetsTimeline": {
+   "query_id": "RgfF9JYDXXI1F-ZrDqjUfQ",
+   "root": "data.list.tweets_timeline.timeline.instructions",
+   "variables": {
+    "count": 20
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "ListMembers": {
+   "query_id": "yQ_0-CTekcCY2oFRTskpSw",
+   "root": "data.list.members_timeline.timeline.instructions",
+   "variables": {
+    "count": 20
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "ListByRestId": {
+   "query_id": "T-YE5ZY0cd0UVtWu8AP04Q",
+   "root": "data.list",
+   "variables": {},
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "CommunityTweetsTimeline": {
+   "query_id": "wXey4HQTUdYUlWWXltWMpg",
+   "root": "data.communityResults.result.ranked_community_timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "displayLocation": "Community",
+    "withCommunity": true
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "CommunityMediaTimeline": {
+   "query_id": "yxMlTG2M9KO6zSmu8gcfAg",
+   "root": "data.communityResults.result.community_media_timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "withCommunity": true
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "CommunityByRestId": {
+   "query_id": "iMDyRADcGz4r9ZrJMpxz1A",
+   "root": "data.communityResults.result",
+   "variables": {},
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "CommunityDiscoveryTimeline": {
+   "query_id": "Q09zXXRL9twh6SlnRaOUMg",
+   "root": "data.viewer.community_discovery_timeline.timeline.instructions",
+   "variables": {
+    "withCommunity": true
+   },
+   "field_toggles": {},
+   "chunk_hint": "bundle.Communities",
+   "source": "app"
+  },
+  "GlobalCommunitiesLatestPostSearchTimeline": {
+   "query_id": "XtgLdT7L-zyrDDKH2dO0lw",
+   "root": "data.search_by_raw_query.communities_latest_posts_search_page.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "withCommunity": true
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "ExplorePage": {
+   "query_id": "BMib5Px-wibex8mYlOUhmQ",
+   "root": "data.explore_page.body",
+   "variables": {
+    "cursor": ""
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "GenericTimelineById": {
+   "query_id": "cW93hZ3nlNYbYcUROF5r5A",
+   "root": "data.timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "withQuickPromoteEligibilityTweetFields": true
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "AudioSpaceById": {
+   "query_id": "sSuYIbdpe1f2v9AtD-sYeQ",
+   "root": "data.audioSpace",
+   "variables": {
+    "isMetatagsQuery": false,
+    "withReplays": true,
+    "withListeners": true
+   },
+   "field_toggles": {},
+   "chunk_hint": "bundle.AudioSpacePeek",
+   "source": "app"
+  },
+  "Bookmarks": {
+   "query_id": "VjWsfItbiMLeajpZ90NJeg",
+   "root": "data.bookmark_timeline_v2.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": true
+   },
+   "field_toggles": {},
+   "chunk_hint": null,
+   "source": "app"
+  },
+  "Likes": {
+   "query_id": "mu4us66Q6RRNOywVQhGtRg",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": false,
+    "withClientEventToken": false,
+    "withBirdwatchNotes": false,
+    "withVoice": true
+   },
+   "field_toggles": {
+    "withPayments": false,
+    "withArticlePlainText": false
+   },
+   "chunk_hint": null,
+   "source": "direct"
+  },
+  "NotificationsTimeline": {
+   "query_id": "EUX2EwvgT4f9F7sC4A59Eg",
+   "root": "data.viewer_v2.user_results.result.notification_timeline.timeline.instructions",
+   "variables": {
+    "count": 20
+   },
+   "field_toggles": {},
+   "chunk_hint": "bundle.Notifications",
+   "source": "app"
+  }
+ }
+}

@@ -1,7 +1,7 @@
 {
  "p4": {
   "status": "P4가 실행해야 함",
-  "behavior": "headers.set 외 read_only, features, method, variables와 35개 배선 작업의 등록부 계약을 실행한다. 3개 미배선 작업 제거는 의도한 변경."
+  "behavior": "headers.set 외 read_only, features, method, variables와 35개 배선 작업의 등록부 계약을 실행한다. 3개 미배선 작업 제거는 의도한 변경. Executed by tests/sns/x/test_requests.py."
  },
  "about": "What a request from the dedicated tab carries (appendix A 13, 29 and the planning session's measurement of the app's own requests on 2026-10-18). headers: each header the app sends and where its value comes from in the logged-in tab; method: when the app uses POST; read_only: which operations may ever be sent; features: how the features parameter is filled; variables: registry defaults and the arguments each wired surface sends (2026-10-19 snapshot). All values are synthetic; no real bearer, token or query id appears here.",
  "headers": {
@@ -83,10 +83,8 @@
    "UserByScreenName",
    "UsersByScreenNames",
    "UserTweets",
-   "UserOriginalsTimeline",
    "UserRepliesTimeline",
    "UserMedia",
-   "UserVideoTimeline",
    "UserHighlightsTweets",
    "UserArticlesTweets",
    "CombinedLists",
@@ -105,7 +103,6 @@
    "ListByRestId",
    "CommunityTweetsTimeline",
    "CommunityMediaTimeline",
-   "CommunityAboutTimeline",
    "CommunityByRestId",
    "CommunityDiscoveryTimeline",
    "GlobalCommunitiesLatestPostSearchTimeline",
@@ -116,7 +113,7 @@
    "Likes",
    "NotificationsTimeline"
   ],
-  "read_list_note": "Snapshot registry names (2026-10-19). P4 removes the unwired UserOriginalsTimeline, UserVideoTimeline and CommunityAboutTimeline under Appendix A.1; the remaining 35 are ported.",
+  "read_list_note": "The 35 wired operations (snapshot registry of 2026-10-19 without the unwired UserOriginalsTimeline, UserVideoTimeline and CommunityAboutTimeline, which the port dropped).",
   "cases": [
    {
     "operation": "TweetDetail",
@@ -514,14 +511,6 @@
     "variables": {
      "communityId": "<id>",
      "count": 20,
-     "withCommunity": true
-    },
-    "field_toggles": {}
-   },
-   "community about": {
-    "operation": "CommunityAboutTimeline",
-    "variables": {
-     "communityId": "<id>",
      "withCommunity": true
     },
     "field_toggles": {}

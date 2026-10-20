@@ -80,9 +80,9 @@
     "bookmark_count": 1,
     "view_count": 1234,
     "is_reply": false,
-    "reply_to_id": null,
     "root_post_id": "1850000000000000001",
-    "unavailable": false
+    "unavailable": false,
+    "parent_id": null
    }
   },
   {
@@ -263,7 +263,7 @@
    "name": "links-expanded-media-link-removed",
    "item": "19",
    "source": "code",
-   "fact": "t.co links become their destinations; the t.co link X appends for attached media is removed from the text (the media list carries it).",
+   "fact": "t.co links become their destinations; the t.co link X appends for attached media is removed from the text (the media list carries it). A photo's image_url is the original picture; its media_id is X's id for the item; n counts the post's media in document order from 1.",
    "parser": "post",
    "raw": {
     "__typename": "Tweet",
@@ -302,7 +302,8 @@
          "width": 1200,
          "height": 800
         },
-        "ext_alt_text": "A synthetic chart"
+        "ext_alt_text": "A synthetic chart",
+        "id_str": "1850000000000000101"
        }
       ]
      }
@@ -315,11 +316,14 @@
     ],
     "media": [
      {
+      "n": 1,
       "kind": "photo",
-      "url": "https://pbs.twimg.com/media/SYNTH1.jpg",
+      "image_url": "https://pbs.twimg.com/media/SYNTH1.jpg",
+      "video_url": null,
       "width": 1200,
       "height": 800,
-      "alt_text": "A synthetic chart"
+      "alt": "A synthetic chart",
+      "media_id": "1850000000000000101"
      }
     ]
    }
@@ -328,7 +332,7 @@
    "name": "video-highest-bitrate",
    "item": "19",
    "source": "code",
-   "fact": "A video's URL is its highest-bitrate MP4 variant; a streaming playlist is not chosen.",
+   "fact": "A video's URL is its highest-bitrate MP4 variant; a streaming playlist is not chosen. The poster picture X names for the video stays beside it as image_url (so a picture can be saved for a video too).",
    "parser": "post",
    "raw": {
     "__typename": "Tweet",
@@ -376,7 +380,8 @@
            "url": "https://video.twimg.com/SYNTH/high.mp4"
           }
          ]
-        }
+        },
+        "id_str": "1850000000000000102"
        }
       ]
      }
@@ -386,11 +391,14 @@
     "text": "Clip",
     "media": [
      {
+      "n": 1,
       "kind": "video",
-      "url": "https://video.twimg.com/SYNTH/high.mp4",
+      "image_url": "https://pbs.twimg.com/ext_tw_video_thumb/SYNTH/pu/img/thumb.jpg",
+      "video_url": "https://video.twimg.com/SYNTH/high.mp4",
       "width": 1280,
       "height": 720,
-      "alt_text": null
+      "alt": null,
+      "media_id": "1850000000000000102"
      }
     ]
    }
@@ -485,9 +493,9 @@
    },
    "expected": {
     "is_reply": true,
-    "reply_to_id": "1850000000000000001",
     "reply_to_author": "example_author",
-    "root_post_id": "1850000000000000001"
+    "root_post_id": "1850000000000000001",
+    "parent_id": "1850000000000000001"
    }
   },
   {
@@ -743,6 +751,264 @@
     }
    },
    "expected": null
+  },
+  {
+   "name": "animated-gif",
+   "item": "19",
+   "source": "code",
+   "fact": "An animated GIF is a video file on X: kind gif, its MP4 as video_url and its first frame as image_url.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000010",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "A"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "Loop https://t.co/M1",
+     "entities": {
+      "media": [
+       {
+        "url": "https://t.co/M1"
+       }
+      ]
+     },
+     "extended_entities": {
+      "media": [
+       {
+        "url": "https://t.co/M1",
+        "id_str": "1850000000000000201",
+        "type": "animated_gif",
+        "media_url_https": "https://pbs.twimg.com/media/SYNTH201.jpg",
+        "original_info": {
+         "width": 641,
+         "height": 481
+        },
+        "video_info": {
+         "variants": [
+          {
+           "content_type": "video/mp4",
+           "bitrate": 0,
+           "url": "https://video.twimg.com/SYNTH/201.mp4"
+          }
+         ]
+        }
+       }
+      ]
+     }
+    }
+   },
+   "expected": {
+    "media": [
+     {
+      "n": 1,
+      "kind": "gif",
+      "image_url": "https://pbs.twimg.com/media/SYNTH201.jpg",
+      "video_url": "https://video.twimg.com/SYNTH/201.mp4",
+      "media_id": "1850000000000000201"
+     }
+    ]
+   }
+  },
+  {
+   "name": "mixed-carousel",
+   "item": "19",
+   "source": "code",
+   "fact": "A post with photos and a video keeps them in X's order, numbered from 1: a photo has no video_url, a video has both its poster and its file.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000011",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "A"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "Three https://t.co/M1 https://t.co/M2 https://t.co/M3",
+     "entities": {
+      "media": [
+       {
+        "url": "https://t.co/M1"
+       },
+       {
+        "url": "https://t.co/M2"
+       },
+       {
+        "url": "https://t.co/M3"
+       }
+      ]
+     },
+     "extended_entities": {
+      "media": [
+       {
+        "url": "https://t.co/M1",
+        "id_str": "1850000000000000301",
+        "type": "photo",
+        "media_url_https": "https://pbs.twimg.com/media/SYNTH301.jpg",
+        "original_info": {
+         "width": 641,
+         "height": 481
+        },
+        "ext_alt_text": "First"
+       },
+       {
+        "url": "https://t.co/M2",
+        "id_str": "1850000000000000302",
+        "type": "video",
+        "media_url_https": "https://pbs.twimg.com/media/SYNTH302.jpg",
+        "original_info": {
+         "width": 642,
+         "height": 482
+        },
+        "video_info": {
+         "variants": [
+          {
+           "content_type": "video/mp4",
+           "bitrate": 832000,
+           "url": "https://video.twimg.com/SYNTH/302.mp4"
+          }
+         ]
+        }
+       },
+       {
+        "url": "https://t.co/M3",
+        "id_str": "1850000000000000303",
+        "type": "photo",
+        "media_url_https": "https://pbs.twimg.com/media/SYNTH303.jpg",
+        "original_info": {
+         "width": 643,
+         "height": 483
+        }
+       }
+      ]
+     }
+    }
+   },
+   "expected": {
+    "media": [
+     {
+      "n": 1,
+      "kind": "photo",
+      "video_url": null,
+      "alt": "First"
+     },
+     {
+      "n": 2,
+      "kind": "video",
+      "image_url": "https://pbs.twimg.com/media/SYNTH302.jpg",
+      "video_url": "https://video.twimg.com/SYNTH/302.mp4"
+     },
+     {
+      "n": 3,
+      "kind": "photo",
+      "video_url": null,
+      "alt": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "quoted-media",
+   "item": "19",
+   "source": "code",
+   "fact": "A quoted post's pictures are numbered in the quoted record, apart from the outer post's: both start at 1, and the picture belongs to the post whose record holds it.",
+   "parser": "post",
+   "raw": {
+    "__typename": "Tweet",
+    "rest_id": "1850000000000000012",
+    "core": {
+     "user_results": {
+      "result": {
+       "$user": "A"
+      }
+     }
+    },
+    "legacy": {
+     "full_text": "Outer https://t.co/M1",
+     "entities": {
+      "media": [
+       {
+        "url": "https://t.co/M1"
+       }
+      ]
+     },
+     "extended_entities": {
+      "media": [
+       {
+        "url": "https://t.co/M1",
+        "id_str": "1850000000000000401",
+        "type": "photo",
+        "media_url_https": "https://pbs.twimg.com/media/SYNTH401.jpg",
+        "original_info": {
+         "width": 641,
+         "height": 481
+        }
+       }
+      ]
+     }
+    },
+    "quoted_status_result": {
+     "result": {
+      "__typename": "Tweet",
+      "rest_id": "1850000000000000013",
+      "core": {
+       "user_results": {
+        "result": {
+         "$user": "B"
+        }
+       }
+      },
+      "legacy": {
+       "full_text": "Inner https://t.co/M1",
+       "entities": {
+        "media": [
+         {
+          "url": "https://t.co/M1"
+         }
+        ]
+       },
+       "extended_entities": {
+        "media": [
+         {
+          "url": "https://t.co/M1",
+          "id_str": "1850000000000000402",
+          "type": "photo",
+          "media_url_https": "https://pbs.twimg.com/media/SYNTH402.jpg",
+          "original_info": {
+           "width": 641,
+           "height": 481
+          }
+         }
+        ]
+       }
+      }
+     }
+    }
+   },
+   "expected": {
+    "media": [
+     {
+      "n": 1,
+      "media_id": "1850000000000000401"
+     }
+    ],
+    "quoted_post": {
+     "id": "1850000000000000013",
+     "media": [
+      {
+       "n": 1,
+       "media_id": "1850000000000000402"
+      }
+     ]
+    }
+   }
   }
  ],
  "after_recon": {
