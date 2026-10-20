@@ -326,3 +326,21 @@ def test_unreadable_limits_refuse_the_command_before_the_tab_is_looked_at(browse
     envelope = json.loads(out)
     assert code == 5 and envelope['error'] == 'blocked' and 'doctor' in envelope['fix']
     assert queries(browser) == [] and 'x.state' not in browser.ops()
+
+
+def test_the_own_limit_in_an_answer_shown_to_another_account_is_still_recorded(browser):
+    """Found by review of the same order in Threads: the account check ran before the answer was judged, so X's limit
+    in an answer that came back under another account was never recorded."""
+    spent = {**RATE, 'x-rate-limit-remaining': '0'}
+    known_tab(browser).respond('x.query', query_result('{"errors":[{"code":88}]}', status=429, headers=spent,
+                                                       user_id='1000000077'))
+    code, out, _ = run(browser, 'feed')
+    assert code == 4, out  # the changed account is what the command ends with (a login outranks a scope limit)
+    assert limits()['HomeTimeline']['remaining'] == 0
+
+
+def test_a_lock_in_an_answer_shown_to_another_account_is_still_recorded(browser):
+    known_tab(browser).respond('x.query', query_result('{"errors":[{"code":326,"message":"locked"}]}', status=403,
+                                                       user_id='1000000077'))
+    code, out, _ = run(browser, 'feed')
+    assert code == 5 and state_of()['person'] is not None, out

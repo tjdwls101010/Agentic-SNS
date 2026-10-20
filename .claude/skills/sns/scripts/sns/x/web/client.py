@@ -287,6 +287,16 @@ class Client:
         if isinstance(user, str) and user:
             self.connection.seen(user)
 
+    def _changed(self, report):
+        """The account-changed error a page report shows, returned rather than raised so the answer is judged first."""
+        try:
+            self._seen(report)
+        except SnsError as error:
+            if error.reason != 'account_changed':
+                raise
+            return error
+        return None
+
     def _note(self, report):
         """Remember whether the skill's own requests were told apart by their nonce (doctor reports it)."""
         if isinstance(report, dict):
@@ -415,7 +425,8 @@ class Client:
                         diagnostic('request', operation=operation, count=self.guard.count, status=result.get('status'),
                                    source=(result.get('used') or {}).get('source'))
                     holds, login = self._consume(result, slot, defer_login=True)
-                    self._seen(result)
+                    # the account check is judged after the answer, so a lock or limit in it is recorded first
+                    login = login or self._changed(result)
                     if login is not None and not (sent and isinstance(result.get('status'), int)):
                         raise login  # nothing came back to judge: the signal is the answer
                     if result.get('stopped') == 'limit':
