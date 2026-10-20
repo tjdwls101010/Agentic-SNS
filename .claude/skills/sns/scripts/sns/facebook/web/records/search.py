@@ -86,7 +86,7 @@ def _is_result_piece(path, data):
 
 
 def edges(chunks):
-    """Result edges by connection index, deferred pieces included; arrival order does not decide."""
+    """(connection index, its result edges) in index order, deferred pieces included; arrival order does not decide."""
     positions = {}
 
     def connection(value):
@@ -118,7 +118,7 @@ def edges(chunks):
                   and all(type(key) is int or key in WRAPPERS for key in tail[2:])):
                 positions.setdefault(tail[1], []).append({'node': data})
     for index in sorted(positions):
-        yield from positions[index]
+        yield index, positions[index]
 
 
 def _entity(node, vertical, captured_at, module_kind=None):
@@ -129,23 +129,33 @@ def _entity(node, vertical, captured_at, module_kind=None):
             'captured_at': iso(captured_at)}
 
 
+def _candidates(edge, vertical, captured_at, module, seen):
+    """The records one result edge holds that are not already listed (seen is updated)."""
+    candidates, found = [], []
+    if vertical in ('top', 'posts'):
+        candidates += posts.top_level([{'data': edge}], source='search', captured_at=captured_at)[0]
+    if vertical != 'posts':
+        for node, module_kind in _result_entities(edge, module):
+            if vertical == 'groups' and node.get('__typename') != 'Group':
+                continue
+            candidates.append(_entity(node, vertical, captured_at, module_kind))
+    for record in candidates:
+        key = (record.get('kind') or 'post', record['id'])
+        if key not in seen:
+            seen.add(key)
+            found.append(record)
+    return found
+
+
 def results(chunks, *, vertical, captured_at):
     """(records in result order, response issues)."""
     records, seen = [], set()
-    for edge in edges(chunks):
-        candidates = []
-        if vertical in ('top', 'posts'):
-            candidates += posts.top_level([{'data': edge}], source='search', captured_at=captured_at)[0]
-        if vertical != 'posts':
-            for node, module_kind in _result_entities(edge):
-                if vertical == 'groups' and node.get('__typename') != 'Group':
-                    continue
-                candidates.append(_entity(node, vertical, captured_at, module_kind))
-        for record in candidates:
-            key = (record.get('kind') or 'post', record['id'])
-            if key not in seen:
-                seen.add(key)
-                records.append(record)
+    for _, pieces in edges(chunks):
+        # an entity delivered in a later piece of its module takes the kind the module's own piece names
+        module = next((kind for kind in (_module_kind(p.get('rendering_strategy') or {}) for p in pieces
+                                         if isinstance(p, dict)) if kind), None)
+        for edge in pieces:
+            records += _candidates(edge, vertical, captured_at, module, seen)
     if vertical in ('top', 'posts'):
         # Posts whose pieces are spread over the response are merged across it; replace each with its merged form.
         merged = {r['id']: r for r in posts.top_level(chunks, source='search', captured_at=captured_at)[0]}

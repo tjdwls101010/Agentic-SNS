@@ -154,3 +154,32 @@ def test_a_top_page_of_entity_modules_lists_each_entity_with_the_kind_its_module
     assert code == 0, result
     assert [(r['kind'], r['id']) for r in result['results']] == [('group', '601'), ('page', '602'), ('page', '603'),
                                                                   ('person', '604')]
+
+
+def deferred(chunks):
+    return query_result('\n'.join(json.dumps(c) for c in chunks))
+
+
+def test_an_entity_of_a_module_that_arrives_in_a_later_piece_keeps_the_modules_kind(browser):
+    """Found by review: a top-search entity delivered as a deferred piece into its module lost the module's see-more
+    type and was called a person although the module lists pages."""
+    piece = {'path': ['serpResponse', 'results', 'edges', 0, 'rendering_strategy', 'result_rendering_strategies', 0],
+             'data': {'view_model': {'profile': entity('User', '602')}}}
+    known_tab(browser)
+    browser.respond('facebook.query', deferred([json.loads(results_body([
+        module('browse_type_profile_with_biz_tools', []), {'node': {**story('POST1'), '__typename': 'Story'}}],
+        has_next=False)), piece]))
+    code, out, _ = run(browser, 'search', 'sample', '--json')
+    result = json.loads(out)
+    assert code == 0, out
+    assert [(r.get('kind'), r['id']) for r in result['results']] == [('page', '602'), ('post', 'POST1')]
+
+
+def test_an_entity_repeated_in_a_later_piece_is_listed_once(browser):
+    piece = {'path': ['serpResponse', 'results', 'edges', 0, 'rendering_strategy', 'result_rendering_strategies', 0],
+             'data': {'view_model': {'profile': entity('User', '602')}}}
+    known_tab(browser)
+    browser.respond('facebook.query', deferred([json.loads(results_body([
+        module('browse_type_profile_with_biz_tools', [entity('User', '602')])], has_next=False)), piece]))
+    code, out, _ = run(browser, 'search', 'sample', '--json')
+    assert [(r['kind'], r['id']) for r in json.loads(out)['results']] == [('page', '602')]
