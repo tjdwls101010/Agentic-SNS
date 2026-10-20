@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "location/hops/share 모든 cases는 옛 테스트에서 파일 미소비. 같은 버킷·최대 2 redirect 홉·공유 3홉·허용 호스트·실제 요청 집계를 유지하고 test_cli_thread.py:134 인라인도 이식한다."},
   "about": "Redirects and share links (appendix A 6, 7). locations: whether a redirect target may be followed and where it leads. hops: scripted answers to a sequence of requests, with the outcome and how many requests were charged. share: share-link resolution (/r/<sub>/s/<token>).",
   "locations": {
     "item": "6",

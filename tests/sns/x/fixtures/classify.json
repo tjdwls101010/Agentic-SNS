@@ -1,4 +1,5 @@
 {
+  "p4": {"removed": {"signals.cases.unidentified-429": "픽스처 문제: P2 R6에서 hook은 URL을 항상 안다고 결론; test_classify.py:42가 건너뛰는 실재 불가능한 설계 사례"}, "behavior": "URL로 GraphQL 작업 또는 REST 경로 버킷을 항상 결정하는 계약은 P4가 검증한다."},
  "about": "Response classification (appendix A 1-11). responses: one GraphQL response as the tab's query snippet returns it ({status, body, headers}; headers holds only the x-rate-limit-* values), the operation it was for, and root, the dotted path where that operation's data must be (from the operation table; a [] segment is a list). outcome: ok (with the number of warnings: errors that came with data), blocked (reason challenge | account_locked: indefinite, a person clears it), rate_limited (bucket = the operation; reset = Unix seconds from the header, or null when there was none and the guard uses 900 s), login (X wants a logged-in session), csrf (X refused the ct0 token: re-read it once and retry, stop if the account changed), signature_rejected (recovery 4), contract_changed (variables no longer fit: exit 6, the skill needs an update), features_missing (names: retried once with store values, recovery 3), rotated (recovery 1-2), transient (exit 6), unavailable (exit 9), shape_changed (exit 6, the skill needs an update). Order when several apply: challenge, account_locked, rate_limited, login, csrf, signature_rejected, contract_changed, features_missing, rotated, transient, unavailable, shape_changed. signals: what the tab's hook saw in the app's own responses between or during commands, and what the guard does with it. source: code (previous transport.py), measured (planning session 2026-10-18), plan, P2 (inferred, confirmed in recon).",
  "responses": [
   {
@@ -640,19 +641,6 @@
      "outcome": "rate_limited",
      "bucket": "ViewerBadgeCounts",
      "reset": 1792300000
-    }
-   },
-   {
-    "name": "unidentified-429",
-    "signal": {
-     "path": null,
-     "status": 429,
-     "codes": [],
-     "rate": null
-    },
-    "expected": {
-     "outcome": "undecided",
-     "decide": "P2 R6"
     }
    }
   ]

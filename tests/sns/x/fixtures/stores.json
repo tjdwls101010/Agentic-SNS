@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "collection/handles/protection/unblock/tab_protection/session의 scenarios 전부: 파일 무결성·단조 핸들·검증된 차단 해제·신호 보존·탭 재생성. 옛 테스트 파일 미소비; per-command-cap/cap-ceiling은 S2로 P4 제거."},
  "about": "Local state scenarios on a real filesystem (appendix A 14, 31, 34 and the plan's protection, limit, deadline and tab contracts). Each scenario states the starting files, the action, and what must hold afterwards. Contexts are the query identity a file or handle is bound to (command, target, sort or tab, filters, normalized window, the X account id). All state lives under the skill's data/ directory (TWITTER_DATA_DIR in tests). source: threads (the store is ported from the threads skill), code (the previous twitter skill), plan.",
  "collection": {
   "item": "31",
@@ -498,7 +499,7 @@
     "name": "idle-blank",
     "start": "the tab unused for about 5 minutes",
     "action": "the idle blanker",
-    "after": "the tab is at about:blank (no request); the next command reloads it and pays the opening reservation"
+    "after": "the tab is at about:blank (no request); the next command opens a new tab; opening is measured when observed early, otherwise reserved"
    }
   ]
  }

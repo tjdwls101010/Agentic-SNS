@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "모든 scenarios가 파일 미소비. collection/handles/protection 계약을 코어에 연결; protection.unblock은 옛 무검증 삭제를 기록하므로 검증 완료 후 해제로 P4 변경. 계정별 상태 및 단조 핸들 유지."},
   "about": "Local state scenarios on a real filesystem (appendix A 48-50). Each scenario states the starting files, the action, and what must hold afterwards. Contexts are the query identity a file or handle is bound to.",
   "collection": {
     "item": "48",

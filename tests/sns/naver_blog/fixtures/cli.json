@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "대부분 서술형 계약은 파일 미소비. 실제 CLI help/옵션 검증 인라인을 연결. exit_codes의 10 및 budget_rule/--max-requests·읽기10/수집40/10분120은 S2로 P4 변경."},
  "about": "Command-level contracts observed through the real cli.py with a fake Aside (appendix A 38, 45-48, 56, 57, 59-62, 64 and the plan's CLI contract). Each rule is checked by a protocol test in P3; arguments are refused before any request (exit 2) unless stated.",
  "exit_codes": {
   "item": "38, plan 종료코드",

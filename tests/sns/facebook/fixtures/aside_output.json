@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "12개 cases 전부 실행 중이지만 실제 subprocess.TimeoutExpired/timeout outcome 사례는 없음. timeout 경로를 추가 실행한다."},
   "about": "What one `aside repl` run prints and how it is read (appendix A 9), in the protocol of aside/program.js: zero or more {\"kind\":\"chunk\",\"index\":i,\"body\"} lines, then one {\"kind\":\"result\",\"chunks\":n,\"body\"} line, or one {\"kind\":\"error\",\"error\"} line. Each case gives the process result (stdout, stderr, exit; timed_out when it did not finish) and the outcome: value (what the page function returned) or error with its kind: invalid, tab_missing, lost (time limit or lost connection), failed (other nonzero exit), timeout.",
   "facts": {
     "process_timeout_seconds": 125,

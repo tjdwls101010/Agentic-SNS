@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "empty_public_buddies/new_surfaces는 파일 기대값 소비자 없음. 공개 이웃 비공개 기본값은 test_cli_neighbors.py:98, 새 응답은 cli_responses.json 출처를 연결."},
  "about": "Blog-side records (appendix A 22-25, 49) and the new surfaces' measured fields. raw is one item as sent; expect is the record or null. relation is how the viewer stands to the blog: neighbor, mutual-neighbor, or null. All ids are synthetic.",
  "cards": [
   {
@@ -292,7 +293,7 @@
   "fact": "Public neighbor lists are private by default: an empty list is not 'no neighbors' — the card's own count usually says otherwise, and the command says so."
  },
  "new_surfaces": {
-  "status": "Shapes from the planning session's field list (plan '계획 세션 실측'), not from a capture. P2 replaces each raw with a synthetic copy of a captured shape and fixes expect; the facts below are what was measured.",
+  "status": "Documentary field inventory, not executable raw/expect cases. Synthetic shapes from the shipped old CLI tests are in cli_responses.json with source lines; there are no local Naver captures in this P1 run. P4 must consume those fixtures. buddy_total is not a shipped route; the sympathy person list remains subject to S13/P3.",
   "surfaces": [
    {
     "op": "search_blogs",
@@ -310,8 +311,9 @@
    {
     "op": "search_clips",
     "path": "/api/search/v1/moment",
-    "fact": "Clip search returns originTitle, playTime, momentNo (and the owner's blog); a Clip record names its next command (R20 decides its URL).",
+    "fact": "Clip results include docNo (the permalink /<blogId>/clip/<docNo>), originTitle, playTime and momentNo; momentNo is not the permalink id.",
     "fields": [
+     "docNo",
      "momentNo",
      "originTitle",
      "playTime",
@@ -337,9 +339,9 @@
     ]
    },
    {
-    "op": "sympathy_users",
+    "op": "sympathy",
     "path": "/api/blogs/{blogId}/posts/{logNo}/sympathy-users",
-    "fact": "totalCount and reactionCounts (per reaction kind) are exact for anyone; the list of people is empty unless the viewer owns the blog (N11: not used). This replaces the old 'first related post is this post' guess for the like count.",
+    "fact": "sympathy yields exact totalCount and reactionCounts. The old implementation does not expose the owner-only person list; S13 requires fresh P3 reconnaissance before adding it.",
     "fields": [
      "totalCount",
      "reactionCounts"
@@ -388,8 +390,10 @@
    {
     "op": "buddy_groups",
     "path": "/api/blogs/{me}/buddy-groups",
-    "fact": "The viewer's neighbor groups (id, name, count).",
+    "fact": "Neighbor groups carry blogId, blogNo, groupId and groupName; the shipped record does not assert a count.",
     "fields": [
+     "blogId",
+     "blogNo",
      "groupId",
      "groupName"
     ]
@@ -400,7 +404,8 @@
     "fact": "How many neighbors.",
     "fields": [
      "totalCount"
-    ]
+    ],
+    "status": "not in the shipped 35-route ledger; documentary observation only, no P4 route implied"
    },
    {
     "op": "followers",
@@ -432,9 +437,9 @@
    {
     "op": "monthly_profiles",
     "path": "/api/blogs/profiles/profile-relation-list",
-    "fact": "Cards for a list of blog ids.",
+    "fact": "The result.blogProfileAndRelationView list contains cards for blogIdList.",
     "fields": [
-     "blogIdList"
+     "result.blogProfileAndRelationView"
     ]
    },
    {

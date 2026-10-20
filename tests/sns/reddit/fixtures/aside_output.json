@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "test_aside.py:15는 exit=0인 비타임아웃 cases만 실행. 비정상 종료·연결 유실·process-timeout 사례를 P4가 실행해야 함."},
   "about": "What one `aside repl` run of the fetch snippet prints and how it is read (appendix A 9). The snippet prints one envelope line {status, url, body, location, ratelimit {used, remaining, reset}}; a body over 1,000,000 characters whose envelope would pass 8 MiB is sent as {kind: body_chunk, index, body} lines of at most 512 KiB (never splitting a surrogate pair), then the envelope with body '' and body_chunks = their number. Each case gives the process result and the outcome: envelope (what the reader returns) or error (exit 3) with a kind: invalid, lost (time limit or lost connection), failed (other nonzero exit), timeout.",
   "facts": {"process_timeout_seconds": 125, "repl_timeout_seconds": 120, "log_line_ceiling_bytes_measured": 12582912,
             "chunk_threshold_chars": 1000000, "chunk_envelope_bytes": 8388608, "chunk_bytes": 524288},

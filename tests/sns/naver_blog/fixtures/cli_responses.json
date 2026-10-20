@@ -1,0 +1,5545 @@
+{
+ "about": "Synthetic response shapes extracted from the read-only old Naver tests. source line numbers refer to oldskills/naver-blog/tests/naver_blog/. Helpers were materialized with args/kwargs; no old test or platform code was changed. also_used_at records duplicate inline consumers. P4 must replace the inline builders with fixture reads while preserving each consumer assertion. Existing HTML and record fixtures remain their source of truth. Repeated generated pages with the same wire shape share a case; also_used_at lists each original source. Sharing a shape does not equate values, page sizes or expected output: P4 must retain each old test assertion and instantiate its original generation parameters.",
+ "p4": {
+  "status": "P4가 실행해야 함",
+  "behavior": "cases의 response/response_text를 실제 CLI 가짜 Aside 입력으로 연결한다. source/also_used_at의 옛 테스트 assertions를 모두 유지하며 budget/window/exit10 assertion만 S2에 따라 바꾼다."
+ },
+ "cases": [
+  {
+   "name": "current_user-1",
+   "source": {
+    "file": "conftest.py",
+    "line": 96,
+    "end_line": 100,
+    "symbol": "current_user"
+   },
+   "args": [],
+   "kwargs": {},
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "userId": "viewer_blog",
+     "loggedIn": true,
+     "blogNo": 900001,
+     "networkBlocked": false,
+     "writeBlocked": false,
+     "naverId": "secret_login_id",
+     "idNo": "7777",
+     "baUserKey": "bk-secret",
+     "nickname": "보는이"
+    }
+   }
+  },
+  {
+   "name": "current_user-2",
+   "source": {
+    "file": "conftest.py",
+    "line": 96,
+    "end_line": 100,
+    "symbol": "current_user"
+   },
+   "args": [],
+   "kwargs": {
+    "loggedIn": false
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "userId": "viewer_blog",
+     "loggedIn": false,
+     "blogNo": 900001,
+     "networkBlocked": false,
+     "writeBlocked": false,
+     "naverId": "secret_login_id",
+     "idNo": "7777",
+     "baUserKey": "bk-secret",
+     "nickname": "보는이"
+    }
+   }
+  },
+  {
+   "name": "current_user-3",
+   "source": {
+    "file": "conftest.py",
+    "line": 96,
+    "end_line": 100,
+    "symbol": "current_user"
+   },
+   "args": [],
+   "kwargs": {
+    "networkBlocked": true
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "userId": "viewer_blog",
+     "loggedIn": true,
+     "blogNo": 900001,
+     "networkBlocked": true,
+     "writeBlocked": false,
+     "naverId": "secret_login_id",
+     "idNo": "7777",
+     "baUserKey": "bk-secret",
+     "nickname": "보는이"
+    }
+   }
+  },
+  {
+   "name": "post_items-1",
+   "source": {
+    "file": "conftest.py",
+    "line": 121,
+    "end_line": 126,
+    "symbol": "post_items"
+   },
+   "args": [
+    2
+   ],
+   "kwargs": {},
+   "response": [
+    {
+     "logNo": 224000000001,
+     "blogId": "blog_a1",
+     "blogNo": 501,
+     "title": "글 1",
+     "content": "요약 1",
+     "nickname": "닉1",
+     "blogName": "블로그1",
+     "addDate": 1792367940000,
+     "sympathyCount": 1,
+     "commentCount": 1,
+     "isBuyWithMyOwnMoney": false
+    },
+    {
+     "logNo": 224000000002,
+     "blogId": "blog_a2",
+     "blogNo": 502,
+     "title": "글 2",
+     "content": "요약 2",
+     "nickname": "닉2",
+     "blogName": "블로그2",
+     "addDate": 1792367880000,
+     "sympathyCount": 2,
+     "commentCount": 1,
+     "isBuyWithMyOwnMoney": false
+    }
+   ]
+  },
+  {
+   "name": "search_page-1",
+   "source": {
+    "file": "conftest.py",
+    "line": 129,
+    "end_line": 132,
+    "symbol": "search_page"
+   },
+   "args": [
+    []
+   ],
+   "kwargs": {
+    "total": 0
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "currentPage": 1,
+     "totalCount": 0,
+     "list": [],
+     "isBlockedByBifrostShield": false,
+     "queryControlInfo": {
+      "isAdult": false,
+      "isForbidden": false
+     }
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_search.py",
+     "line": 122,
+     "end_line": 122,
+     "test": "test_an_explicit_empty_result_is_exit_7"
+    }
+   ]
+  },
+  {
+   "name": "sympathy-1",
+   "source": {
+    "file": "test_cli_post.py",
+    "line": 13,
+    "end_line": 16,
+    "symbol": "sympathy"
+   },
+   "args": [],
+   "kwargs": {},
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "currentPage": 0,
+     "totalCount": 525,
+     "totalPage": 0,
+     "postTitle": "t",
+     "sympathyUserViewList": [],
+     "blogOwner": false,
+     "reactionCounts": [
+      {
+       "reactionType": "like",
+       "count": 514
+      },
+      {
+       "reactionType": "impressive",
+       "count": 10
+      },
+      {
+       "reactionType": "thanks",
+       "count": 1
+      }
+     ]
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_post.py",
+     "line": 42,
+     "end_line": 42,
+     "test": "answer_post"
+    }
+   ]
+  },
+  {
+   "name": "related-1",
+   "source": {
+    "file": "test_cli_post.py",
+    "line": 19,
+    "end_line": 24,
+    "symbol": "related"
+   },
+   "args": [
+    224000000005,
+    224000000001,
+    224000000006
+   ],
+   "kwargs": {},
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "recommendationType": "CATEGORY_RELATED_POST",
+     "totalCount": 3,
+     "recommendationPostList": [
+      {
+       "blogId": "cafe_note",
+       "blogNo": 123456,
+       "logNo": 224000000005,
+       "title": "같은 카테고리 224000000005",
+       "addDate": "2026-10-14T19:45:27+0900",
+       "commentCount": 1,
+       "sympathyCount": 2,
+       "briefContents": ""
+      },
+      {
+       "blogId": "cafe_note",
+       "blogNo": 123456,
+       "logNo": 224000000001,
+       "title": "같은 카테고리 224000000001",
+       "addDate": "2026-10-14T19:45:27+0900",
+       "commentCount": 1,
+       "sympathyCount": 2,
+       "briefContents": ""
+      },
+      {
+       "blogId": "cafe_note",
+       "blogNo": 123456,
+       "logNo": 224000000006,
+       "title": "같은 카테고리 224000000006",
+       "addDate": "2026-10-14T19:45:27+0900",
+       "commentCount": 1,
+       "sympathyCount": 2,
+       "briefContents": ""
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "cbox-1",
+   "source": {
+    "file": "test_cli_post.py",
+    "line": 32,
+    "end_line": 36,
+    "symbol": "cbox"
+   },
+   "args": [
+    [
+     {
+      "commentNo": 11,
+      "parentCommentNo": 11,
+      "replyLevel": 1,
+      "userName": "B",
+      "contents": "새 댓글",
+      "regTime": "2026-10-18T12:00:00+0900",
+      "objectId": "123456_201_224000000001"
+     },
+     {
+      "commentNo": 12,
+      "parentCommentNo": 10,
+      "replyLevel": 2,
+      "userName": "주인",
+      "contents": "두 번째 답글",
+      "regTime": "2026-10-18T12:30:00+0900",
+      "objectId": "123456_201_224000000001"
+     },
+     {
+      "commentNo": 14,
+      "parentCommentNo": 10,
+      "replyLevel": 2,
+      "userName": "주인",
+      "contents": "첫 답글",
+      "regTime": "2026-10-18T11:10:00+0900",
+      "objectId": "123456_201_224000000001"
+     },
+     {
+      "commentNo": 10,
+      "parentCommentNo": 10,
+      "replyLevel": 1,
+      "userName": "A",
+      "contents": "먼저 단 댓글",
+      "regTime": "2026-10-18T11:00:00+0900",
+      "objectId": "123456_201_224000000001"
+     },
+     {
+      "commentNo": 13,
+      "parentCommentNo": 9,
+      "replyLevel": 2,
+      "userName": "주인",
+      "contents": "앞 쪽 댓글의 답글",
+      "regTime": "2026-10-18T11:30:00+0900",
+      "objectId": "123456_201_224000000001"
+     }
+    ]
+   ],
+   "kwargs": {},
+   "response": {
+    "success": true,
+    "code": "1000",
+    "result": {
+     "commentList": [
+      {
+       "commentNo": 11,
+       "parentCommentNo": 11,
+       "replyLevel": 1,
+       "userName": "B",
+       "contents": "새 댓글",
+       "regTime": "2026-10-18T12:00:00+0900",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 12,
+       "parentCommentNo": 10,
+       "replyLevel": 2,
+       "userName": "주인",
+       "contents": "두 번째 답글",
+       "regTime": "2026-10-18T12:30:00+0900",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 14,
+       "parentCommentNo": 10,
+       "replyLevel": 2,
+       "userName": "주인",
+       "contents": "첫 답글",
+       "regTime": "2026-10-18T11:10:00+0900",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 10,
+       "parentCommentNo": 10,
+       "replyLevel": 1,
+       "userName": "A",
+       "contents": "먼저 단 댓글",
+       "regTime": "2026-10-18T11:00:00+0900",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 13,
+       "parentCommentNo": 9,
+       "replyLevel": 2,
+       "userName": "주인",
+       "contents": "앞 쪽 댓글의 답글",
+       "regTime": "2026-10-18T11:30:00+0900",
+       "objectId": "123456_201_224000000001"
+      }
+     ],
+     "pageModel": {
+      "page": 1,
+      "totalPages": 1,
+      "nextPage": 0
+     },
+     "count": {
+      "comment": 3,
+      "reply": 2,
+      "delCommentByUser": 0,
+      "delCommentByMon": 0,
+      "blindCommentByUser": 0,
+      "blindReplyByUser": 0,
+      "total": 5
+     }
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_post.py",
+     "line": 109,
+     "end_line": 109,
+     "test": "test_post_with_comments_reads_one_page"
+    },
+    {
+     "file": "test_cli_post.py",
+     "line": 118,
+     "end_line": 118,
+     "test": "test_comments_are_rebuilt_under_their_parents"
+    }
+   ]
+  },
+  {
+   "name": "cbox-2",
+   "source": {
+    "file": "test_cli_post.py",
+    "line": 32,
+    "end_line": 36,
+    "symbol": "cbox"
+   },
+   "args": [
+    [],
+    2,
+    2
+   ],
+   "kwargs": {
+    "count": {
+     "comment": 0,
+     "reply": 0,
+     "total": 0
+    }
+   },
+   "response": {
+    "success": true,
+    "code": "1000",
+    "result": {
+     "commentList": [],
+     "pageModel": {
+      "page": 2,
+      "totalPages": 2,
+      "nextPage": 0
+     },
+     "count": {
+      "comment": 0,
+      "reply": 0,
+      "total": 0
+     }
+    }
+   }
+  },
+  {
+   "name": "posts_of-1",
+   "source": {
+    "file": "test_cli_blog.py",
+    "line": 15,
+    "end_line": 20,
+    "symbol": "posts_of"
+   },
+   "args": [
+    2
+   ],
+   "kwargs": {},
+   "response": [
+    {
+     "domainIdOrBlogId": "cafe_note",
+     "logNo": 224000000100,
+     "blogNo": 123456,
+     "titleWithInspectMessage": "글 0",
+     "briefContents": "요약",
+     "addDate": 1792368000000,
+     "sympathyCnt": 3,
+     "commentCnt": 1,
+     "categoryNo": 1,
+     "categoryName": "맛집",
+     "allOpenPost": true,
+     "readCount": null,
+     "postBlocked": false,
+     "notOpen": false,
+     "buddyOpen": false,
+     "bothBuddyOpen": false
+    },
+    {
+     "domainIdOrBlogId": "cafe_note",
+     "logNo": 224000000099,
+     "blogNo": 123456,
+     "titleWithInspectMessage": "글 1",
+     "briefContents": "요약",
+     "addDate": 1792281600000,
+     "sympathyCnt": 3,
+     "commentCnt": 1,
+     "categoryNo": 1,
+     "categoryName": "맛집",
+     "allOpenPost": true,
+     "readCount": null,
+     "postBlocked": false,
+     "notOpen": false,
+     "buddyOpen": false,
+     "bothBuddyOpen": false
+    }
+   ]
+  },
+  {
+   "name": "post_list-1",
+   "source": {
+    "file": "test_cli_blog.py",
+    "line": 23,
+    "end_line": 24,
+    "symbol": "post_list"
+   },
+   "args": [
+    []
+   ],
+   "kwargs": {},
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "page": 1,
+     "categoryNo": 0,
+     "totalCount": 0,
+     "items": []
+    }
+   }
+  },
+  {
+   "name": "feed_items-1",
+   "source": {
+    "file": "test_cli_neighbors.py",
+    "line": 8,
+    "end_line": 13,
+    "symbol": "feed_items"
+   },
+   "args": [
+    2
+   ],
+   "kwargs": {},
+   "response": [
+    {
+     "domainIdOrBlogId": "friend0",
+     "blogNo": 700,
+     "logNo": 224000000500,
+     "title": "이웃 글 0",
+     "titleWithInspectMessage": "이웃 글 0",
+     "briefContents": "요약",
+     "addDate": 1792368000000,
+     "nickName": "이웃0",
+     "blogName": "이웃 블로그",
+     "likeCount": 2,
+     "commentCount": 1,
+     "shareCount": 0,
+     "groupId": 1,
+     "relationType": 2,
+     "isRss": false,
+     "allOpenPost": true,
+     "buyWithMyOwnMoney": false
+    },
+    {
+     "domainIdOrBlogId": "friend1",
+     "blogNo": 701,
+     "logNo": 224000000499,
+     "title": "이웃 글 1",
+     "titleWithInspectMessage": "이웃 글 1",
+     "briefContents": "요약",
+     "addDate": 1792364400000,
+     "nickName": "이웃1",
+     "blogName": "이웃 블로그",
+     "likeCount": 2,
+     "commentCount": 1,
+     "shareCount": 0,
+     "groupId": 1,
+     "relationType": 2,
+     "isRss": false,
+     "allOpenPost": true,
+     "buyWithMyOwnMoney": true
+    }
+   ]
+  },
+  {
+   "name": "feed_page-1",
+   "source": {
+    "file": "test_cli_neighbors.py",
+    "line": 16,
+    "end_line": 20,
+    "symbol": "feed_page"
+   },
+   "args": [
+    [],
+    20,
+    2
+   ],
+   "kwargs": {},
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "totalCount": 20,
+     "page": 2,
+     "isBetterFeedTestTarget": false
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_neighbors.py",
+     "line": 63,
+     "end_line": 63,
+     "test": "test_a_page_past_the_end_comes_without_items"
+    },
+    {
+     "file": "test_cli_neighbors.py",
+     "line": 70,
+     "end_line": 70,
+     "test": "test_no_neighbor_posts_is_an_explicit_empty_result",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    }
+   ]
+  },
+  {
+   "name": "buddy_page-1",
+   "source": {
+    "file": "test_cli_neighbors.py",
+    "line": 23,
+    "end_line": 25,
+    "symbol": "buddy_page"
+   },
+   "args": [
+    []
+   ],
+   "kwargs": {
+    "pages": 0,
+    "key": "totalPublicBuddyCount",
+    "total": 0
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "blogId": "viewer_blog",
+     "totalPublicBuddyCount": 0,
+     "totalPageCount": 0,
+     "currentPage": 1,
+     "buddyList": []
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_neighbors.py",
+     "line": 99,
+     "end_line": 99,
+     "test": "test_a_blogs_public_neighbors_and_the_private_default"
+    }
+   ]
+  },
+  {
+   "name": "buddies-1",
+   "source": {
+    "file": "test_cli_neighbors.py",
+    "line": 28,
+    "end_line": 30,
+    "symbol": "buddies"
+   },
+   "args": [
+    2
+   ],
+   "kwargs": {},
+   "response": [
+    {
+     "blogId": "nb0",
+     "blogName": "이웃 0",
+     "nickName": "n0",
+     "bothNeighbor": true,
+     "groupId": 1,
+     "updateTime": null,
+     "officialBlog": false
+    },
+    {
+     "blogId": "nb1",
+     "blogName": "이웃 1",
+     "nickName": "n1",
+     "bothNeighbor": false,
+     "groupId": 1,
+     "updateTime": null,
+     "officialBlog": false
+    }
+   ]
+  },
+  {
+   "name": "topic_posts-1",
+   "source": {
+    "file": "test_cli_directory.py",
+    "line": 14,
+    "end_line": 17,
+    "symbol": "topic_posts"
+   },
+   "args": [
+    2
+   ],
+   "kwargs": {},
+   "response": [
+    {
+     "domainIdOrBlogId": "tb0",
+     "blogNo": 0,
+     "logNo": 900,
+     "title": "주제 글 0",
+     "briefContents": "요약",
+     "addDate": 1792368000000,
+     "nickname": "n",
+     "sympathyCnt": 1,
+     "commentCnt": 0,
+     "buyWithMyOwnMoney": false
+    },
+    {
+     "domainIdOrBlogId": "tb1",
+     "blogNo": 1,
+     "logNo": 901,
+     "title": "주제 글 1",
+     "briefContents": "요약",
+     "addDate": 1792364400000,
+     "nickname": "n",
+     "sympathyCnt": 1,
+     "commentCnt": 0,
+     "buyWithMyOwnMoney": false
+    }
+   ]
+  },
+  {
+   "name": "clip_items-1",
+   "source": {
+    "file": "test_cli_new.py",
+    "line": 32,
+    "end_line": 35,
+    "symbol": "clip_items"
+   },
+   "args": [
+    2
+   ],
+   "kwargs": {},
+   "response": [
+    {
+     "blogId": "clipper",
+     "blogNo": 1,
+     "docNo": "1600",
+     "title": "<b>클립</b> 0",
+     "originTitle": "클립 0",
+     "content": "",
+     "playTime": "23",
+     "thumbnailUrl": "https://x",
+     "addDate": 1792368000000,
+     "nickname": "클립러",
+     "momentNo": "9000",
+     "videoId": "v"
+    },
+    {
+     "blogId": "clipper",
+     "blogNo": 1,
+     "docNo": "1601",
+     "title": "<b>클립</b> 1",
+     "originTitle": "클립 1",
+     "content": "",
+     "playTime": "23",
+     "thumbnailUrl": "https://x",
+     "addDate": 1792367999000,
+     "nickname": "클립러",
+     "momentNo": "9001",
+     "videoId": "v"
+    }
+   ]
+  },
+  {
+   "name": "test_cli_blog-28",
+   "source": {
+    "file": "test_cli_blog.py",
+    "line": 28,
+    "end_line": 28,
+    "test": "answer_card"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "blogId": "cafe_note",
+     "blogNo": 123456,
+     "blogName": "카페 기록",
+     "blogNameWithTag": "<b>카페</b> 기록",
+     "nickName": "카페노트",
+     "blogDesc": "성수 &amp; 연남 카페",
+     "subscriberCount": 1520,
+     "dayVisitorCount": 340,
+     "totalVisitorCount": 880000,
+     "mylogPostCount": 712,
+     "blogDirectoryName": "맛집",
+     "officialBlog": false,
+     "isMarketBlog": true,
+     "bothNeighbor": true,
+     "neighbor": true,
+     "powerBlog": true
+    }
+   }
+  },
+  {
+   "name": "test_cli_blog-29",
+   "source": {
+    "file": "test_cli_blog.py",
+    "line": 29,
+    "end_line": 29,
+    "test": "answer_card"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "postCount": 712,
+     "marketPostCount": 0,
+     "momentCount": 4
+    }
+   }
+  },
+  {
+   "name": "test_cli_blog-30",
+   "source": {
+    "file": "test_cli_blog.py",
+    "line": 30,
+    "end_line": 30,
+    "test": "answer_card"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "mylogCategoryList": [
+      {
+       "categoryNo": 0,
+       "categoryName": "전체보기",
+       "postCnt": 120
+      },
+      {
+       "divisionLine": true,
+       "categoryNo": 99
+      },
+      {
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "postCnt": 80
+      },
+      {
+       "categoryNo": 2,
+       "categoryName": "서울",
+       "parentCategoryNo": 1,
+       "postCnt": 50
+      },
+      {
+       "categoryNo": 3,
+       "categoryName": "성수",
+       "parentCategoryNo": 2,
+       "postCnt": 20
+      },
+      {
+       "categoryNo": 4,
+       "categoryName": "구분",
+       "categoryType": "S"
+      },
+      {
+       "categoryNo": 5,
+       "categoryName": "비밀",
+       "openYN": "N",
+       "postCnt": 7
+      },
+      {
+       "categoryName": "번호 없음"
+      }
+     ],
+     "mylogPostCount": 120
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_blog.py",
+     "line": 71,
+     "end_line": 71,
+     "test": "test_posts_by_category_name_costs_one_lookup"
+    }
+   ]
+  },
+  {
+   "name": "test_cli_blog-35",
+   "source": {
+    "file": "test_cli_blog.py",
+    "line": 35,
+    "end_line": 35,
+    "test": "test_blog_reads_the_card_counts_categories_notices_and_popular"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "noticePostViewList": []
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_blog.py",
+     "line": 104,
+     "end_line": 104,
+     "test": "test_empty_notices_are_exit_7"
+    }
+   ]
+  },
+  {
+   "name": "test_cli_blog-36",
+   "source": {
+    "file": "test_cli_blog.py",
+    "line": 36,
+    "end_line": 37,
+    "test": "test_blog_reads_the_card_counts_categories_notices_and_popular"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "popularPostList": [
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000100,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 0",
+       "briefContents": "요약",
+       "addDate": 1792368000000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false,
+       "viewCount": 384
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000099,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 1",
+       "briefContents": "요약",
+       "addDate": 1792281600000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false,
+       "viewCount": 384
+      }
+     ]
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_blog.py",
+     "line": 97,
+     "end_line": 98,
+     "test": "test_popular_is_one_page_with_view_counts",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    }
+   ]
+  },
+  {
+   "name": "test_cli_blog-53",
+   "source": {
+    "file": "test_cli_blog.py",
+    "line": 53,
+    "end_line": 53,
+    "test": "test_a_missing_blog_is_exit_9"
+   },
+   "response": {
+    "isSuccess": false,
+    "error": {
+     "code": "not_exist_blog",
+     "message": "x"
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_search.py",
+     "line": 107,
+     "end_line": 107,
+     "test": "test_a_domain_address_is_resolved_once"
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 80,
+     "end_line": 80,
+     "test": "test_an_owner_only_surface_is_9",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    }
+   ]
+  },
+  {
+   "name": "test_cli_blog-61",
+   "source": {
+    "file": "test_cli_blog.py",
+    "line": 61,
+    "end_line": 61,
+    "test": "test_posts_list_newest_first_and_continue"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "page": 1,
+     "categoryNo": 0,
+     "totalCount": 0,
+     "items": [
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000100,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 0",
+       "briefContents": "요약",
+       "addDate": 1792368000000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000099,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 1",
+       "briefContents": "요약",
+       "addDate": 1792281600000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000098,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 2",
+       "briefContents": "요약",
+       "addDate": 1792195200000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000097,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 3",
+       "briefContents": "요약",
+       "addDate": 1792108800000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000096,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 4",
+       "briefContents": "요약",
+       "addDate": 1792022400000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000095,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 5",
+       "briefContents": "요약",
+       "addDate": 1791936000000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000094,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 6",
+       "briefContents": "요약",
+       "addDate": 1791849600000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000093,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 7",
+       "briefContents": "요약",
+       "addDate": 1791763200000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000092,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 8",
+       "briefContents": "요약",
+       "addDate": 1791676800000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000091,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 9",
+       "briefContents": "요약",
+       "addDate": 1791590400000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000090,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 10",
+       "briefContents": "요약",
+       "addDate": 1791504000000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000089,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 11",
+       "briefContents": "요약",
+       "addDate": 1791417600000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000088,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 12",
+       "briefContents": "요약",
+       "addDate": 1791331200000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000087,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 13",
+       "briefContents": "요약",
+       "addDate": 1791244800000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000086,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 14",
+       "briefContents": "요약",
+       "addDate": 1791158400000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000085,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 15",
+       "briefContents": "요약",
+       "addDate": 1791072000000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000084,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 16",
+       "briefContents": "요약",
+       "addDate": 1790985600000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000083,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 17",
+       "briefContents": "요약",
+       "addDate": 1790899200000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000082,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 18",
+       "briefContents": "요약",
+       "addDate": 1790812800000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000081,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 19",
+       "briefContents": "요약",
+       "addDate": 1790726400000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000080,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 20",
+       "briefContents": "요약",
+       "addDate": 1790640000000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000079,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 21",
+       "briefContents": "요약",
+       "addDate": 1790553600000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000078,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 22",
+       "briefContents": "요약",
+       "addDate": 1790467200000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000077,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 23",
+       "briefContents": "요약",
+       "addDate": 1790380800000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000076,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 24",
+       "briefContents": "요약",
+       "addDate": 1790294400000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000075,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 25",
+       "briefContents": "요약",
+       "addDate": 1790208000000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000074,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 26",
+       "briefContents": "요약",
+       "addDate": 1790121600000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000073,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 27",
+       "briefContents": "요약",
+       "addDate": 1790035200000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000072,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 28",
+       "briefContents": "요약",
+       "addDate": 1789948800000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      },
+      {
+       "domainIdOrBlogId": "cafe_note",
+       "logNo": 224000000071,
+       "blogNo": 123456,
+       "titleWithInspectMessage": "글 29",
+       "briefContents": "요약",
+       "addDate": 1789862400000,
+       "sympathyCnt": 3,
+       "commentCnt": 1,
+       "categoryNo": 1,
+       "categoryName": "맛집",
+       "allOpenPost": true,
+       "readCount": null,
+       "postBlocked": false,
+       "notOpen": false,
+       "buddyOpen": false,
+       "bothBuddyOpen": false
+      }
+     ]
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_blog.py",
+     "line": 89,
+     "end_line": 89,
+     "test": "test_a_window_closes_on_the_newest_first_list"
+    },
+    {
+     "file": "test_cli_blog.py",
+     "line": 72,
+     "end_line": 72,
+     "test": "test_posts_by_category_name_costs_one_lookup",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_blog.py",
+     "line": 81,
+     "end_line": 81,
+     "test": "test_category_names_match_exactly_first_then_by_part",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_blog.py",
+     "line": 90,
+     "end_line": 90,
+     "test": "test_a_window_closes_on_the_newest_first_list",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    }
+   ]
+  },
+  {
+   "name": "test_cli_blog-79",
+   "source": {
+    "file": "test_cli_blog.py",
+    "line": 79,
+    "end_line": 80,
+    "test": "test_category_names_match_exactly_first_then_by_part"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "mylogCategoryList": [
+      {
+       "categoryNo": 1,
+       "categoryName": "맛집"
+      },
+      {
+       "categoryNo": 2,
+       "categoryName": "서울"
+      },
+      {
+       "categoryNo": 4,
+       "categoryName": "맛집 일기"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "test_cli_directory-65",
+   "source": {
+    "file": "test_cli_directory.py",
+    "line": 65,
+    "end_line": 65,
+    "test": "answer_monthly"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "yearList": [
+      {
+       "year": 2026,
+       "monthList": [
+        9,
+        8,
+        7
+       ]
+      },
+      {
+       "year": 2025,
+       "monthList": [
+        12,
+        11
+       ]
+      }
+     ]
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_directory.py",
+     "line": 87,
+     "end_line": 87,
+     "test": "test_an_unpublished_month_names_the_latest_instead_of_swapping_it"
+    },
+    {
+     "file": "test_cli_directory.py",
+     "line": 50,
+     "end_line": 51,
+     "test": "ISSUES"
+    }
+   ]
+  },
+  {
+   "name": "test_cli_directory-66",
+   "source": {
+    "file": "test_cli_directory.py",
+    "line": 66,
+    "end_line": 66,
+    "test": "answer_monthly"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "directoryAndBlogIdList": [
+      {
+       "totalCount": 2,
+       "directory": {
+        "name": "공연·전시",
+        "directorySeq": 7
+       },
+       "blogIdList": [
+        "mb1",
+        "mb2"
+       ]
+      },
+      {
+       "totalCount": 1,
+       "directory": {
+        "name": "드라마",
+        "directorySeq": 9
+       },
+       "blogIdList": [
+        "mb3"
+       ]
+      }
+     ]
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_directory.py",
+     "line": 52,
+     "end_line": 54,
+     "test": "GROUPS"
+    }
+   ]
+  },
+  {
+   "name": "test_cli_directory-67",
+   "source": {
+    "file": "test_cli_directory.py",
+    "line": 67,
+    "end_line": 67,
+    "test": "answer_monthly"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "totalCount": 3,
+     "blogProfileAndRelationView": [
+      {
+       "blogId": "mb1",
+       "blogNo": 1,
+       "blogName": "이달의 1",
+       "nickname": "n1",
+       "introduce": "소개",
+       "subjectName": "공연·전시"
+      },
+      {
+       "blogId": "mb2",
+       "blogNo": 2,
+       "blogName": "이달의 2",
+       "nickname": "n2",
+       "introduce": "소개",
+       "subjectName": "공연·전시"
+      },
+      {
+       "blogId": "mb3",
+       "blogNo": 3,
+       "blogName": "이달의 3",
+       "nickname": "n3",
+       "introduce": "소개",
+       "subjectName": "드라마"
+      }
+     ]
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_directory.py",
+     "line": 55,
+     "end_line": 57,
+     "test": "PROFILES"
+    }
+   ]
+  },
+  {
+   "name": "test_cli_directory-68",
+   "source": {
+    "file": "test_cli_directory.py",
+    "line": 68,
+    "end_line": 68,
+    "test": "answer_monthly"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "popularPostList": [
+      {
+       "blogId": "mb1",
+       "totalCount": 6,
+       "postList": [
+        {
+         "logNo": 100,
+         "title": "대표 1-0",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 101,
+         "title": "대표 1-1",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 102,
+         "title": "대표 1-2",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 103,
+         "title": "대표 1-3",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 104,
+         "title": "대표 1-4",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 105,
+         "title": "대표 1-5",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        }
+       ]
+      },
+      {
+       "blogId": "mb2",
+       "totalCount": 6,
+       "postList": [
+        {
+         "logNo": 200,
+         "title": "대표 2-0",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 201,
+         "title": "대표 2-1",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 202,
+         "title": "대표 2-2",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 203,
+         "title": "대표 2-3",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 204,
+         "title": "대표 2-4",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 205,
+         "title": "대표 2-5",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        }
+       ]
+      },
+      {
+       "blogId": "mb3",
+       "totalCount": 6,
+       "postList": [
+        {
+         "logNo": 300,
+         "title": "대표 3-0",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 301,
+         "title": "대표 3-1",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 302,
+         "title": "대표 3-2",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 303,
+         "title": "대표 3-3",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 304,
+         "title": "대표 3-4",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        },
+        {
+         "logNo": 305,
+         "title": "대표 3-5",
+         "adddate": 1792368000000,
+         "allOpenPost": true,
+         "postBlocked": true,
+         "briefContents": "b"
+        }
+       ]
+      }
+     ]
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_directory.py",
+     "line": 58,
+     "end_line": 61,
+     "test": "POSTS"
+    }
+   ]
+  },
+  {
+   "name": "test_cli_failures-25",
+   "source": {
+    "file": "test_cli_failures.py",
+    "line": 25,
+    "end_line": 25,
+    "test": "test_a_block_after_records_keeps_them_and_exits_5"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "currentPage": 1,
+     "totalCount": 7749,
+     "list": [
+      {
+       "logNo": 224000000001,
+       "blogId": "blog_a1",
+       "blogNo": 501,
+       "title": "글 1",
+       "content": "요약 1",
+       "nickname": "닉1",
+       "blogName": "블로그1",
+       "addDate": 1792367940000,
+       "sympathyCount": 1,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000002,
+       "blogId": "blog_a2",
+       "blogNo": 502,
+       "title": "글 2",
+       "content": "요약 2",
+       "nickname": "닉2",
+       "blogName": "블로그2",
+       "addDate": 1792367880000,
+       "sympathyCount": 2,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000003,
+       "blogId": "blog_a0",
+       "blogNo": 503,
+       "title": "글 3",
+       "content": "요약 3",
+       "nickname": "닉3",
+       "blogName": "블로그3",
+       "addDate": 1792367820000,
+       "sympathyCount": 3,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000004,
+       "blogId": "blog_a1",
+       "blogNo": 504,
+       "title": "글 4",
+       "content": "요약 4",
+       "nickname": "닉4",
+       "blogName": "블로그4",
+       "addDate": 1792367760000,
+       "sympathyCount": 4,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000005,
+       "blogId": "blog_a2",
+       "blogNo": 505,
+       "title": "글 5",
+       "content": "요약 5",
+       "nickname": "닉5",
+       "blogName": "블로그5",
+       "addDate": 1792367700000,
+       "sympathyCount": 5,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000006,
+       "blogId": "blog_a0",
+       "blogNo": 506,
+       "title": "글 6",
+       "content": "요약 6",
+       "nickname": "닉6",
+       "blogName": "블로그6",
+       "addDate": 1792367640000,
+       "sympathyCount": 6,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000007,
+       "blogId": "blog_a1",
+       "blogNo": 507,
+       "title": "글 7",
+       "content": "요약 7",
+       "nickname": "닉7",
+       "blogName": "블로그7",
+       "addDate": 1792367580000,
+       "sympathyCount": 7,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000008,
+       "blogId": "blog_a2",
+       "blogNo": 508,
+       "title": "글 8",
+       "content": "요약 8",
+       "nickname": "닉8",
+       "blogName": "블로그8",
+       "addDate": 1792367520000,
+       "sympathyCount": 8,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000009,
+       "blogId": "blog_a0",
+       "blogNo": 509,
+       "title": "글 9",
+       "content": "요약 9",
+       "nickname": "닉9",
+       "blogName": "블로그9",
+       "addDate": 1792367460000,
+       "sympathyCount": 9,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000010,
+       "blogId": "blog_a1",
+       "blogNo": 510,
+       "title": "글 10",
+       "content": "요약 10",
+       "nickname": "닉10",
+       "blogName": "블로그10",
+       "addDate": 1792367400000,
+       "sympathyCount": 10,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000011,
+       "blogId": "blog_a2",
+       "blogNo": 511,
+       "title": "글 11",
+       "content": "요약 11",
+       "nickname": "닉11",
+       "blogName": "블로그11",
+       "addDate": 1792367340000,
+       "sympathyCount": 11,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000012,
+       "blogId": "blog_a0",
+       "blogNo": 512,
+       "title": "글 12",
+       "content": "요약 12",
+       "nickname": "닉12",
+       "blogName": "블로그12",
+       "addDate": 1792367280000,
+       "sympathyCount": 12,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000013,
+       "blogId": "blog_a1",
+       "blogNo": 513,
+       "title": "글 13",
+       "content": "요약 13",
+       "nickname": "닉13",
+       "blogName": "블로그13",
+       "addDate": 1792367220000,
+       "sympathyCount": 13,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000014,
+       "blogId": "blog_a2",
+       "blogNo": 514,
+       "title": "글 14",
+       "content": "요약 14",
+       "nickname": "닉14",
+       "blogName": "블로그14",
+       "addDate": 1792367160000,
+       "sympathyCount": 14,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000015,
+       "blogId": "blog_a0",
+       "blogNo": 515,
+       "title": "글 15",
+       "content": "요약 15",
+       "nickname": "닉15",
+       "blogName": "블로그15",
+       "addDate": 1792367100000,
+       "sympathyCount": 15,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000016,
+       "blogId": "blog_a1",
+       "blogNo": 516,
+       "title": "글 16",
+       "content": "요약 16",
+       "nickname": "닉16",
+       "blogName": "블로그16",
+       "addDate": 1792367040000,
+       "sympathyCount": 16,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000017,
+       "blogId": "blog_a2",
+       "blogNo": 517,
+       "title": "글 17",
+       "content": "요약 17",
+       "nickname": "닉17",
+       "blogName": "블로그17",
+       "addDate": 1792366980000,
+       "sympathyCount": 17,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000018,
+       "blogId": "blog_a0",
+       "blogNo": 518,
+       "title": "글 18",
+       "content": "요약 18",
+       "nickname": "닉18",
+       "blogName": "블로그18",
+       "addDate": 1792366920000,
+       "sympathyCount": 18,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000019,
+       "blogId": "blog_a1",
+       "blogNo": 519,
+       "title": "글 19",
+       "content": "요약 19",
+       "nickname": "닉19",
+       "blogName": "블로그19",
+       "addDate": 1792366860000,
+       "sympathyCount": 19,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000020,
+       "blogId": "blog_a2",
+       "blogNo": 520,
+       "title": "글 20",
+       "content": "요약 20",
+       "nickname": "닉20",
+       "blogName": "블로그20",
+       "addDate": 1792366800000,
+       "sympathyCount": 20,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000021,
+       "blogId": "blog_a0",
+       "blogNo": 521,
+       "title": "글 21",
+       "content": "요약 21",
+       "nickname": "닉21",
+       "blogName": "블로그21",
+       "addDate": 1792366740000,
+       "sympathyCount": 21,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000022,
+       "blogId": "blog_a1",
+       "blogNo": 522,
+       "title": "글 22",
+       "content": "요약 22",
+       "nickname": "닉22",
+       "blogName": "블로그22",
+       "addDate": 1792366680000,
+       "sympathyCount": 22,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000023,
+       "blogId": "blog_a2",
+       "blogNo": 523,
+       "title": "글 23",
+       "content": "요약 23",
+       "nickname": "닉23",
+       "blogName": "블로그23",
+       "addDate": 1792366620000,
+       "sympathyCount": 23,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000024,
+       "blogId": "blog_a0",
+       "blogNo": 524,
+       "title": "글 24",
+       "content": "요약 24",
+       "nickname": "닉24",
+       "blogName": "블로그24",
+       "addDate": 1792366560000,
+       "sympathyCount": 24,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000025,
+       "blogId": "blog_a1",
+       "blogNo": 525,
+       "title": "글 25",
+       "content": "요약 25",
+       "nickname": "닉25",
+       "blogName": "블로그25",
+       "addDate": 1792366500000,
+       "sympathyCount": 25,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000026,
+       "blogId": "blog_a2",
+       "blogNo": 526,
+       "title": "글 26",
+       "content": "요약 26",
+       "nickname": "닉26",
+       "blogName": "블로그26",
+       "addDate": 1792366440000,
+       "sympathyCount": 26,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000027,
+       "blogId": "blog_a0",
+       "blogNo": 527,
+       "title": "글 27",
+       "content": "요약 27",
+       "nickname": "닉27",
+       "blogName": "블로그27",
+       "addDate": 1792366380000,
+       "sympathyCount": 27,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000028,
+       "blogId": "blog_a1",
+       "blogNo": 528,
+       "title": "글 28",
+       "content": "요약 28",
+       "nickname": "닉28",
+       "blogName": "블로그28",
+       "addDate": 1792366320000,
+       "sympathyCount": 28,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000029,
+       "blogId": "blog_a2",
+       "blogNo": 529,
+       "title": "글 29",
+       "content": "요약 29",
+       "nickname": "닉29",
+       "blogName": "블로그29",
+       "addDate": 1792366260000,
+       "sympathyCount": 29,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000030,
+       "blogId": "blog_a0",
+       "blogNo": 530,
+       "title": "글 30",
+       "content": "요약 30",
+       "nickname": "닉30",
+       "blogName": "블로그30",
+       "addDate": 1792366200000,
+       "sympathyCount": 30,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      }
+     ],
+     "isBlockedByBifrostShield": false,
+     "queryControlInfo": {
+      "isAdult": false,
+      "isForbidden": false
+     }
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_failures.py",
+     "line": 47,
+     "end_line": 47,
+     "test": "test_a_window_filling_after_records_is_8_and_resumable"
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 71,
+     "end_line": 71,
+     "test": "test_a_changed_response_after_records_is_8"
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 15,
+     "end_line": 15,
+     "test": "test_search_collects_resumes_and_then_reads_nothing"
+    },
+    {
+     "file": "test_cli_search.py",
+     "line": 16,
+     "end_line": 16,
+     "test": "test_post_search_shows_the_default_and_offers_more"
+    },
+    {
+     "file": "test_cli_search.py",
+     "line": 33,
+     "end_line": 33,
+     "test": "test_a_handle_from_another_query_is_refused"
+    },
+    {
+     "file": "test_cli_search.py",
+     "line": 130,
+     "end_line": 130,
+     "test": "test_only_a_limit_above_the_default_collects"
+    },
+    {
+     "file": "test_cli_search.py",
+     "line": 138,
+     "end_line": 138,
+     "test": "test_a_cold_session_costs_one_current_user_request_before_reading"
+    },
+    {
+     "file": "test_cli_search.py",
+     "line": 150,
+     "end_line": 150,
+     "test": "test_more_uses_the_path_the_cli_was_invoked_with"
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 16,
+     "end_line": 16,
+     "test": "test_search_collects_resumes_and_then_reads_nothing",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 31,
+     "end_line": 31,
+     "test": "test_a_file_of_another_query_is_refused_unchanged",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_search.py",
+     "line": 42,
+     "end_line": 42,
+     "test": "test_dated_post_search_is_filtered_by_naver_and_collects",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_search.py",
+     "line": 115,
+     "end_line": 115,
+     "test": "test_a_restricted_query_keeps_what_arrived",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    }
+   ]
+  },
+  {
+   "name": "test_cli_failures-55",
+   "source": {
+    "file": "test_cli_failures.py",
+    "line": 55,
+    "end_line": 55,
+    "test": "test_the_budget_after_records_is_8_with_more"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "items": [
+      {
+       "logNo": 224000000030,
+       "blogId": "blog_a0",
+       "blogNo": 530,
+       "title": "글 30",
+       "content": "요약 30",
+       "nickname": "닉30",
+       "blogName": "블로그30",
+       "addDate": 1792366200000,
+       "sympathyCount": 30,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000031,
+       "blogId": "blog_a1",
+       "blogNo": 531,
+       "title": "글 31",
+       "content": "요약 31",
+       "nickname": "닉31",
+       "blogName": "블로그31",
+       "addDate": 1792366140000,
+       "sympathyCount": 31,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000032,
+       "blogId": "blog_a2",
+       "blogNo": 532,
+       "title": "글 32",
+       "content": "요약 32",
+       "nickname": "닉32",
+       "blogName": "블로그32",
+       "addDate": 1792366080000,
+       "sympathyCount": 32,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000033,
+       "blogId": "blog_a0",
+       "blogNo": 533,
+       "title": "글 33",
+       "content": "요약 33",
+       "nickname": "닉33",
+       "blogName": "블로그33",
+       "addDate": 1792366020000,
+       "sympathyCount": 33,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000034,
+       "blogId": "blog_a1",
+       "blogNo": 534,
+       "title": "글 34",
+       "content": "요약 34",
+       "nickname": "닉34",
+       "blogName": "블로그34",
+       "addDate": 1792365960000,
+       "sympathyCount": 34,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000035,
+       "blogId": "blog_a2",
+       "blogNo": 535,
+       "title": "글 35",
+       "content": "요약 35",
+       "nickname": "닉35",
+       "blogName": "블로그35",
+       "addDate": 1792365900000,
+       "sympathyCount": 35,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000036,
+       "blogId": "blog_a0",
+       "blogNo": 536,
+       "title": "글 36",
+       "content": "요약 36",
+       "nickname": "닉36",
+       "blogName": "블로그36",
+       "addDate": 1792365840000,
+       "sympathyCount": 36,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000037,
+       "blogId": "blog_a1",
+       "blogNo": 537,
+       "title": "글 37",
+       "content": "요약 37",
+       "nickname": "닉37",
+       "blogName": "블로그37",
+       "addDate": 1792365780000,
+       "sympathyCount": 37,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000038,
+       "blogId": "blog_a2",
+       "blogNo": 538,
+       "title": "글 38",
+       "content": "요약 38",
+       "nickname": "닉38",
+       "blogName": "블로그38",
+       "addDate": 1792365720000,
+       "sympathyCount": 38,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000039,
+       "blogId": "blog_a0",
+       "blogNo": 539,
+       "title": "글 39",
+       "content": "요약 39",
+       "nickname": "닉39",
+       "blogName": "블로그39",
+       "addDate": 1792365660000,
+       "sympathyCount": 39,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000040,
+       "blogId": "blog_a1",
+       "blogNo": 540,
+       "title": "글 40",
+       "content": "요약 40",
+       "nickname": "닉40",
+       "blogName": "블로그40",
+       "addDate": 1792365600000,
+       "sympathyCount": 40,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000041,
+       "blogId": "blog_a2",
+       "blogNo": 541,
+       "title": "글 41",
+       "content": "요약 41",
+       "nickname": "닉41",
+       "blogName": "블로그41",
+       "addDate": 1792365540000,
+       "sympathyCount": 41,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000042,
+       "blogId": "blog_a0",
+       "blogNo": 542,
+       "title": "글 42",
+       "content": "요약 42",
+       "nickname": "닉42",
+       "blogName": "블로그42",
+       "addDate": 1792365480000,
+       "sympathyCount": 42,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000043,
+       "blogId": "blog_a1",
+       "blogNo": 543,
+       "title": "글 43",
+       "content": "요약 43",
+       "nickname": "닉43",
+       "blogName": "블로그43",
+       "addDate": 1792365420000,
+       "sympathyCount": 43,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000044,
+       "blogId": "blog_a2",
+       "blogNo": 544,
+       "title": "글 44",
+       "content": "요약 44",
+       "nickname": "닉44",
+       "blogName": "블로그44",
+       "addDate": 1792365360000,
+       "sympathyCount": 44,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000045,
+       "blogId": "blog_a0",
+       "blogNo": 545,
+       "title": "글 45",
+       "content": "요약 45",
+       "nickname": "닉45",
+       "blogName": "블로그45",
+       "addDate": 1792365300000,
+       "sympathyCount": 45,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000046,
+       "blogId": "blog_a1",
+       "blogNo": 546,
+       "title": "글 46",
+       "content": "요약 46",
+       "nickname": "닉46",
+       "blogName": "블로그46",
+       "addDate": 1792365240000,
+       "sympathyCount": 46,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000047,
+       "blogId": "blog_a2",
+       "blogNo": 547,
+       "title": "글 47",
+       "content": "요약 47",
+       "nickname": "닉47",
+       "blogName": "블로그47",
+       "addDate": 1792365180000,
+       "sympathyCount": 47,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000048,
+       "blogId": "blog_a0",
+       "blogNo": 548,
+       "title": "글 48",
+       "content": "요약 48",
+       "nickname": "닉48",
+       "blogName": "블로그48",
+       "addDate": 1792365120000,
+       "sympathyCount": 48,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000049,
+       "blogId": "blog_a1",
+       "blogNo": 549,
+       "title": "글 49",
+       "content": "요약 49",
+       "nickname": "닉49",
+       "blogName": "블로그49",
+       "addDate": 1792365060000,
+       "sympathyCount": 49,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000050,
+       "blogId": "blog_a2",
+       "blogNo": 550,
+       "title": "글 50",
+       "content": "요약 50",
+       "nickname": "닉50",
+       "blogName": "블로그50",
+       "addDate": 1792365000000,
+       "sympathyCount": 50,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000051,
+       "blogId": "blog_a0",
+       "blogNo": 551,
+       "title": "글 51",
+       "content": "요약 51",
+       "nickname": "닉51",
+       "blogName": "블로그51",
+       "addDate": 1792364940000,
+       "sympathyCount": 51,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000052,
+       "blogId": "blog_a1",
+       "blogNo": 552,
+       "title": "글 52",
+       "content": "요약 52",
+       "nickname": "닉52",
+       "blogName": "블로그52",
+       "addDate": 1792364880000,
+       "sympathyCount": 52,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000053,
+       "blogId": "blog_a2",
+       "blogNo": 553,
+       "title": "글 53",
+       "content": "요약 53",
+       "nickname": "닉53",
+       "blogName": "블로그53",
+       "addDate": 1792364820000,
+       "sympathyCount": 53,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000054,
+       "blogId": "blog_a0",
+       "blogNo": 554,
+       "title": "글 54",
+       "content": "요약 54",
+       "nickname": "닉54",
+       "blogName": "블로그54",
+       "addDate": 1792364760000,
+       "sympathyCount": 54,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000055,
+       "blogId": "blog_a1",
+       "blogNo": 555,
+       "title": "글 55",
+       "content": "요약 55",
+       "nickname": "닉55",
+       "blogName": "블로그55",
+       "addDate": 1792364700000,
+       "sympathyCount": 55,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000056,
+       "blogId": "blog_a2",
+       "blogNo": 556,
+       "title": "글 56",
+       "content": "요약 56",
+       "nickname": "닉56",
+       "blogName": "블로그56",
+       "addDate": 1792364640000,
+       "sympathyCount": 56,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000057,
+       "blogId": "blog_a0",
+       "blogNo": 557,
+       "title": "글 57",
+       "content": "요약 57",
+       "nickname": "닉57",
+       "blogName": "블로그57",
+       "addDate": 1792364580000,
+       "sympathyCount": 57,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000058,
+       "blogId": "blog_a1",
+       "blogNo": 558,
+       "title": "글 58",
+       "content": "요약 58",
+       "nickname": "닉58",
+       "blogName": "블로그58",
+       "addDate": 1792364520000,
+       "sympathyCount": 58,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      },
+      {
+       "logNo": 224000000059,
+       "blogId": "blog_a2",
+       "blogNo": 559,
+       "title": "글 59",
+       "content": "요약 59",
+       "nickname": "닉59",
+       "blogName": "블로그59",
+       "addDate": 1792364460000,
+       "sympathyCount": 59,
+       "commentCount": 1,
+       "isBuyWithMyOwnMoney": false
+      }
+     ]
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_failures.py",
+     "line": 55,
+     "end_line": 55,
+     "test": "test_the_budget_after_records_is_8_with_more",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 52,
+     "end_line": 53,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_out.py",
+     "line": 54,
+     "end_line": 54,
+     "test": "test_a_budget_stop_is_not_done_and_the_same_command_resumes",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    }
+   ]
+  },
+  {
+   "name": "test_cli_failures-64",
+   "source": {
+    "file": "test_cli_failures.py",
+    "line": 64,
+    "end_line": 64,
+    "test": "test_a_changed_response_before_records_is_6"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "items": []
+    }
+   }
+  },
+  {
+   "name": "test_cli_failures-72",
+   "source": {
+    "file": "test_cli_failures.py",
+    "line": 72,
+    "end_line": 72,
+    "test": "test_a_changed_response_after_records_is_8"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {}
+   }
+  },
+  {
+   "name": "test_cli_neighbors-36",
+   "source": {
+    "file": "test_cli_neighbors.py",
+    "line": 36,
+    "end_line": 36,
+    "test": "test_feed_reads_the_accounts_neighbor_posts_and_pages_on"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "totalCount": 45,
+     "page": 1,
+     "isBetterFeedTestTarget": false,
+     "items": [
+      {
+       "domainIdOrBlogId": "friend0",
+       "blogNo": 700,
+       "logNo": 224000000500,
+       "title": "이웃 글 0",
+       "titleWithInspectMessage": "이웃 글 0",
+       "briefContents": "요약",
+       "addDate": 1792368000000,
+       "nickName": "이웃0",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend1",
+       "blogNo": 701,
+       "logNo": 224000000499,
+       "title": "이웃 글 1",
+       "titleWithInspectMessage": "이웃 글 1",
+       "briefContents": "요약",
+       "addDate": 1792364400000,
+       "nickName": "이웃1",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": true
+      },
+      {
+       "domainIdOrBlogId": "friend2",
+       "blogNo": 702,
+       "logNo": 224000000498,
+       "title": "이웃 글 2",
+       "titleWithInspectMessage": "이웃 글 2",
+       "briefContents": "요약",
+       "addDate": 1792360800000,
+       "nickName": "이웃2",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend3",
+       "blogNo": 703,
+       "logNo": 224000000497,
+       "title": "이웃 글 3",
+       "titleWithInspectMessage": "이웃 글 3",
+       "briefContents": "요약",
+       "addDate": 1792357200000,
+       "nickName": "이웃3",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend0",
+       "blogNo": 704,
+       "logNo": 224000000496,
+       "title": "이웃 글 4",
+       "titleWithInspectMessage": "이웃 글 4",
+       "briefContents": "요약",
+       "addDate": 1792353600000,
+       "nickName": "이웃4",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend1",
+       "blogNo": 705,
+       "logNo": 224000000495,
+       "title": "이웃 글 5",
+       "titleWithInspectMessage": "이웃 글 5",
+       "briefContents": "요약",
+       "addDate": 1792350000000,
+       "nickName": "이웃5",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend2",
+       "blogNo": 706,
+       "logNo": 224000000494,
+       "title": "이웃 글 6",
+       "titleWithInspectMessage": "이웃 글 6",
+       "briefContents": "요약",
+       "addDate": 1792346400000,
+       "nickName": "이웃6",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend3",
+       "blogNo": 707,
+       "logNo": 224000000493,
+       "title": "이웃 글 7",
+       "titleWithInspectMessage": "이웃 글 7",
+       "briefContents": "요약",
+       "addDate": 1792342800000,
+       "nickName": "이웃7",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend0",
+       "blogNo": 708,
+       "logNo": 224000000492,
+       "title": "이웃 글 8",
+       "titleWithInspectMessage": "이웃 글 8",
+       "briefContents": "요약",
+       "addDate": 1792339200000,
+       "nickName": "이웃8",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend1",
+       "blogNo": 709,
+       "logNo": 224000000491,
+       "title": "이웃 글 9",
+       "titleWithInspectMessage": "이웃 글 9",
+       "briefContents": "요약",
+       "addDate": 1792335600000,
+       "nickName": "이웃9",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend2",
+       "blogNo": 710,
+       "logNo": 224000000490,
+       "title": "이웃 글 10",
+       "titleWithInspectMessage": "이웃 글 10",
+       "briefContents": "요약",
+       "addDate": 1792332000000,
+       "nickName": "이웃10",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend3",
+       "blogNo": 711,
+       "logNo": 224000000489,
+       "title": "이웃 글 11",
+       "titleWithInspectMessage": "이웃 글 11",
+       "briefContents": "요약",
+       "addDate": 1792328400000,
+       "nickName": "이웃11",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend0",
+       "blogNo": 712,
+       "logNo": 224000000488,
+       "title": "이웃 글 12",
+       "titleWithInspectMessage": "이웃 글 12",
+       "briefContents": "요약",
+       "addDate": 1792324800000,
+       "nickName": "이웃12",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend1",
+       "blogNo": 713,
+       "logNo": 224000000487,
+       "title": "이웃 글 13",
+       "titleWithInspectMessage": "이웃 글 13",
+       "briefContents": "요약",
+       "addDate": 1792321200000,
+       "nickName": "이웃13",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend2",
+       "blogNo": 714,
+       "logNo": 224000000486,
+       "title": "이웃 글 14",
+       "titleWithInspectMessage": "이웃 글 14",
+       "briefContents": "요약",
+       "addDate": 1792317600000,
+       "nickName": "이웃14",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend3",
+       "blogNo": 715,
+       "logNo": 224000000485,
+       "title": "이웃 글 15",
+       "titleWithInspectMessage": "이웃 글 15",
+       "briefContents": "요약",
+       "addDate": 1792314000000,
+       "nickName": "이웃15",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend0",
+       "blogNo": 716,
+       "logNo": 224000000484,
+       "title": "이웃 글 16",
+       "titleWithInspectMessage": "이웃 글 16",
+       "briefContents": "요약",
+       "addDate": 1792310400000,
+       "nickName": "이웃16",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend1",
+       "blogNo": 717,
+       "logNo": 224000000483,
+       "title": "이웃 글 17",
+       "titleWithInspectMessage": "이웃 글 17",
+       "briefContents": "요약",
+       "addDate": 1792306800000,
+       "nickName": "이웃17",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend2",
+       "blogNo": 718,
+       "logNo": 224000000482,
+       "title": "이웃 글 18",
+       "titleWithInspectMessage": "이웃 글 18",
+       "briefContents": "요약",
+       "addDate": 1792303200000,
+       "nickName": "이웃18",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      },
+      {
+       "domainIdOrBlogId": "friend3",
+       "blogNo": 719,
+       "logNo": 224000000481,
+       "title": "이웃 글 19",
+       "titleWithInspectMessage": "이웃 글 19",
+       "briefContents": "요약",
+       "addDate": 1792299600000,
+       "nickName": "이웃19",
+       "blogName": "이웃 블로그",
+       "likeCount": 2,
+       "commentCount": 1,
+       "shareCount": 0,
+       "groupId": 1,
+       "relationType": 2,
+       "isRss": false,
+       "allOpenPost": true,
+       "buyWithMyOwnMoney": false
+      }
+     ]
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_neighbors.py",
+     "line": 37,
+     "end_line": 37,
+     "test": "test_feed_reads_the_accounts_neighbor_posts_and_pages_on",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_neighbors.py",
+     "line": 38,
+     "end_line": 38,
+     "test": "test_feed_reads_the_accounts_neighbor_posts_and_pages_on",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_neighbors.py",
+     "line": 50,
+     "end_line": 50,
+     "test": "test_feed_continues_by_handle",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_neighbors.py",
+     "line": 51,
+     "end_line": 51,
+     "test": "test_feed_continues_by_handle",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_neighbors.py",
+     "line": 62,
+     "end_line": 62,
+     "test": "test_a_page_past_the_end_comes_without_items",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    },
+    {
+     "file": "test_cli_neighbors.py",
+     "line": 78,
+     "end_line": 78,
+     "test": "test_feed_with_a_cold_session_asks_who_is_logged_in_first",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    }
+   ]
+  },
+  {
+   "name": "test_cli_neighbors-92",
+   "source": {
+    "file": "test_cli_neighbors.py",
+    "line": 92,
+    "end_line": 92,
+    "test": "test_my_neighbors"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "blogId": "viewer_blog",
+     "totalMyBuddyCount": 20,
+     "totalPageCount": 2,
+     "currentPage": 1,
+     "buddyList": [
+      {
+       "blogId": "nb0",
+       "blogName": "이웃 0",
+       "nickName": "n0",
+       "bothNeighbor": true,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb1",
+       "blogName": "이웃 1",
+       "nickName": "n1",
+       "bothNeighbor": false,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb2",
+       "blogName": "이웃 2",
+       "nickName": "n2",
+       "bothNeighbor": true,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb3",
+       "blogName": "이웃 3",
+       "nickName": "n3",
+       "bothNeighbor": false,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb4",
+       "blogName": "이웃 4",
+       "nickName": "n4",
+       "bothNeighbor": true,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb5",
+       "blogName": "이웃 5",
+       "nickName": "n5",
+       "bothNeighbor": false,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb6",
+       "blogName": "이웃 6",
+       "nickName": "n6",
+       "bothNeighbor": true,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb7",
+       "blogName": "이웃 7",
+       "nickName": "n7",
+       "bothNeighbor": false,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb8",
+       "blogName": "이웃 8",
+       "nickName": "n8",
+       "bothNeighbor": true,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb9",
+       "blogName": "이웃 9",
+       "nickName": "n9",
+       "bothNeighbor": false,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb10",
+       "blogName": "이웃 10",
+       "nickName": "n10",
+       "bothNeighbor": true,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb11",
+       "blogName": "이웃 11",
+       "nickName": "n11",
+       "bothNeighbor": false,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb12",
+       "blogName": "이웃 12",
+       "nickName": "n12",
+       "bothNeighbor": true,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb13",
+       "blogName": "이웃 13",
+       "nickName": "n13",
+       "bothNeighbor": false,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb14",
+       "blogName": "이웃 14",
+       "nickName": "n14",
+       "bothNeighbor": true,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb15",
+       "blogName": "이웃 15",
+       "nickName": "n15",
+       "bothNeighbor": false,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb16",
+       "blogName": "이웃 16",
+       "nickName": "n16",
+       "bothNeighbor": true,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb17",
+       "blogName": "이웃 17",
+       "nickName": "n17",
+       "bothNeighbor": false,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb18",
+       "blogName": "이웃 18",
+       "nickName": "n18",
+       "bothNeighbor": true,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      },
+      {
+       "blogId": "nb19",
+       "blogName": "이웃 19",
+       "nickName": "n19",
+       "bothNeighbor": false,
+       "groupId": 1,
+       "updateTime": null,
+       "officialBlog": false
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "test_cli_new-16",
+   "source": {
+    "file": "test_cli_new.py",
+    "line": 16,
+    "end_line": 18,
+    "test": "test_popular_keywords_with_their_date"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "keywords": [
+      {
+       "keyword": "인기0",
+       "thumbnailUrl": "https://x"
+      },
+      {
+       "keyword": "인기1",
+       "thumbnailUrl": "https://x"
+      },
+      {
+       "keyword": "인기2",
+       "thumbnailUrl": "https://x"
+      },
+      {
+       "keyword": "인기3",
+       "thumbnailUrl": "https://x"
+      },
+      {
+       "keyword": "인기4",
+       "thumbnailUrl": "https://x"
+      },
+      {
+       "keyword": "인기5",
+       "thumbnailUrl": "https://x"
+      },
+      {
+       "keyword": "인기6",
+       "thumbnailUrl": "https://x"
+      },
+      {
+       "keyword": "인기7",
+       "thumbnailUrl": "https://x"
+      },
+      {
+       "keyword": "인기8",
+       "thumbnailUrl": "https://x"
+      },
+      {
+       "keyword": "인기9",
+       "thumbnailUrl": "https://x"
+      },
+      {
+       "keyword": "인기10",
+       "thumbnailUrl": "https://x"
+      },
+      {
+       "keyword": "인기11",
+       "thumbnailUrl": "https://x"
+      }
+     ],
+     "keywordDate": "2026-10-19",
+     "enabled": true
+    }
+   }
+  },
+  {
+   "name": "test_cli_new-26",
+   "source": {
+    "file": "test_cli_new.py",
+    "line": 26,
+    "end_line": 27,
+    "test": "test_related_keywords_for_one_keyword"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "keywords": [
+      "연관0",
+      "연관1",
+      "연관2",
+      "연관3",
+      "연관4",
+      "연관5",
+      "연관6",
+      "연관7",
+      "연관8",
+      "연관9",
+      "연관10",
+      "연관11",
+      "연관12",
+      "연관13",
+      "연관14"
+     ],
+     "totalCount": 15
+    }
+   }
+  },
+  {
+   "name": "test_cli_new-39",
+   "source": {
+    "file": "test_cli_new.py",
+    "line": 39,
+    "end_line": 39,
+    "test": "test_clip_search_names_each_clips_permalink"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "currentPage": 1,
+     "totalCount": 3,
+     "list": [
+      {
+       "blogId": "clipper",
+       "blogNo": 1,
+       "docNo": "1600",
+       "title": "<b>클립</b> 0",
+       "originTitle": "클립 0",
+       "content": "",
+       "playTime": "23",
+       "thumbnailUrl": "https://x",
+       "addDate": 1792368000000,
+       "nickname": "클립러",
+       "momentNo": "9000",
+       "videoId": "v"
+      },
+      {
+       "blogId": "clipper",
+       "blogNo": 1,
+       "docNo": "1601",
+       "title": "<b>클립</b> 1",
+       "originTitle": "클립 1",
+       "content": "",
+       "playTime": "23",
+       "thumbnailUrl": "https://x",
+       "addDate": 1792367999000,
+       "nickname": "클립러",
+       "momentNo": "9001",
+       "videoId": "v"
+      },
+      {
+       "blogId": "clipper",
+       "blogNo": 1,
+       "docNo": "1602",
+       "title": "<b>클립</b> 2",
+       "originTitle": "클립 2",
+       "content": "",
+       "playTime": "23",
+       "thumbnailUrl": "https://x",
+       "addDate": 1792367998000,
+       "nickname": "클립러",
+       "momentNo": "9002",
+       "videoId": "v"
+      }
+     ],
+     "isBlockedByBifrostShield": false,
+     "queryControlInfo": {
+      "isAdult": false,
+      "isForbidden": false
+     },
+     "totalPage": 1
+    }
+   }
+  },
+  {
+   "name": "test_cli_new-134",
+   "source": {
+    "file": "test_cli_new.py",
+    "line": 134,
+    "end_line": 135,
+    "test": "test_followers_are_the_blogs_that_added_me"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "blogId": "viewer_blog",
+     "totalMeBuddyCount": 1,
+     "totalPageCount": 1,
+     "currentPage": 1,
+     "buddyList": [
+      {
+       "blogId": "fan1",
+       "nickName": "팬"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "test_cli_new-142",
+   "source": {
+    "file": "test_cli_new.py",
+    "line": 142,
+    "end_line": 143,
+    "test": "test_groups_list_and_one_group"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": [
+     {
+      "blogId": "viewer_blog",
+      "blogNo": 1,
+      "groupId": 1,
+      "groupName": "맛집 친구"
+     },
+     {
+      "blogId": "viewer_blog",
+      "blogNo": 1,
+      "groupId": 3,
+      "groupName": "여행"
+     }
+    ]
+   }
+  },
+  {
+   "name": "test_cli_new-146",
+   "source": {
+    "file": "test_cli_new.py",
+    "line": 146,
+    "end_line": 146,
+    "test": "test_groups_list_and_one_group"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "blogId": "viewer_blog",
+     "totalMyBuddyCount": 1,
+     "totalPageCount": 1,
+     "currentPage": 1,
+     "buddyList": [
+      {
+       "blogId": "g3a",
+       "groupId": 3
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "test_cli_new-160",
+   "source": {
+    "file": "test_cli_new.py",
+    "line": 160,
+    "end_line": 160,
+    "test": "test_the_feed_of_one_group"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "totalCount": 0,
+     "page": 1
+    }
+   }
+  },
+  {
+   "name": "test_cli_post-117",
+   "source": {
+    "file": "test_cli_post.py",
+    "line": 117,
+    "end_line": 117,
+    "test": "test_comments_are_rebuilt_under_their_parents"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "blogNo": 123456,
+     "totalCount": 5
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_post.py",
+     "line": 132,
+     "end_line": 132,
+     "test": "test_comments_continue_without_the_lookup",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    }
+   ]
+  },
+  {
+   "name": "test_cli_post-135",
+   "source": {
+    "file": "test_cli_post.py",
+    "line": 135,
+    "end_line": 135,
+    "test": "test_comments_continue_without_the_lookup"
+   },
+   "response": {
+    "success": true,
+    "code": "1000",
+    "result": {
+     "commentList": [
+      {
+       "commentNo": 5000,
+       "parentCommentNo": 5000,
+       "replyLevel": 1,
+       "userName": "u0",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4999,
+       "parentCommentNo": 4999,
+       "replyLevel": 1,
+       "userName": "u1",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4998,
+       "parentCommentNo": 4998,
+       "replyLevel": 1,
+       "userName": "u2",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4997,
+       "parentCommentNo": 4997,
+       "replyLevel": 1,
+       "userName": "u3",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4996,
+       "parentCommentNo": 4996,
+       "replyLevel": 1,
+       "userName": "u4",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4995,
+       "parentCommentNo": 4995,
+       "replyLevel": 1,
+       "userName": "u5",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4994,
+       "parentCommentNo": 4994,
+       "replyLevel": 1,
+       "userName": "u6",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4993,
+       "parentCommentNo": 4993,
+       "replyLevel": 1,
+       "userName": "u7",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4992,
+       "parentCommentNo": 4992,
+       "replyLevel": 1,
+       "userName": "u8",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4991,
+       "parentCommentNo": 4991,
+       "replyLevel": 1,
+       "userName": "u9",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4990,
+       "parentCommentNo": 4990,
+       "replyLevel": 1,
+       "userName": "u10",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4989,
+       "parentCommentNo": 4989,
+       "replyLevel": 1,
+       "userName": "u11",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4988,
+       "parentCommentNo": 4988,
+       "replyLevel": 1,
+       "userName": "u12",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4987,
+       "parentCommentNo": 4987,
+       "replyLevel": 1,
+       "userName": "u13",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4986,
+       "parentCommentNo": 4986,
+       "replyLevel": 1,
+       "userName": "u14",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4985,
+       "parentCommentNo": 4985,
+       "replyLevel": 1,
+       "userName": "u15",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4984,
+       "parentCommentNo": 4984,
+       "replyLevel": 1,
+       "userName": "u16",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4983,
+       "parentCommentNo": 4983,
+       "replyLevel": 1,
+       "userName": "u17",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4982,
+       "parentCommentNo": 4982,
+       "replyLevel": 1,
+       "userName": "u18",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4981,
+       "parentCommentNo": 4981,
+       "replyLevel": 1,
+       "userName": "u19",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4980,
+       "parentCommentNo": 4980,
+       "replyLevel": 1,
+       "userName": "u20",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4979,
+       "parentCommentNo": 4979,
+       "replyLevel": 1,
+       "userName": "u21",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4978,
+       "parentCommentNo": 4978,
+       "replyLevel": 1,
+       "userName": "u22",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4977,
+       "parentCommentNo": 4977,
+       "replyLevel": 1,
+       "userName": "u23",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4976,
+       "parentCommentNo": 4976,
+       "replyLevel": 1,
+       "userName": "u24",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4975,
+       "parentCommentNo": 4975,
+       "replyLevel": 1,
+       "userName": "u25",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4974,
+       "parentCommentNo": 4974,
+       "replyLevel": 1,
+       "userName": "u26",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4973,
+       "parentCommentNo": 4973,
+       "replyLevel": 1,
+       "userName": "u27",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4972,
+       "parentCommentNo": 4972,
+       "replyLevel": 1,
+       "userName": "u28",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4971,
+       "parentCommentNo": 4971,
+       "replyLevel": 1,
+       "userName": "u29",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4970,
+       "parentCommentNo": 4970,
+       "replyLevel": 1,
+       "userName": "u30",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4969,
+       "parentCommentNo": 4969,
+       "replyLevel": 1,
+       "userName": "u31",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4968,
+       "parentCommentNo": 4968,
+       "replyLevel": 1,
+       "userName": "u32",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4967,
+       "parentCommentNo": 4967,
+       "replyLevel": 1,
+       "userName": "u33",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4966,
+       "parentCommentNo": 4966,
+       "replyLevel": 1,
+       "userName": "u34",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4965,
+       "parentCommentNo": 4965,
+       "replyLevel": 1,
+       "userName": "u35",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4964,
+       "parentCommentNo": 4964,
+       "replyLevel": 1,
+       "userName": "u36",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4963,
+       "parentCommentNo": 4963,
+       "replyLevel": 1,
+       "userName": "u37",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4962,
+       "parentCommentNo": 4962,
+       "replyLevel": 1,
+       "userName": "u38",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4961,
+       "parentCommentNo": 4961,
+       "replyLevel": 1,
+       "userName": "u39",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4960,
+       "parentCommentNo": 4960,
+       "replyLevel": 1,
+       "userName": "u40",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4959,
+       "parentCommentNo": 4959,
+       "replyLevel": 1,
+       "userName": "u41",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4958,
+       "parentCommentNo": 4958,
+       "replyLevel": 1,
+       "userName": "u42",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4957,
+       "parentCommentNo": 4957,
+       "replyLevel": 1,
+       "userName": "u43",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4956,
+       "parentCommentNo": 4956,
+       "replyLevel": 1,
+       "userName": "u44",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4955,
+       "parentCommentNo": 4955,
+       "replyLevel": 1,
+       "userName": "u45",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4954,
+       "parentCommentNo": 4954,
+       "replyLevel": 1,
+       "userName": "u46",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4953,
+       "parentCommentNo": 4953,
+       "replyLevel": 1,
+       "userName": "u47",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4952,
+       "parentCommentNo": 4952,
+       "replyLevel": 1,
+       "userName": "u48",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4951,
+       "parentCommentNo": 4951,
+       "replyLevel": 1,
+       "userName": "u49",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4950,
+       "parentCommentNo": 4950,
+       "replyLevel": 1,
+       "userName": "u50",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4949,
+       "parentCommentNo": 4949,
+       "replyLevel": 1,
+       "userName": "u51",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4948,
+       "parentCommentNo": 4948,
+       "replyLevel": 1,
+       "userName": "u52",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4947,
+       "parentCommentNo": 4947,
+       "replyLevel": 1,
+       "userName": "u53",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4946,
+       "parentCommentNo": 4946,
+       "replyLevel": 1,
+       "userName": "u54",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4945,
+       "parentCommentNo": 4945,
+       "replyLevel": 1,
+       "userName": "u55",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4944,
+       "parentCommentNo": 4944,
+       "replyLevel": 1,
+       "userName": "u56",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4943,
+       "parentCommentNo": 4943,
+       "replyLevel": 1,
+       "userName": "u57",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4942,
+       "parentCommentNo": 4942,
+       "replyLevel": 1,
+       "userName": "u58",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4941,
+       "parentCommentNo": 4941,
+       "replyLevel": 1,
+       "userName": "u59",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4940,
+       "parentCommentNo": 4940,
+       "replyLevel": 1,
+       "userName": "u60",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4939,
+       "parentCommentNo": 4939,
+       "replyLevel": 1,
+       "userName": "u61",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4938,
+       "parentCommentNo": 4938,
+       "replyLevel": 1,
+       "userName": "u62",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4937,
+       "parentCommentNo": 4937,
+       "replyLevel": 1,
+       "userName": "u63",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4936,
+       "parentCommentNo": 4936,
+       "replyLevel": 1,
+       "userName": "u64",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4935,
+       "parentCommentNo": 4935,
+       "replyLevel": 1,
+       "userName": "u65",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4934,
+       "parentCommentNo": 4934,
+       "replyLevel": 1,
+       "userName": "u66",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4933,
+       "parentCommentNo": 4933,
+       "replyLevel": 1,
+       "userName": "u67",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4932,
+       "parentCommentNo": 4932,
+       "replyLevel": 1,
+       "userName": "u68",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4931,
+       "parentCommentNo": 4931,
+       "replyLevel": 1,
+       "userName": "u69",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4930,
+       "parentCommentNo": 4930,
+       "replyLevel": 1,
+       "userName": "u70",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4929,
+       "parentCommentNo": 4929,
+       "replyLevel": 1,
+       "userName": "u71",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4928,
+       "parentCommentNo": 4928,
+       "replyLevel": 1,
+       "userName": "u72",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4927,
+       "parentCommentNo": 4927,
+       "replyLevel": 1,
+       "userName": "u73",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4926,
+       "parentCommentNo": 4926,
+       "replyLevel": 1,
+       "userName": "u74",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4925,
+       "parentCommentNo": 4925,
+       "replyLevel": 1,
+       "userName": "u75",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4924,
+       "parentCommentNo": 4924,
+       "replyLevel": 1,
+       "userName": "u76",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4923,
+       "parentCommentNo": 4923,
+       "replyLevel": 1,
+       "userName": "u77",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4922,
+       "parentCommentNo": 4922,
+       "replyLevel": 1,
+       "userName": "u78",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4921,
+       "parentCommentNo": 4921,
+       "replyLevel": 1,
+       "userName": "u79",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4920,
+       "parentCommentNo": 4920,
+       "replyLevel": 1,
+       "userName": "u80",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4919,
+       "parentCommentNo": 4919,
+       "replyLevel": 1,
+       "userName": "u81",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4918,
+       "parentCommentNo": 4918,
+       "replyLevel": 1,
+       "userName": "u82",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4917,
+       "parentCommentNo": 4917,
+       "replyLevel": 1,
+       "userName": "u83",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4916,
+       "parentCommentNo": 4916,
+       "replyLevel": 1,
+       "userName": "u84",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4915,
+       "parentCommentNo": 4915,
+       "replyLevel": 1,
+       "userName": "u85",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4914,
+       "parentCommentNo": 4914,
+       "replyLevel": 1,
+       "userName": "u86",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4913,
+       "parentCommentNo": 4913,
+       "replyLevel": 1,
+       "userName": "u87",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4912,
+       "parentCommentNo": 4912,
+       "replyLevel": 1,
+       "userName": "u88",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4911,
+       "parentCommentNo": 4911,
+       "replyLevel": 1,
+       "userName": "u89",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4910,
+       "parentCommentNo": 4910,
+       "replyLevel": 1,
+       "userName": "u90",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4909,
+       "parentCommentNo": 4909,
+       "replyLevel": 1,
+       "userName": "u91",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4908,
+       "parentCommentNo": 4908,
+       "replyLevel": 1,
+       "userName": "u92",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4907,
+       "parentCommentNo": 4907,
+       "replyLevel": 1,
+       "userName": "u93",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4906,
+       "parentCommentNo": 4906,
+       "replyLevel": 1,
+       "userName": "u94",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4905,
+       "parentCommentNo": 4905,
+       "replyLevel": 1,
+       "userName": "u95",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4904,
+       "parentCommentNo": 4904,
+       "replyLevel": 1,
+       "userName": "u96",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4903,
+       "parentCommentNo": 4903,
+       "replyLevel": 1,
+       "userName": "u97",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4902,
+       "parentCommentNo": 4902,
+       "replyLevel": 1,
+       "userName": "u98",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      },
+      {
+       "commentNo": 4901,
+       "parentCommentNo": 4901,
+       "replyLevel": 1,
+       "userName": "u99",
+       "contents": "c",
+       "objectId": "123456_201_224000000001"
+      }
+     ],
+     "pageModel": {
+      "page": 1,
+      "totalPages": 2,
+      "nextPage": 2
+     },
+     "count": {
+      "comment": 200,
+      "reply": 0,
+      "total": 200
+     }
+    }
+   }
+  },
+  {
+   "name": "test_cli_search-54",
+   "source": {
+    "file": "test_cli_search.py",
+    "line": 54,
+    "end_line": 54,
+    "test": "test_blog_search_uses_v2_and_takes_only_an_order"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "currentPage": 1,
+     "totalCount": 3,
+     "list": [
+      {
+       "blogId": "b0",
+       "domainIdOrBlogId": "b0",
+       "blogNo": 0,
+       "blogName": "블로그 0",
+       "nickname": "n0",
+       "blogStatus": "최근 게시물 2건",
+       "relationType": null
+      },
+      {
+       "blogId": "b1",
+       "domainIdOrBlogId": "b1",
+       "blogNo": 1,
+       "blogName": "블로그 1",
+       "nickname": "n1",
+       "blogStatus": "최근 게시물 2건",
+       "relationType": null
+      },
+      {
+       "blogId": "b2",
+       "domainIdOrBlogId": "b2",
+       "blogNo": 2,
+       "blogName": "블로그 2",
+       "nickname": "n2",
+       "blogStatus": "최근 게시물 2건",
+       "relationType": null
+      }
+     ],
+     "isBlockedByBifrostShield": false,
+     "queryControlInfo": {
+      "isAdult": false,
+      "isForbidden": false
+     },
+     "totalPage": 1
+    }
+   }
+  },
+  {
+   "name": "test_cli_search-79",
+   "source": {
+    "file": "test_cli_search.py",
+    "line": 79,
+    "end_line": 79,
+    "test": "test_tag_search_is_newest_first_so_a_window_closes_on_it"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "page": 1,
+     "totalCount": 9,
+     "items": [
+      {
+       "blogId": "tb",
+       "logNo": 100,
+       "title": "t0",
+       "content": "c",
+       "addDate": 1792368000000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 101,
+       "title": "t1",
+       "content": "c",
+       "addDate": 1792281600000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 102,
+       "title": "t2",
+       "content": "c",
+       "addDate": 1792195200000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 103,
+       "title": "t3",
+       "content": "c",
+       "addDate": 1792108800000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 104,
+       "title": "t4",
+       "content": "c",
+       "addDate": 1792022400000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 105,
+       "title": "t5",
+       "content": "c",
+       "addDate": 1791936000000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 106,
+       "title": "t6",
+       "content": "c",
+       "addDate": 1791849600000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 107,
+       "title": "t7",
+       "content": "c",
+       "addDate": 1791763200000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 108,
+       "title": "t8",
+       "content": "c",
+       "addDate": 1791676800000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 109,
+       "title": "t9",
+       "content": "c",
+       "addDate": 1791590400000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 110,
+       "title": "t10",
+       "content": "c",
+       "addDate": 1791504000000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 111,
+       "title": "t11",
+       "content": "c",
+       "addDate": 1791417600000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 112,
+       "title": "t12",
+       "content": "c",
+       "addDate": 1791331200000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 113,
+       "title": "t13",
+       "content": "c",
+       "addDate": 1791244800000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 114,
+       "title": "t14",
+       "content": "c",
+       "addDate": 1791158400000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 115,
+       "title": "t15",
+       "content": "c",
+       "addDate": 1791072000000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 116,
+       "title": "t16",
+       "content": "c",
+       "addDate": 1790985600000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 117,
+       "title": "t17",
+       "content": "c",
+       "addDate": 1790899200000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 118,
+       "title": "t18",
+       "content": "c",
+       "addDate": 1790812800000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 119,
+       "title": "t19",
+       "content": "c",
+       "addDate": 1790726400000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 120,
+       "title": "t20",
+       "content": "c",
+       "addDate": 1790640000000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 121,
+       "title": "t21",
+       "content": "c",
+       "addDate": 1790553600000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 122,
+       "title": "t22",
+       "content": "c",
+       "addDate": 1790467200000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 123,
+       "title": "t23",
+       "content": "c",
+       "addDate": 1790380800000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 124,
+       "title": "t24",
+       "content": "c",
+       "addDate": 1790294400000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 125,
+       "title": "t25",
+       "content": "c",
+       "addDate": 1790208000000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 126,
+       "title": "t26",
+       "content": "c",
+       "addDate": 1790121600000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 127,
+       "title": "t27",
+       "content": "c",
+       "addDate": 1790035200000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 128,
+       "title": "t28",
+       "content": "c",
+       "addDate": 1789948800000
+      },
+      {
+       "blogId": "tb",
+       "logNo": 129,
+       "title": "t29",
+       "content": "c",
+       "addDate": 1789862400000
+      }
+     ]
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_search.py",
+     "line": 81,
+     "end_line": 81,
+     "test": "test_tag_search_is_newest_first_so_a_window_closes_on_it",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    }
+   ]
+  },
+  {
+   "name": "test_cli_search-91",
+   "source": {
+    "file": "test_cli_search.py",
+    "line": 91,
+    "end_line": 91,
+    "test": "test_one_blogs_own_search"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "totalCount": 4,
+     "totalPage": 1,
+     "list": [
+      {
+       "blogId": "own",
+       "logNo": 1,
+       "title": "안 0",
+       "contents": "c",
+       "addDate": 1792368000000
+      },
+      {
+       "blogId": "own",
+       "logNo": 2,
+       "title": "안 1",
+       "contents": "c",
+       "addDate": 1792368000000
+      },
+      {
+       "blogId": "own",
+       "logNo": 3,
+       "title": "안 2",
+       "contents": "c",
+       "addDate": 1792368000000
+      },
+      {
+       "blogId": "own",
+       "logNo": 4,
+       "title": "안 3",
+       "contents": "c",
+       "addDate": 1792368000000
+      }
+     ]
+    }
+   },
+   "also_used_at": [
+    {
+     "file": "test_cli_search.py",
+     "line": 100,
+     "end_line": 100,
+     "test": "test_one_blogs_tag_search",
+     "use": "Same response shape; preserve this old test’s original generated values, page sizes and assertions when applying the template."
+    }
+   ]
+  },
+  {
+   "name": "test_cli_search-109",
+   "source": {
+    "file": "test_cli_search.py",
+    "line": 109,
+    "end_line": 109,
+    "test": "test_a_domain_address_is_resolved_once"
+   },
+   "response": {
+    "isSuccess": true,
+    "result": {
+     "totalCount": 0,
+     "totalPage": 0,
+     "list": []
+    }
+   }
+  },
+  {
+   "name": "topic-directory-xssi",
+   "source": {
+    "file": "test_cli_directory.py",
+    "line": 10,
+    "end_line": 11,
+    "symbol": "DIRECTORY"
+   },
+   "response_text": ")]}',\n{\"result\": [{\"name\": \"\\uc5d4\\ud130\\ud14c\\uc778\\uba3c\\ud2b8\\u00b7\\uc608\\uc220\", \"directoryList\": [{\"seq\": 5, \"name\": \"\\ubb38\\ud559\\u00b7\\ucc45\"}, {\"seq\": 6, \"name\": \"\\uc601\\ud654\"}]}, {\"name\": \"\\uc0dd\\ud65c\\u00b7\\ub178\\ud558\\uc6b0\\u00b7\\uc1fc\\ud551\", \"directoryList\": [{\"seq\": 20, \"name\": \"\\ub9db\\uc9d1\"}, {\"name\": \"\\ubc88\\ud638 \\uc5c6\\uc74c\"}]}]}"
+  }
+ ]
+}

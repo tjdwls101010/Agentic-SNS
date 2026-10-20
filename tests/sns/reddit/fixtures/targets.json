@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "commands.accepts는 파일 소비자 없음. related 댓글 URL 및 wiki URL은 listing.py:34/wiki.py:9에 맞춰 수정; CLI 경로를 실제 실행해야 함."},
   "about": "What a user-typed target normalizes to, with no request (appendix A 10-14): kind post | comment | subreddit | subreddits (an r/a+b combination) | user | me | share, and the parts (sub, post_id, comment_id, user, url for a share link), or refused (exit 2). All names and ids are synthetic.",
   "cases": [
     {"input": "https://www.reddit.com/r/example/comments/aaa1/some_title/", "item": "14", "target": {"kind": "post", "sub": "example", "post_id": "aaa1", "comment_id": null}},
@@ -69,9 +70,9 @@
       "comments": ["post", "comment", "share"],
       "profile": ["user"],
       "about": ["subreddit", "user"],
-      "related": ["post"],
+      "related": ["post", "comment"],
       "search --in": ["subreddit"],
-      "wiki": ["subreddit"]
+      "wiki": ["subreddit", "wiki"]
     },
     "notes": "The old post command took post and share but not comment (a comment link went to comments); the plan's post contract opens a comment link with the comment as the anchor, so post now accepts comment too (intended change). about needs an explicit r/ or u/ (a bare word is refused) because a bare word is read as a post id."
   }

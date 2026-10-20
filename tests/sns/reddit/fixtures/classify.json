@@ -90,7 +90,7 @@
      "outcome": {"outcome": "failed"}},
     {"name": "me-logged-out-shape", "item": "3", "fact": "A logged-out /api/me.json is {} (not a t2): login is required.",
      "expect": "me", "envelope": {"status": 200, "url": "https://www.reddit.com/api/me.json?raw_json=1", "body": "{}", "ratelimit": {"used": "4", "remaining": "96", "reset": "300"}},
-     "outcome": {"outcome": "login", "note": "P2: decided by inference (a logged-out me answer is {}); the old code read it as a shape change (6). See after_recon me-logged-out-is-login."}},
+     "outcome": {"outcome": "login", "note": "P2: decided by inference (a logged-out me answer is {}); the old code read it as a shape change (6). This inference is pinned by cases.me-logged-out-shape and test_reddit_web.py:test_classify; it has not been verified against a logged-out capture."}},
     {"name": "personal-listing-empty-modhash", "item": "3", "fact": "On a personal surface a Listing whose modhash is the empty string means logged out.",
      "expect": "listing", "personal": true, "envelope": {"status": 200, "url": "https://www.reddit.com/best.json?raw_json=1", "body": "{\"kind\": \"Listing\", \"data\": {\"modhash\": \"\", \"after\": null, \"children\": [{\"kind\": \"t3\", \"data\": {\"id\": \"aaa1\", \"name\": \"t3_aaa1\"}}]}}", "ratelimit": {"used": "4", "remaining": "96", "reset": "300"}},
      "outcome": {"outcome": "login"}},

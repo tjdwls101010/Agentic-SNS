@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "29 scenarios는 test_paging.py가 전부 실행. rate-window-before/after-records(종료10), budget-before/after-records는 S2로 P4 변경; 자연 종료·천장·중복·반복·기한을 유지."},
  "about": "Paging, windows and stops (appendix A 33-40, 53-55, 62, and the plan's stop table). A scenario serves pages in order to one walk. policy: plain (page+1; a short page ends it; a ceiling makes a short page near it capped), marked (the page names the last page: marker), single (one page). A page is {count, start} (ids r<start>.. in order), {count, repeat} (consecutive runs), {ids}, {dated: [KST minutes or null]} (ids d1, d2.. across the scenario), optional marker and reported_total, or {error: {code, reason}} with kept records for a restriction. options: limit (records to show), since/until (KST days), monotonic (the surface is newest first). expect: shown ids or shown_count, stop_reason, exit, pending (read, not shown, kept in the handle), pages_fetched, reported_total, undated. continue resumes from the first walk's state.",
  "scenarios": [
   {

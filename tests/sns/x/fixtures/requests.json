@@ -1,5 +1,9 @@
 {
- "about": "What a request from the dedicated tab carries (appendix A 13, 29 and the planning session's measurement of the app's own requests on 2026-10-18). headers: each header the app sends and where its value comes from in the logged-in tab; method: when the app uses POST; read_only: which operations may ever be sent; features: how the features parameter is filled; variables: what each surface sends (the previous skill's registry, to be checked against the app's own requests in P2 R7/R8). All values are synthetic; no real bearer, token or query id appears here.",
+ "p4": {
+  "status": "P4가 실행해야 함",
+  "behavior": "headers.set 외 read_only, features, method, variables와 35개 배선 작업의 등록부 계약을 실행한다. 3개 미배선 작업 제거는 의도한 변경."
+ },
+ "about": "What a request from the dedicated tab carries (appendix A 13, 29 and the planning session's measurement of the app's own requests on 2026-10-18). headers: each header the app sends and where its value comes from in the logged-in tab; method: when the app uses POST; read_only: which operations may ever be sent; features: how the features parameter is filled; variables: registry defaults and the arguments each wired surface sends (2026-10-19 snapshot). All values are synthetic; no real bearer, token or query id appears here.",
  "headers": {
   "item": "13",
   "source": "measured",
@@ -73,39 +77,46 @@
   "source": "plan",
   "fact": "An operation is sent only when the module index defines it with operationType query and its name is on the skill's read list; a mutation or subscription is refused before anything is sent, even when its name is on the list.",
   "read_list": [
-   "UserByScreenName",
-   "UsersByScreenNames",
    "Viewer",
-   "UserTweets",
-   "UserTweetsAndReplies",
-   "UserMedia",
-   "UserHighlightsTweets",
-   "UserArticlesTweets",
-   "Likes",
-   "Bookmarks",
    "HomeTimeline",
    "HomeLatestTimeline",
+   "UserByScreenName",
+   "UsersByScreenNames",
+   "UserTweets",
+   "UserOriginalsTimeline",
+   "UserRepliesTimeline",
+   "UserMedia",
+   "UserVideoTimeline",
+   "UserHighlightsTweets",
+   "UserArticlesTweets",
+   "CombinedLists",
+   "ListMemberships",
    "TweetDetail",
    "TweetResultsByRestIds",
    "SearchTimeline",
+   "Retweeters",
    "Following",
    "Followers",
    "BlueVerifiedFollowers",
    "FollowersYouKnow",
-   "Retweeters",
+   "ConnectTabTimeline",
    "ListLatestTweetsTimeline",
-   "ListByRestId",
    "ListMembers",
-   "ExplorePage",
-   "GenericTimelineById",
-   "CommunitiesExploreTimeline",
+   "ListByRestId",
    "CommunityTweetsTimeline",
    "CommunityMediaTimeline",
-   "CommunityByRestId",
    "CommunityAboutTimeline",
-   "GlobalCommunitiesLatestPostSearchTimeline"
+   "CommunityByRestId",
+   "CommunityDiscoveryTimeline",
+   "GlobalCommunitiesLatestPostSearchTimeline",
+   "ExplorePage",
+   "GenericTimelineById",
+   "AudioSpaceById",
+   "Bookmarks",
+   "Likes",
+   "NotificationsTimeline"
   ],
-  "read_list_note": "UserRepliesTimeline and Favoriters are dropped (R8 keeps one replies-tab operation; nobody's likes list is public). P2 R5 adds the operations for notifications, an account's lists, spaces and similar accounts.",
+  "read_list_note": "Snapshot registry names (2026-10-19). P4 removes the unwired UserOriginalsTimeline, UserVideoTimeline and CommunityAboutTimeline under Appendix A.1; the remaining 35 are ported.",
   "cases": [
    {
     "operation": "TweetDetail",
@@ -137,7 +148,7 @@
  "features": {
   "item": "7,plan",
   "source": "measured (featureSwitches from modules, values from the store) + plan, P2 R7 (fieldToggles values)",
-  "fact": "features is every name in the operation's featureSwitches list (from its module definition), each with the store's value (featureSwitch.user.config[name].value); a name the store does not know is false. fieldToggles is the operation's fieldToggles list; its values are not in the store — the previous registry sent withArticleRichContentState, withArticleSummaryText and withArticleVoiceOver true on TweetDetail, and P2 R7 decides the values from the app's own requests. When X answers 'features cannot be null: a, b', those names are added the same way and the request is retried once.",
+  "fact": "features contains every module featureSwitch name with its store value (false when unknown). fieldToggles names come from the live module and values from the 2026-10-19 registry (unknown names are false); TweetDetail enables withArticleRichContentState, withArticleSummaryText and withArticleVoiceOver. A features_missing response adds the named switches and retries once.",
   "cases": [
    {
     "featureSwitches": [
@@ -180,16 +191,18 @@
  },
  "variables": {
   "item": "29",
-  "source": "code (previous registry, 2026-09-29) — P2 R7/R8 checks each against the app's own request",
+  "source": "2026-10-19 operations.json defaults plus client.py call arguments; target ids below are synthetic placeholders.",
   "surfaces": {
    "feed foryou": {
     "operation": "HomeTimeline",
     "variables": {
      "count": 20,
      "includePromotedContent": true,
-     "latestControlAvailable": true,
      "requestContext": "launch",
      "withCommunity": true
+    },
+    "field_toggles": {
+     "withPayments": false
     }
    },
    "feed following": {
@@ -197,9 +210,11 @@
     "variables": {
      "count": 20,
      "includePromotedContent": true,
-     "latestControlAvailable": true,
      "requestContext": "launch",
      "withCommunity": true
+    },
+    "field_toggles": {
+     "withPayments": false
     }
    },
    "profile posts": {
@@ -210,16 +225,24 @@
      "includePromotedContent": true,
      "withQuickPromoteEligibilityTweetFields": true,
      "withVoice": true
+    },
+    "field_toggles": {
+     "withPayments": false,
+     "withArticlePlainText": false
     }
    },
    "profile replies": {
-    "operation": "UserTweetsAndReplies",
+    "operation": "UserRepliesTimeline",
     "variables": {
      "userId": "<id>",
      "count": 20,
      "includePromotedContent": true,
      "withCommunity": true,
      "withVoice": true
+    },
+    "field_toggles": {
+     "withPayments": false,
+     "withArticlePlainText": false
     }
    },
    "profile media": {
@@ -231,6 +254,10 @@
      "withClientEventToken": false,
      "withBirdwatchNotes": false,
      "withVoice": true
+    },
+    "field_toggles": {
+     "withPayments": false,
+     "withArticlePlainText": false
     }
    },
    "profile highlights": {
@@ -238,8 +265,12 @@
     "variables": {
      "userId": "<id>",
      "count": 20,
-     "includePromotedContent": false,
+     "includePromotedContent": true,
      "withVoice": true
+    },
+    "field_toggles": {
+     "withPayments": false,
+     "withArticlePlainText": false
     }
    },
    "profile articles": {
@@ -251,6 +282,10 @@
      "withClientEventToken": false,
      "withBirdwatchNotes": false,
      "withVoice": true
+    },
+    "field_toggles": {
+     "withPayments": false,
+     "withArticlePlainText": false
     }
    },
    "post": {
@@ -258,12 +293,23 @@
     "variables": {
      "focalTweetId": "<id>",
      "with_rux_injections": false,
-     "rankingMode": "Relevance | Recency",
+     "rankingMode": "Relevance",
      "includePromotedContent": true,
      "withCommunity": true,
      "withQuickPromoteEligibilityTweetFields": true,
      "withBirdwatchNotes": true,
-     "withVoice": true
+     "withVoice": true,
+     "referrer": "tweet"
+    },
+    "field_toggles": {
+     "withArticleRichContentState": true,
+     "withArticleSummaryText": true,
+     "withArticleVoiceOver": true
+    },
+    "variants": {
+     "recent": {
+      "rankingMode": "Recency"
+     }
     }
    },
    "posts batch": {
@@ -273,8 +319,14 @@
       "<id>"
      ],
      "includePromotedContent": false,
-     "withCommunity": false,
-     "withVoice": false
+     "withCommunity": true,
+     "withVoice": true,
+     "withBirdwatchNotes": true
+    },
+    "field_toggles": {
+     "withArticleRichContentState": true,
+     "withArticleSummaryText": true,
+     "withArticleVoiceOver": true
     }
    },
    "search": {
@@ -283,20 +335,42 @@
      "rawQuery": "<query>",
      "count": 20,
      "querySource": "typed_query",
-     "product": "Latest | Top | People | Media",
-     "withGrokTranslatedBio": true,
+     "product": "Latest",
+     "withGrokTranslatedBio": false,
      "withQuickPromoteEligibilityTweetFields": false
+    },
+    "field_toggles": {},
+    "variants": {
+     "Top": {
+      "product": "Top",
+      "withGrokTranslatedBio": true
+     },
+     "People": {
+      "product": "People",
+      "withGrokTranslatedBio": true
+     },
+     "Media": {
+      "product": "Media",
+      "withGrokTranslatedBio": false
+     }
     }
    },
    "quotes": {
     "operation": "SearchTimeline",
     "variables": {
-     "rawQuery": "quoted_tweet_id:<id>",
+     "rawQuery": "quoted_tweet_id:<id> OR url:\"status/<id>/video\" OR url:\"status/<id>/photo\"",
      "count": 20,
-     "querySource": "typed_query",
-     "product": "Latest | Top",
-     "withGrokTranslatedBio": true,
+     "querySource": "tdqt",
+     "product": "Latest",
+     "withGrokTranslatedBio": false,
      "withQuickPromoteEligibilityTweetFields": false
+    },
+    "field_toggles": {},
+    "variants": {
+     "top": {
+      "product": "Top",
+      "withGrokTranslatedBio": true
+     }
     }
    },
    "reposts": {
@@ -304,14 +378,20 @@
     "variables": {
      "tweetId": "<id>",
      "count": 20,
-     "includePromotedContent": true
-    }
+     "includePromotedContent": true,
+     "enableRanking": true
+    },
+    "field_toggles": {}
    },
    "about": {
     "operation": "UserByScreenName",
     "variables": {
      "screen_name": "<handle>",
-     "withSafetyModeUserFields": true
+     "withGrokTranslatedBio": true
+    },
+    "field_toggles": {
+     "withPayments": false,
+     "withAuxiliaryUserLabels": true
     }
    },
    "about many": {
@@ -320,7 +400,11 @@
      "screen_names": [
       "<handle>"
      ],
-     "withSafetyModeUserFields": true
+     "withGrokTranslatedBio": true
+    },
+    "field_toggles": {
+     "withPayments": false,
+     "withAuxiliaryUserLabels": true
     }
    },
    "graph following": {
@@ -328,39 +412,48 @@
     "variables": {
      "userId": "<id>",
      "count": 20,
-     "includePromotedContent": false
-    }
+     "includePromotedContent": false,
+     "withGrokTranslatedBio": true
+    },
+    "field_toggles": {}
    },
    "graph followers": {
     "operation": "Followers",
     "variables": {
      "userId": "<id>",
      "count": 20,
-     "includePromotedContent": false
-    }
+     "includePromotedContent": false,
+     "withGrokTranslatedBio": true
+    },
+    "field_toggles": {}
    },
    "graph verified": {
     "operation": "BlueVerifiedFollowers",
     "variables": {
      "userId": "<id>",
      "count": 20,
-     "includePromotedContent": false
-    }
+     "includePromotedContent": false,
+     "withGrokTranslatedBio": true
+    },
+    "field_toggles": {}
    },
    "graph known": {
     "operation": "FollowersYouKnow",
     "variables": {
      "userId": "<id>",
      "count": 20,
-     "includePromotedContent": false
-    }
+     "includePromotedContent": false,
+     "withGrokTranslatedBio": true
+    },
+    "field_toggles": {}
    },
    "me bookmarks": {
     "operation": "Bookmarks",
     "variables": {
      "count": 20,
-     "includePromotedContent": false
-    }
+     "includePromotedContent": true
+    },
+    "field_toggles": {}
    },
    "me likes": {
     "operation": "Likes",
@@ -371,6 +464,10 @@
      "withClientEventToken": false,
      "withBirdwatchNotes": false,
      "withVoice": true
+    },
+    "field_toggles": {
+     "withPayments": false,
+     "withArticlePlainText": false
     }
    },
    "list posts": {
@@ -378,20 +475,23 @@
     "variables": {
      "listId": "<id>",
      "count": 20
-    }
+    },
+    "field_toggles": {}
    },
    "list members": {
     "operation": "ListMembers",
     "variables": {
      "listId": "<id>",
      "count": 20
-    }
+    },
+    "field_toggles": {}
    },
    "list about": {
     "operation": "ListByRestId",
     "variables": {
      "listId": "<id>"
-    }
+    },
+    "field_toggles": {}
    },
    "community posts": {
     "operation": "CommunityTweetsTimeline",
@@ -399,8 +499,14 @@
      "communityId": "<id>",
      "count": 20,
      "displayLocation": "Community",
-     "rankingMode": "Relevance | Recency",
+     "rankingMode": "Relevance",
      "withCommunity": true
+    },
+    "field_toggles": {},
+    "variants": {
+     "recent": {
+      "rankingMode": "Recency"
+     }
     }
    },
    "community media": {
@@ -409,27 +515,30 @@
      "communityId": "<id>",
      "count": 20,
      "withCommunity": true
-    }
+    },
+    "field_toggles": {}
    },
    "community about": {
     "operation": "CommunityAboutTimeline",
     "variables": {
      "communityId": "<id>",
-     "count": 20,
      "withCommunity": true
-    }
+    },
+    "field_toggles": {}
    },
    "community card": {
     "operation": "CommunityByRestId",
     "variables": {
      "communityId": "<id>"
-    }
+    },
+    "field_toggles": {}
    },
    "communities": {
-    "operation": "CommunitiesExploreTimeline",
+    "operation": "CommunityDiscoveryTimeline",
     "variables": {
-     "count": 20
-    }
+     "withCommunity": true
+    },
+    "field_toggles": {}
    },
    "search in communities": {
     "operation": "GlobalCommunitiesLatestPostSearchTimeline",
@@ -437,27 +546,72 @@
      "rawQuery": "<query>",
      "count": 20,
      "withCommunity": true
-    }
+    },
+    "field_toggles": {}
    },
    "trends": {
     "operation": "ExplorePage",
     "variables": {
-     "withCommunitiesMemberships": true
-    }
+     "cursor": ""
+    },
+    "field_toggles": {}
    },
    "trends tab": {
     "operation": "GenericTimelineById",
     "variables": {
      "timelineId": "<from ExplorePage>",
      "count": 20,
-     "withCommunity": true
-    }
+     "withQuickPromoteEligibilityTweetFields": true
+    },
+    "field_toggles": {}
    },
    "doctor / unblock check": {
     "operation": "Viewer",
     "variables": {
      "withCommunitiesMemberships": true
-    }
+    },
+    "field_toggles": {}
+   },
+   "profile lists": {
+    "operation": "CombinedLists",
+    "variables": {
+     "count": 100,
+     "userId": "<id>"
+    },
+    "field_toggles": {}
+   },
+   "profile memberships": {
+    "operation": "ListMemberships",
+    "variables": {
+     "count": 20,
+     "userId": "<id>"
+    },
+    "field_toggles": {}
+   },
+   "graph similar": {
+    "operation": "ConnectTabTimeline",
+    "variables": {
+     "count": 20,
+     "context": "{\"contextualUserId\":\"<id>\"}"
+    },
+    "field_toggles": {}
+   },
+   "about space": {
+    "operation": "AudioSpaceById",
+    "variables": {
+     "isMetatagsQuery": false,
+     "withReplays": true,
+     "withListeners": true,
+     "id": "<id>"
+    },
+    "field_toggles": {}
+   },
+   "me notifications": {
+    "operation": "NotificationsTimeline",
+    "variables": {
+     "count": 20
+    },
+    "field_toggles": {}
    }
   },
   "rules": [

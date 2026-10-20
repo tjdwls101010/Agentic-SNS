@@ -1,5 +1,6 @@
 {
-  "about": "Response classification (appendix A 1-8). Each case is one response envelope as the browser returns it ({status, url, body}; body_lines are joined with newlines after an optional prefix), how it was requested (mode: graphql | home | html | asset; for graphql an expected key and kind), and the outcome: ok (with the decoded chunk count), blocked (reason checkpoint | rate_limit), login, retry (temporary rejection, one paced retry allowed), failed, or empty (an explicitly empty connection).",
+  "p4": {"removed": {"asset-429": "픽스처 문제: R1은 static asset을 요청하지 않으며 http-429가 실행 중인 동등 사례", "asset-body-with-auth-strings": "픽스처 문제: obsolete asset 모드의 JavaScript 리터럴 무시는 GraphQL checkpoint_url=null에 대한 증거가 아님"}, "behavior": "has_key는 값과 무관하게 키 존재로 판정하는 현행 계약. GraphQL의 null 키를 안전하다고 바꿀 플랫폼 증거는 없으며 별도 테스트가 고정해야 함."},
+  "about": "Response classification (appendix A 1-8). Each case is one response envelope as the browser returns it ({status, url, body}; body_lines are joined with newlines after an optional prefix), how it was requested (mode: graphql | home | html; for graphql an expected key and kind), and the outcome: ok (with the decoded chunk count), blocked (reason checkpoint | rate_limit), login, retry (temporary rejection, one paced retry allowed), failed, or empty (an explicitly empty connection).",
   "cases": [
     {"name": "anti-json-prefix-and-ndjson", "item": "1", "fact": "A body can start with for (;;); and carry several JSON objects (Relay incremental delivery).",
      "mode": "graphql", "expected": {"key": "news_feed", "kind": "connection"},
@@ -59,14 +60,6 @@
      "mode": "graphql", "expected": {"key": "news_feed", "kind": "connection"}, "retried": true,
      "envelope": {"status": 200, "url": "https://www.facebook.com/api/graphql/", "prefix": "for (;;);", "body_lines": [{"error": 1357054}]},
      "outcome": {"outcome": "blocked", "reason": "rate_limit"}},
-    {"name": "asset-429", "item": "4", "fact": "A 429 from a static asset (fbcdn) is a rate limit too.",
-     "mode": "asset",
-     "envelope": {"status": 429, "url": "https://static.xx.fbcdn.net/rsrc.php/v4/y1/r/abc.js", "body": ""},
-     "outcome": {"outcome": "blocked", "reason": "rate_limit"}},
-    {"name": "asset-body-with-auth-strings", "item": "4", "fact": "A static asset's body contains client code with auth-error literals; they are not an account response.",
-     "mode": "asset",
-     "envelope": {"status": 200, "url": "https://static.xx.fbcdn.net/rsrc.php/v4/y1/r/abc.js", "body": "__d(\"X\",[],function(){var a={\"error\":1357001,\"checkpoint_url\":null,\"USER_ID\":\"0\"};});"},
-     "outcome": {"outcome": "ok"}},
     {"name": "errors-without-data", "item": "5", "fact": "A chunk with errors and no data is a failed query.",
      "mode": "graphql", "expected": {"key": "news_feed", "kind": "connection"},
      "envelope": {"status": 200, "url": "https://www.facebook.com/api/graphql/", "body_lines": [{"errors": [{"message": "PersistedQueryNotFound", "code": 1675002}]}]},

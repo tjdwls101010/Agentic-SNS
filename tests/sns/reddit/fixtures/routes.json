@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "after_recon의 share URL 사례는 path가 없어 test_reddit_web.py:71에서 제외. 실제 request.bucket은 share이며 metered=false; null 버킷 표시를 수정. P4가 URL 사례도 연결한다."},
   "about": "What may be requested and how a command becomes a request (appendix A 5, 8). paths: whether a path may be fetched at all (no host, no query, no . or .., always .json). requests: the path and query a command surface sends, before raw_json=1 is added by the snippet. The new surfaces (wiki, moderators, pinned posts) and each path's bucket are filled after P2 (R3-R5).",
   "paths": {
     "item": "5",
@@ -88,7 +89,7 @@
       {"path": "/duplicates/aaa1.json", "allowed": true, "bucket": "general"},
       {"path": "/subreddits/mine/subscriber.json", "allowed": true, "bucket": "general"},
       {"path": "/api/me.json", "allowed": true, "bucket": "general"},
-      {"url": "https://www.reddit.com/r/example/s/AbC123", "allowed": true, "bucket": null, "fact": "a share link: no headers, not in the .json bucket"},
+      {"url": "https://www.reddit.com/r/example/s/AbC123", "allowed": true, "bucket": "share", "fact": "a share link: no headers, not in the .json bucket"},
       {"path": "/r/example+other_sub/wiki/index.json", "allowed": false, "why": "a wiki belongs to one community"}
     ]
   }

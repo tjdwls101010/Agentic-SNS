@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "process-timeout은 test_aside.py:12에서 제외됨. P4가 실제 subprocess timeout을 실행해야 함."},
   "about": "What one `aside repl` run prints and how it is read (appendix A 8), in the protocol the skill's Aside unit will speak (ported in P3 from the facebook skill's aside/program.js): zero or more {\"kind\":\"chunk\",\"index\":i,\"body\"} lines, then one {\"kind\":\"result\",\"chunks\":n,\"body\"} line, or one {\"kind\":\"error\",\"error\"} line. Each case gives the process result (stdout, stderr, exit; timed_out when it did not finish) and the outcome: value (what the page function returned) or error with its kind: invalid, tab_missing, lost (time limit or lost connection), failed (other nonzero exit), timeout. The previous reader's body_file refusal has no counterpart: in this protocol a result never names a file, so a run that does not end in one result or error line is invalid.",
   "facts": {
     "process_timeout_seconds": 125,

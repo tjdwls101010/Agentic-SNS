@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "모든 scenarios가 파일 미소비. 파일 무결성·단조 핸들·차단 우선순위·검증된 해제·신호 보존·탭 재사용 계약은 유지하고 test_collection/handles/guard/session/cli_doctor 인라인도 이식. per-command-cap/cap-ceiling은 S2로 P4 제거."},
   "about": "Local state scenarios on a real filesystem (appendix A 27-29, and the plan's protection and tab contracts that replace the old ones). Each scenario states the starting files, the action, and what must hold afterwards. Contexts are the query identity a file or handle is bound to (command, target, sort or tab, filters, normalized window, the Threads account). All state lives under the skill's data/ directory (THREADS_DATA_DIR in tests).",
   "collection": {
     "item": "27",

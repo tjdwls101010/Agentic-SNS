@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "variables/read_only/provider_flags는 파일 미소비. following 변수는 test_cli_feed.py:143 인라인으로 variant/pagination_source만 고정; 페이지네이션 실측 미확정은 유지. replies-next-batch.expected.first=4는 관찰값(옛 queries.json=10), RECENT와 x-asbd-id 출처도 미확정; 플랫폼 실측값을 코드 기본값으로 덮지 않는다."},
   "about": "What a request carries (appendix A 22, 25, 33, and the planning session's observation of the app's own requests on 2026-10-16). variables: the variables a read sends for a surface, with the parts that are facts marked; headers: where each header's value comes from in the logged-in tab; read_only: which operation names may ever be sent; provider_flags: which relay provider variables are accepted from a module or a learned value. All values are synthetic.",
   "variables": [
     {"name": "profile-threads-tab-first-10", "item": "22",
@@ -67,7 +68,7 @@
   },
   "provider_flags": {
     "item": "33",
-    "fact": "Relay provider variables are named __relay_internal__pv__<Name>relayprovider; only booleans, integers and upper-case constant strings are accepted as their values.",
+    "fact": "Relay provider variables learned from document preloader values are named __relay_internal__pv__<Name>relayprovider; only booleans, integers and upper-case constant strings are accepted there. Live module provider.get() values are read directly and are not subject to this document-learning filter.",
     "input": {
       "__relay_internal__pv__BarcelonaIsLoggedInrelayprovider": true,
       "__relay_internal__pv__BarcelonaQuotaPageSizerelayprovider": 3,

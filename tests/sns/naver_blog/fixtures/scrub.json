@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "8개 cases는 옛 테스트 미소비. 진단 키 마스킹·pstatic 서명 쿼리 제거·pageNo 보존·naverId/userId 구별을 직접 실행한다. P1에서는 옛 scrub 함수와 8개 모두 일치 확인."},
  "about": "Diagnostic scrubbing (appendix A 9, 31). scrub(value) returns a copy for stderr: cookie, token and viewer-identifier keys are redacted wherever they appear (JSON keys, form pairs, dict keys), pstatic image URLs lose their signed query, and nothing else changes. Diagnostics never carry snippet source, ARGS or stdout at all. A case with absent instead of output checks only that those values are gone.",
  "cases": [
   {

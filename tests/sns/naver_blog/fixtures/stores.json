@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "protection.constants만 test_guard.py:14에서 소비; 나머지 scenarios는 인라인으로 재현. 단조 핸들·실제 계정 결합·검증된 해제·이미지 TTL은 보존. protection.constants의 명령/수집/10분 상한, window·budget 시나리오는 S2로 P4 변경."},
  "about": "Local state on a real filesystem (appendix A 41-44, 63, 65 and the plan's protection semantics N5). Each scenario states the starting files, the action and what must hold afterwards. All state lives under the skill's data/ (NAVER_BLOG_DATA_DIR in tests). Contexts are the query identity a handle or file is bound to: command, target, sort/type/kind, window, and the Naver account (current-user userId).",
  "protection": {
   "item": "41, N5",

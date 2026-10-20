@@ -1,5 +1,5 @@
 {
- "about": "Post HTML → PostDoc (appendix A 27-32 and the fields the current parser drops). file is a synthetic page; request is what was asked for; expect lists what the parse must yield (a field not listed is not checked here); outcome is a refusal. lines are the body's text lines in order (a line may hold a newline inside one paragraph block). Picture numbers are new (images <post> N), as are link host/link_id and the own-money, product and blogNo fields; the current parser yields [image: caption] without numbers and no link ids.",
+ "about": "Post HTML → PostDoc (appendix A 27-32 and the fields the current parser drops). file is a synthetic page; request is what was asked for; expect lists what the parse must yield (a field not listed is not checked here); outcome is a refusal. lines are the body's text lines in order (a line may hold a newline inside one paragraph block). Picture numbers (images <post> N), link host/link_id, own-money cards, product and blogNo fields are implemented and asserted by test_body.py; these are current parser contracts.",
  "full": {
   "file": "posts/smart_full.html",
   "request": {

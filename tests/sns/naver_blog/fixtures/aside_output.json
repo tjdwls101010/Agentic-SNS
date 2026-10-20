@@ -1,4 +1,5 @@
 {
+  "p4": {"status": "P4가 실행해야 함", "behavior": "test_cli_doctor.py:108은 error가 있는 cases만 파일에서 소비한다. one-envelope/ansi-and-noise-lines의 envelope 기대값과 process의 실제 timeout 경로는 고정 없음; P4가 모두 실행해야 함."},
   "about": "Reading one Aside REPL run back (appendix A 8). Each case is the process result (exit code, stdout, stderr) and what the aside unit makes of it: value (the one JSON envelope printed: {status, url, body, location}, plus base64 for an image) or an error with exit 3 and its reason (timeout, connection, invalid). The envelope is the last JSON line; ANSI colour codes are stripped; a body_file envelope (Aside spilling a large result to a file) is refused, never followed; status must be an integer 100-599 and url and body strings.",
   "cases": [
     {"name": "one-envelope", "exit": 0, "stdout": "{\"status\":200,\"url\":\"https://m.blog.naver.com/api/x\",\"body\":\"{}\",\"location\":null}\n", "stderr": "",

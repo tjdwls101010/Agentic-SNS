@@ -1,16 +1,17 @@
 {
-  "about": "Input checks and target resolution (appendix A 10, 21, 22). url_checks: whether a URL may be requested at all. targets: what a user-typed target normalizes to (or that it is refused before any request). resolve: which id a fetched page yields.",
+  "p4": {"status": "P4가 실행해야 함", "behavior": "url_checks는 옛 테스트 미소비. targets와 resolve는 test_facebook_formats.py:59,71 실행. 공유/reel/watch URL은 P3 D7 이후 추가한다."},
+  "about": "Input checks and target resolution (appendix A 10, 21, 22). url_checks: whether the target normalizer accepts a Facebook target URL (http or https, five explicit hosts, no credentials or explicit port); snippet page fetching has a separate same-origin gate. targets: what a user-typed target normalizes to (or that it is refused before any request). resolve: which id a fetched page yields.",
   "url_checks": [
     {"url": "https://www.facebook.com/x", "allowed": true},
     {"url": "https://m.facebook.com/x", "allowed": true},
-    {"url": "https://static.xx.fbcdn.net/rsrc.php/v4/a.js", "allowed": true},
-    {"url": "http://www.facebook.com/x", "allowed": false, "why": "https only"},
+    {"url": "https://static.xx.fbcdn.net/rsrc.php/v4/a.js", "allowed": false, "why": "CDN assets are not target URLs; R1 no longer fetches them"},
+    {"url": "http://www.facebook.com/x", "allowed": true},
     {"url": "https://user:pw@www.facebook.com/x", "allowed": false, "why": "no credentials"},
-    {"url": "https://www.facebook.com:8443/x", "allowed": false, "why": "no port but 443"},
-    {"url": "https://www.facebook.com:443/x", "allowed": true},
-    {"url": "https://evilfacebook.com/x", "allowed": false, "why": "host must be facebook.com or a subdomain"},
-    {"url": "https://facebook.com.evil.net/x", "allowed": false, "why": "host must end in .facebook.com"},
-    {"url": "https://www.fbcdn.net.evil.net/a.js", "allowed": false}
+    {"url": "https://www.facebook.com:8443/x", "allowed": false, "why": "all explicit ports are refused"},
+    {"url": "https://www.facebook.com:443/x", "allowed": false, "why": "all explicit ports are refused, including 443"},
+    {"url": "https://evilfacebook.com/x", "allowed": false, "why": "the hostname must be one of the five explicit Facebook target hosts"},
+    {"url": "https://facebook.com.evil.net/x", "allowed": false, "why": "the hostname must be one of the five explicit Facebook target hosts"},
+    {"url": "https://www.fbcdn.net.evil.net/a.js", "allowed": false, "why": "the hostname must be one of the five explicit Facebook target hosts"}
   ],
   "targets": [
     {"command": "profile", "input": "some.person", "normalized": "https://www.facebook.com/some.person"},
