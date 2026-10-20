@@ -1,5 +1,5 @@
 {
-  "p4": {"status": "P4가 실행해야 함", "behavior": "first_read.cases, merge.expansion-in-sibling-slot, batching.same-descriptor-twice-stalls-only-that-gap은 파일 사례 미실행(인라인 anchor/expansion/stall 테스트 있음). 실제 데이터로 assertions를 연결한다."},
+  "p4": {"status": "executed", "behavior": "first_read.cases run through the cli (test_cli_thread.py); merge.expansion-in-sibling-slot and batching.same-descriptor-twice-stalls-only-that-gap run on the tree policy (test_tree.py)."},
   "about": "Comment trees (appendix A 21-26): how a response is walked and validated, how comments are put in place, how a gap (a more pointer) is expanded and merged, and what coverage says. Comments are written compactly: {id, parent (fullname), body?, replies: [...]} for a t1 and {more: [ids], parent, count} for a more pointer ({more: [], count: 0} is 'continue this thread': Reddit sends it as a more with id '_' and no children, P2 R1). The P3 tests turn these into Reddit's raw shapes. All ids are synthetic.",
   "walk": {
     "item": "21",

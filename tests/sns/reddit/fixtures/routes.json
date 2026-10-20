@@ -1,5 +1,5 @@
 {
-  "p4": {"status": "P4가 실행해야 함", "behavior": "after_recon의 share URL 사례는 path가 없어 test_reddit_web.py:71에서 제외. 실제 request.bucket은 share이며 metered=false; null 버킷 표시를 수정. P4가 URL 사례도 연결한다."},
+  "p4": {"status": "executed", "behavior": "The share URL case is run in test_web.py (bucket share, never measured)."},
   "about": "What may be requested and how a command becomes a request (appendix A 5, 8). paths: whether a path may be fetched at all (no host, no query, no . or .., always .json). requests: the path and query a command surface sends, before raw_json=1 is added by the snippet. The new surfaces (wiki, moderators, pinned posts) and each path's bucket are filled after P2 (R3-R5).",
   "paths": {
     "item": "5",

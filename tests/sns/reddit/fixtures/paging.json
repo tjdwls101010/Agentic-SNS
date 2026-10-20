@@ -1,5 +1,5 @@
 {
-  "p4": {"status": "P4가 실행해야 함", "behavior": "listing.cases 전부와 window-resumes-with-saved-bounds/window-dst-edge 외 시나리오 상당수는 CLI 인라인으로만 검증. search.cases 미소비; empty-search-retry.expected는 one-request 계약으로 수정. window-new-only는 정렬 미지정이면 new+sort=new (window), 명시한 다른 정렬이면 2로 P4 변경."},
+  "p4": {"status": "executed", "behavior": "Run through the cli in test_paging_scenarios.py (listing cases are test_web.py); the window rule changed: a window with no --sort reads as sort new and says sort=new (window), an explicit other sort stays exit 2."},
   "about": "Listings and date windows (appendix A 27-31). Each scenario serves pages in order (records carry only what the policy reads: id fullname, created_at UTC, pinned) with the after value Reddit sent, and gives options and what must hold: shown ids in order, stop_reason, pages fetched, pending (received, not shown, kept for the next handle), and the exit code. Dates in options are local days (YYYY-MM-DD) judged in tz; --until is the last day included. The window contract is the threads one on purpose (R11); the old reader took ISO times in UTC.",
   "listing": {
     "item": "27",

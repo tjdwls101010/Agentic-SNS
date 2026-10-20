@@ -1,5 +1,5 @@
 {
-  "p4": {"status": "P4가 실행해야 함", "behavior": "commands.accepts는 파일 소비자 없음. related 댓글 URL 및 wiki URL은 listing.py:34/wiki.py:9에 맞춰 수정; CLI 경로를 실제 실행해야 함."},
+  "p4": {"status": "executed", "behavior": "commands.accepts is the table web.ACCEPTS that every command checks its target against (test_web.py); the commands refuse other kinds through the cli (test_cli_*.py)."},
   "about": "What a user-typed target normalizes to, with no request (appendix A 10-14): kind post | comment | subreddit | subreddits (an r/a+b combination) | user | me | share, and the parts (sub, post_id, comment_id, user, url for a share link), or refused (exit 2). All names and ids are synthetic.",
   "cases": [
     {"input": "https://www.reddit.com/r/example/comments/aaa1/some_title/", "item": "14", "target": {"kind": "post", "sub": "example", "post_id": "aaa1", "comment_id": null}},
