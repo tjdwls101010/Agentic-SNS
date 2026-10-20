@@ -1,0 +1,493 @@
+{
+ "about": "Command-level contracts observed through the real cli.py with a fake Aside (appendix A 38, 45-48, 56, 57, 59-62, 64 and the plan's CLI contract). Each rule is checked by a protocol test in P3; arguments are refused before any request (exit 2) unless stated.",
+ "exit_codes": {
+  "item": "38, plan 종료코드",
+  "codes": {
+   "0": "success",
+   "2": "arguments, or a handle or file of another query",
+   "3": "Aside unavailable",
+   "4": "Naver login needed",
+   "5": "blocked (429, captcha, networkBlocked, unreadable protection state) — a person checks",
+   "6": "a request or contract failure before any record",
+   "7": "an explicit empty result",
+   "8": "partial: records then a failure, the command budget, a policy restriction",
+   "9": "the target cannot be seen (deleted, private, buddy-only, owner-only)",
+   "10": "the local 10-minute window was full before any record (not an account problem; says when the next request may go)"
+  },
+  "empty_only_when": "7 is used only for exhausted and window_reached with nothing shown; a capped or stalled empty walk is 8."
+ },
+ "sections": {
+  "item": "45",
+  "fact": "A composite command (blog, post, monthly) shows every section, failed ones included, and exits with the most serious failure: 3 and 4 above 5 above 10 above 9 above 6 above 8 above 2 and 7. A failed primary section (the card, the post itself) fails the command.",
+  "cases": [
+   {
+    "failures": [
+     6,
+     9
+    ],
+    "exit": 9
+   },
+   {
+    "failures": [
+     5,
+     4
+    ],
+    "exit": 4
+   },
+   {
+    "failures": [
+     8
+    ],
+    "exit": 8
+   },
+   {
+    "failures": [
+     6
+    ],
+    "exit": 8,
+    "fact": "a non-target failure in a secondary section is partial"
+   },
+   {
+    "failures": [
+     10,
+     6
+    ],
+    "exit": 10
+   },
+   {
+    "failures": [
+     3,
+     5
+    ],
+    "exit": 3
+   },
+   {
+    "failures": [],
+    "exit": 0
+   }
+  ]
+ },
+ "schema": {
+  "item": "46",
+  "fact": "schema is generated from the record dataclasses; every field a command can return is described, and no field is described that none returns."
+ },
+ "monthly": {
+  "item": "47",
+  "fact": "A month Naver has not published yet comes back as its latest issue: the answer names the issue it actually shows (the mobile API lists issues, so the issue is known rather than inferred)."
+ },
+ "excerpt": {
+  "item": "48",
+  "fact": "A list's summary is Naver's excerpt, cut at a character count; the text page labels it excerpt (Naver's, cut by length) so its ending is not read as the post's conclusion."
+ },
+ "comments_handle": {
+  "item": "56",
+  "fact": "comments asks comments-info once for blogNo (unless the post page already gave it); a continuation handle carries blog_no and the total, so continuing costs no lookup."
+ },
+ "post_search_window": {
+  "item": "57",
+  "fact": "post search sends --since/--until as startDate/endDate (Naver applies them) and filters again locally for free; inside-blog search does the same (startDate/endDate measured in the planning session)."
+ },
+ "post_comments": {
+  "item": "59",
+  "fact": "post --comments reads exactly one page of comments (up to 10 parents shown)."
+ },
+ "names": {
+  "item": "60",
+  "fact": "--category and topic accept a number (no request) or a name (one request): an exact match first, then a substring; several matches are exit 2 listing numbers; none is exit 9.",
+  "cases": [
+   {
+    "names": [
+     "맛집",
+     "서울 맛집",
+     "맛집 일기"
+    ],
+    "wanted": "맛집",
+    "pick": "맛집"
+   },
+   {
+    "names": [
+     "서울 맛집",
+     "맛집 일기"
+    ],
+    "wanted": "맛집",
+    "exit": 2
+   },
+   {
+    "names": [
+     "여행"
+    ],
+    "wanted": "맛집",
+    "exit": 9
+   },
+   {
+    "names": [
+     "Travel"
+    ],
+    "wanted": "travel",
+    "pick": "Travel"
+   }
+  ]
+ },
+ "feed_empty": {
+  "item": "61",
+  "fact": "An account with no neighbors is an explicit empty result (7) only when Naver says so explicitly (the old feed's hasBuddy false); a missing field is not that. The feed/v1 equivalent is decided in P2."
+ },
+ "finished_walk": {
+  "item": "62",
+  "fact": "see paging.json single-page-keeps-its-terminal and capped-keeps-its-terminal: the more: line is offered for an unshown tail, but the stop reason stays the surface's own."
+ },
+ "defaults": {
+  "item": "64",
+  "fact": "Default shown records: search, posts, feed, topic 10; comments and buddies 20. --chars 180 for previews (0 = whole); a post body is never clipped.",
+  "limits": {
+   "search": 10,
+   "posts": 10,
+   "feed": 10,
+   "topic": 10,
+   "comments": 20,
+   "buddies": 20
+  },
+  "chars": 180
+ },
+ "argument_rules": {
+  "item": "64, R25",
+  "fact": "Combinations a surface cannot honour are refused before they cost a request (P2 R25): posts take --sort, dates and --own-money; blogs only --sort; tags no order (newest first, so dates are applied locally); --blog posts --sort and dates; --blog tags neither.",
+  "refused": [
+   {
+    "args": [
+     "search",
+     "x",
+     "--type",
+     "tags",
+     "--sort",
+     "date"
+    ],
+    "why": "tag search has no order"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--type",
+     "blogs",
+     "--own-money"
+    ],
+    "why": "the own-money flag marks posts"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--blog",
+     "b",
+     "--type",
+     "tags",
+     "--sort",
+     "date"
+    ],
+    "why": "tag search inside a blog ignores order"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--blog",
+     "b",
+     "--type",
+     "clips"
+    ],
+    "why": "inside-blog search is posts or tags"
+   },
+   {
+    "args": [
+     "posts",
+     "b",
+     "--popular",
+     "--since",
+     "2026-10-01"
+    ],
+    "why": "popular and notices are one page"
+   },
+   {
+    "args": [
+     "posts",
+     "b",
+     "--notices",
+     "--out",
+     "f.ndjson"
+    ],
+    "why": "one page: no file"
+   },
+   {
+    "args": [
+     "posts",
+     "b",
+     "--popular",
+     "--notices"
+    ],
+    "why": "one surface at a time"
+   },
+   {
+    "args": [
+     "posts",
+     "https://blog.naver.com/PostList.naver?blogId=b&categoryNo=3",
+     "--category",
+     "4"
+    ],
+    "why": "the URL already names a category"
+   },
+   {
+    "args": [
+     "topic",
+     "--top"
+    ],
+    "why": "a topic is needed for --top"
+   },
+   {
+    "args": [
+     "topic",
+     "5",
+     "--top",
+     "--since",
+     "2026-10-01"
+    ],
+    "why": "featured posts are one page"
+   },
+   {
+    "args": [
+     "topic",
+     "--since",
+     "2026-10-01"
+    ],
+    "why": "the directory is one page of names"
+   },
+   {
+    "args": [
+     "monthly",
+     "--month",
+     "13"
+    ],
+    "why": "months are 1-12"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--out",
+     "f.ndjson",
+     "--after",
+     "3"
+    ],
+    "why": "--out resumes its own file"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--since",
+     "2026-10-15",
+     "--until",
+     "2026-10-10"
+    ],
+    "why": "since after until"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--since",
+     "2026/10/15"
+    ],
+    "why": "dates are YYYY-MM-DD"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--chars",
+     "-1"
+    ],
+    "why": "chars cannot be negative"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--limit",
+     "0"
+    ],
+    "why": "a positive integer"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--type",
+     "blogs",
+     "--since",
+     "2026-10-01"
+    ],
+    "why": "blog search ignores dates"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--blog",
+     "b",
+     "--type",
+     "tags",
+     "--since",
+     "2026-10-01"
+    ],
+    "why": "in-blog tag search ignores dates"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--blog",
+     "b",
+     "--own-money"
+    ],
+    "why": "the flag filters Naver-wide post search only"
+   }
+  ],
+  "accepted": [
+   {
+    "args": [
+     "search",
+     "성수",
+     "카페",
+     "후기"
+    ],
+    "why": "several words are one query, unquoted"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--sort",
+     "date",
+     "--since",
+     "2026-10-01",
+     "--own-money"
+    ]
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--blog",
+     "b"
+    ]
+   },
+   {
+    "args": [
+     "posts",
+     "b",
+     "--category",
+     "맛집",
+     "--since",
+     "2026-10-01"
+    ]
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--type",
+     "tags",
+     "--since",
+     "2026-10-01"
+    ],
+    "why": "tag search is newest first: a local window closes"
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--type",
+     "blogs",
+     "--sort",
+     "date"
+    ],
+    "why": "blog search honours an order"
+   }
+  ]
+ },
+ "budget_rule": {
+  "item": "N5, plan 계정 보호",
+  "fact": "Collecting (budget 40) is asking for it: --limit above the command's default, a date window, --out, or images. --limit at or below the default stays at 10 (the old code gave 40 for any --limit).",
+  "cases": [
+   {
+    "args": [
+     "search",
+     "x"
+    ],
+    "budget": 10
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--limit",
+     "3"
+    ],
+    "budget": 10
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--limit",
+     "10"
+    ],
+    "budget": 10
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--limit",
+     "11"
+    ],
+    "budget": 40
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--since",
+     "2026-10-01"
+    ],
+    "budget": 40
+   },
+   {
+    "args": [
+     "search",
+     "x",
+     "--out",
+     "f.ndjson"
+    ],
+    "budget": 40
+   },
+   {
+    "args": [
+     "blog",
+     "b"
+    ],
+    "budget": 10
+   },
+   {
+    "args": [
+     "comments",
+     "b/1",
+     "--limit",
+     "21"
+    ],
+    "budget": 40
+   }
+  ]
+ }
+}

@@ -1,0 +1,33 @@
+{
+  "about": "How Reddit markdown becomes one dense line in the text page (appendix A 20). --json and --out keep the received text unchanged; only the text page is normalized. Each case: the received text and the normalized line. ⏎ separates paragraphs; ❝…❞ marks words quoted from someone else (a > blockquote).",
+  "text": [
+    {"name": "entities", "item": "20", "fact": "HTML entities are decoded (raw_json=1 avoids most, but not inside every field).", "input": "Tom &amp; Jerry &gt; cats", "line": "Tom & Jerry > cats"},
+    {"name": "format-characters", "item": "20", "fact": "Format characters (Cf) and variation selectors are removed.", "input": "zero​width and ❤️", "line": "zerowidth and ❤"},
+    {"name": "markdown-link", "item": "20", "fact": "[text](url) becomes text (url).", "input": "see [the docs](https://docs.example/a) now", "line": "see the docs (https://docs.example/a) now"},
+    {"name": "repeated-url-once", "item": "20", "fact": "The same URL is shown once.", "input": "[a](https://x.example/1) and again https://x.example/1 here", "line": "a (https://x.example/1) and again here"},
+    {"name": "link-text-equals-url", "item": "20", "fact": "A link whose text is its own address shows the address once — the old renderer left \"url ()\" (fixed).",
+     "input": "source: [https://x.example/1](https://x.example/1)", "line": "source: https://x.example/1", "old_line": "source: https://x.example/1 ()"},
+    {"name": "table-separator", "item": "20", "fact": "A table's separator row is removed.", "input": "a | b\n---|---\n1 | 2", "line": "a | b ⏎ 1 | 2"},
+    {"name": "emphasis", "item": "20", "fact": "*, ~~, ` and ^ marks are removed.", "input": "**bold** ~~gone~~ `code` ^sup", "line": "bold gone code sup"},
+    {"name": "paragraphs", "item": "20", "fact": "Lines of one paragraph join with a space; paragraphs join with ⏎.", "input": "first line\nsecond line\n\nnext para", "line": "first line second line ⏎ next para"},
+    {"name": "quote-then-reply", "item": "20",
+     "fact": "A > blockquote is someone else's words: it is kept apart as ❝…❞ so the reply that disagrees with it is not read as the quote's author. The old renderer dropped the > and merged the voices (fixed).",
+     "input": "> Electric cars are always cheaper to run.\n\nNot where I live: power costs twice as much.",
+     "line": "❝Electric cars are always cheaper to run.❞ ⏎ Not where I live: power costs twice as much.",
+     "old_line": "Electric cars are always cheaper to run. ⏎ Not where I live: power costs twice as much."},
+    {"name": "multi-line-quote", "item": "20", "fact": "Consecutive > lines are one quote.", "input": "> line one\n> line two\n\nmine", "line": "❝line one line two❞ ⏎ mine"},
+    {"name": "lazy-quote-continuation", "item": "20", "fact": "As in Reddit's markdown, a line right after a > line without a blank line continues the quote.", "input": "> quoted start\nstill quoted\n\nmine", "line": "❝quoted start still quoted❞ ⏎ mine"},
+    {"name": "quote-interrupts-paragraph", "item": "20", "fact": "A > line after the author's own line starts a quote within that paragraph.", "input": "As you said:\n> it works\n\nIt does not.", "line": "As you said: ❝it works❞ ⏎ It does not."},
+    {"name": "nested-quote", "item": "20", "fact": "Nested > markers are one quote level in the line.", "input": ">> deeper\n\nreply", "line": "❝deeper❞ ⏎ reply"},
+    {"name": "greater-than-mid-line-is-not-a-quote", "item": "20", "fact": "Only a > at the start of a line quotes.", "input": "5 > 3 is true", "line": "5 > 3 is true"}
+  ],
+  "page": {
+    "about": "Rules of the text page around the text (checked as golden output in P3).",
+    "rules": [
+      "A comment line is indented two spaces per depth level, at most 20 levels.",
+      "The post body is shown in full by post; other texts are clipped to --chars as text[N of M chars shown].",
+      "Each record ends with the URL that names that record alone (post permalink, comment permalink, r/ or u/ URL).",
+      "Comment markers: OP, mod, admin, pinned, collapsed, controversial, edited, removed or deleted, the author's flair in quotes, score hidden."
+    ]
+  }
+}

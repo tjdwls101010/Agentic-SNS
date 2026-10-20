@@ -1,0 +1,27 @@
+{
+  "about": "Reading one Aside REPL run back (appendix A 8). Each case is the process result (exit code, stdout, stderr) and what the aside unit makes of it: value (the one JSON envelope printed: {status, url, body, location}, plus base64 for an image) or an error with exit 3 and its reason (timeout, connection, invalid). The envelope is the last JSON line; ANSI colour codes are stripped; a body_file envelope (Aside spilling a large result to a file) is refused, never followed; status must be an integer 100-599 and url and body strings.",
+  "cases": [
+    {"name": "one-envelope", "exit": 0, "stdout": "{\"status\":200,\"url\":\"https://m.blog.naver.com/api/x\",\"body\":\"{}\",\"location\":null}\n", "stderr": "",
+     "value": {"status": 200, "url": "https://m.blog.naver.com/api/x", "body": "{}", "location": null}},
+    {"name": "ansi-and-noise-lines", "exit": 0, "stdout": "\u001b[32mready\u001b[0m\n\u001b[0m{\"status\":200,\"url\":\"https://m.blog.naver.com/api/x\",\"body\":\"ok\",\"location\":null}\u001b[0m\n", "stderr": "",
+     "value": {"status": 200, "url": "https://m.blog.naver.com/api/x", "body": "ok", "location": null}},
+    {"name": "two-envelopes-is-invalid", "exit": 0, "stdout": "{\"status\":200,\"url\":\"u\",\"body\":\"a\"}\n{\"status\":200,\"url\":\"u\",\"body\":\"b\"}\n", "stderr": "",
+     "error": {"code": 3, "reason": "invalid"}},
+    {"name": "body-file-is-refused", "exit": 0, "stdout": "{\"status\":200,\"url\":\"u\",\"body_file\":\"/tmp/x\"}\n", "stderr": "",
+     "error": {"code": 3, "reason": "invalid"}},
+    {"name": "status-out-of-range", "exit": 0, "stdout": "{\"status\":42,\"url\":\"u\",\"body\":\"\"}\n", "stderr": "",
+     "error": {"code": 3, "reason": "invalid"}},
+    {"name": "status-as-string", "exit": 0, "stdout": "{\"status\":\"200\",\"url\":\"u\",\"body\":\"\"}\n", "stderr": "",
+     "error": {"code": 3, "reason": "invalid"}},
+    {"name": "no-json-line", "exit": 0, "stdout": "Error: boom\n", "stderr": "",
+     "error": {"code": 3, "reason": "invalid"}},
+    {"name": "repl-limit", "exit": 1, "stdout": "", "stderr": "Error: other side closed",
+     "error": {"code": 3, "reason": "connection"}},
+    {"name": "daemon-down", "exit": 1, "stdout": "", "stderr": "daemon is not reachable",
+     "error": {"code": 3, "reason": "connection"}},
+    {"name": "other-failure", "exit": 2, "stdout": "", "stderr": "unknown flag",
+     "error": {"code": 3, "reason": "failed"}}
+  ],
+  "process": {"fact": "One process per request, bounded at 125 seconds (the REPL's own limit is 120); a timeout is exit 3 and the request may have been made. The account is NAVER_BLOG_ASIDE_ACCOUNT when set (passed as --account), else Aside's default (no --account at all).",
+              "timeout_seconds": 125}
+}

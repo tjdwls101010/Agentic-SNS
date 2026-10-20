@@ -1,0 +1,478 @@
+{
+ "about": "What a request from the dedicated tab carries (appendix A 13, 29 and the planning session's measurement of the app's own requests on 2026-10-18). headers: each header the app sends and where its value comes from in the logged-in tab; method: when the app uses POST; read_only: which operations may ever be sent; features: how the features parameter is filled; variables: what each surface sends (the previous skill's registry, to be checked against the app's own requests in P2 R7/R8). All values are synthetic; no real bearer, token or query id appears here.",
+ "headers": {
+  "item": "13",
+  "source": "measured",
+  "fact": "The app's GraphQL requests are XHR to https://x.com/i/api/graphql/<queryId>/<operationName> with exactly these headers; a request is not sent when any source is missing (no bearer in the modules, no ct0 cookie, no signature generator).",
+  "set": {
+   "authorization": "Bearer <the bearer string found in the app's modules>",
+   "x-twitter-auth-type": "OAuth2Session",
+   "x-csrf-token": "<the ct0 cookie>",
+   "x-twitter-client-language": "<the store's session.language>",
+   "x-twitter-active-user": "yes",
+   "content-type": "application/json",
+   "x-client-transaction-id": "<the app's own generator called with (host, path without query or fragment, method)>"
+  },
+  "polling_only": {
+   "x-twitter-polling": "true"
+  },
+  "never": [
+   "origin",
+   "referer",
+   "user-agent",
+   "cookie"
+  ],
+  "missing_cases": [
+   {
+    "missing": "bearer",
+    "expected": {
+     "sent": false,
+     "reason": "missing"
+    }
+   },
+   {
+    "missing": "ct0",
+    "expected": {
+     "sent": false,
+     "reason": "login"
+    }
+   },
+   {
+    "missing": "generator",
+    "expected": {
+     "sent": false,
+     "reason": "missing"
+    }
+   }
+  ]
+ },
+ "method": {
+  "item": "29",
+  "source": "measured (the app client's module source)",
+  "fact": "The app sends POST only for a mutation or when its caller passes forcePost; every query the skill sends is GET with variables, features and fieldToggles as JSON in the query string. The previous skill sent the home feeds as POST (it imitated a request that carried the ids the app had already seen); the skill sends them as GET.",
+  "cases": [
+   {
+    "operation": "HomeTimeline",
+    "operationType": "query",
+    "expected": "GET"
+   },
+   {
+    "operation": "HomeLatestTimeline",
+    "operationType": "query",
+    "expected": "GET"
+   },
+   {
+    "operation": "TweetDetail",
+    "operationType": "query",
+    "expected": "GET"
+   }
+  ]
+ },
+ "read_only": {
+  "item": "plan",
+  "source": "plan",
+  "fact": "An operation is sent only when the module index defines it with operationType query and its name is on the skill's read list; a mutation or subscription is refused before anything is sent, even when its name is on the list.",
+  "read_list": [
+   "UserByScreenName",
+   "UsersByScreenNames",
+   "Viewer",
+   "UserTweets",
+   "UserTweetsAndReplies",
+   "UserMedia",
+   "UserHighlightsTweets",
+   "UserArticlesTweets",
+   "Likes",
+   "Bookmarks",
+   "HomeTimeline",
+   "HomeLatestTimeline",
+   "TweetDetail",
+   "TweetResultsByRestIds",
+   "SearchTimeline",
+   "Following",
+   "Followers",
+   "BlueVerifiedFollowers",
+   "FollowersYouKnow",
+   "Retweeters",
+   "ListLatestTweetsTimeline",
+   "ListByRestId",
+   "ListMembers",
+   "ExplorePage",
+   "GenericTimelineById",
+   "CommunitiesExploreTimeline",
+   "CommunityTweetsTimeline",
+   "CommunityMediaTimeline",
+   "CommunityByRestId",
+   "CommunityAboutTimeline",
+   "GlobalCommunitiesLatestPostSearchTimeline"
+  ],
+  "read_list_note": "UserRepliesTimeline and Favoriters are dropped (R8 keeps one replies-tab operation; nobody's likes list is public). P2 R5 adds the operations for notifications, an account's lists, spaces and similar accounts.",
+  "cases": [
+   {
+    "operation": "TweetDetail",
+    "operationType": "query",
+    "expected": "send"
+   },
+   {
+    "operation": "CreateTweet",
+    "operationType": "mutation",
+    "expected": "refuse"
+   },
+   {
+    "operation": "TweetDetail",
+    "operationType": "mutation",
+    "expected": "refuse"
+   },
+   {
+    "operation": "FavoriteTweet",
+    "operationType": "mutation",
+    "expected": "refuse"
+   },
+   {
+    "operation": "SomeUnlistedQuery",
+    "operationType": "query",
+    "expected": "refuse"
+   }
+  ]
+ },
+ "features": {
+  "item": "7,plan",
+  "source": "measured (featureSwitches from modules, values from the store) + plan, P2 R7 (fieldToggles values)",
+  "fact": "features is every name in the operation's featureSwitches list (from its module definition), each with the store's value (featureSwitch.user.config[name].value); a name the store does not know is false. fieldToggles is the operation's fieldToggles list; its values are not in the store — the previous registry sent withArticleRichContentState, withArticleSummaryText and withArticleVoiceOver true on TweetDetail, and P2 R7 decides the values from the app's own requests. When X answers 'features cannot be null: a, b', those names are added the same way and the request is retried once.",
+  "cases": [
+   {
+    "featureSwitches": [
+     "alpha_enabled",
+     "beta_enabled",
+     "gamma_enabled"
+    ],
+    "store": {
+     "alpha_enabled": {
+      "value": true
+     },
+     "beta_enabled": {
+      "value": false
+     }
+    },
+    "expected": {
+     "alpha_enabled": true,
+     "beta_enabled": false,
+     "gamma_enabled": false
+    }
+   },
+   {
+    "featureSwitches": [
+     "alpha_enabled"
+    ],
+    "store": {
+     "alpha_enabled": {
+      "value": true
+     }
+    },
+    "missing_named": [
+     "delta_enabled"
+    ],
+    "expected_retry": {
+     "alpha_enabled": true,
+     "delta_enabled": false
+    }
+   }
+  ]
+ },
+ "variables": {
+  "item": "29",
+  "source": "code (previous registry, 2026-09-29) — P2 R7/R8 checks each against the app's own request",
+  "surfaces": {
+   "feed foryou": {
+    "operation": "HomeTimeline",
+    "variables": {
+     "count": 20,
+     "includePromotedContent": true,
+     "latestControlAvailable": true,
+     "requestContext": "launch",
+     "withCommunity": true
+    }
+   },
+   "feed following": {
+    "operation": "HomeLatestTimeline",
+    "variables": {
+     "count": 20,
+     "includePromotedContent": true,
+     "latestControlAvailable": true,
+     "requestContext": "launch",
+     "withCommunity": true
+    }
+   },
+   "profile posts": {
+    "operation": "UserTweets",
+    "variables": {
+     "userId": "<id>",
+     "count": 20,
+     "includePromotedContent": true,
+     "withQuickPromoteEligibilityTweetFields": true,
+     "withVoice": true
+    }
+   },
+   "profile replies": {
+    "operation": "UserTweetsAndReplies",
+    "variables": {
+     "userId": "<id>",
+     "count": 20,
+     "includePromotedContent": true,
+     "withCommunity": true,
+     "withVoice": true
+    }
+   },
+   "profile media": {
+    "operation": "UserMedia",
+    "variables": {
+     "userId": "<id>",
+     "count": 20,
+     "includePromotedContent": false,
+     "withClientEventToken": false,
+     "withBirdwatchNotes": false,
+     "withVoice": true
+    }
+   },
+   "profile highlights": {
+    "operation": "UserHighlightsTweets",
+    "variables": {
+     "userId": "<id>",
+     "count": 20,
+     "includePromotedContent": false,
+     "withVoice": true
+    }
+   },
+   "profile articles": {
+    "operation": "UserArticlesTweets",
+    "variables": {
+     "userId": "<id>",
+     "count": 20,
+     "includePromotedContent": false,
+     "withClientEventToken": false,
+     "withBirdwatchNotes": false,
+     "withVoice": true
+    }
+   },
+   "post": {
+    "operation": "TweetDetail",
+    "variables": {
+     "focalTweetId": "<id>",
+     "with_rux_injections": false,
+     "rankingMode": "Relevance | Recency",
+     "includePromotedContent": true,
+     "withCommunity": true,
+     "withQuickPromoteEligibilityTweetFields": true,
+     "withBirdwatchNotes": true,
+     "withVoice": true
+    }
+   },
+   "posts batch": {
+    "operation": "TweetResultsByRestIds",
+    "variables": {
+     "tweetIds": [
+      "<id>"
+     ],
+     "includePromotedContent": false,
+     "withCommunity": false,
+     "withVoice": false
+    }
+   },
+   "search": {
+    "operation": "SearchTimeline",
+    "variables": {
+     "rawQuery": "<query>",
+     "count": 20,
+     "querySource": "typed_query",
+     "product": "Latest | Top | People | Media",
+     "withGrokTranslatedBio": true,
+     "withQuickPromoteEligibilityTweetFields": false
+    }
+   },
+   "quotes": {
+    "operation": "SearchTimeline",
+    "variables": {
+     "rawQuery": "quoted_tweet_id:<id>",
+     "count": 20,
+     "querySource": "typed_query",
+     "product": "Latest | Top",
+     "withGrokTranslatedBio": true,
+     "withQuickPromoteEligibilityTweetFields": false
+    }
+   },
+   "reposts": {
+    "operation": "Retweeters",
+    "variables": {
+     "tweetId": "<id>",
+     "count": 20,
+     "includePromotedContent": true
+    }
+   },
+   "about": {
+    "operation": "UserByScreenName",
+    "variables": {
+     "screen_name": "<handle>",
+     "withSafetyModeUserFields": true
+    }
+   },
+   "about many": {
+    "operation": "UsersByScreenNames",
+    "variables": {
+     "screen_names": [
+      "<handle>"
+     ],
+     "withSafetyModeUserFields": true
+    }
+   },
+   "graph following": {
+    "operation": "Following",
+    "variables": {
+     "userId": "<id>",
+     "count": 20,
+     "includePromotedContent": false
+    }
+   },
+   "graph followers": {
+    "operation": "Followers",
+    "variables": {
+     "userId": "<id>",
+     "count": 20,
+     "includePromotedContent": false
+    }
+   },
+   "graph verified": {
+    "operation": "BlueVerifiedFollowers",
+    "variables": {
+     "userId": "<id>",
+     "count": 20,
+     "includePromotedContent": false
+    }
+   },
+   "graph known": {
+    "operation": "FollowersYouKnow",
+    "variables": {
+     "userId": "<id>",
+     "count": 20,
+     "includePromotedContent": false
+    }
+   },
+   "me bookmarks": {
+    "operation": "Bookmarks",
+    "variables": {
+     "count": 20,
+     "includePromotedContent": false
+    }
+   },
+   "me likes": {
+    "operation": "Likes",
+    "variables": {
+     "userId": "<the logged-in account's id>",
+     "count": 20,
+     "includePromotedContent": false,
+     "withClientEventToken": false,
+     "withBirdwatchNotes": false,
+     "withVoice": true
+    }
+   },
+   "list posts": {
+    "operation": "ListLatestTweetsTimeline",
+    "variables": {
+     "listId": "<id>",
+     "count": 20
+    }
+   },
+   "list members": {
+    "operation": "ListMembers",
+    "variables": {
+     "listId": "<id>",
+     "count": 20
+    }
+   },
+   "list about": {
+    "operation": "ListByRestId",
+    "variables": {
+     "listId": "<id>"
+    }
+   },
+   "community posts": {
+    "operation": "CommunityTweetsTimeline",
+    "variables": {
+     "communityId": "<id>",
+     "count": 20,
+     "displayLocation": "Community",
+     "rankingMode": "Relevance | Recency",
+     "withCommunity": true
+    }
+   },
+   "community media": {
+    "operation": "CommunityMediaTimeline",
+    "variables": {
+     "communityId": "<id>",
+     "count": 20,
+     "withCommunity": true
+    }
+   },
+   "community about": {
+    "operation": "CommunityAboutTimeline",
+    "variables": {
+     "communityId": "<id>",
+     "count": 20,
+     "withCommunity": true
+    }
+   },
+   "community card": {
+    "operation": "CommunityByRestId",
+    "variables": {
+     "communityId": "<id>"
+    }
+   },
+   "communities": {
+    "operation": "CommunitiesExploreTimeline",
+    "variables": {
+     "count": 20
+    }
+   },
+   "search in communities": {
+    "operation": "GlobalCommunitiesLatestPostSearchTimeline",
+    "variables": {
+     "rawQuery": "<query>",
+     "count": 20,
+     "withCommunity": true
+    }
+   },
+   "trends": {
+    "operation": "ExplorePage",
+    "variables": {
+     "withCommunitiesMemberships": true
+    }
+   },
+   "trends tab": {
+    "operation": "GenericTimelineById",
+    "variables": {
+     "timelineId": "<from ExplorePage>",
+     "count": 20,
+     "withCommunity": true
+    }
+   },
+   "doctor / unblock check": {
+    "operation": "Viewer",
+    "variables": {
+     "withCommunitiesMemberships": true
+    }
+   }
+  },
+  "rules": [
+   {
+    "fact": "A profile timeline needs the numeric user id: UserByScreenName is asked once per query and the id kept in the query's state (handle or --out), so later pages do not ask again.",
+    "source": "code"
+   },
+   {
+    "fact": "Likes needs the logged-in account's own id (the store's session.user_id).",
+    "source": "code + measured"
+   },
+   {
+    "fact": "A cursor is added as the cursor variable only when continuing; the first page sends none.",
+    "source": "code"
+   }
+  ]
+ }
+}

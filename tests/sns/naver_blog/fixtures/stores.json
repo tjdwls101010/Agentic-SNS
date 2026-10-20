@@ -1,0 +1,268 @@
+{
+ "about": "Local state on a real filesystem (appendix A 41-44, 63, 65 and the plan's protection semantics N5). Each scenario states the starting files, the action and what must hold afterwards. All state lives under the skill's data/ (NAVER_BLOG_DATA_DIR in tests). Contexts are the query identity a handle or file is bound to: command, target, sort/type/kind, window, and the Naver account (current-user userId).",
+ "protection": {
+  "item": "41, N5",
+  "fact": "Every request runs inside one critical section under a cross-process lock: block check → command budget → 10-minute window → pacing → the request is reserved (logged) before it is sent → sent → classified → a block recorded before the lock is released. A process killed in flight has still spent its slot. Unreadable protection state is a block (fail closed).",
+  "constants": {
+   "window_seconds": 600,
+   "window_limit": 120,
+   "pace_seconds": 0.5,
+   "pace_jitter": [
+    0,
+    0.3
+   ],
+   "command_budget": 10,
+   "collect_budget": 40,
+   "rate_limit_block_seconds": 1800
+  },
+  "scenarios": [
+   {
+    "name": "reserve-before-send",
+    "start": "empty",
+    "action": "one request whose sender is killed after the reservation",
+    "after": "requests.jsonl holds one entry {at, kind, n: 1}; the 10-minute window counts it"
+   },
+   {
+    "name": "command-budget",
+    "start": "empty",
+    "action": "a non-collecting command asks for its 11th request",
+    "after": "refused before sending: exit 8, stop_reason budget; 10 were sent"
+   },
+   {
+    "name": "collect-budget",
+    "start": "empty",
+    "action": "--limit above the command's default, a date window, --out or images: the 41st request",
+    "after": "refused: exit 8 budget; 40 sent. --limit at or below the default keeps the budget at 10"
+   },
+   {
+    "name": "window-full",
+    "start": "120 logged requests in the last 600 s, the oldest 500 s ago",
+    "action": "one request",
+    "after": "refused before sending: exit 10 (not 5), stop_reason rate_window, the next allowed time = oldest + 600 s is stated; no block file is written"
+   },
+   {
+    "name": "window-slides",
+    "start": "120 logged requests, the oldest 601 s ago",
+    "action": "one request",
+    "after": "sent"
+   },
+   {
+    "name": "pacing",
+    "start": "a request logged 0.1 s ago",
+    "action": "one request",
+    "after": "it waits until at least 0.5 s (+0-0.3 s) after the last; NAVER_BLOG_NO_PACING=1 skips the wait in tests"
+   },
+   {
+    "name": "429-blocks-30-minutes",
+    "start": "empty",
+    "action": "a request answered 429",
+    "after": "blocked.json {reason rate_limit, blocked_at, expires_at = +1800}; the next command exits 5 without sending; after expiry requests resume on their own"
+   },
+   {
+    "name": "network-blocked-blocks-until-a-person",
+    "start": "empty",
+    "action": "current-user answers networkBlocked true (R18 decides its meaning before P3)",
+    "after": "blocked.json {reason network_blocked, expires_at null}; only a verified doctor --unblock clears it"
+   },
+   {
+    "name": "unreadable-state-fails-closed",
+    "start": "blocked.json holds garbage",
+    "action": "one request",
+    "after": "refused: exit 5 (state unreadable); nothing sent"
+   },
+   {
+    "name": "two-processes",
+    "start": "empty",
+    "action": "two processes send 5 requests each at once",
+    "after": "10 entries, never two requests inside one pacing gap; the lock serializes them"
+   },
+   {
+    "name": "unblock-verifies-first",
+    "start": "blocked.json rate_limit",
+    "action": "doctor --unblock",
+    "after": "one current-user check is sent while the block stands; only a logged-in, not networkBlocked answer for the same account clears it, and only the block read at the start (a newer one written meanwhile stays). The 10-minute window is never cleared"
+   },
+   {
+    "name": "unblock-refused",
+    "start": "blocked.json network_blocked",
+    "action": "doctor --unblock while current-user still says networkBlocked true",
+    "after": "exit 5; the block stays"
+   },
+   {
+    "name": "unblock-interrupted",
+    "start": "blocked.json rate_limit",
+    "action": "doctor --unblock killed during its check, or the check fails",
+    "after": "the block stays"
+   },
+   {
+    "name": "recent-usage",
+    "start": "entries over the last day",
+    "action": "doctor",
+    "after": "reports requests in the last 10 minutes, hour and day, read from requests.jsonl (observation only; a broken line is skipped)"
+   }
+  ]
+ },
+ "session": {
+  "item": "42, 65",
+  "fact": "Who the browser is logged in as (current-user userId) is cached for 12 hours, because asking costs a request. A post page names the viewer, which refreshes the cache for free. A different account invalidates every handle (they are page numbers into one account's view). viewer identifiers other than the blog id (idNo, baUserKey) are never stored.",
+  "scenarios": [
+   {
+    "name": "cold",
+    "start": "no session",
+    "action": "a command that needs the account",
+    "after": "one current-user request; session.json {account (userId), blog_no, read_at}"
+   },
+   {
+    "name": "warm",
+    "start": "session read 1 h ago",
+    "action": "the same",
+    "after": "no request"
+   },
+   {
+    "name": "stale",
+    "start": "session read 13 h ago",
+    "action": "the same",
+    "after": "one current-user request"
+   },
+   {
+    "name": "post-refreshes",
+    "start": "session read 13 h ago",
+    "action": "post reads a page whose userId names the same account",
+    "after": "read_at renewed, no request"
+   },
+   {
+    "name": "account-changed",
+    "start": "session for account A and handles",
+    "action": "current-user names account B",
+    "after": "session for B; every saved handle is refused (exit 2, rerun the original command)"
+   },
+   {
+    "name": "logged-out",
+    "start": "any",
+    "action": "current-user answers loggedIn false",
+    "after": "exit 4; the session is not overwritten"
+   }
+  ]
+ },
+ "handles": {
+  "item": "43, 39, 56",
+  "fact": "A handle is a monotonic number, reserved and fsynced in the counter before its file is written (an interruption leaves a gap, never a reused number), bound to its query context and the Naver account, format-versioned, and kept 24 hours. It carries the unshown tail and what a continuation needs (comment handles carry blog_no and the total, saving one request).",
+  "scenarios": [
+   {
+    "name": "save-and-load",
+    "action": "save(context X, state) then load(n, X)",
+    "after": "the state comes back"
+   },
+   {
+    "name": "other-context",
+    "action": "load(n, Y)",
+    "after": "exit 2: belongs to another command, target, order or account"
+   },
+   {
+    "name": "expired",
+    "action": "load a handle saved 25 h ago",
+    "after": "exit 2: expired, rerun the original command; the file is cleaned"
+   },
+   {
+    "name": "old-format",
+    "action": "load a handle whose format is not the current one (e.g. one written by the old skill)",
+    "after": "exit 2, the file is not changed"
+   },
+   {
+    "name": "never-reused",
+    "action": "save after the counter was reserved but the file write failed",
+    "after": "the next handle skips that number"
+   },
+   {
+    "name": "cleaning-keeps-the-counter",
+    "action": "handle files expire and are removed",
+    "after": "the counter stays, so numbers never restart"
+   }
+  ]
+ },
+ "collection": {
+  "item": "44, 58, 63",
+  "fact": "--out NDJSON: a header (format, context), then records, each page closed by a page marker (state, ids, n, stop_reason). Only complete pages are trusted: on resume the tail after the last marker is dropped and read again; a damaged line before a later marker is an integrity failure. Duplicates by id are not written twice. The file is opened without following a symlink, mode 0600, locked without waiting. A file for another query or format is refused before any byte changes. An empty page is committed too, so the state moves on. A finished file (exhausted, window_reached, not_paginable, server_capped, pagination_stalled) reads nothing; a file stopped by budget or rate_window is not finished — the same command resumes it. post --out writes a failed section as its own row, so the file never reads later as a post without comments.",
+  "scenarios": [
+   {
+    "name": "header",
+    "start": null,
+    "action": "open with context X",
+    "after": "one header line with X and the format; mode 0600"
+   },
+   {
+    "name": "commit",
+    "action": "commit [A, B] with state S",
+    "after": "A, B, then {kind: page, state: S, ids: [A, B], n: 2, stop_reason}"
+   },
+   {
+    "name": "torn-tail",
+    "start": "a committed page, then half a record",
+    "action": "reopen with X",
+    "after": "the half record is dropped; resuming starts from the last state"
+   },
+   {
+    "name": "damaged-middle",
+    "start": "a broken line, then a page marker",
+    "action": "reopen",
+    "after": "exit 2 integrity failure; the file is unchanged"
+   },
+   {
+    "name": "other-query",
+    "start": "a file for Y",
+    "action": "open with X",
+    "after": "exit 2; unchanged"
+   },
+   {
+    "name": "old-skill-file",
+    "start": "a file written by the current skill (header without format)",
+    "action": "open",
+    "after": "exit 2; unchanged byte for byte"
+   },
+   {
+    "name": "symlink",
+    "start": "a symlink at the path",
+    "action": "open",
+    "after": "exit 2; the target untouched"
+   },
+   {
+    "name": "empty-page",
+    "action": "commit [] with state S2",
+    "after": "a page marker with n 0 and S2"
+   },
+   {
+    "name": "budget-is-not-done",
+    "start": "a file whose last page says budget",
+    "action": "rerun the same command",
+    "after": "it continues from the saved state"
+   },
+   {
+    "name": "after-is-refused",
+    "action": "--out together with --after",
+    "after": "exit 2 before any request"
+   }
+  ]
+ },
+ "images": {
+  "item": "plan images store",
+  "fact": "Downloaded photos live under data/images/ and are removed 24 hours after they were saved, by the skill itself; nobody needs to delete them. A saved name is derived by the skill (never from the URL path), so a URL cannot write outside data/images/. The command prints each path so the model can Read it.",
+  "scenarios": [
+   {
+    "name": "save",
+    "action": "save image bytes for post P, number N",
+    "after": "a file under data/images/ whose name the skill chose; its path is returned"
+   },
+   {
+    "name": "ttl",
+    "start": "a photo saved 25 h ago",
+    "action": "any images command",
+    "after": "the old file is gone"
+   },
+   {
+    "name": "escape",
+    "action": "a URL path holding ../ or an absolute path",
+    "after": "the file still lands under data/images/ (the name never comes from the URL)"
+   }
+  ]
+ }
+}

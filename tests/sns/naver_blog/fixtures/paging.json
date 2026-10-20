@@ -1,0 +1,855 @@
+{
+ "about": "Paging, windows and stops (appendix A 33-40, 53-55, 62, and the plan's stop table). A scenario serves pages in order to one walk. policy: plain (page+1; a short page ends it; a ceiling makes a short page near it capped), marked (the page names the last page: marker), single (one page). A page is {count, start} (ids r<start>.. in order), {count, repeat} (consecutive runs), {ids}, {dated: [KST minutes or null]} (ids d1, d2.. across the scenario), optional marker and reported_total, or {error: {code, reason}} with kept records for a restriction. options: limit (records to show), since/until (KST days), monotonic (the surface is newest first). expect: shown ids or shown_count, stop_reason, exit, pending (read, not shown, kept in the handle), pages_fetched, reported_total, undated. continue resumes from the first walk's state.",
+ "scenarios": [
+  {
+   "name": "short-page-ends",
+   "item": "33",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "count": 30,
+     "start": 1
+    },
+    {
+     "count": 12,
+     "start": 31
+    }
+   ],
+   "expect": {
+    "shown_count": 42,
+    "stop_reason": "exhausted",
+    "exit": 0,
+    "pages_fetched": 2,
+    "pending": 0
+   }
+  },
+  {
+   "name": "explicit-empty",
+   "item": "38",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 10
+   },
+   "pages": [
+    {
+     "count": 0,
+     "start": 1
+    }
+   ],
+   "expect": {
+    "shown_count": 0,
+    "stop_reason": "exhausted",
+    "exit": 7,
+    "pages_fetched": 1
+   }
+  },
+  {
+   "name": "post-search-short-at-1000",
+   "item": "33",
+   "fact": "Post search went short at position 1,000: near the ceiling a short page is the ceiling, not the end.",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": 1000
+   },
+   "options": {
+    "limit": 2000
+   },
+   "pages": [
+    {
+     "count": 30,
+     "repeat": 33
+    },
+    {
+     "count": 10,
+     "start": 991
+    }
+   ],
+   "expect": {
+    "shown_count": 1000,
+    "stop_reason": "server_capped",
+    "exit": 8,
+    "pages_fetched": 34
+   }
+  },
+  {
+   "name": "tag-search-empty-at-990",
+   "item": "33",
+   "fact": "Tag search went empty at 990: one more page would cross the ceiling, so it is the ceiling.",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": 1000
+   },
+   "options": {
+    "limit": 2000
+   },
+   "pages": [
+    {
+     "count": 30,
+     "repeat": 33
+    },
+    {
+     "count": 0,
+     "start": 1
+    }
+   ],
+   "expect": {
+    "shown_count": 990,
+    "stop_reason": "server_capped",
+    "exit": 8,
+    "pages_fetched": 34
+   }
+  },
+  {
+   "name": "full-page-on-the-ceiling",
+   "item": "33",
+   "fact": "A full page that lands exactly on the ceiling is capped too.",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 10,
+    "ceiling": 1000
+   },
+   "options": {
+    "limit": 2000
+   },
+   "pages": [
+    {
+     "count": 10,
+     "repeat": 100
+    }
+   ],
+   "expect": {
+    "shown_count": 1000,
+    "stop_reason": "server_capped",
+    "exit": 8,
+    "pages_fetched": 100
+   }
+  },
+  {
+   "name": "short-page-far-from-ceiling",
+   "item": "33",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": 1000
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "count": 30,
+     "start": 1
+    },
+    {
+     "count": 5,
+     "start": 31
+    }
+   ],
+   "expect": {
+    "shown_count": 35,
+    "stop_reason": "exhausted",
+    "exit": 0
+   }
+  },
+  {
+   "name": "marked-pages",
+   "item": "35",
+   "fact": "A surface that names its last page is followed by that marker, not by page length.",
+   "policy": {
+    "pagination": "marked",
+    "page_size": 20
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "count": 20,
+     "start": 1,
+     "marker": 3
+    },
+    {
+     "count": 20,
+     "start": 21,
+     "marker": 3
+    },
+    {
+     "count": 5,
+     "start": 41,
+     "marker": 3
+    }
+   ],
+   "expect": {
+    "shown_count": 45,
+    "stop_reason": "exhausted",
+    "exit": 0,
+    "pages_fetched": 3
+   }
+  },
+  {
+   "name": "marker-not-an-integer",
+   "item": "54",
+   "policy": {
+    "pagination": "marked",
+    "page_size": 20
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "count": 20,
+     "start": 1,
+     "marker": "3"
+    }
+   ],
+   "expect": {
+    "shown_count": 0,
+    "stop_reason": "query_failure",
+    "exit": 6,
+    "failure": {
+     "code": 6,
+     "reason": "drift"
+    }
+   }
+  },
+  {
+   "name": "stalled",
+   "item": "36",
+   "fact": "The same page served twice cannot be told from the end.",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "count": 30,
+     "start": 1
+    },
+    {
+     "count": 30,
+     "start": 1
+    }
+   ],
+   "expect": {
+    "shown_count": 30,
+    "stop_reason": "pagination_stalled",
+    "exit": 8
+   }
+  },
+  {
+   "name": "tail-kept-for-the-handle",
+   "item": "39",
+   "fact": "Records read but not shown are kept in the handle and shown first on continuing, without a request.",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 10
+   },
+   "pages": [
+    {
+     "count": 30,
+     "start": 1
+    }
+   ],
+   "expect": {
+    "shown": [
+     "r1",
+     "r2",
+     "r3",
+     "r4",
+     "r5",
+     "r6",
+     "r7",
+     "r8",
+     "r9",
+     "r10"
+    ],
+    "stop_reason": "limit_reached",
+    "exit": 0,
+    "pending": 20,
+    "pages_fetched": 1
+   },
+   "continue": {
+    "options": {
+     "limit": 10
+    },
+    "pages": [],
+    "expect": {
+     "shown": [
+      "r11",
+      "r12",
+      "r13",
+      "r14",
+      "r15",
+      "r16",
+      "r17",
+      "r18",
+      "r19",
+      "r20"
+     ],
+     "pages_fetched": 0,
+     "pending": 10
+    }
+   }
+  },
+  {
+   "name": "duplicates-across-pages",
+   "item": "39",
+   "fact": "A record already shown is not shown again when a later page repeats it (page boundaries shift).",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "count": 30,
+     "start": 1
+    },
+    {
+     "ids": [
+      "r30",
+      "r31",
+      "r32"
+     ]
+    }
+   ],
+   "expect": {
+    "shown_count": 32,
+    "stop_reason": "exhausted"
+   }
+  },
+  {
+   "name": "window-closes-newest-first",
+   "item": "37",
+   "fact": "On a newest-first surface a page wholly older than --since closes the window; --until includes its whole KST day.",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 3,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 100,
+    "since": "2026-10-10",
+    "until": "2026-10-15",
+    "monotonic": true
+   },
+   "pages": [
+    {
+     "dated": [
+      "2026-10-16T23:59",
+      "2026-10-15T23:59",
+      "2026-10-10T00:00"
+     ]
+    },
+    {
+     "dated": [
+      "2026-10-09T23:59",
+      "2026-10-08T00:00",
+      "2026-10-07T00:00"
+     ]
+    }
+   ],
+   "expect": {
+    "shown": [
+     "d2",
+     "d3"
+    ],
+    "stop_reason": "window_reached",
+    "exit": 0,
+    "pages_fetched": 2
+   }
+  },
+  {
+   "name": "window-with-nothing-inside",
+   "item": "37,38",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 2,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 10,
+    "since": "2026-10-10",
+    "monotonic": true
+   },
+   "pages": [
+    {
+     "dated": [
+      "2026-10-05T00:00",
+      "2026-10-04T00:00"
+     ]
+    }
+   ],
+   "expect": {
+    "shown_count": 0,
+    "stop_reason": "window_reached",
+    "exit": 7
+   }
+  },
+  {
+   "name": "window-out-of-order-never-closes",
+   "item": "37",
+   "fact": "Once a page is seen out of order, a page below --since no longer proves the window is done.",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 2,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 10,
+    "since": "2026-10-10",
+    "monotonic": true
+   },
+   "pages": [
+    {
+     "dated": [
+      "2026-10-12T00:00",
+      "2026-10-13T00:00"
+     ]
+    },
+    {
+     "dated": [
+      "2026-10-01T00:00",
+      "2026-10-02T00:00"
+     ]
+    },
+    {
+     "dated": [
+      "2026-10-11T00:00"
+     ]
+    }
+   ],
+   "expect": {
+    "shown": [
+     "d1",
+     "d2",
+     "d5"
+    ],
+    "stop_reason": "exhausted",
+    "exit": 0,
+    "pages_fetched": 3
+   }
+  },
+  {
+   "name": "undated-left-out",
+   "item": "37",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 4,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 10,
+    "since": "2026-10-10"
+   },
+   "pages": [
+    {
+     "dated": [
+      "2026-10-12T00:00",
+      null,
+      "2026-10-11T00:00"
+     ]
+    }
+   ],
+   "expect": {
+    "shown": [
+     "d1",
+     "d3"
+    ],
+    "stop_reason": "exhausted",
+    "undated": 1
+   }
+  },
+  {
+   "name": "false-zero-total",
+   "item": "55",
+   "fact": "totalCount 0 beside actual items is false and not reported; another total is shown as Naver's drifting figure.",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 5
+   },
+   "pages": [
+    {
+     "count": 30,
+     "start": 1,
+     "reported_total": 0
+    }
+   ],
+   "expect": {
+    "reported_total": null
+   }
+  },
+  {
+   "name": "reported-total-kept",
+   "item": "40",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 5
+   },
+   "pages": [
+    {
+     "count": 30,
+     "start": 1,
+     "reported_total": 7749
+    }
+   ],
+   "expect": {
+    "reported_total": 7749
+   }
+  },
+  {
+   "name": "failure-before-records",
+   "item": "38",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 10
+   },
+   "pages": [
+    {
+     "error": {
+      "code": 6,
+      "reason": "transient"
+     }
+    }
+   ],
+   "expect": {
+    "shown_count": 0,
+    "stop_reason": "query_failure",
+    "exit": 6
+   }
+  },
+  {
+   "name": "failure-after-records",
+   "item": "38",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "count": 30,
+     "start": 1
+    },
+    {
+     "error": {
+      "code": 6,
+      "reason": "transient"
+     }
+    }
+   ],
+   "expect": {
+    "shown_count": 30,
+    "stop_reason": "query_failure",
+    "exit": 8
+   }
+  },
+  {
+   "name": "block-after-records",
+   "item": "38, plan 정지 판정표",
+   "fact": "A block after records keeps them and still exits 5.",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "count": 30,
+     "start": 1
+    },
+    {
+     "error": {
+      "code": 5,
+      "reason": "rate_limit"
+     }
+    }
+   ],
+   "expect": {
+    "shown_count": 30,
+    "stop_reason": "blocked",
+    "exit": 5
+   }
+  },
+  {
+   "name": "login-after-records",
+   "item": "plan 정지 판정표",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "count": 30,
+     "start": 1
+    },
+    {
+     "error": {
+      "code": 4,
+      "reason": "login"
+     }
+    }
+   ],
+   "expect": {
+    "shown_count": 30,
+    "stop_reason": "blocked",
+    "exit": 4
+   }
+  },
+  {
+   "name": "rate-window-before-records",
+   "item": "plan 정지 판정표",
+   "fact": "The local 10-minute window is not an account block: exit 10 before records, 8 after, stop_reason rate_window.",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 10
+   },
+   "pages": [
+    {
+     "error": {
+      "code": 10,
+      "reason": "rate_window"
+     }
+    }
+   ],
+   "expect": {
+    "shown_count": 0,
+    "stop_reason": "rate_window",
+    "exit": 10
+   }
+  },
+  {
+   "name": "rate-window-after-records",
+   "item": "plan 정지 판정표",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "count": 30,
+     "start": 1
+    },
+    {
+     "error": {
+      "code": 10,
+      "reason": "rate_window"
+     }
+    }
+   ],
+   "expect": {
+    "shown_count": 30,
+    "stop_reason": "rate_window",
+    "exit": 8
+   }
+  },
+  {
+   "name": "budget-after-records",
+   "item": "38",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "count": 30,
+     "start": 1
+    },
+    {
+     "error": {
+      "code": 8,
+      "reason": "budget"
+     }
+    }
+   ],
+   "expect": {
+    "shown_count": 30,
+    "stop_reason": "budget",
+    "exit": 8
+   }
+  },
+  {
+   "name": "budget-before-records",
+   "item": "plan 정지 판정표",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "error": {
+      "code": 8,
+      "reason": "budget"
+     }
+    }
+   ],
+   "expect": {
+    "shown_count": 0,
+    "stop_reason": "budget",
+    "exit": 8
+   }
+  },
+  {
+   "name": "restricted-keeps-what-arrived",
+   "item": "4",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 100
+   },
+   "pages": [
+    {
+     "error": {
+      "code": 8,
+      "reason": "query_restricted"
+     },
+     "kept": {
+      "count": 3,
+      "start": 1
+     }
+    }
+   ],
+   "expect": {
+    "shown_count": 3,
+    "stop_reason": "query_restricted",
+    "exit": 8
+   }
+  },
+  {
+   "name": "single-page-keeps-its-terminal",
+   "item": "62",
+   "fact": "A finished walk keeps its own stop at the display limit: one page only is not 'more available'.",
+   "policy": {
+    "pagination": "single"
+   },
+   "options": {
+    "limit": 5
+   },
+   "pages": [
+    {
+     "count": 10,
+     "start": 1
+    }
+   ],
+   "expect": {
+    "shown_count": 5,
+    "stop_reason": "not_paginable",
+    "exit": 0,
+    "pending": 5
+   }
+  },
+  {
+   "name": "capped-keeps-its-terminal",
+   "item": "62",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": 1000
+   },
+   "options": {
+    "limit": 995
+   },
+   "pages": [
+    {
+     "count": 30,
+     "repeat": 33
+    },
+    {
+     "count": 10,
+     "start": 991
+    }
+   ],
+   "expect": {
+    "shown_count": 995,
+    "stop_reason": "server_capped",
+    "exit": 8,
+    "pending": 5
+   }
+  },
+  {
+   "name": "since-after-until",
+   "item": "37",
+   "policy": {
+    "pagination": "plain",
+    "page_size": 30,
+    "ceiling": null
+   },
+   "options": {
+    "limit": 10,
+    "since": "2026-10-15",
+    "until": "2026-10-10"
+   },
+   "pages": [],
+   "expect": {
+    "exit": 2,
+    "pages_fetched": 0
+   }
+  }
+ ]
+}

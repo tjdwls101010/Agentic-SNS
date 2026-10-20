@@ -1,0 +1,658 @@
+{
+ "about": "A post page (appendix A 24): TweetDetail's instructions read into the asked post (role post), its parents (role parent, top first) and its replies (role reply) with depth, plus reply coverage. Roles follow position and ids, never query names: the entry whose post id is the asked id is the post; on a first page, posts before it outside any module are parents; posts inside conversationthread-* modules are replies; other modules (related posts, who to follow) are not part of the conversation; the new reader counts them as other (the previous one dropped them silently). depth is a reply's place in its conversation module (0: the module's first item, which answers the post; later items sit under it); parent_shown says whether the post a reply answers is on the page (X's modules can skip posts). Coverage: reported (the post's own reply_count as X reports it), direct_shown, nested_shown, branches (collapsed branches inside modules: ShowMore cursors), hidden (X's 'show more replies' prompts outside modules: ShowMoreThreads, ShowMoreThreadsPrompt), unavailable (tombstones among replies). {\"$post\": [id, reply_to_id]} stands for a minimal tweet result with that rest_id answering reply_to_id (null for none), author A, created_at 2026-10-15T10:00:00Z; a \"legacy_extra\" object inside the result is merged into its legacy. source: code (previous thread.py), measured (planning session: page 1 = the post + 38 conversationthread modules of one post each + a Bottom cursor, no ShowMore), P2 (cursor shapes not yet seen).",
+ "users": {
+  "A": {
+   "__typename": "User",
+   "rest_id": "1000000001",
+   "core": {
+    "screen_name": "example_author",
+    "name": "Example Author"
+   },
+   "legacy": {}
+  }
+ },
+ "cases": [
+  {
+   "name": "first-page-roles-depth-coverage",
+   "item": "24",
+   "source": "code",
+   "fact": "Parents above the post (outside modules, before it), the post, then each conversationthread module: its first item answers the post, later items answer earlier ones and nest deeper. reported is the post's reply_count.",
+   "post_id": "1850000000000000100",
+   "cursor": null,
+   "instructions": [
+    {
+     "type": "TimelineAddEntries",
+     "entries": [
+      {
+       "entryId": "tweet-1850000000000000098",
+       "content": {
+        "itemContent": {
+         "itemType": "TimelineTweet",
+         "tweet_results": {
+          "result": {
+           "$post": [
+            "1850000000000000098",
+            null
+           ]
+          }
+         }
+        }
+       }
+      },
+      {
+       "entryId": "tweet-1850000000000000099",
+       "content": {
+        "itemContent": {
+         "itemType": "TimelineTweet",
+         "tweet_results": {
+          "result": {
+           "$post": [
+            "1850000000000000099",
+            "1850000000000000098"
+           ]
+          }
+         }
+        }
+       }
+      },
+      {
+       "entryId": "tweet-1850000000000000100",
+       "content": {
+        "itemContent": {
+         "itemType": "TimelineTweet",
+         "tweet_results": {
+          "result": {
+           "$post": [
+            "1850000000000000100",
+            "1850000000000000099"
+           ],
+           "legacy_extra": {
+            "reply_count": 7
+           }
+          }
+         }
+        }
+       }
+      },
+      {
+       "entryId": "conversationthread-1850000000000000101",
+       "content": {
+        "entryType": "TimelineTimelineModule",
+        "items": [
+         {
+          "entryId": "conversationthread-1850000000000000101-tweet-1850000000000000101",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTweet",
+            "tweet_results": {
+             "result": {
+              "$post": [
+               "1850000000000000101",
+               "1850000000000000100"
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "entryId": "conversationthread-1850000000000000101-tweet-1850000000000000102",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTweet",
+            "tweet_results": {
+             "result": {
+              "$post": [
+               "1850000000000000102",
+               "1850000000000000101"
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "entryId": "conversationthread-1850000000000000101-tweet-1850000000000000103",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTweet",
+            "tweet_results": {
+             "result": {
+              "$post": [
+               "1850000000000000103",
+               "1850000000000000102"
+              ]
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      },
+      {
+       "entryId": "conversationthread-1850000000000000104",
+       "content": {
+        "entryType": "TimelineTimelineModule",
+        "items": [
+         {
+          "entryId": "conversationthread-1850000000000000104-tweet-1850000000000000104",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTweet",
+            "tweet_results": {
+             "result": {
+              "$post": [
+               "1850000000000000104",
+               "1850000000000000100"
+              ]
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      },
+      {
+       "entryId": "tweetdetailrelatedtweets-1",
+       "content": {
+        "entryType": "TimelineTimelineModule",
+        "items": [
+         {
+          "entryId": "tweetdetailrelatedtweets-1-tweet-1850000000000000900",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTweet",
+            "tweet_results": {
+             "result": {
+              "$post": [
+               "1850000000000000900",
+               null
+              ]
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      },
+      {
+       "entryId": "cursor-bottom-1",
+       "content": {
+        "cursorType": "Bottom",
+        "value": "REPLYCUR1"
+       }
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "order": [
+     [
+      "1850000000000000098",
+      "parent",
+      0
+     ],
+     [
+      "1850000000000000099",
+      "parent",
+      0
+     ],
+     [
+      "1850000000000000100",
+      "post",
+      0
+     ],
+     [
+      "1850000000000000101",
+      "reply",
+      0
+     ],
+     [
+      "1850000000000000102",
+      "reply",
+      1
+     ],
+     [
+      "1850000000000000103",
+      "reply",
+      2
+     ],
+     [
+      "1850000000000000104",
+      "reply",
+      0
+     ]
+    ],
+    "bottom": "REPLYCUR1",
+    "coverage": {
+     "reported": 7,
+     "direct_shown": 2,
+     "nested_shown": 2,
+     "branches": 0,
+     "hidden": 0,
+     "unavailable": 0
+    }
+   }
+  },
+  {
+   "name": "next-page-has-no-parents",
+   "item": "24",
+   "source": "code",
+   "fact": "A page read with a cursor continues the replies: posts outside modules are not parents there, and the post itself is not repeated.",
+   "post_id": "1850000000000000100",
+   "cursor": "REPLYCUR1",
+   "instructions": [
+    {
+     "type": "TimelineAddToModule",
+     "moduleEntryId": "conversationthread-1850000000000000105",
+     "moduleItems": [
+      {
+       "entryId": "conversationthread-1850000000000000105-tweet-1850000000000000105",
+       "item": {
+        "itemContent": {
+         "itemType": "TimelineTweet",
+         "tweet_results": {
+          "result": {
+           "$post": [
+            "1850000000000000105",
+            "1850000000000000100"
+           ]
+          }
+         }
+        }
+       }
+      }
+     ]
+    },
+    {
+     "type": "TimelineAddEntries",
+     "entries": [
+      {
+       "entryId": "cursor-bottom-2",
+       "content": {
+        "cursorType": "Bottom",
+        "value": "REPLYCUR2"
+       }
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "order": [
+     [
+      "1850000000000000105",
+      "reply",
+      0
+     ]
+    ],
+    "bottom": "REPLYCUR2",
+    "coverage": {
+     "direct_shown": 1,
+     "nested_shown": 0
+    }
+   }
+  },
+  {
+   "name": "focal-tombstone-unavailable",
+   "item": "24",
+   "source": "code",
+   "fact": "When the asked post is a tombstone the page answers unavailable (exit 9), even if parents or replies came with it.",
+   "post_id": "1850000000000000110",
+   "cursor": null,
+   "instructions": [
+    {
+     "type": "TimelineAddEntries",
+     "entries": [
+      {
+       "entryId": "tweet-1850000000000000110",
+       "content": {
+        "itemContent": {
+         "itemType": "TimelineTweet",
+         "tweet_results": {
+          "result": {
+           "__typename": "TweetTombstone",
+           "tombstone": {
+            "text": {
+             "text": "This post was deleted by the post author."
+            }
+           }
+          }
+         }
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "error": "unavailable"
+   }
+  },
+  {
+   "name": "reply-tombstone-marked",
+   "item": "24",
+   "source": "plan",
+   "fact": "A tombstone among the replies is kept in place as unavailable and counted, so a missing reply is not read as never written.",
+   "post_id": "1850000000000000120",
+   "cursor": null,
+   "instructions": [
+    {
+     "type": "TimelineAddEntries",
+     "entries": [
+      {
+       "entryId": "tweet-1850000000000000120",
+       "content": {
+        "itemContent": {
+         "itemType": "TimelineTweet",
+         "tweet_results": {
+          "result": {
+           "$post": [
+            "1850000000000000120",
+            null
+           ]
+          }
+         }
+        }
+       }
+      },
+      {
+       "entryId": "conversationthread-1850000000000000121",
+       "content": {
+        "entryType": "TimelineTimelineModule",
+        "items": [
+         {
+          "entryId": "conversationthread-1850000000000000121-tweet-1850000000000000121",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTweet",
+            "tweet_results": {
+             "result": {
+              "__typename": "TweetTombstone",
+              "tombstone": {
+               "text": {
+                "text": "This post is unavailable."
+               }
+              }
+             }
+            }
+           }
+          }
+         },
+         {
+          "entryId": "conversationthread-1850000000000000121-tweet-1850000000000000122",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTweet",
+            "tweet_results": {
+             "result": {
+              "$post": [
+               "1850000000000000122",
+               "1850000000000000121"
+              ]
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "order": [
+     [
+      "1850000000000000120",
+      "post",
+      0
+     ],
+     [
+      "1850000000000000121",
+      "reply",
+      0
+     ],
+     [
+      "1850000000000000122",
+      "reply",
+      1
+     ]
+    ],
+    "unavailable_ids": [
+     "1850000000000000121"
+    ],
+    "coverage": {
+     "unavailable": 1
+    }
+   }
+  },
+  {
+   "name": "collapsed-branch-and-hidden-replies",
+   "item": "24",
+   "source": "code+P2",
+   "fact": "A ShowMore cursor inside a module is a collapsed branch of that reply (readable later through its replies handle); a ShowMoreThreads or ShowMoreThreadsPrompt cursor outside modules is X hiding replies it ranks low (readable later through the post's replies handle). Neither is followed by itself; both are counted. The previous skill counted both as hidden branches; the new coverage tells them apart (R2 confirms the shapes and the replay).",
+   "post_id": "1850000000000000130",
+   "cursor": null,
+   "instructions": [
+    {
+     "type": "TimelineAddEntries",
+     "entries": [
+      {
+       "entryId": "tweet-1850000000000000130",
+       "content": {
+        "itemContent": {
+         "itemType": "TimelineTweet",
+         "tweet_results": {
+          "result": {
+           "$post": [
+            "1850000000000000130",
+            null
+           ]
+          }
+         }
+        }
+       }
+      },
+      {
+       "entryId": "conversationthread-1850000000000000131",
+       "content": {
+        "entryType": "TimelineTimelineModule",
+        "items": [
+         {
+          "entryId": "conversationthread-1850000000000000131-tweet-1850000000000000131",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTweet",
+            "tweet_results": {
+             "result": {
+              "$post": [
+               "1850000000000000131",
+               "1850000000000000130"
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "entryId": "conversationthread-1850000000000000131-cursor-showmore-1",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTimelineCursor",
+            "cursorType": "ShowMore",
+            "value": "BRANCHCUR1"
+           }
+          }
+         }
+        ]
+       }
+      },
+      {
+       "entryId": "cursor-showmorethreadsprompt-1",
+       "content": {
+        "cursorType": "ShowMoreThreadsPrompt",
+        "value": "HIDDENCUR1",
+        "displayTreatment": {
+         "actionText": "Show probable spam"
+        }
+       }
+      },
+      {
+       "entryId": "cursor-bottom-3",
+       "content": {
+        "cursorType": "Bottom",
+        "value": "REPLYCUR3"
+       }
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "order": [
+     [
+      "1850000000000000130",
+      "post",
+      0
+     ],
+     [
+      "1850000000000000131",
+      "reply",
+      0
+     ]
+    ],
+    "branch_of": {
+     "1850000000000000131": "BRANCHCUR1"
+    },
+    "hidden_cursor": "HIDDENCUR1",
+    "bottom": "REPLYCUR3",
+    "coverage": {
+     "branches": 1,
+     "hidden": 1
+    }
+   }
+  },
+  {
+   "name": "reported-missing-only-when-sent",
+   "item": "24",
+   "source": "code",
+   "fact": "reported is the post's reply_count; on a continuing page without the post it is not re-stated (the first page's value stands).",
+   "post_id": "1850000000000000100",
+   "cursor": "REPLYCUR2",
+   "instructions": [
+    {
+     "type": "TimelineAddEntries",
+     "entries": [
+      {
+       "entryId": "cursor-bottom-4",
+       "content": {
+        "cursorType": "Bottom",
+        "value": "REPLYCUR4"
+       }
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "order": [],
+    "coverage_has_reported": false
+   }
+  },
+  {
+   "name": "module-skips-a-post",
+   "item": "24",
+   "source": "P2",
+   "fact": "A conversation module can skip posts: its second item answers a post that is not on the page. It is still under the first item (depth by position in the module), and parent_shown false says the post it answers was not shown.",
+   "post_id": "1850000000000000140",
+   "cursor": null,
+   "instructions": [
+    {
+     "type": "TimelineAddEntries",
+     "entries": [
+      {
+       "entryId": "tweet-1850000000000000140",
+       "content": {
+        "itemContent": {
+         "itemType": "TimelineTweet",
+         "tweet_results": {
+          "result": {
+           "$post": [
+            "1850000000000000140",
+            null
+           ]
+          }
+         }
+        }
+       }
+      },
+      {
+       "entryId": "conversationthread-1850000000000000141",
+       "content": {
+        "entryType": "TimelineTimelineModule",
+        "items": [
+         {
+          "entryId": "conversationthread-1850000000000000141-tweet-1850000000000000141",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTweet",
+            "tweet_results": {
+             "result": {
+              "$post": [
+               "1850000000000000141",
+               "1850000000000000140"
+              ]
+             }
+            }
+           }
+          }
+         },
+         {
+          "entryId": "conversationthread-1850000000000000141-tweet-1850000000000000143",
+          "item": {
+           "itemContent": {
+            "itemType": "TimelineTweet",
+            "tweet_results": {
+             "result": {
+              "$post": [
+               "1850000000000000143",
+               "1850000000000000142"
+              ]
+             }
+            }
+           }
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ],
+   "expected": {
+    "order": [
+     [
+      "1850000000000000140",
+      "post",
+      0
+     ],
+     [
+      "1850000000000000141",
+      "reply",
+      0
+     ],
+     [
+      "1850000000000000143",
+      "reply",
+      1
+     ]
+    ],
+    "parent_shown": {
+     "1850000000000000141": true,
+     "1850000000000000143": false
+    }
+   }
+  }
+ ]
+}

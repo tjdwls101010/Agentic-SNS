@@ -1,0 +1,43 @@
+{
+  "about": "Target rules (appendix A 10-15). Each case is what a person may type for a command kind (post: needs one post; blog: a blog, a post URL's blog; either), and what it normalizes to with no request — blog_id, log_no, category_no — or that it is refused (exit 2) before any request. A naver.me link is not parsed locally: it is marked short (one counted hop resolves it, then these rules apply to the destination). All ids are synthetic.",
+  "cases": [
+    {"input": "sample_blog", "kind": "blog", "expect": {"blog_id": "sample_blog"}},
+    {"input": "123456789", "kind": "blog", "expect": {"blog_id": "123456789"}, "fact": "Digit-only blog ids exist."},
+    {"input": "sample_blog/224000000001", "kind": "post", "expect": {"blog_id": "sample_blog", "log_no": "224000000001"}},
+    {"input": "https://blog.naver.com/sample_blog/224000000001", "kind": "post", "expect": {"blog_id": "sample_blog", "log_no": "224000000001"}},
+    {"input": "https://m.blog.naver.com/sample_blog/224000000001", "kind": "post", "expect": {"blog_id": "sample_blog", "log_no": "224000000001"}},
+    {"input": "blog.naver.com/sample_blog/224000000001", "kind": "post", "expect": {"blog_id": "sample_blog", "log_no": "224000000001"}, "fact": "A schemeless host/path is accepted."},
+    {"input": "https://www.blog.naver.com/sample_blog", "kind": "blog", "expect": {"blog_id": "sample_blog"}},
+    {"input": "https://m.blog.naver.com/PostView.naver?blogId=sample_blog&logNo=224000000001", "kind": "post", "expect": {"blog_id": "sample_blog", "log_no": "224000000001"}},
+    {"input": "https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=12", "kind": "blog", "expect": {"blog_id": "sample_blog", "category_no": "12"}},
+    {"input": "https://blog.naver.com/NBlogTop.naver?blogId=sample_blog", "kind": "blog", "expect": {"blog_id": "sample_blog"}},
+    {"input": "https://blog.naver.com/prologue.naver?blogId=sample_blog", "kind": "blog", "expect": {"blog_id": "sample_blog"}},
+    {"input": "https://blog.naver.com/sample_blog/224000000001", "kind": "blog", "expect": {"blog_id": "sample_blog"}, "fact": "A blog command keeps only the blog; keeping the post number would widen the request silently."},
+    {"input": "sample_blog", "kind": "post", "error": 2, "fact": "post needs a post number."},
+    {"input": "https://blog.naver.com/PostWrite.naver?blogId=sample_blog", "kind": "blog", "error": 2, "fact": "A reserved route outside the read surface is refused even with a valid blogId."},
+    {"input": "https://blog.naver.com/BuddyList.naver?blogId=sample_blog", "kind": "blog", "error": 2},
+    {"input": "https://blog.naver.com/PostView.naver/extra?blogId=sample_blog&logNo=1", "kind": "post", "error": 2},
+    {"input": "https://blog.naver.com/admin", "kind": "blog", "error": 2},
+    {"input": "https://blog.naver.com/other_blog?blogId=sample_blog", "kind": "blog", "error": 2, "fact": "Path and query naming two blogs is refused."},
+    {"input": "https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=abc", "kind": "blog", "error": 2},
+    {"input": "https://blog.naver.com:8443/sample_blog", "kind": "blog", "error": 2, "fact": "A port is refused."},
+    {"input": "https://user@blog.naver.com/sample_blog", "kind": "blog", "error": 2, "fact": "User info is refused."},
+    {"input": "https://cafe.naver.com/somecafe/1", "kind": "post", "error": 2},
+    {"input": "sample_blog/12ab", "kind": "post", "error": 2},
+    {"input": "bad id!", "kind": "blog", "error": 2},
+    {"input": "sample_blog/1234567890123456789012345678901234567890", "kind": "post", "expect": {"blog_id": "sample_blog", "log_no": "1234567890123456789012345678901234567890"}, "fact": "Up to 40 digits; length is not a format claim."},
+    {"input": "sample_blog/12345678901234567890123456789012345678901", "kind": "post", "error": 2},
+    {"input": "https://naver.me/AbCd12Ef", "kind": "post", "expect": {"short": "AbCd12Ef"}, "fact": "New contract: a short link is resolved by one counted hop, then parsed by these rules (old code refused it)."},
+    {"input": "naver.me/AbCd12Ef", "kind": "blog", "expect": {"short": "AbCd12Ef"}},
+    {"input": "https://naver.me/AbCd12Ef/x", "kind": "post", "error": 2}
+  ],
+  "short_destinations": {
+    "item": "15",
+    "fact": "After the hop, a destination on a blog host is parsed by the rules above; anything else is exit 2 that names where the link goes (so the person can open it some other way).",
+    "cases": [
+      {"location": "https://m.blog.naver.com/sample_blog/224000000001", "kind": "post", "expect": {"blog_id": "sample_blog", "log_no": "224000000001"}},
+      {"location": "https://brandconnect.naver.com/affiliates/1234", "kind": "post", "error": 2, "names": "brandconnect.naver.com"},
+      {"location": null, "kind": "post", "error": 9}
+    ]
+  }
+}

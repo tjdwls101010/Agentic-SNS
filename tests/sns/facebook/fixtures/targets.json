@@ -1,0 +1,49 @@
+{
+  "about": "Input checks and target resolution (appendix A 10, 21, 22). url_checks: whether a URL may be requested at all. targets: what a user-typed target normalizes to (or that it is refused before any request). resolve: which id a fetched page yields.",
+  "url_checks": [
+    {"url": "https://www.facebook.com/x", "allowed": true},
+    {"url": "https://m.facebook.com/x", "allowed": true},
+    {"url": "https://static.xx.fbcdn.net/rsrc.php/v4/a.js", "allowed": true},
+    {"url": "http://www.facebook.com/x", "allowed": false, "why": "https only"},
+    {"url": "https://user:pw@www.facebook.com/x", "allowed": false, "why": "no credentials"},
+    {"url": "https://www.facebook.com:8443/x", "allowed": false, "why": "no port but 443"},
+    {"url": "https://www.facebook.com:443/x", "allowed": true},
+    {"url": "https://evilfacebook.com/x", "allowed": false, "why": "host must be facebook.com or a subdomain"},
+    {"url": "https://facebook.com.evil.net/x", "allowed": false, "why": "host must end in .facebook.com"},
+    {"url": "https://www.fbcdn.net.evil.net/a.js", "allowed": false}
+  ],
+  "targets": [
+    {"command": "profile", "input": "some.person", "normalized": "https://www.facebook.com/some.person"},
+    {"command": "profile", "input": "1000123", "normalized": "https://www.facebook.com/profile.php?id=1000123"},
+    {"command": "profile", "input": "https://www.facebook.com/profile.php?id=1000123&sk=about", "normalized": "https://www.facebook.com/profile.php?id=1000123"},
+    {"command": "profile", "input": "https://m.facebook.com/some.one/about", "normalized": "https://www.facebook.com/some.one"},
+    {"command": "profile", "input": "https://www.facebook.com/people/Some-One/1000456/", "normalized": "https://www.facebook.com/profile.php?id=1000456"},
+    {"command": "profile", "input": "groups", "refused": true, "why": "reserved path, not a profile"},
+    {"command": "profile", "input": "https://www.facebook.com/watch/", "refused": true, "why": "reserved path"},
+    {"command": "profile", "input": "https://www.facebook.com/some.one/../groups", "refused": true, "why": "path traversal"},
+    {"command": "profile", "input": "https://www.facebook.com/a\\b", "refused": true, "why": "backslash"},
+    {"command": "profile", "input": "https://www.facebook.com/a b", "refused": true, "why": "whitespace"},
+    {"command": "profile", "input": "https://example.com/some.one", "refused": true, "why": "not Facebook"},
+    {"command": "group", "input": "1000000000000001", "normalized": "https://www.facebook.com/groups/1000000000000001/", "direct_id": "1000000000000001"},
+    {"command": "group", "input": "example-group.name", "normalized": "https://www.facebook.com/groups/example-group.name/"},
+    {"command": "group", "input": "https://www.facebook.com/groups/example-group/posts/123/", "refused": true, "why": "a post URL, not a group"},
+    {"command": "group", "input": "..", "refused": true},
+    {"command": "post", "input": "https://www.facebook.com/some.one/posts/pfbid02abc", "normalized": "https://www.facebook.com/some.one/posts/pfbid02abc"},
+    {"command": "post", "input": "https://www.facebook.com/groups/g1/posts/123/", "normalized": "https://www.facebook.com/groups/g1/posts/123"},
+    {"command": "post", "input": "https://www.facebook.com/groups/g1/permalink/123/", "normalized": "https://www.facebook.com/groups/g1/permalink/123"},
+    {"command": "post", "input": "https://www.facebook.com/some.page/videos/987/", "normalized": "https://www.facebook.com/some.page/videos/987"},
+    {"command": "post", "input": "https://www.facebook.com/story.php?story_fbid=111&id=222&mibextid=x", "normalized": "https://www.facebook.com/permalink.php?story_fbid=111&id=222"},
+    {"command": "post", "input": "https://m.facebook.com/permalink.php?story_fbid=111&id=222", "normalized": "https://www.facebook.com/permalink.php?story_fbid=111&id=222"},
+    {"command": "post", "input": "https://www.facebook.com/photo/?fbid=333&set=a.1", "normalized": "https://www.facebook.com/photo.php?fbid=333"},
+    {"command": "post", "input": "https://www.facebook.com/some.one", "refused": true, "why": "a profile, not a post"},
+    {"command": "post", "input": "https://www.facebook.com/", "refused": true, "why": "the feed, not a post"}
+  ],
+  "resolve": [
+    {"kind": "profile", "item": "21", "html": "<script>{\"props\":{\"userID\":\"1000777\",\"other\":\"x\"}}</script>", "id": "1000777"},
+    {"kind": "profile", "item": "21", "html": "<html>no id here</html>", "id": null},
+    {"kind": "group", "item": "21", "html": "<script>{\"groupID\":\"555000\"}</script>", "id": "555000"},
+    {"kind": "group", "item": "21", "html": "<script>{\"group_id\":555001}</script>", "id": "555001"},
+    {"kind": "post", "item": "21", "html": "<script>{\"storyID\":\"UzpfSTEwMDA6MTIz\"}</script>", "id": "UzpfSTEwMDA6MTIz"},
+    {"kind": "post", "item": "21", "html": "<a href=\"/x\">no story id</a>", "id": null}
+  ]
+}

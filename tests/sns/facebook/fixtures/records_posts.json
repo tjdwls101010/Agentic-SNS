@@ -1,0 +1,2377 @@
+{
+  "about": "Synthetic GraphQL bodies for post records (appendix A 23-39). Each case: parser, args, body_lines (joined with newlines; optional prefix) and expected. expected.records lists, in order, the fields each record must have; records not listed must not exist. Names, ids and URLs are invented.",
+  "cases": [
+    {
+      "name": "defer-fragments-merge-by-feedback-id",
+      "item": "23",
+      "fact": "A story arrives in @defer fragments; fragments with the same feedback.id merge: non-null wins, dicts recurse.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "__typename": "Story",
+                      "id": "S1",
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "first fragment text"
+                      },
+                      "actors": null
+                    },
+                    "cursor": "e1"
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": true,
+                  "end_cursor": "CUR1"
+                }
+              }
+            }
+          }
+        },
+        {
+          "label": "CometFeedStory$defer$actors",
+          "path": [
+            "viewer",
+            "news_feed",
+            "edges",
+            0,
+            "node"
+          ],
+          "data": {
+            "feedback": {
+              "id": "F1"
+            },
+            "actors": [
+              {
+                "__typename": "User",
+                "id": "100",
+                "name": "Author One",
+                "url": "https://www.facebook.com/author.one"
+              }
+            ],
+            "message": null
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "text": "first fragment text",
+            "author_name": "Author One",
+            "author_id": "100",
+            "author_url": "https://www.facebook.com/author.one",
+            "created_at": "2026-01-01T00:00:00Z",
+            "incomplete": false
+          }
+        ],
+        "page_info": {
+          "has_next_page": true,
+          "end_cursor": "CUR1"
+        },
+        "issues": []
+      }
+    },
+    {
+      "name": "defer-fragments-union-lists",
+      "item": "23",
+      "fact": "Merge: lists of id-bearing dicts union by id; other lists concatenate and drop exact duplicates, so an item only one fragment has survives.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "attachments": [
+                        {
+                          "media": {
+                            "image": {
+                              "uri": "https://scontent.example.fbcdn.net/a.jpg",
+                              "width": 10,
+                              "height": 20
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        },
+        {
+          "path": [
+            "viewer",
+            "news_feed",
+            "edges",
+            0,
+            "node"
+          ],
+          "data": {
+            "feedback": {
+              "id": "F1"
+            },
+            "attachments": [
+              {
+                "media": {
+                  "image": {
+                    "uri": "https://scontent.example.fbcdn.net/a.jpg",
+                    "width": 10,
+                    "height": 20
+                  }
+                }
+              },
+              {
+                "media": {
+                  "image": {
+                    "uri": "https://scontent.example.fbcdn.net/b.jpg",
+                    "width": 30,
+                    "height": 40
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "type": "photo",
+            "media": [
+              {
+                "kind": "image",
+                "url": "https://scontent.example.fbcdn.net/a.jpg",
+                "width": 10,
+                "height": 20,
+                "alt": null
+              },
+              {
+                "kind": "image",
+                "url": "https://scontent.example.fbcdn.net/b.jpg",
+                "width": 30,
+                "height": 40,
+                "alt": null
+              }
+            ]
+          }
+        ],
+        "page_info": {
+          "has_next_page": false,
+          "end_cursor": null
+        },
+        "issues": []
+      }
+    },
+    {
+      "name": "comments-inside-a-story-are-not-posts",
+      "item": "24",
+      "fact": "The post walk does not descend into a node with __typename Comment, or one with both depth and author; their feedback ids are not posts and their text is not the post's text.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "comet_sections": {
+                        "preview": {
+                          "__typename": "Comment",
+                          "id": "C1",
+                          "feedback": {
+                            "id": "CF1"
+                          },
+                          "message": {
+                            "text": "typed comment text"
+                          }
+                        },
+                        "inline": {
+                          "id": "C2",
+                          "depth": 0,
+                          "author": {
+                            "id": "200",
+                            "name": "Commenter Two"
+                          },
+                          "feedback": {
+                            "id": "CF2"
+                          },
+                          "message": {
+                            "text": "untyped comment text"
+                          }
+                        },
+                        "content": {
+                          "story": {
+                            "feedback": {
+                              "id": "F1"
+                            },
+                            "message": {
+                              "text": "the post's own text"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "text": "the post's own text"
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "interesting-top-level-comment-preview-is-not-a-post",
+      "item": "26",
+      "fact": "A comment preview under interesting_top_level_comments is feedback-shaped but is a comment: never a post, never merged.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "post body"
+                      },
+                      "comet_sections": {
+                        "feedback": {
+                          "story": {
+                            "story_ufi_container": {
+                              "story": {
+                                "feedback_context": {
+                                  "interesting_top_level_comments": [
+                                    {
+                                      "comment": {
+                                        "feedback": {
+                                          "id": "CF9"
+                                        },
+                                        "body": {
+                                          "text": "preview comment"
+                                        },
+                                        "message": {
+                                          "text": "preview comment"
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "text": "post body",
+            "type": "status"
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "shared-story-only-nested",
+      "item": "25",
+      "fact": "A story under attached_story is the shared post; seen only there, it is not a top-level post. The sharing post's type is shared.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "look at this"
+                      },
+                      "actors": [
+                        {
+                          "id": "100",
+                          "name": "Sharer",
+                          "url": "https://www.facebook.com/sharer"
+                        }
+                      ],
+                      "attached_story": {
+                        "feedback": {
+                          "id": "F2"
+                        },
+                        "creation_time": 1767139200,
+                        "message": {
+                          "text": "original words"
+                        },
+                        "actors": [
+                          {
+                            "id": "300",
+                            "name": "Original Author",
+                            "url": "https://www.facebook.com/original.author"
+                          }
+                        ],
+                        "permalink_url": "https://www.facebook.com/original.author/posts/pfbid0002"
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "type": "shared",
+            "text": "look at this",
+            "author_name": "Sharer",
+            "shared_post": {
+              "id": "F2",
+              "text": "original words",
+              "author_name": "Original Author",
+              "created_at": "2025-12-31T00:00:00Z",
+              "url": "https://www.facebook.com/original.author/posts/pfbid0002",
+              "shared_post": null
+            }
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "shared-story-also-top-level",
+      "item": "25",
+      "fact": "A story seen once outside any attached_story is top-level even if it is also shared elsewhere; order is the first top-level sighting.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "sharing"
+                      },
+                      "attached_story": {
+                        "feedback": {
+                          "id": "F2"
+                        },
+                        "message": {
+                          "text": "shared and also in feed"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F2"
+                      },
+                      "creation_time": 1767139200,
+                      "message": {
+                        "text": "shared and also in feed"
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "type": "shared",
+            "shared_post": {
+              "id": "F2"
+            }
+          },
+          {
+            "id": "F2",
+            "type": "status",
+            "created_at": "2025-12-31T00:00:00Z"
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "share-chain-nests",
+      "item": "25",
+      "fact": "Share chains nest: a share of a share keeps each level.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "attached_story": {
+                        "feedback": {
+                          "id": "F2"
+                        },
+                        "message": {
+                          "text": "middle"
+                        },
+                        "attached_story": {
+                          "feedback": {
+                            "id": "F3"
+                          },
+                          "message": {
+                            "text": "origin"
+                          }
+                        }
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "type": "shared",
+            "shared_post": {
+              "id": "F2",
+              "type": "shared",
+              "text": "middle",
+              "shared_post": {
+                "id": "F3",
+                "text": "origin",
+                "shared_post": null
+              }
+            }
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "share-cycle-is-cut",
+      "item": "25",
+      "fact": "A share chain that loops back is cut where it repeats and reported as the issue cyclic_shared_story.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "one"
+                      },
+                      "attached_story": {
+                        "feedback": {
+                          "id": "F2"
+                        },
+                        "message": {
+                          "text": "two"
+                        },
+                        "attached_story": {
+                          "feedback": {
+                            "id": "F1"
+                          }
+                        }
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "text": "one",
+            "shared_post": {
+              "id": "F2",
+              "text": "two",
+              "shared_post": null
+            }
+          }
+        ],
+        "issues": [
+          "cyclic_shared_story"
+        ]
+      }
+    },
+    {
+      "name": "unidentifiable-shared-story-marks-incomplete",
+      "item": "25",
+      "fact": "An attached_story without a feedback id cannot be identified: the sharing post is incomplete, its type is still shared, shared_post is null.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "shared something private"
+                      },
+                      "attached_story": {
+                        "__typename": "Story",
+                        "message": null
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "type": "shared",
+            "shared_post": null,
+            "incomplete": true
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "creation-time-root-only",
+      "item": "27",
+      "fact": "created_at comes only from an int creation_time directly on the merged story; a nested attachment's creation_time is a decoy. Edit time is an int key containing both edit and time.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "attachments": [
+                        {
+                          "target": {
+                            "creation_time": 1000
+                          }
+                        }
+                      ],
+                      "comet_sections": {
+                        "context_layout": {
+                          "story": {
+                            "feedback": {
+                              "id": "F1"
+                            },
+                            "creation_time": 1767225600,
+                            "last_edit_time": 1767229200
+                          }
+                        }
+                      },
+                      "message": {
+                        "text": "dated"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F2"
+                      },
+                      "attachments": [
+                        {
+                          "target": {
+                            "creation_time": 1000
+                          }
+                        }
+                      ],
+                      "message": {
+                        "text": "only a decoy time"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F3"
+                      },
+                      "creation_time": "1767225600",
+                      "message": {
+                        "text": "string time is not a time"
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "created_at": "2026-01-01T00:00:00Z",
+            "edited_at": "2026-01-01T01:00:00Z",
+            "undated": false
+          },
+          {
+            "id": "F2",
+            "created_at": null,
+            "undated": true,
+            "edited_at": null
+          },
+          {
+            "id": "F3",
+            "created_at": null,
+            "undated": true
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "permalink-precedence",
+      "item": "28",
+      "fact": "url: root permalink_url, else root wwwURL, else the first wwwURL below the root (shares excluded).",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "wwwURL": "https://www.facebook.com/a/posts/www1",
+                      "permalink_url": "https://www.facebook.com/a/posts/perma1"
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F2"
+                      },
+                      "creation_time": 1767225600,
+                      "wwwURL": "https://www.facebook.com/a/posts/www2",
+                      "comet_sections": {
+                        "x": {
+                          "wwwURL": "https://www.facebook.com/a/posts/nested2"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F3"
+                      },
+                      "creation_time": 1767225600,
+                      "attached_story": {
+                        "feedback": {
+                          "id": "F9"
+                        },
+                        "wwwURL": "https://www.facebook.com/b/posts/shared9"
+                      },
+                      "comet_sections": {
+                        "x": {
+                          "wwwURL": "https://www.facebook.com/a/posts/nested3"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F4"
+                      },
+                      "creation_time": 1767225600
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "url": "https://www.facebook.com/a/posts/perma1"
+          },
+          {
+            "id": "F2",
+            "url": "https://www.facebook.com/a/posts/www2"
+          },
+          {
+            "id": "F3",
+            "url": "https://www.facebook.com/a/posts/nested3",
+            "shared_post": {
+              "id": "F9",
+              "url": "https://www.facebook.com/b/posts/shared9"
+            }
+          },
+          {
+            "id": "F4",
+            "url": null
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "own-text-skips-shares-and-empty-messages",
+      "item": "29",
+      "fact": "text is the first non-empty message.text reachable from the root, never from the shared story or a comment; empty string when none.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": ""
+                      },
+                      "attached_story": {
+                        "feedback": {
+                          "id": "F2"
+                        },
+                        "message": {
+                          "text": "SHARED TEXT"
+                        }
+                      },
+                      "comet_sections": {
+                        "content": {
+                          "story": {
+                            "message": {
+                              "text": "OWN TEXT"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F3"
+                      },
+                      "creation_time": 1767225600,
+                      "attached_story": {
+                        "feedback": {
+                          "id": "F4"
+                        },
+                        "message": {
+                          "text": "only the shared post has words"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "text": "OWN TEXT",
+            "shared_post": {
+              "id": "F2",
+              "text": "SHARED TEXT"
+            }
+          },
+          {
+            "id": "F3",
+            "text": "",
+            "type": "shared",
+            "shared_post": {
+              "id": "F4",
+              "text": "only the shared post has words"
+            }
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "author-is-first-own-actors-list",
+      "item": "30",
+      "fact": "The author is the first element of the first actors list of dicts below the root; the shared story's actors are the original author's, not this post's.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "attached_story": {
+                        "feedback": {
+                          "id": "F2"
+                        },
+                        "actors": [
+                          {
+                            "id": "300",
+                            "name": "Original Author",
+                            "url": "https://www.facebook.com/original.author"
+                          }
+                        ]
+                      },
+                      "comet_sections": {
+                        "context_layout": {
+                          "story": {
+                            "actors": [
+                              {
+                                "id": "100",
+                                "name": "Sharer",
+                                "url": "https://www.facebook.com/sharer"
+                              },
+                              {
+                                "id": "101",
+                                "name": "Co Author"
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F3"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "no actors"
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "author_name": "Sharer",
+            "author_id": "100",
+            "author_url": "https://www.facebook.com/sharer",
+            "shared_post": {
+              "id": "F2",
+              "author_name": "Original Author",
+              "author_id": "300"
+            }
+          },
+          {
+            "id": "F3",
+            "author_name": null,
+            "author_id": null,
+            "author_url": null
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "media-image-video-poster",
+      "item": "31",
+      "fact": "image.uri (with width/height) is an image; playable_url or playable_url_quality_hd is a video; a video's poster image is listed as an image; media dedupe by URL.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "attachments": [
+                        {
+                          "media": {
+                            "__typename": "Photo",
+                            "image": {
+                              "uri": "https://scontent.example.fbcdn.net/p1.jpg",
+                              "width": 800,
+                              "height": 600
+                            }
+                          }
+                        },
+                        {
+                          "media": {
+                            "image": {
+                              "uri": "https://scontent.example.fbcdn.net/p1.jpg",
+                              "width": 800,
+                              "height": 600
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F2"
+                      },
+                      "creation_time": 1767225600,
+                      "attachments": [
+                        {
+                          "media": {
+                            "__typename": "Video",
+                            "image": {
+                              "uri": "https://scontent.example.fbcdn.net/poster.jpg",
+                              "width": 1280,
+                              "height": 720
+                            },
+                            "playable_url_quality_hd": "https://video.example.fbcdn.net/v1-hd.mp4"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "type": "photo",
+            "media": [
+              {
+                "kind": "image",
+                "url": "https://scontent.example.fbcdn.net/p1.jpg",
+                "width": 800,
+                "height": 600,
+                "alt": null
+              }
+            ]
+          },
+          {
+            "id": "F2",
+            "type": "video",
+            "media": [
+              {
+                "kind": "image",
+                "url": "https://scontent.example.fbcdn.net/poster.jpg",
+                "width": 1280,
+                "height": 720,
+                "alt": null
+              },
+              {
+                "kind": "video",
+                "url": "https://video.example.fbcdn.net/v1-hd.mp4",
+                "width": null,
+                "height": null,
+                "alt": null
+              }
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "single-photo-photo-image-with-alt",
+      "item": "31 (calibrated by P2 capture)",
+      "fact": "A single photo arrives as media.photo_image (not image); media.accessibility_caption beside it is Facebook's machine-generated description in the viewer's language. viewer_image carries only dimensions.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "one photo"
+                      },
+                      "attachments": [
+                        {
+                          "styles": {
+                            "attachment": {
+                              "media": {
+                                "__typename": "Photo",
+                                "id": "M1",
+                                "accessibility_caption": "May be an image of text",
+                                "photo_image": {
+                                  "uri": "https://scontent.example.fbcdn.net/one.jpg",
+                                  "width": 960,
+                                  "height": 720
+                                },
+                                "viewer_image": {
+                                  "width": 960,
+                                  "height": 720
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "type": "photo",
+            "media": [
+              {
+                "kind": "image",
+                "url": "https://scontent.example.fbcdn.net/one.jpg",
+                "width": 960,
+                "height": 720,
+                "alt": "May be an image of text"
+              }
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "album-video-without-playable-url",
+      "item": "31 (calibrated by P2 capture)",
+      "fact": "In an album a video is a media node typed Video whose image is its poster; the playable URL is not in the response. It is a video with url null, its poster is an image, and images inside the video node (preferred_thumbnail) are not separate media. A video makes the post a video post.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "album"
+                      },
+                      "attachments": [
+                        {
+                          "styles": {
+                            "attachment": {
+                              "all_subattachments": {
+                                "nodes": [
+                                  {
+                                    "media": {
+                                      "__typename": "Photo",
+                                      "id": "M1",
+                                      "accessibility_caption": "May be an image of 1 person",
+                                      "image": {
+                                        "uri": "https://scontent.example.fbcdn.net/a1.jpg",
+                                        "width": 1280,
+                                        "height": 720
+                                      },
+                                      "viewer_image": {
+                                        "uri": "https://scontent.example.fbcdn.net/a1-v.jpg",
+                                        "width": 1280,
+                                        "height": 720
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "media": {
+                                      "__typename": "Video",
+                                      "id": "M2",
+                                      "is_playable": true,
+                                      "image": {
+                                        "uri": "https://scontent.example.fbcdn.net/poster.jpg",
+                                        "width": 1280,
+                                        "height": 720
+                                      },
+                                      "video_grid_renderer": {
+                                        "video": {
+                                          "id": "M2",
+                                          "videoDeliveryLegacyFields": {},
+                                          "preferred_thumbnail": {
+                                            "image": {
+                                              "uri": "https://scontent.example.fbcdn.net/thumb.jpg"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "type": "video",
+            "media": [
+              {
+                "kind": "image",
+                "url": "https://scontent.example.fbcdn.net/a1.jpg",
+                "width": 1280,
+                "height": 720,
+                "alt": "May be an image of 1 person"
+              },
+              {
+                "kind": "image",
+                "url": "https://scontent.example.fbcdn.net/poster.jpg",
+                "width": 1280,
+                "height": 720,
+                "alt": null
+              },
+              {
+                "kind": "video",
+                "url": null,
+                "width": null,
+                "height": null,
+                "alt": null
+              }
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "link-share-thumbnail-is-not-a-photo",
+      "item": "31,32",
+      "fact": "A link is a dict with url and title or description and no uri. Its thumbnail image does not make the post a photo; the link is listed in links.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "read this article"
+                      },
+                      "attachments": [
+                        {
+                          "styles": {
+                            "attachment": {
+                              "url": "https://example.com/article",
+                              "title": "An Article",
+                              "description": "About things",
+                              "media": {
+                                "image": {
+                                  "uri": "https://external.example.fbcdn.net/thumb.jpg",
+                                  "width": 100,
+                                  "height": 100
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "type": "link",
+            "links": [
+              {
+                "url": "https://example.com/article",
+                "title": "An Article",
+                "description": "About things"
+              }
+            ]
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "type-priority",
+      "item": "33",
+      "fact": "Type priority: a key containing reel -> reel; life_event or lifeevent -> life_event; a share -> shared; video; photo; link; text -> status; otherwise unknown.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "R1"
+                      },
+                      "creation_time": 1767225600,
+                      "short_form_reel_info": {
+                        "x": 1
+                      },
+                      "attached_story": {
+                        "feedback": {
+                          "id": "Z1"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "L1"
+                      },
+                      "creation_time": 1767225600,
+                      "life_event_story": {
+                        "title": {
+                          "text": "Started a job"
+                        }
+                      },
+                      "message": {
+                        "text": "news"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "S1"
+                      },
+                      "creation_time": 1767225600,
+                      "attached_story": {
+                        "feedback": {
+                          "id": "Z2"
+                        }
+                      },
+                      "attachments": [
+                        {
+                          "media": {
+                            "playable_url": "https://video.example.fbcdn.net/s1.mp4"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "V1"
+                      },
+                      "creation_time": 1767225600,
+                      "attachments": [
+                        {
+                          "media": {
+                            "playable_url": "https://video.example.fbcdn.net/v1.mp4",
+                            "image": {
+                              "uri": "https://scontent.example.fbcdn.net/v1.jpg"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "P1"
+                      },
+                      "creation_time": 1767225600,
+                      "attachments": [
+                        {
+                          "media": {
+                            "image": {
+                              "uri": "https://scontent.example.fbcdn.net/ph.jpg"
+                            }
+                          }
+                        },
+                        {
+                          "url": "https://example.com/x",
+                          "title": "X"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "K1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "a link"
+                      },
+                      "attachments": [
+                        {
+                          "url": "https://example.com/y",
+                          "description": "Y"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "T1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "just words"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "U1"
+                      },
+                      "creation_time": 1767225600
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "R1",
+            "type": "reel"
+          },
+          {
+            "id": "L1",
+            "type": "life_event"
+          },
+          {
+            "id": "S1",
+            "type": "shared"
+          },
+          {
+            "id": "V1",
+            "type": "video"
+          },
+          {
+            "id": "P1",
+            "type": "photo"
+          },
+          {
+            "id": "K1",
+            "type": "link"
+          },
+          {
+            "id": "T1",
+            "type": "status"
+          },
+          {
+            "id": "U1",
+            "type": "unknown",
+            "text": ""
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "pinned-and-sponsored-flags",
+      "item": "34,35",
+      "fact": "pinned: is_pinned, is_pinned_story or is_featured is true. sponsored: is_sponsored true, a sponsored_data dict, or a truthy ad_id; an ad can be undated.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "A1"
+                      },
+                      "creation_time": 1767225600,
+                      "is_pinned": true
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "A2"
+                      },
+                      "creation_time": 1767225600,
+                      "comet_sections": {
+                        "x": {
+                          "is_pinned_story": true
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "A3"
+                      },
+                      "creation_time": 1767225600,
+                      "is_featured": true
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "A4"
+                      },
+                      "creation_time": 1767225600,
+                      "is_pinned": false,
+                      "is_featured": "yes"
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "B1"
+                      },
+                      "is_sponsored": true
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "B2"
+                      },
+                      "creation_time": 1767225600,
+                      "sponsored_data": {
+                        "ad_id": "77",
+                        "client_token": "t"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "B3"
+                      },
+                      "creation_time": 1767225600,
+                      "x": {
+                        "ad_id": "88"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "B4"
+                      },
+                      "creation_time": 1767225600,
+                      "ad_id": null,
+                      "sponsored_data": null,
+                      "is_sponsored": false
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "A1",
+            "pinned": true,
+            "sponsored": false
+          },
+          {
+            "id": "A2",
+            "pinned": true
+          },
+          {
+            "id": "A3",
+            "pinned": true
+          },
+          {
+            "id": "A4",
+            "pinned": false
+          },
+          {
+            "id": "B1",
+            "sponsored": true,
+            "undated": true,
+            "pinned": false
+          },
+          {
+            "id": "B2",
+            "sponsored": true
+          },
+          {
+            "id": "B3",
+            "sponsored": true
+          },
+          {
+            "id": "B4",
+            "sponsored": false
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "post-counts",
+      "item": "36",
+      "fact": "reaction_count = feedback.reaction_count.count, share_count = feedback.share_count.count, comment_count = feedback.comment_rendering_instance.comments.total_count (no comment_count key exists). Negative or non-integer values are null.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1",
+                        "reaction_count": {
+                          "count": 12
+                        },
+                        "share_count": {
+                          "count": 3
+                        },
+                        "comment_count": {
+                          "total_count": 99
+                        },
+                        "comment_rendering_instance": {
+                          "comments": {
+                            "total_count": 5
+                          }
+                        }
+                      },
+                      "creation_time": 1767225600
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F2",
+                        "reaction_count": {
+                          "count": -1
+                        },
+                        "share_count": {
+                          "count": "7"
+                        },
+                        "comment_rendering_instance": {
+                          "comments": {
+                            "total_count": 2.5
+                          }
+                        }
+                      },
+                      "creation_time": 1767225600
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F3"
+                      },
+                      "creation_time": 1767225600
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "reaction_count": 12,
+            "share_count": 3,
+            "comment_count": 5
+          },
+          {
+            "id": "F2",
+            "reaction_count": null,
+            "share_count": null,
+            "comment_count": null
+          },
+          {
+            "id": "F3",
+            "reaction_count": null,
+            "share_count": null,
+            "comment_count": null
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "truncation-markers",
+      "item": "37",
+      "fact": "A truthy key containing truncat, preferred_body or see_more marks the received body as cut; message_truncation_line_limit is a display setting on every post and does not; markers inside the shared story do not mark the sharing post.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "short"
+                      },
+                      "comet_sections": {
+                        "message": {
+                          "story": {
+                            "message_truncation_line_limit": 7
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F2"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "a long post that was cut"
+                      },
+                      "comet_sections": {
+                        "message": {
+                          "story": {
+                            "is_text_truncated": true
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F3"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "cut too"
+                      },
+                      "preferred_body": {
+                        "text": "x"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F4"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "share"
+                      },
+                      "attached_story": {
+                        "feedback": {
+                          "id": "F5"
+                        },
+                        "message": {
+                          "text": "shared cut"
+                        },
+                        "see_more_url": "https://www.facebook.com/x"
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F6"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "falsy marker"
+                      },
+                      "has_see_more": false
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "text_truncated": false
+          },
+          {
+            "id": "F2",
+            "text_truncated": true
+          },
+          {
+            "id": "F3",
+            "text_truncated": true
+          },
+          {
+            "id": "F4",
+            "text_truncated": false,
+            "shared_post": {
+              "id": "F5",
+              "text_truncated": true
+            }
+          },
+          {
+            "id": "F6",
+            "text_truncated": false
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "path-patch-on-read-field-marks-story-incomplete",
+      "item": "38",
+      "fact": "A path-only patch (data at a path, not itself a story) that carries a field the records read marks the story it points into as incomplete; one that reaches no story is a response issue; one carrying only unread fields changes nothing.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "comet_sections": {
+                        "content": {
+                          "story": {
+                            "message": {
+                              "text": "before patch"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F2"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "untouched"
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        },
+        {
+          "path": [
+            "viewer",
+            "news_feed",
+            "edges",
+            0,
+            "node",
+            "comet_sections",
+            "content",
+            "story",
+            "message"
+          ],
+          "data": {
+            "text": "after patch"
+          }
+        },
+        {
+          "path": [
+            "viewer",
+            "news_feed",
+            "edges",
+            1,
+            "node",
+            "comet_sections",
+            "video_player"
+          ],
+          "data": {
+            "player_internal_state": 3
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "incomplete": true
+          },
+          {
+            "id": "F2",
+            "incomplete": false
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "path-patch-reaching-no-story-is-a-response-issue",
+      "item": "38",
+      "fact": "A patch carrying a read field whose path reaches no story becomes the response issue unsupported_path_patch.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "fine"
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        },
+        {
+          "path": [
+            "viewer",
+            "unrelated_module"
+          ],
+          "data": {
+            "title": "something read-shaped"
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "incomplete": false
+          }
+        ],
+        "issues": [
+          "unsupported_path_patch"
+        ]
+      }
+    },
+    {
+      "name": "graphql-errors-attribution",
+      "item": "38",
+      "fact": "An error whose path points into a story at a read field marks that story incomplete; an error on a field no record reads is ignored; an error without a path is the response issue graphql_errors.",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "has a broken field"
+                      },
+                      "comet_sections": {
+                        "attachments": null
+                      }
+                    }
+                  },
+                  {
+                    "node": {
+                      "feedback": {
+                        "id": "F2"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "fine"
+                      }
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          },
+          "errors": [
+            {
+              "message": "field failed",
+              "severity": "ERROR",
+              "path": [
+                "viewer",
+                "news_feed",
+                "edges",
+                0,
+                "node",
+                "comet_sections",
+                "attachments"
+              ]
+            },
+            {
+              "message": "tracking failed",
+              "severity": "WARNING",
+              "path": [
+                "viewer",
+                "news_feed",
+                "edges",
+                1,
+                "node",
+                "tracking_internal"
+              ]
+            },
+            {
+              "message": "something somewhere",
+              "severity": "ERROR"
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "incomplete": true
+          },
+          {
+            "id": "F2",
+            "incomplete": false
+          }
+        ],
+        "issues": [
+          "graphql_errors"
+        ]
+      }
+    },
+    {
+      "name": "permalink-root-not-decoy",
+      "item": "39",
+      "fact": "In a permalink response the requested post is the root (data.node_v2, node or story) of a chunk without a path; other stories in the response are decoys.",
+      "parser": "permalink",
+      "args": {},
+      "body_lines": [
+        {
+          "data": {
+            "node_v2": {
+              "__typename": "Story",
+              "feedback": {
+                "id": "P1"
+              },
+              "creation_time": 1767225600,
+              "message": {
+                "text": "the requested post"
+              },
+              "comet_sections": {
+                "related": {
+                  "feedback": {
+                    "id": "D1"
+                  },
+                  "creation_time": 1767139200,
+                  "message": {
+                    "text": "a decoy story"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "path": [
+            "node_v2",
+            "comet_sections",
+            "more"
+          ],
+          "data": {
+            "feedback": {
+              "id": "D2"
+            },
+            "message": {
+              "text": "another decoy"
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "P1",
+            "text": "the requested post",
+            "created_at": "2026-01-01T00:00:00Z"
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "permalink-without-root",
+      "item": "39",
+      "fact": "A permalink response with no root story yields no post (the caller reports it as a failed read, not as an empty post).",
+      "parser": "permalink",
+      "args": {},
+      "body_lines": [
+        {
+          "data": {
+            "node_v2": null,
+            "viewer": {
+              "feedback": {
+                "id": "D9"
+              },
+              "message": {
+                "text": "not the post"
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [],
+        "issues": []
+      }
+    }
+  ]
+}

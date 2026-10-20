@@ -1,0 +1,286 @@
+{
+ "about": "Comment records (appendix A 20, 21) and a page's rebuilt order. raw is one item of the comment box's commentList; expect is the record, or null. labels: deleted, blinded, secret, status=<raw>. author_blog_id is the commenter's blog — the next hop to a person. All names and ids are synthetic.",
+ "cases": [
+  {
+   "name": "top-level-points-at-itself",
+   "item": "20",
+   "fact": "Naver points a top-level comment's parentCommentNo at itself; that is no parent.",
+   "raw": {
+    "commentNo": 1001,
+    "parentCommentNo": 1001,
+    "replyLevel": 1,
+    "userName": "지나가는 사람",
+    "profileUserId": "visitor_a",
+    "regTime": "2026-10-18T10:00:00+0900",
+    "contents": "잘 보고 갑니다~",
+    "sympathyCount": 2,
+    "replyCount": 1
+   },
+   "expect": {
+    "id": "comment:1001",
+    "comment_no": "1001",
+    "parent_comment_no": null,
+    "reply_level": 1,
+    "author": "지나가는 사람",
+    "author_blog_id": "visitor_a",
+    "created_at": "2026-10-18T10:00+09:00",
+    "text": "잘 보고 갑니다~",
+    "like_count": 2,
+    "reply_count": 1,
+    "labels": []
+   }
+  },
+  {
+   "name": "reply",
+   "item": "20",
+   "fact": "A reply is replyLevel 2 with its parent's number.",
+   "raw": {
+    "commentNo": 1002,
+    "parentCommentNo": 1001,
+    "replyLevel": 2,
+    "maskedUserName": "블로****",
+    "profileUserId": "owner_blog",
+    "regTime": "2026-10-18T11:00:00+0900",
+    "contents": "감사합니다 :)"
+   },
+   "expect": {
+    "id": "comment:1002",
+    "comment_no": "1002",
+    "parent_comment_no": "1001",
+    "reply_level": 2,
+    "author": "블로****",
+    "author_blog_id": "owner_blog",
+    "created_at": "2026-10-18T11:00+09:00",
+    "text": "감사합니다 :)",
+    "like_count": null,
+    "reply_count": null,
+    "labels": []
+   }
+  },
+  {
+   "name": "deleted-keeps-no-text",
+   "item": "20",
+   "fact": "A deleted comment shows as deleted with its text emptied.",
+   "raw": {
+    "commentNo": 1003,
+    "parentCommentNo": 0,
+    "deleted": true,
+    "contents": "삭제된 댓글입니다."
+   },
+   "expect": {
+    "id": "comment:1003",
+    "comment_no": "1003",
+    "parent_comment_no": null,
+    "reply_level": 1,
+    "author": null,
+    "author_blog_id": null,
+    "created_at": null,
+    "text": "",
+    "like_count": null,
+    "reply_count": null,
+    "labels": [
+     "deleted"
+    ]
+   }
+  },
+  {
+   "name": "string-false-is-not-deleted",
+   "item": "20",
+   "fact": "Only a real boolean counts: the string \"false\" is not a deletion.",
+   "raw": {
+    "commentNo": 1004,
+    "deleted": "false",
+    "contents": "살아 있는 댓글"
+   },
+   "expect": {
+    "id": "comment:1004",
+    "comment_no": "1004",
+    "parent_comment_no": null,
+    "reply_level": 1,
+    "author": null,
+    "author_blog_id": null,
+    "created_at": null,
+    "text": "살아 있는 댓글",
+    "like_count": null,
+    "reply_count": null,
+    "labels": []
+   }
+  },
+  {
+   "name": "blinded-by-cleanbot",
+   "item": "20",
+   "fact": "blind or hiddenByCleanbot reads blinded.",
+   "raw": {
+    "commentNo": 1005,
+    "hiddenByCleanbot": true,
+    "contents": "클린봇이 가린 댓글"
+   },
+   "expect": {
+    "id": "comment:1005",
+    "comment_no": "1005",
+    "parent_comment_no": null,
+    "reply_level": 1,
+    "author": null,
+    "author_blog_id": null,
+    "created_at": null,
+    "text": "클린봇이 가린 댓글",
+    "like_count": null,
+    "reply_count": null,
+    "labels": [
+     "blinded"
+    ]
+   }
+  },
+  {
+   "name": "secret",
+   "item": "20",
+   "raw": {
+    "commentNo": 1006,
+    "secret": true,
+    "contents": ""
+   },
+   "expect": {
+    "id": "comment:1006",
+    "comment_no": "1006",
+    "parent_comment_no": null,
+    "reply_level": 1,
+    "author": null,
+    "author_blog_id": null,
+    "created_at": null,
+    "text": "",
+    "like_count": null,
+    "reply_count": null,
+    "labels": [
+     "secret"
+    ]
+   }
+  },
+  {
+   "name": "unknown-status-is-shown",
+   "item": "20",
+   "fact": "A status this reader does not recognize is shown, not acted on.",
+   "raw": {
+    "commentNo": 1007,
+    "status": 3,
+    "contents": "무언가"
+   },
+   "expect": {
+    "id": "comment:1007",
+    "comment_no": "1007",
+    "parent_comment_no": null,
+    "reply_level": 1,
+    "author": null,
+    "author_blog_id": null,
+    "created_at": null,
+    "text": "무언가",
+    "like_count": null,
+    "reply_count": null,
+    "labels": [
+     "status=3"
+    ]
+   }
+  },
+  {
+   "name": "no-number-is-not-a-comment",
+   "item": "20",
+   "raw": {
+    "contents": "x"
+   },
+   "expect": null
+  }
+ ],
+ "page": {
+  "item": "21",
+  "fact": "Replies are rows of the same paged list (P2 R12: replyPageSize does not limit them), newest first, each reply placed just before its parent. They are rebuilt under their parent: top-level comments keep the served order, each parent's replies follow it oldest first, indented, and a reply whose parent is not on this page (its parent opens the next page) says so (parent not shown) instead of being placed under the wrong comment.",
+  "raw": [
+   {
+    "commentNo": 11,
+    "parentCommentNo": 11,
+    "replyLevel": 1,
+    "userName": "B",
+    "contents": "새 댓글",
+    "regTime": "2026-10-18T12:00:00+0900"
+   },
+   {
+    "commentNo": 12,
+    "parentCommentNo": 10,
+    "replyLevel": 2,
+    "userName": "주인",
+    "contents": "두 번째 답글",
+    "regTime": "2026-10-18T12:30:00+0900"
+   },
+   {
+    "commentNo": 14,
+    "parentCommentNo": 10,
+    "replyLevel": 2,
+    "userName": "주인",
+    "contents": "첫 답글",
+    "regTime": "2026-10-18T11:10:00+0900"
+   },
+   {
+    "commentNo": 10,
+    "parentCommentNo": 10,
+    "replyLevel": 1,
+    "userName": "A",
+    "contents": "먼저 단 댓글",
+    "regTime": "2026-10-18T11:00:00+0900"
+   },
+   {
+    "commentNo": 13,
+    "parentCommentNo": 9,
+    "replyLevel": 2,
+    "userName": "주인",
+    "contents": "앞 쪽 댓글의 답글",
+    "regTime": "2026-10-18T11:30:00+0900"
+   }
+  ],
+  "expect_order": [
+   {
+    "comment_no": "11",
+    "depth": 0
+   },
+   {
+    "comment_no": "10",
+    "depth": 0
+   },
+   {
+    "comment_no": "14",
+    "depth": 1,
+    "parent_shown": true
+   },
+   {
+    "comment_no": "12",
+    "depth": 1,
+    "parent_shown": true
+   },
+   {
+    "comment_no": "13",
+    "depth": 1,
+    "parent_shown": false
+   }
+  ],
+  "old_order_note": "The current code keeps the served order and only marks parent_shown; the new order is an intended change (plan: '답글이 부모보다 먼저 찍힘' render defect)."
+ },
+ "counts": {
+  "item": "R16",
+  "fact": "The comment box answers count beside commentList (P2): comment, reply, exposeCount, delCommentByUser, delCommentByMon, blindCommentByUser, blindReplyByUser, total. deleted and blinded sum their two kinds. There is no bestList on blog posts (config.useBest false); a row's best flag marks a best comment.",
+  "raw": {
+   "comment": 135,
+   "reply": 7,
+   "exposeCount": 135,
+   "delCommentByUser": 1,
+   "delCommentByMon": 2,
+   "blindCommentByUser": 0,
+   "blindReplyByUser": 1,
+   "total": 142,
+   "fallback": false
+  },
+  "expect": {
+   "comments": 135,
+   "replies": 7,
+   "deleted": 3,
+   "blinded": 1,
+   "total": 142
+  }
+ }
+}

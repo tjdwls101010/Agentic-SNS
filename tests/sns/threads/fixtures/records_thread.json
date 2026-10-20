@@ -1,0 +1,125 @@
+{
+  "about": "A post page (appendix A 18-20): the responses a post page needs, each a data object {media: {...}} as Threads returns it, read into the post, its parent chain and its first batch of direct replies with their sub-replies, plus reply coverage. post_id is the id the shortcode encodes (targets.json shortcodes). Roles are told apart by shape, never by query name: the media whose code is the requested shortcode is the post, containing_thread holds the parents, direct_replies holds the replies; each response must be about post_id. A direct reply edge is node.posts.edges[].node, the first being the direct reply and the rest what hangs under it (sub-replies, or the replier continuing). depth comes from reply_to_id, or (what Threads sends now) from reply_level and reply_to_author; relation is reply (a different author answers) or continuation (the author of the post it answers continues it). limit counts direct replies shown. An object {\"$user\": \"A\"} stands for users.A. All content is synthetic. Every synthetic code is the shortcode of its post's pk (base64url digits, targets.json shortcodes), so a post URL names that same post with no request.",
+  "users": {
+    "A": {"pk": "1000000001", "username": "example.author"},
+    "B": {"pk": "1000000002", "username": "someone.else"},
+    "C": {"pk": "1000000003", "username": "third.person"}
+  },
+  "cases": [
+    {"name": "post-parents-replies-coverage", "item": "18,19,20",
+     "fact": "The page yields parents above the post, the post, then each direct reply followed by what hangs under it, each nested reply placed by reply_to_id. A reply already seen is skipped; an empty or tombstone direct reply counts as unavailable and is marked in place. Coverage: reported direct replies, received readable ones, shown, nested shown, received but not shown, unavailable, and an estimate of never-received ones = reported - received - unavailable.",
+     "code": "DThr_201", "post_id": "14535981231413", "limit": 10,
+     "responses": [
+       {"media": {"pk": "14535981231413", "code": "DThr_201", "taken_at": 1791428400, "caption": {"text": "The post"}, "user": {"$user": "A"},
+                  "text_post_app_info": {"direct_reply_count": 5, "is_reply": true, "reply_to_id": "3000000000000000200", "reply_to_author": {"$user": "C"}}}},
+       {"media": {"pk": "14535981231413", "text_post_app_info": {"containing_thread": {"posts": {"edges": [
+         {"node": {"pk": "3000000000000000200", "code": "CmiJBr2LADI", "taken_at": 1791349200, "caption": {"text": "The parent"}, "user": {"$user": "C"}}},
+         {"node": {"pk": "14535981231413", "code": "DThr_201", "user": {"$user": "A"}}}]}}}}},
+       {"media": {"pk": "14535981231413", "text_post_app_info": {"direct_replies": {"edges": [
+         {"node": {"posts": {"edges": [
+           {"node": {"pk": "3000000000000000211", "code": "CmiJBr2LADT", "caption": {"text": "Reply one"}, "user": {"$user": "B"}, "text_post_app_info": {"is_reply": true, "reply_to_id": "14535981231413"}}},
+           {"node": {"pk": "3000000000000000212", "code": "CmiJBr2LADU", "caption": {"text": "Author answers"}, "user": {"$user": "A"}, "text_post_app_info": {"is_reply": true, "reply_to_id": "3000000000000000211"}}},
+           {"node": {"pk": "3000000000000000213", "code": "CmiJBr2LADV", "caption": {"text": "Back to the author"}, "user": {"$user": "B"}, "text_post_app_info": {"is_reply": true, "reply_to_id": "3000000000000000212"}}}]}}},
+         {"node": {"posts": {"edges": [
+           {"node": {"pk": "3000000000000000221", "code": "CmiJBr2LADd", "caption": {"text": "Reply two"}, "user": {"$user": "C"}, "text_post_app_info": {"is_reply": true, "reply_to_id": "14535981231413"}}},
+           {"node": {"pk": "3000000000000000222", "code": "CmiJBr2LADe", "caption": {"text": "Reply two, continued"}, "user": {"$user": "C"}, "text_post_app_info": {"is_reply": true, "reply_to_id": "3000000000000000221"}}}]}}},
+         {"node": {"posts": {"edges": []}}},
+         {"node": {"posts": {"edges": [{"node": {"pk": "3000000000000000231", "is_post_unavailable": true}}]}}},
+         {"node": {"posts": {"edges": [{"node": {"pk": "3000000000000000211", "code": "CmiJBr2LADT", "user": {"$user": "B"}}}]}}}]}}}}
+     ],
+     "expected": {
+       "records": [
+         {"id": "3000000000000000200", "role": "parent", "depth": 0},
+         {"id": "14535981231413", "role": "post", "depth": 0},
+         {"id": "3000000000000000211", "role": "reply", "depth": 0},
+         {"id": "3000000000000000212", "role": "reply", "depth": 1, "relation": {"kind": "reply", "to": "3000000000000000211"}},
+         {"id": "3000000000000000213", "role": "reply", "depth": 2, "relation": {"kind": "reply", "to": "3000000000000000212"}},
+         {"id": "3000000000000000221", "role": "reply", "depth": 0},
+         {"id": "3000000000000000222", "role": "reply", "depth": 1, "relation": {"kind": "continuation", "to": "3000000000000000221"}},
+         {"id": "3000000000000000231", "role": "reply", "depth": 0, "unavailable": true}],
+       "coverage": {"reported_direct": 5, "received_direct": 2, "shown_direct": 2, "shown_descendants": 3, "unshown_received": 0, "unavailable": 2, "unfetched": 1, "unfetched_is_estimate": true}}},
+    {"name": "limit-keeps-received-count", "item": "19,20",
+     "fact": "A direct reply beyond --limit is received but not shown, with what hangs under it; it still counts as received.",
+     "code": "DThr_201", "post_id": "14535981231413", "limit": 1, "responses_from": "post-parents-replies-coverage",
+     "expected": {
+       "ids": ["3000000000000000200", "14535981231413", "3000000000000000211", "3000000000000000212", "3000000000000000213"],
+       "coverage": {"reported_direct": 5, "received_direct": 2, "shown_direct": 1, "shown_descendants": 2, "unshown_received": 1, "unavailable": 2, "unfetched": 1, "unfetched_is_estimate": true}}},
+    {"name": "estimate-null-when-negative", "item": "20",
+     "fact": "When more arrived than Threads reports, the never-received estimate is unknown (null), not negative or zero.",
+     "code": "DThr_202", "post_id": "14535981231414", "limit": 10,
+     "responses": [
+       {"media": {"pk": "14535981231414", "code": "DThr_202", "user": {"$user": "A"}, "text_post_app_info": {"direct_reply_count": 1}}},
+       {"media": {"pk": "14535981231414", "text_post_app_info": {"containing_thread": {"posts": {"edges": []}}}}},
+       {"media": {"pk": "14535981231414", "text_post_app_info": {"direct_replies": {"edges": [
+         {"node": {"posts": {"edges": [{"node": {"pk": "3000000000000000241", "code": "CmiJBr2LADx", "user": {"$user": "B"}}}]}}},
+         {"node": {"posts": {"edges": [{"node": {"pk": "3000000000000000242", "code": "CmiJBr2LADy", "user": {"$user": "C"}}}]}}}]}}}}
+     ],
+     "expected": {"coverage": {"reported_direct": 1, "received_direct": 2, "unfetched": null, "unfetched_is_estimate": false}}},
+    {"name": "no-reported-count", "item": "20",
+     "fact": "Without a reported count nothing can be estimated.",
+     "code": "DThr_203", "post_id": "14535981231415", "limit": 10,
+     "responses": [
+       {"media": {"pk": "14535981231415", "code": "DThr_203", "user": {"$user": "A"}}},
+       {"media": {"pk": "14535981231415", "text_post_app_info": {"containing_thread": {"posts": {"edges": []}}}}},
+       {"media": {"pk": "14535981231415", "text_post_app_info": {"direct_replies": {"edges": []}}}}
+     ],
+     "expected": {"coverage": {"reported_direct": null, "received_direct": 0, "unfetched": null, "unfetched_is_estimate": false}}},
+    {"name": "composite-media-identity", "item": "11,18",
+     "fact": "A response's media may identify the post only by <pk>_<author pk>; its head must equal post_id.",
+     "code": "DThr_203", "post_id": "14535981231415", "limit": 10,
+     "responses": [
+       {"media": {"id": "14535981231415_1000000001", "code": "DThr_203", "user": {"$user": "A"}}},
+       {"media": {"id": "14535981231415_1000000001", "text_post_app_info": {"containing_thread": {"posts": {"edges": []}}}}},
+       {"media": {"id": "14535981231415_1000000001", "text_post_app_info": {"direct_replies": {"edges": []}}}}
+     ],
+     "expected": {"ids": ["14535981231415"]}},
+    {"name": "two-reply-payloads-refused", "item": "18",
+     "fact": "Two different responses claiming the same role are refused rather than guessed between.",
+     "code": "DThr_203", "post_id": "14535981231415", "limit": 10,
+     "responses": [
+       {"media": {"pk": "14535981231415", "code": "DThr_203", "user": {"$user": "A"}}},
+       {"media": {"pk": "14535981231415", "text_post_app_info": {"containing_thread": {"posts": {"edges": []}}}}},
+       {"media": {"pk": "14535981231415", "text_post_app_info": {"direct_replies": {"edges": []}}}},
+       {"media": {"pk": "14535981231415", "text_post_app_info": {"direct_replies": {"edges": [{"node": {"posts": {"edges": [{"node": {"pk": "3000000000000000251", "user": {"$user": "B"}}}]}}}]}}}}
+     ],
+     "expected": {"outcome": "failed", "kind": "shape_changed"}},
+    {"name": "response-about-another-post-ignored", "item": "18",
+     "fact": "A response about another post id plays no role here; with no replies response left, the page is a changed shape.",
+     "code": "DThr_203", "post_id": "14535981231415", "limit": 10,
+     "responses": [
+       {"media": {"pk": "14535981231415", "code": "DThr_203", "user": {"$user": "A"}}},
+       {"media": {"pk": "14535981231415", "text_post_app_info": {"containing_thread": {"posts": {"edges": []}}}}},
+       {"media": {"pk": "3000000000000000999", "text_post_app_info": {"direct_replies": {"edges": []}}}}
+     ],
+     "expected": {"outcome": "failed", "kind": "shape_changed"}},
+    {"name": "replies-placed-by-level", "item": "18,19",
+     "fact": "Observed 2026-10-17: Threads sends no reply_to_id on replies; each carries reply_level (1 answers the post) and reply_to_author. A reply answers the nearest earlier post of its unit one level up, and only when that post's author is the one it names; a reply naming no author, or another one, stays unplaced rather than guessed.",
+     "code": "DThr_201", "post_id": "14535981231413", "limit": 10,
+     "responses": [
+       {"media": {"pk": "14535981231413", "code": "DThr_201", "caption": {"text": "The post"}, "user": {"$user": "A"}, "text_post_app_info": {"direct_reply_count": 2}}},
+       {"media": {"pk": "14535981231413", "text_post_app_info": {"containing_thread": {"posts": {"edges": []}}}}},
+       {"media": {"pk": "14535981231413", "text_post_app_info": {"direct_replies": {"edges": [
+         {"node": {"posts": {"edges": [{"node": {"pk": "3000000000000000231", "caption": {"text": "First answer"}, "user": {"$user": "B"}, "text_post_app_info": {"is_reply": true, "reply_level": 1, "reply_to_author": {"$user": "A"}}}}, {"node": {"pk": "3000000000000000232", "caption": {"text": "Author replies"}, "user": {"$user": "A"}, "text_post_app_info": {"is_reply": true, "reply_level": 2, "reply_to_author": {"$user": "B"}}}}, {"node": {"pk": "3000000000000000233", "caption": {"text": "Another answer to B"}, "user": {"$user": "C"}, "text_post_app_info": {"is_reply": true, "reply_level": 2, "reply_to_author": {"$user": "B"}}}}, {"node": {"pk": "3000000000000000234", "caption": {"text": "B answers C"}, "user": {"$user": "B"}, "text_post_app_info": {"is_reply": true, "reply_level": 3, "reply_to_author": {"$user": "C"}}}}]}}},
+         {"node": {"posts": {"edges": [{"node": {"pk": "3000000000000000241", "caption": {"text": "Second answer"}, "user": {"$user": "C"}, "text_post_app_info": {"is_reply": true, "reply_level": 1, "reply_to_author": {"$user": "A"}}}}, {"node": {"pk": "3000000000000000242", "caption": {"text": "C continues"}, "user": {"$user": "C"}, "text_post_app_info": {"is_reply": true, "reply_level": 2, "reply_to_author": {"$user": "C"}}}}, {"node": {"pk": "3000000000000000243", "caption": {"text": "Names someone the unit does not hold"}, "user": {"$user": "B"}, "text_post_app_info": {"is_reply": true, "reply_level": 2, "reply_to_author": {"$user": "A"}}}}, {"node": {"pk": "3000000000000000244", "caption": {"text": "Names nobody"}, "user": {"$user": "B"}, "text_post_app_info": {"is_reply": true, "reply_level": 2}}}]}}}]}}}}
+     ],
+     "expected": {"records": [{"id": "14535981231413", "role": "post"},
+                              {"id": "3000000000000000231", "depth": 0, "relation": null, "reply_level": 1, "reply_to_author": "example.author"},
+                              {"id": "3000000000000000232", "depth": 1, "relation": {"kind": "reply", "to": "3000000000000000231"}},
+                              {"id": "3000000000000000233", "depth": 1, "relation": {"kind": "reply", "to": "3000000000000000231"}},
+                              {"id": "3000000000000000234", "depth": 2, "relation": {"kind": "reply", "to": "3000000000000000233"}},
+                              {"id": "3000000000000000241", "depth": 0, "relation": null},
+                              {"id": "3000000000000000242", "depth": 1, "relation": {"kind": "continuation", "to": "3000000000000000241"}},
+                              {"id": "3000000000000000243", "depth": 0, "relation": null},
+                              {"id": "3000000000000000244", "depth": 0, "relation": null}]}},
+    {"name": "post-unavailable", "item": "4,18",
+     "fact": "When the post itself is a tombstone the target is unavailable (exit 9).",
+     "code": "DThr_203", "post_id": "14535981231415", "limit": 10,
+     "responses": [
+       {"media": {"pk": "14535981231415", "code": "DThr_203", "is_post_unavailable": true}},
+       {"media": {"pk": "14535981231415", "text_post_app_info": {"containing_thread": {"posts": {"edges": []}}}}},
+       {"media": {"pk": "14535981231415", "text_post_app_info": {"direct_replies": {"edges": []}}}}
+     ],
+     "expected": {"outcome": "unavailable"}}
+  ],
+  "observed_2026_10_16": "Facts from the planning session's tab observation, to be turned into cases from P2 captures (paths unverified): the post page's first reply batch carries page_info with has_next_page and an end_cursor (base64 JSON listing reply ids already sent and their count); each direct reply carries its own page_info for its sub-replies; the next batch comes from BarcelonaPostPageDirectRepliesRefetchQuery {after, filterType, first, postID, sortOrder}."
+}

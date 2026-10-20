@@ -1,0 +1,574 @@
+{
+ "about": "Post records from every list surface (appendix A 16-19, 26, 50) and the two field normalizers. raw is one item as the surface sends it; context is what the caller knows (the blog a list belongs to); expect is the record in the skill's terms, or null when the item is not a post. Times are KST, minute precision. labels: what Naver said about the post — private, buddy-only, mutual-only, own-money (the writer set Naver's own-money flag; not the same as a title or tag saying 내돈내산). A count Naver did not send is null, never 0. Expected stamps come from datetime with a fixed +09:00 zone. feed rows follow the planning-session field list (likeCount, commentCount, buyWithMyOwnMoney) and are recalibrated against P2 captures.",
+ "cases": [
+  {
+   "name": "search-post-item",
+   "item": "16,17,18",
+   "surface": "search_posts",
+   "fact": "Search highlights matches with <strong>; entities are unescaped; isBuyWithMyOwnMoney is Naver's own-money flag (the writer set it). Search spells content, nickname, sympathyCount, commentCount and carries blogNo (P2).",
+   "raw": {
+    "logNo": 224000000001,
+    "blogId": "cafe_note",
+    "title": "성수 <strong class=\"search_keyword\">카페</strong> &amp; 디저트",
+    "blogName": "카페 기록",
+    "addDate": 1792368000000,
+    "isBuyWithMyOwnMoney": true,
+    "content": "오늘은 <strong>카페</strong>에 다녀왔어요 &lt;3",
+    "nickname": "카페노트",
+    "sympathyCount": 12,
+    "commentCount": 3,
+    "blogNo": 123456
+   },
+   "expect": {
+    "id": "post:cafe_note/224000000001",
+    "blog_id": "cafe_note",
+    "log_no": "224000000001",
+    "url": "https://blog.naver.com/cafe_note/224000000001",
+    "title": "성수 카페 & 디저트",
+    "summary": "오늘은 카페에 다녀왔어요 <3",
+    "created_at": "2026-10-19T09:00+09:00",
+    "blog_name": "카페 기록",
+    "nickname": "카페노트",
+    "category_no": null,
+    "category_name": null,
+    "like_count": 12,
+    "comment_count": 3,
+    "view_count": null,
+    "labels": [
+     "own-money"
+    ]
+   }
+  },
+  {
+   "name": "title-wins-when-both",
+   "item": "16",
+   "surface": "search_posts",
+   "raw": {
+    "logNo": 13,
+    "blogId": "b",
+    "title": "제목",
+    "titleWithInspectMessage": "[검수중] 제목"
+   },
+   "expect": {
+    "id": "post:b/13",
+    "blog_id": "b",
+    "log_no": "13",
+    "url": "https://blog.naver.com/b/13",
+    "title": "제목",
+    "summary": "",
+    "created_at": null,
+    "blog_name": null,
+    "nickname": null,
+    "category_no": null,
+    "category_name": null,
+    "like_count": null,
+    "comment_count": null,
+    "view_count": null,
+    "labels": []
+   }
+  },
+  {
+   "name": "post-list-item",
+   "item": "16,17",
+   "surface": "post_list",
+   "context": {
+    "blog_id": "daily_log"
+   },
+   "fact": "post-list sends only titleWithInspectMessage (P2), so it is the title there; allOpenPost false with buddyOpen is buddy-only; a null or 0 readCount off the viewer's own blog is not a view count; categoryNo becomes a string; a zero-width space is removed.",
+   "raw": {
+    "logNo": "224000000002",
+    "titleWithInspectMessage": "[검수중] 주말 일기",
+    "briefContents": "토요일엔​ 비가 왔다",
+    "addDate": 1792400400000,
+    "sympathyCnt": 5,
+    "commentCnt": 2,
+    "categoryNo": 7,
+    "categoryName": "일상",
+    "allOpenPost": false,
+    "buddyOpen": true,
+    "readCount": null
+   },
+   "expect": {
+    "id": "post:daily_log/224000000002",
+    "blog_id": "daily_log",
+    "log_no": "224000000002",
+    "url": "https://blog.naver.com/daily_log/224000000002",
+    "title": "[검수중] 주말 일기",
+    "summary": "토요일엔 비가 왔다",
+    "created_at": "2026-10-19T18:00+09:00",
+    "blog_name": null,
+    "nickname": null,
+    "category_no": "7",
+    "category_name": "일상",
+    "like_count": 5,
+    "comment_count": 2,
+    "view_count": null,
+    "labels": [
+     "buddy-only"
+    ]
+   }
+  },
+  {
+   "name": "visibility-labels-follow-the-app",
+   "item": "17, P2",
+   "surface": "post_list",
+   "context": {
+    "blog_id": "daily_log"
+   },
+   "fact": "The app labels visibility as notOpen → private, else buddyOpen → buddy-only, else bothBuddyOpen → mutual-only (P2: the mobile bundle). postBlocked is not a label: it is true on every post of the blogs-of-the-month surface and false on ordinary lists.",
+   "raw": {
+    "logNo": 3,
+    "title": "t",
+    "allOpenPost": false,
+    "notOpen": true,
+    "buddyOpen": true,
+    "postBlocked": true
+   },
+   "expect": {
+    "id": "post:daily_log/3",
+    "blog_id": "daily_log",
+    "log_no": "3",
+    "url": "https://blog.naver.com/daily_log/3",
+    "title": "t",
+    "summary": "",
+    "created_at": null,
+    "blog_name": null,
+    "nickname": null,
+    "category_no": null,
+    "category_name": null,
+    "like_count": null,
+    "comment_count": null,
+    "view_count": null,
+    "labels": [
+     "private"
+    ]
+   }
+  },
+  {
+   "name": "mutual-only",
+   "item": "17, P2",
+   "surface": "post_list",
+   "context": {
+    "blog_id": "daily_log"
+   },
+   "fact": "bothBuddyOpen alone is mutual-neighbors only.",
+   "raw": {
+    "logNo": 31,
+    "title": "t",
+    "allOpenPost": false,
+    "bothBuddyOpen": true
+   },
+   "expect": {
+    "id": "post:daily_log/31",
+    "blog_id": "daily_log",
+    "log_no": "31",
+    "url": "https://blog.naver.com/daily_log/31",
+    "title": "t",
+    "summary": "",
+    "created_at": null,
+    "blog_name": null,
+    "nickname": null,
+    "category_no": null,
+    "category_name": null,
+    "like_count": null,
+    "comment_count": null,
+    "view_count": null,
+    "labels": [
+     "mutual-only"
+    ]
+   }
+  },
+  {
+   "name": "post-blocked-is-not-a-label",
+   "item": "17, P2",
+   "surface": "post_list",
+   "context": {
+    "blog_id": "daily_log"
+   },
+   "fact": "postBlocked true on a public post says nothing a reader can use.",
+   "raw": {
+    "logNo": 32,
+    "title": "t",
+    "allOpenPost": true,
+    "postBlocked": true
+   },
+   "expect": {
+    "id": "post:daily_log/32",
+    "blog_id": "daily_log",
+    "log_no": "32",
+    "url": "https://blog.naver.com/daily_log/32",
+    "title": "t",
+    "summary": "",
+    "created_at": null,
+    "blog_name": null,
+    "nickname": null,
+    "category_no": null,
+    "category_name": null,
+    "like_count": null,
+    "comment_count": null,
+    "view_count": null,
+    "labels": []
+   }
+  },
+  {
+   "name": "popular-view-count",
+   "item": "16",
+   "surface": "popular_posts",
+   "context": {
+    "blog_id": "daily_log"
+   },
+   "fact": "Only popular posts carry viewCount; it is kept, zero included.",
+   "raw": {
+    "logNo": 4,
+    "title": "인기 글",
+    "viewCount": 0,
+    "readCount": 55
+   },
+   "expect": {
+    "id": "post:daily_log/4",
+    "blog_id": "daily_log",
+    "log_no": "4",
+    "url": "https://blog.naver.com/daily_log/4",
+    "title": "인기 글",
+    "summary": "",
+    "created_at": null,
+    "blog_name": null,
+    "nickname": null,
+    "category_no": null,
+    "category_name": null,
+    "like_count": null,
+    "comment_count": null,
+    "view_count": 0,
+    "labels": []
+   }
+  },
+  {
+   "name": "own-blog-read-count",
+   "item": "16",
+   "surface": "post_list",
+   "context": {
+    "blog_id": "me_blog"
+   },
+   "fact": "readCount is a real number only on the viewer's own blog, where it is nonzero; a nonzero one is kept as the view count.",
+   "raw": {
+    "logNo": 5,
+    "title": "내 글",
+    "readCount": 37
+   },
+   "expect": {
+    "id": "post:me_blog/5",
+    "blog_id": "me_blog",
+    "log_no": "5",
+    "url": "https://blog.naver.com/me_blog/5",
+    "title": "내 글",
+    "summary": "",
+    "created_at": null,
+    "blog_name": null,
+    "nickname": null,
+    "category_no": null,
+    "category_name": null,
+    "like_count": null,
+    "comment_count": null,
+    "view_count": 37,
+    "labels": []
+   }
+  },
+  {
+   "name": "topic-item-domain-id",
+   "item": "16,19",
+   "surface": "directory_posts",
+   "fact": "Topic listings name the blog domainIdOrBlogId and date it with a +0900 string; the nickname key may be nickname.",
+   "raw": {
+    "logNo": 6,
+    "domainIdOrBlogId": "travel_kim",
+    "title": "제주 3일",
+    "content": "첫날은 &quot;협재&quot;",
+    "nickname": "여행김",
+    "regDate": "2026-10-18T09:30:00+0900"
+   },
+   "expect": {
+    "id": "post:travel_kim/6",
+    "blog_id": "travel_kim",
+    "log_no": "6",
+    "url": "https://blog.naver.com/travel_kim/6",
+    "title": "제주 3일",
+    "summary": "첫날은 \"협재\"",
+    "created_at": "2026-10-18T09:30+09:00",
+    "blog_name": null,
+    "nickname": "여행김",
+    "category_no": null,
+    "category_name": null,
+    "like_count": null,
+    "comment_count": null,
+    "view_count": null,
+    "labels": []
+   }
+  },
+  {
+   "name": "tag-search-has-no-blog-name",
+   "item": "50",
+   "surface": "search_tags",
+   "fact": "Tag search sends no blog name: an absent name is a gap of that surface, not an unnamed blog.",
+   "raw": {
+    "logNo": 7,
+    "blogId": "tag_blog",
+    "title": "태그 글",
+    "contents": "요약"
+   },
+   "expect": {
+    "id": "post:tag_blog/7",
+    "blog_id": "tag_blog",
+    "log_no": "7",
+    "url": "https://blog.naver.com/tag_blog/7",
+    "title": "태그 글",
+    "summary": "요약",
+    "created_at": null,
+    "blog_name": null,
+    "nickname": null,
+    "category_no": null,
+    "category_name": null,
+    "like_count": null,
+    "comment_count": null,
+    "view_count": null,
+    "labels": []
+   }
+  },
+  {
+   "name": "truncated-emoji",
+   "item": "18",
+   "surface": "search_posts",
+   "fact": "A summary cut mid-emoji leaves a lone surrogate, which is removed (it cannot be written as UTF-8).",
+   "raw": {
+    "logNo": 8,
+    "blogId": "b",
+    "title": "x",
+    "contents": "맛있어요 \ud83d"
+   },
+   "expect": {
+    "id": "post:b/8",
+    "blog_id": "b",
+    "log_no": "8",
+    "url": "https://blog.naver.com/b/8",
+    "title": "x",
+    "summary": "맛있어요",
+    "created_at": null,
+    "blog_name": null,
+    "nickname": null,
+    "category_no": null,
+    "category_name": null,
+    "like_count": null,
+    "comment_count": null,
+    "view_count": null,
+    "labels": []
+   }
+  },
+  {
+   "name": "like-count-names",
+   "item": "16",
+   "surface": "feed",
+   "fact": "The same count is sympathyCount, sympathyCnt or likeCount depending on the surface; comments commentCount or commentCnt.",
+   "raw": {
+    "logNo": 9,
+    "blogId": "b",
+    "title": "x",
+    "likeCount": 4,
+    "commentCount": 1
+   },
+   "expect": {
+    "id": "post:b/9",
+    "blog_id": "b",
+    "log_no": "9",
+    "url": "https://blog.naver.com/b/9",
+    "title": "x",
+    "summary": "",
+    "created_at": null,
+    "blog_name": null,
+    "nickname": null,
+    "category_no": null,
+    "category_name": null,
+    "like_count": 4,
+    "comment_count": 1,
+    "view_count": null,
+    "labels": []
+   }
+  },
+  {
+   "name": "feed-own-money-name",
+   "item": "17",
+   "surface": "feed",
+   "fact": "feed/v1 spells the own-money flag buyWithMyOwnMoney.",
+   "raw": {
+    "logNo": 10,
+    "blogId": "b",
+    "title": "x",
+    "buyWithMyOwnMoney": true
+   },
+   "expect": {
+    "id": "post:b/10",
+    "blog_id": "b",
+    "log_no": "10",
+    "url": "https://blog.naver.com/b/10",
+    "title": "x",
+    "summary": "",
+    "created_at": null,
+    "blog_name": null,
+    "nickname": null,
+    "category_no": null,
+    "category_name": null,
+    "like_count": null,
+    "comment_count": null,
+    "view_count": null,
+    "labels": [
+     "own-money"
+    ]
+   }
+  },
+  {
+   "name": "no-log-no-is-not-a-post",
+   "item": "16",
+   "surface": "search_posts",
+   "raw": {
+    "blogId": "b",
+    "title": "x"
+   },
+   "expect": null
+  },
+  {
+   "name": "no-blog-is-not-a-post",
+   "item": "16",
+   "surface": "search_posts",
+   "raw": {
+    "logNo": 1,
+    "title": "x"
+   },
+   "expect": null
+  },
+  {
+   "name": "string-false-is-not-a-flag",
+   "item": "17",
+   "surface": "search_posts",
+   "fact": "Only a real true sets a label.",
+   "raw": {
+    "logNo": 11,
+    "blogId": "b",
+    "title": "x",
+    "isBuyWithMyOwnMoney": "false",
+    "postBlocked": 0
+   },
+   "expect": {
+    "id": "post:b/11",
+    "blog_id": "b",
+    "log_no": "11",
+    "url": "https://blog.naver.com/b/11",
+    "title": "x",
+    "summary": "",
+    "created_at": null,
+    "blog_name": null,
+    "nickname": null,
+    "category_no": null,
+    "category_name": null,
+    "like_count": null,
+    "comment_count": null,
+    "view_count": null,
+    "labels": []
+   }
+  },
+  {
+   "name": "undated",
+   "item": "19",
+   "surface": "search_posts",
+   "raw": {
+    "logNo": 12,
+    "blogId": "b",
+    "title": "x",
+    "addDate": ""
+   },
+   "expect": {
+    "id": "post:b/12",
+    "blog_id": "b",
+    "log_no": "12",
+    "url": "https://blog.naver.com/b/12",
+    "title": "x",
+    "summary": "",
+    "created_at": null,
+    "blog_name": null,
+    "nickname": null,
+    "category_no": null,
+    "category_name": null,
+    "like_count": null,
+    "comment_count": null,
+    "view_count": null,
+    "labels": []
+   }
+  }
+ ],
+ "stamp": [
+  {
+   "input": 1792368000000,
+   "output": "2026-10-19T09:00+09:00"
+  },
+  {
+   "input": "1792368000000",
+   "output": "2026-10-19T09:00+09:00"
+  },
+  {
+   "input": "2026-10-18T09:30:00+0900",
+   "output": "2026-10-18T09:30+09:00"
+  },
+  {
+   "input": "2026-10-18T00:30:00+09:00",
+   "output": "2026-10-18T00:30+09:00"
+  },
+  {
+   "input": "2026-10-18T00:30:00Z",
+   "output": "2026-10-18T09:30+09:00"
+  },
+  {
+   "input": "2026-10-18 09:30",
+   "output": "2026-10-18T09:30+09:00",
+   "fact": "A zone-less time is KST."
+  },
+  {
+   "input": null,
+   "output": null
+  },
+  {
+   "input": "",
+   "output": null
+  },
+  {
+   "input": "not a date",
+   "output": null
+  },
+  {
+   "input": true,
+   "output": null
+  }
+ ],
+ "clean": [
+  {
+   "input": "<em>성수</em> 카페",
+   "output": "성수 카페"
+  },
+  {
+   "input": "a &amp; b &#39;c&#39;",
+   "output": "a & b 'c'"
+  },
+  {
+   "input": "​﻿폭 없음‍",
+   "output": "폭 없음"
+  },
+  {
+   "input": "  공백  ",
+   "output": "공백"
+  },
+  {
+   "input": null,
+   "output": null
+  },
+  {
+   "input": "<span class=\"x\">태그</span> 제거",
+   "output": "태그 제거"
+  }
+ ]
+}
