@@ -10,7 +10,7 @@ from sns import reading
 from sns.cmdline import command_line, words
 from sns.errors import SnsError
 from sns.page import Page
-from sns.paging import paginate
+from sns.paging import END, paginate
 from sns.x import web
 
 
@@ -36,12 +36,15 @@ def post(platform, invocation):
 
     def read(connection, state, out):
         page = connection.client.post_page(target.post_id, sort=sort)
-        records = page.records
+        records, cut = page.records, []
         if options.get('limit') is not None:
-            records = _limit_replies(records, options['limit'])
+            records, cut = _limit_replies(records, options['limit'])
         shown_ids = [r['id'] for r in records if r.get('id')]
-        result = {'results': records, 'stop_reason': 'exhausted', 'details': {'replies': page.coverage},
-                  'coverage': _coverage(page.coverage)}
+        replies = [r for r in records if r.get('role') == 'reply' and not r.get('unavailable')]
+        coverage = {**page.coverage, 'direct_shown': sum(1 for r in replies if r.get('depth') == 0),
+                    'nested_shown': sum(1 for r in replies if (r.get('depth') or 0) > 0)}  # what is shown, not received
+        result = {'results': records, 'stop_reason': 'exhausted', 'details': {'replies': coverage},
+                  'coverage': _coverage(coverage)}
         for record in records:
             if record.get('role') == 'reply' and _has_more(record, records):
                 number = _handle(connection, result, _branch(record, sort))
@@ -56,9 +59,10 @@ def post(platform, invocation):
         if number is not None:
             result['coverage'].append(f'X hid some replies as probable spam or low quality; replies {number} reads '
                                       'them')
+        # the replies --limit cut wait in the handle, so more: shows them before it asks for the next batch
         number = _handle(connection, result, {'kind': 'direct', 'post_id': target.post_id, 'sort': sort,
-                                              'cursor': page.cursor, 'seen': shown_ids, 'pending': []}) \
-            if page.cursor else None
+                                              'cursor': page.cursor or END, 'seen': shown_ids, 'pending': cut}) \
+            if page.cursor or cut else None
         if number is not None:
             result['next'] = command_line(invocation.cli_path, words(platform.key, 'replies', str(number), [], options))
             result['stop_reason'] = 'limit_reached'
@@ -118,17 +122,17 @@ def _has_more(record, records):
 
 
 def _limit_replies(records, limit):
-    """Parents and the post, then the first `limit` conversation threads (each reply with what hangs under it)."""
-    kept, threads = [], 0
+    """(parents and the post, then the first `limit` conversation threads — each reply with what hangs under it; the
+    replies cut)."""
+    kept, cut, threads = [], [], 0
     for record in records:
         if record.get('role') != 'reply':
             kept.append(record)
             continue
         if record.get('depth') == 0:
             threads += 1
-        if threads <= limit:
-            kept.append(record)
-    return kept
+        (kept if threads <= limit else cut).append(record)
+    return kept, cut
 
 
 def _replies(platform, connection, invocation, start, out):

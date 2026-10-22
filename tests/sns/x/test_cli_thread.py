@@ -131,6 +131,20 @@ def test_limit_keeps_the_first_threads_whole(browser):
     assert code == 0 and 'post 103' in out and 'post 104' not in out
 
 
+def test_a_limit_counts_what_it_shows_and_keeps_the_rest_for_more(browser):
+    """Found by grading a contrast run: with --limit the replies line still said every reply of the batch was shown, and
+    the replies --limit cut were lost (more: started at the next batch). The line counts what is shown; more: shows the
+    cut replies first, without a request."""
+    known_tab(browser).respond('x.query', query_result(FIRST, headers=RATE))
+    code, out, _ = post(browser, '101', '--limit', '1')
+    assert code == 0 and 'replies: 1 direct and 1 nested shown of 40' in out, out
+    more = next(line for line in out.splitlines() if line.startswith('more: '))
+    browser.respond('x.state', state())
+    code, out, _ = rerun(browser, more)  # more: carries --limit 1
+    assert code == 0 and 'post 104' in out and 'requests=0' in out.splitlines()[0], out
+    assert len(queries(browser)) == 1  # the cut replies came from the handle
+
+
 def test_a_deleted_post_is_unavailable(browser):
     tomb = {'__typename': 'TweetTombstone', 'tombstone': {'text': {'text': 'This post was deleted.'}}}
     gone = detail([{'entryId': 'tweet-101', 'content': {'itemContent': {'itemType': 'TimelineTweet',
