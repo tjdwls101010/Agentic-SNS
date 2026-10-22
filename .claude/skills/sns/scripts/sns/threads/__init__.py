@@ -14,13 +14,15 @@ FEED_CHOICES = ['foryou', 'following']
 PROFILE_TABS = ['threads', 'replies', 'reposts', 'media']
 GRAPH_RELATIONS = ['followers', 'following']
 ME_COLLECTIONS = ['liked', 'saved']
+ACTIVITY_FILTERS = list(web.ACTIVITY_FILTERS)
 REPLY_SORTS = ['top', 'recent']
 SEARCH_TYPES = ['posts', 'tags', 'accounts']
 SEARCH_SORTS = ['top', 'recent']
 
 CHOICES = {
     'feed.feed': FEED_CHOICES, 'profile.tab': PROFILE_TABS, 'graph.relation': GRAPH_RELATIONS,
-    'me.collection': ME_COLLECTIONS, 'search.type': SEARCH_TYPES, 'search.sort': SEARCH_SORTS,
+    'me.collection': ME_COLLECTIONS, 'activity.filter': ACTIVITY_FILTERS,
+    'search.type': SEARCH_TYPES, 'search.sort': SEARCH_SORTS,
     'post.sort': REPLY_SORTS,
 }
 
@@ -64,6 +66,12 @@ def _chars(value):
     if value.isascii() and value.isdigit():
         return int(value)
     raise argparse.ArgumentTypeError('expected 0 (full text) or a positive integer')
+
+
+def _activity_limit(value):
+    if value.isascii() and value.isdigit() and 1 <= int(value) <= 50:
+        return int(value)
+    raise argparse.ArgumentTypeError('expected an integer from 1 to 50')
 
 
 def _run(function):
@@ -121,6 +129,22 @@ COMMANDS = {
         'run': _run(listing.me),
         'arguments': [(('collection',), {'choices': ME_COLLECTIONS, 'help': 'liked or saved'}), *LIST],
         'epilog': ['One batch, as Threads sends it (stopped=not_paginable): not your whole history.',
+                   'requests: 1.'],
+        'exits': (0, 2, 3, 4, 5, 6, 7, 8),
+    },
+    'activity': {
+        'help': 'Read your activity (notifications) list without marking it seen.',
+        'run': _run(listing.notifications),
+        'arguments': [(('--filter',), {'choices': ACTIVITY_FILTERS, 'default': 'all',
+                                       'help': 'App activity filter (default: all); requests means follow requests'}),
+                      (('--limit',), {'type': _activity_limit, 'default': 20, 'metavar': 'N',
+                                     'help': 'Rows to request in this page (default 20; 1 to 50)'}),
+                      'json', (('--chars',), {'type': _chars, 'metavar': 'N',
+                                            'help': 'Characters of each notification to show (default 180; 0 = all)'})],
+        'epilog': ['Reads one page in Threads\' order. If Threads says older activity exists, stopped=server_capped '
+                   'and the coverage line say only this page was read; no next page is requested.',
+                   'Reading the list sends no seen change (the app marks notifications seen only when its activity '
+                   'screen opens, which this skill never does); seen state as observed on 2026-10-22.',
                    'requests: 1.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8),
     },
@@ -202,7 +226,8 @@ COMMANDS = {
 
 # What every reading command's output holds beyond the shared description (the core's text names no Threads record
 # kinds and knows nothing of the dedicated tab).
-RECORDS = ('records: one block per record, labelled [p1] post, [r1] reply, [a1] account, each ending with the arguments '
+RECORDS = ('records: one block per record, labelled [p1] post, [r1] reply, [a1] account, [n1] notification, '
+           'each ending with the arguments '
            'of the next command (url: post <url> opens that one post; author; replies <handle>).')
 TAB = ('the dedicated tab: the skill reads from its own threads.com tab. Opening it (or loading it again after it was '
        'emptied) costs about 34-40 requests the page makes itself, shown as "tab opened" and counted apart from the '
@@ -210,6 +235,6 @@ TAB = ('the dedicated tab: the skill reads from its own threads.com tab. Opening
        'requests the page itself sends while a read runs are counted with that read, so requests= can be a few more than the requests: line of a command says; requests the open tab made between commands are shown as unwatched=, not charged, but a block seen there stops '
        'the command before it sends anything; static files do not count. The tab is emptied (about:blank) about 5 '
        'minutes after the last command.')
-for _name in ('feed', 'profile', 'about', 'graph', 'me', 'search', 'post', 'replies', 'quotes', 'reposts'):
+for _name in ('feed', 'profile', 'about', 'graph', 'me', 'activity', 'search', 'post', 'replies', 'quotes', 'reposts'):
     COMMANDS[_name]['epilog'] = [*COMMANDS[_name]['epilog'], RECORDS, TAB]
 COMMANDS['images']['epilog'] = [*COMMANDS['images']['epilog'], TAB]

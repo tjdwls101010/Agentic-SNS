@@ -151,3 +151,17 @@ def me(platform, invocation):
                        words=[collection], fetch=lambda cursor: connection.client.mine(collection))
 
     return reading.run(platform, invocation, command='me', target=None, identity=identity, reader=read)
+
+
+def notifications(platform, invocation):
+    """Your activity list: only the first page has been verified to answer without marking anything seen."""
+    options = invocation.options
+    identity = {'filter': options['filter']}
+
+    def read(connection, state, out):
+        page = connection.client.notifications(options['filter'], options['limit'])
+        # The pagination query has not answered live, so a next-page flag is coverage rather than a continuation.
+        coverage = ['Threads says older activity exists; only this page was read'] if page.stop else []
+        return {'results': page.records, 'stop_reason': page.stop or 'exhausted', 'coverage': coverage}
+
+    return reading.run(platform, invocation, command='activity', target=None, identity=identity, reader=read)

@@ -602,6 +602,20 @@
    },
    "args": null
   },
+  "activity": {
+   "name": "BarcelonaActivityFeedV2StoryListContainerQuery",
+   "doc_id": "27957944693878890",
+   "endpoint": "/api/graphql/",
+   "root": null,
+   "providers": [
+    "BarcelonaHasCommunityTopContributors.relayprovider",
+    "BarcelonaHasViewerReplied.relayprovider",
+    "BarcelonaHasWebFavicons.relayprovider"
+   ],
+   "route": null,
+   "variables": {"first": 20, "selected_filters": null},
+   "args": ["first", "selected_filters"]
+  },
   "liked": {
    "name": "BarcelonaLikedPageViewerQuery",
    "doc_id": "28667284016233130",

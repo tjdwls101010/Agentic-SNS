@@ -102,13 +102,25 @@ def _replies_line(replies):
             f'{replies.get("unavailable", 0)} unavailable')
 
 
+def notification(record, label, chars):
+    unseen = record.get('unseen')
+    seen = 'unseen' if unseen is True else 'seen' if unseen is False else 'seen unknown'
+    return (f'[{label}] {_time(record.get("created_at"))} · {_line(record.get("notification_type") or "?")} · {seen}\n'
+            f'     {_shown(record.get("text"), chars)}\n'
+            f'     url: {_handle(record.get("url"))}')
+
+
 def render(envelope, chars, command):
     """The record lines of a text page (a post read's replies line first). chars None: the default; 0: everything
     received."""
     limit = limit_of(chars)
     lines = [_replies_line(envelope['replies'])] if envelope.get('replies') else []
-    labels, counts = {}, {'p': 0, 'r': 0, 'a': 0}
+    labels, counts = {}, {'p': 0, 'r': 0, 'a': 0, 'n': 0}
     for record in envelope.get('results') or []:
+        if record.get('kind') == 'notification':
+            counts['n'] += 1
+            lines.append(notification(record, f'n{counts["n"]}', limit))
+            continue
         if record.get('kind') == 'image':
             counts['i'] = counts.get('i', 0) + 1
             lines.append(image_line(record, f'i{counts["i"]}'))

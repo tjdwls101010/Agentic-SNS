@@ -1,4 +1,5 @@
-"""What each record field means, for `schema post` and `schema account`."""
+"""What each record field means, for `schema post`, `schema account` and `schema notification`."""
+from sns.threads.web.records.notifications import SCHEMA as NOTIFICATION
 
 POST = {
     'object': 'post',
@@ -66,4 +67,4 @@ ACCOUNT = {
     },
 }
 
-SCHEMAS = {'post': POST, 'account': ACCOUNT}
+SCHEMAS = {'post': POST, 'account': ACCOUNT, 'notification': NOTIFICATION}

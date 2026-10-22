@@ -30,6 +30,12 @@ OPEN_RESERVE = 40
 LEARN_LIMIT = 3     # document reads one command may spend learning queries (each is one request)
 RELOAD_LIMIT = 1    # tab reloads one command may spend when the app's own module was refused
 REOPEN_LIMIT = 1    # tabs one command may replace after Aside lost the one it used
+ACTIVITY_FILTERS = {
+    'all': None, 'mentions': 'text_post_app_mentions', 'replies': 'text_post_app_replies',
+    'quotes': 'text_post_app_quote_posts', 'reposts': 'text_post_app_reposts', 'follows': 'text_post_app_user_follows',
+    'conversations': 'text_post_app_conversations', 'following': 'text_post_app_following',
+    'requests': 'text_post_app_private_follow_requests',
+}
 LOAD_WAIT = 20      # seconds to wait for a tab to finish loading
 _GONE = 'Run the command again; it opens a new tab.'
 # What the request log says an answer was
@@ -458,7 +464,7 @@ class Client:
             self.session.learn(name, doc_id, flags)
 
     def query(self, key, variables, *, route=None, missing=None):
-        """The decoded payload of one read query; a refused one is learned again once (see the module docstring)."""
+        """One read query; route null forbids recovery through any screen, including a tab reload."""
         spec = self._spec(key)
         for attempt in range(2):
             if not spec['name']:
@@ -478,6 +484,7 @@ class Client:
                 else classify.response(r, mode='graphql')), key)
             used = result.get('used') or {}
             if verdict.kind == 'failed' and verdict.reason == 'rejected_query' and not attempt:
+                self._require_route(spec)  # mounting activity marks it seen, even when the refused id came from live
                 if self.guard.checking:
                     raise SnsError('failed', 'Threads no longer runs this query as sent.', classify.REJECTED_FIX,
                                    reason='stale')
@@ -522,8 +529,9 @@ class Client:
     def _learn(self, key, spec, route):
         """Learn `key`'s current id from the screen that uses it: its preloaders, then its bundles, then a renamed
         successor found by argument names and root field. Raises when none is certain."""
+        self._require_route(spec)
         self._recover('learn')
-        path = (spec.get('route') or '/').format(**(route or {}))
+        path = spec['route'].format(**(route or {}))
         html = self.page(path, setup=True, kind='recovery')
         found = learn.preloaders(html)
         flags = {}
@@ -557,6 +565,13 @@ class Client:
                 return
         raise SnsError('failed', f'Threads no longer serves {spec["name"]} and no single successor was found.',
                        'Tell the user the Threads reader needs an update.', reason='stale')
+
+    def _require_route(self, spec):
+        """A null route is a read whose screen must never be opened to recover a refused query."""
+        if spec.get('route') is None:
+            raise SnsError('failed', 'Threads no longer accepts the stored activity query. The skill does not open '
+                           'the activity screen to relearn it, because opening it marks notifications seen.',
+                           'Tell the user the Threads activity reader needs an updated stored query.', reason='stale')
 
     def page(self, path, *, setup=False, kind=None):
         """The HTML of one Threads document on the read surface, redirects followed by the rules (at most three)."""
@@ -736,6 +751,11 @@ class Client:
         """The viewer's liked or saved posts (one batch)."""
         payload = self.query(collection, {}, route={})
         return self._read(collection, lambda: records.connection_page(payload['data'], collection))
+
+    def notifications(self, filter_word, limit):
+        """Your activity list: one query, no activity screen and no seen mutation."""
+        payload = self.query('activity', {'first': limit, 'selected_filters': ACTIVITY_FILTERS[filter_word]})
+        return self._read('activity', lambda: records.notifications_page(payload['data']))
 
     def search_posts(self, text, *, recent, tag, cursor, filters=None):
         variables = {'query': text, 'recent': 1 if recent else 0, 'search_surface': 'tags' if tag else 'default',
