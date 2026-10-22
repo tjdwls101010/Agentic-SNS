@@ -1,0 +1,1 @@
+${SNS_TASK_CROSS_EVENT} 얘기가 X랑 Threads에서 각각 어떻게 받아들여지고 있는지 비교해줘.

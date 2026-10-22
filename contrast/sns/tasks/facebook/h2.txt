@@ -1,0 +1,1 @@
+페이스북에서 ${SNS_TASK_FACEBOOK_TOPIC} 검색해서 사람들 반응 정리해줘.
