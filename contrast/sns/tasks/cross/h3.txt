@@ -1,0 +1,1 @@
+${SNS_TASK_CROSS_PRODUCT4}에 대해 X와 Threads에서 사람들이 하는 얘기가 어떻게 다른지 비교해줘.

@@ -1,0 +1,1 @@
+${SNS_TASK_REDDIT_POST_URL2} 이 스레드 댓글 끝까지 읽고 의견 갈래를 정리해줘.
