@@ -1,0 +1,866 @@
+{
+  "about": "Synthetic GraphQL bodies for search entities (appendix A 43) and About fields (44). Same case format as records_posts.json. About cases give bodies (one body_lines list per response) because About reads an overview and then one response per collection.",
+  "cases": [
+    {
+      "name": "people-vertical",
+      "item": "43",
+      "fact": "An entity is a result-root node with __typename User, Page or Group and an id, a string name and a string url. In the people vertical a User is a person. verified is is_verified when it is a boolean, else null. Repeated ids appear once.",
+      "parser": "search",
+      "args": {
+        "search_type": "people"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "serpResponse": {
+              "results": {
+                "edges": [
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "500",
+                          "name": "Sample Person",
+                          "url": "https://www.facebook.com/sample.person",
+                          "is_verified": true
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  },
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "501",
+                          "name": "Sample Person",
+                          "url": "https://www.facebook.com/profile.php?id=501",
+                          "is_verified": "no"
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  },
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "500",
+                          "name": "Sample Person",
+                          "url": "https://www.facebook.com/sample.person",
+                          "is_verified": true
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  },
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "502",
+                          "name": null,
+                          "url": "https://www.facebook.com/x"
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": true,
+                  "end_cursor": "SCUR1"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "kind": "person",
+            "id": "500",
+            "name": "Sample Person",
+            "url": "https://www.facebook.com/sample.person",
+            "verified": true
+          },
+          {
+            "kind": "person",
+            "id": "501",
+            "verified": null
+          }
+        ],
+        "page_info": {
+          "has_next_page": true,
+          "end_cursor": "SCUR1"
+        },
+        "issues": []
+      }
+    },
+    {
+      "name": "pages-vertical-user-typename-is-a-page",
+      "item": "43",
+      "fact": "In the pages vertical Facebook sends pages with __typename User, so the vertical decides the kind.",
+      "parser": "search",
+      "args": {
+        "search_type": "pages"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "serpResponse": {
+              "results": {
+                "edges": [
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "600",
+                          "name": "Example Page",
+                          "url": "https://www.facebook.com/examplepage",
+                          "is_verified": false
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "kind": "page",
+            "id": "600",
+            "name": "Example Page",
+            "verified": false
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "groups-vertical-keeps-only-groups",
+      "item": "43",
+      "fact": "Group is unambiguous. The groups vertical drops non-Group nodes (nested users are members or admins, not results).",
+      "parser": "search",
+      "args": {
+        "search_type": "groups"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "serpResponse": {
+              "results": {
+                "edges": [
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "Group",
+                          "id": "700",
+                          "name": "Example Group",
+                          "url": "https://www.facebook.com/groups/700/"
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  },
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "701",
+                          "name": "An Admin",
+                          "url": "https://www.facebook.com/an.admin"
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "kind": "group",
+            "id": "700",
+            "name": "Example Group",
+            "url": "https://www.facebook.com/groups/700/"
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "top-search-index-order-and-no-authors",
+      "item": "43",
+      "fact": "Only result wrappers (node, result, entity, profile, group, page, user, rendering_strategy, view_model) are followed; a Story, Comment or feedback-bearing node is not entered, so a post's author is not an entity. A top search keeps the connection's index order even when deferred pieces arrive out of order.",
+      "parser": "search",
+      "args": {
+        "search_type": "top"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "serpResponse": {
+              "results": {
+                "edges": [
+                  {
+                    "rendering_strategy": {
+                      "view_model": null
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  },
+                  {
+                    "rendering_strategy": {
+                      "view_model": null
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  },
+                  {
+                    "node": {
+                      "__typename": "Story",
+                      "feedback": {
+                        "id": "SF1"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "a post in search"
+                      },
+                      "actors": [
+                        {
+                          "__typename": "User",
+                          "id": "800",
+                          "name": "Post Author",
+                          "url": "https://www.facebook.com/post.author"
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": true,
+                  "end_cursor": "SCUR2"
+                }
+              }
+            }
+          }
+        },
+        {
+          "path": [
+            "serpResponse",
+            "results",
+            "edges",
+            1,
+            "rendering_strategy"
+          ],
+          "data": {
+            "view_model": {
+              "profile": {
+                "__typename": "Page",
+                "id": "610",
+                "name": "Second Result Page",
+                "url": "https://www.facebook.com/secondpage"
+              }
+            }
+          }
+        },
+        {
+          "path": [
+            "serpResponse",
+            "results",
+            "edges",
+            0,
+            "rendering_strategy"
+          ],
+          "data": {
+            "view_model": {
+              "profile": {
+                "__typename": "User",
+                "id": "510",
+                "name": "First Result Person",
+                "url": "https://www.facebook.com/first.person"
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "kind": "person",
+            "id": "510"
+          },
+          {
+            "kind": "page",
+            "id": "610"
+          },
+          {
+            "id": "SF1",
+            "text": "a post in search",
+            "author_name": "Post Author",
+            "source": "search"
+          }
+        ],
+        "page_info": {
+          "has_next_page": true,
+          "end_cursor": "SCUR2"
+        },
+        "issues": []
+      }
+    },
+    {
+      "name": "posts-vertical-has-no-entities",
+      "item": "43",
+      "fact": "The posts vertical returns posts only.",
+      "parser": "search",
+      "args": {
+        "search_type": "posts"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "serpResponse": {
+              "results": {
+                "edges": [
+                  {
+                    "node": {
+                      "__typename": "Story",
+                      "feedback": {
+                        "id": "SF2"
+                      },
+                      "creation_time": 1767225600,
+                      "message": {
+                        "text": "only posts here"
+                      }
+                    }
+                  },
+                  {
+                    "rendering_strategy": {
+                      "view_model": {
+                        "profile": {
+                          "__typename": "User",
+                          "id": "520",
+                          "name": "Not In Posts",
+                          "url": "https://www.facebook.com/np"
+                        }
+                      }
+                    },
+                    "node": {
+                      "role": "ENTITY_USER",
+                      "__typename": "SearchRenderable"
+                    }
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "SF2",
+            "text": "only posts here"
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "about-overview-collections",
+      "item": "19,44",
+      "fact": "The About overview (collectionToken null) lists all_collections.nodes [{name, id}] in response order; a node without a string name and id is skipped; ids appear once.",
+      "parser": "about_collections",
+      "args": {},
+      "body_lines": [
+        {
+          "data": {
+            "user": {
+              "about_app_sections": {
+                "nodes": [
+                  {
+                    "all_collections": {
+                      "nodes": [
+                        {
+                          "name": "Work and education",
+                          "id": "COL_WORK"
+                        },
+                        {
+                          "name": "Places lived",
+                          "id": "COL_PLACES"
+                        },
+                        {
+                          "name": "Broken",
+                          "id": 5
+                        },
+                        {
+                          "name": "Work and education",
+                          "id": "COL_WORK"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "collections": [
+          {
+            "name": "Work and education",
+            "id": "COL_WORK"
+          },
+          {
+            "name": "Places lived",
+            "id": "COL_PLACES"
+          }
+        ]
+      }
+    },
+    {
+      "name": "about-fields-across-collections",
+      "item": "44",
+      "fact": "Fields are profile_fields.nodes[] of a node carrying field_section_type (locale-independent): title.text, field_type, link_url. They dedupe on (section, text); the same text in another section is kept. collection is the viewer-language name of the tab it came from, null for the overview.",
+      "parser": "about",
+      "args": {
+        "profile_id": "4",
+        "collection_names": [
+          null,
+          "Work and education"
+        ]
+      },
+      "bodies": [
+        [
+          {
+            "data": {
+              "user": {
+                "about_app_sections": {
+                  "nodes": [
+                    {
+                      "activeCollections": {
+                        "nodes": [
+                          {
+                            "style_renderer": {
+                              "profile_field_sections": [
+                                {
+                                  "field_section_type": "overview",
+                                  "profile_fields": {
+                                    "nodes": [
+                                      {
+                                        "title": {
+                                          "text": "Works at Example Co"
+                                        },
+                                        "field_type": "work",
+                                        "link_url": "https://www.facebook.com/exampleco"
+                                      },
+                                      {
+                                        "title": {
+                                          "text": "Lives in Example City"
+                                        },
+                                        "field_type": "current_city"
+                                      },
+                                      {
+                                        "title": null
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ],
+        [
+          {
+            "data": {
+              "user": {
+                "about_app_sections": {
+                  "nodes": [
+                    {
+                      "activeCollections": {
+                        "nodes": [
+                          {
+                            "style_renderer": {
+                              "profile_field_sections": [
+                                {
+                                  "field_section_type": "work",
+                                  "profile_fields": {
+                                    "nodes": [
+                                      {
+                                        "title": {
+                                          "text": "Works at Example Co"
+                                        },
+                                        "field_type": "work"
+                                      },
+                                      {
+                                        "title": {
+                                          "text": "Works at Example Co"
+                                        },
+                                        "field_type": "work"
+                                      },
+                                      {
+                                        "title": {
+                                          "text": "Studied at Example School"
+                                        },
+                                        "field_type": "education",
+                                        "link_url": 7
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      ],
+      "expected": {
+        "records": [
+          {
+            "profile_id": "4",
+            "section": "overview",
+            "collection": null,
+            "field_type": "work",
+            "text": "Works at Example Co",
+            "url": "https://www.facebook.com/exampleco"
+          },
+          {
+            "profile_id": "4",
+            "section": "overview",
+            "collection": null,
+            "field_type": "current_city",
+            "text": "Lives in Example City",
+            "url": null
+          },
+          {
+            "profile_id": "4",
+            "section": "work",
+            "collection": "Work and education",
+            "text": "Works at Example Co",
+            "url": null
+          },
+          {
+            "profile_id": "4",
+            "section": "work",
+            "collection": "Work and education",
+            "field_type": "education",
+            "text": "Studied at Example School",
+            "url": null
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "about-errors-are-issues-unrelated-patches-are-not",
+      "item": "44 (calibrated by P2 capture)",
+      "fact": "About fields are read from every piece of the response wherever they arrive, so a deferred piece that carries fields is used, and one that carries none (a real About response always defers its navigation, timeline_nav_app_sections) changes nothing. An error can have dropped fields, so any error is an issue.",
+      "parser": "about",
+      "args": {
+        "profile_id": "4",
+        "collection_names": [
+          null
+        ]
+      },
+      "bodies": [
+        [
+          {
+            "data": {
+              "user": {
+                "about_app_sections": {
+                  "nodes": [
+                    {
+                      "x": {
+                        "field_section_type": "overview",
+                        "profile_fields": {
+                          "nodes": [
+                            {
+                              "title": {
+                                "text": "Visible field"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "errors": [
+              {
+                "message": "a section failed",
+                "path": [
+                  "user",
+                  "about_app_sections",
+                  "nodes",
+                  0,
+                  "y"
+                ]
+              }
+            ]
+          },
+          {
+            "path": [
+              "user",
+              "about_app_sections",
+              "nodes",
+              0
+            ],
+            "data": {
+              "z": {
+                "unread": 1
+              }
+            }
+          }
+        ]
+      ],
+      "expected": {
+        "records": [
+          {
+            "section": "overview",
+            "text": "Visible field"
+          }
+        ],
+        "issues": [
+          "graphql_errors"
+        ]
+      }
+    },
+    {
+      "name": "group-card-from-the-group-header",
+      "item": "R5 (P2 capture)",
+      "fact": "CometGroupRootQuery {groupID} answers data.group.profile_header_renderer.group: name, url, group_address (vanity), privacy_info.title.text (viewer language) and icon_name (locale-independent), group_member_profiles.formatted_count_text (a formatted string, not a number), viewer_join_state, has_membership_questions.",
+      "parser": "group_card",
+      "args": {
+        "group_id": "700"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "group": {
+              "id": "700",
+              "profile_header_renderer": {
+                "group": {
+                  "__typename": "Group",
+                  "id": "700",
+                  "name": "Example Group",
+                  "url": "https://www.facebook.com/groups/examplegroup/",
+                  "group_address": "examplegroup",
+                  "privacy_info": {
+                    "icon_name": "globe-americas",
+                    "title": {
+                      "text": "Public group",
+                      "ranges": []
+                    }
+                  },
+                  "group_member_profiles": {
+                    "formatted_count_text": "90K members"
+                  },
+                  "viewer_join_state": "CAN_JOIN",
+                  "has_membership_questions": false,
+                  "group_type_name_for_content": "GROUP"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "kind": "group",
+            "id": "700",
+            "name": "Example Group",
+            "url": "https://www.facebook.com/groups/examplegroup/",
+            "vanity": "examplegroup",
+            "privacy": "Public group",
+            "privacy_icon": "globe-americas",
+            "member_count_text": "90K members",
+            "join_state": "CAN_JOIN",
+            "membership_questions": false
+          }
+        ],
+        "issues": []
+      }
+    },
+    {
+      "name": "group-about-units",
+      "item": "R5 (P4 capture)",
+      "fact": "CometGroupAboutRootQuery {groupID} answers data.group.about_feed_units: an about card (description_with_entities.text; about_info_items with privacy_info label and description), a members card, an activity card (number_of_posts_in_last_day and _month as integers, created_time, group_total_members_info_text as the viewer-language exact total), and a rules card (group_rules.nodes[] rule_title, description).",
+      "parser": "group_about",
+      "args": {},
+      "body_lines": [
+        {
+          "data": {
+            "group": {
+              "id": "700",
+              "about_feed_units": [
+                {
+                  "__typename": "GroupsAboutFeedAboutCardUnit",
+                  "group": {
+                    "id": "700",
+                    "description_with_entities": {
+                      "text": "A group about examples.",
+                      "ranges": []
+                    },
+                    "about_info_items": [
+                      {
+                        "__typename": "XFBPrivacyGroupsAboutInfoItem",
+                        "group": {
+                          "privacy_info": {
+                            "label": {
+                              "text": "Public"
+                            },
+                            "description": {
+                              "text": "Anyone can see who's in the group and what they post."
+                            },
+                            "icon_name": "globe-americas"
+                          },
+                          "id": "700"
+                        }
+                      }
+                    ]
+                  }
+                },
+                {
+                  "__typename": "GroupsAboutFeedMembersCardUnit",
+                  "group": {
+                    "id": "700",
+                    "group_member_profiles": {
+                      "formatted_count_text": "90K members"
+                    }
+                  }
+                },
+                {
+                  "__typename": "GroupsAboutFeedActivityCardUnit",
+                  "group": {
+                    "id": "700",
+                    "created_time": 1767225600,
+                    "number_of_posts_in_last_day": 62,
+                    "number_of_posts_in_last_month": 1986,
+                    "group_total_members_info_text": "90,355 total members"
+                  }
+                },
+                {
+                  "__typename": "GroupsAboutFeedRulesCardUnit",
+                  "group": {
+                    "id": "700",
+                    "group_rules": {
+                      "nodes": [
+                        {
+                          "id": "r1",
+                          "rule_title": "Be kind",
+                          "description": "No insults."
+                        },
+                        {
+                          "id": "r2",
+                          "rule_title": "No spam",
+                          "description": null
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "description": "A group about examples.",
+            "privacy_description": "Anyone can see who's in the group and what they post.",
+            "member_count_text": "90,355 total members",
+            "posts_last_day": 62,
+            "posts_last_month": 1986,
+            "created_at": "2026-01-01T00:00:00Z",
+            "rules": [
+              {
+                "title": "Be kind",
+                "description": "No insults."
+              },
+              {
+                "title": "No spam",
+                "description": null
+              }
+            ]
+          }
+        ],
+        "issues": []
+      }
+    }
+  ]
+}

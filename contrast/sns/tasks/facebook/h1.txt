@@ -1,0 +1,1 @@
+${SNS_TASK_FACEBOOK_PAGE} 페이지는 어떤 곳이고 최근에 무엇을 올렸어?

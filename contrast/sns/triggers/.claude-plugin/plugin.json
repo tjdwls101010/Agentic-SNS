@@ -1,0 +1,5 @@
+{
+  "name": "sns-trigger-eval",
+  "version": "0.0.0",
+  "description": "Wrapper that loads the sns skill so claude plugin eval can measure when its description triggers."
+}

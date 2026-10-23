@@ -1,0 +1,77 @@
+{
+  "p4": {"status": "P4가 실행해야 함", "behavior": "8개 cases는 옛 테스트 미소비. 진단 키 마스킹·pstatic 서명 쿼리 제거·pageNo 보존·naverId/userId 구별을 직접 실행한다. P1에서는 옛 scrub 함수와 8개 모두 일치 확인."},
+ "about": "Diagnostic scrubbing (appendix A 9, 31). scrub(value) returns a copy for stderr: cookie, token and viewer-identifier keys are redacted wherever they appear (JSON keys, form pairs, dict keys), pstatic image URLs lose their signed query, and nothing else changes. Diagnostics never carry snippet source, ARGS or stdout at all. A case with absent instead of output checks only that those values are gone.",
+ "cases": [
+  {
+   "input": "Cookie: NID_AUT=abc123; NID_SES=def456; nnb=XYZ",
+   "absent": [
+    "abc123",
+    "def456",
+    "XYZ"
+   ],
+   "fact": "The exact redacted form is free; no secret value may survive."
+  },
+  {
+   "input": "{\"NID_AUT\":\"abc\",\"page\":1}",
+   "output": "{\"NID_AUT\":\"[REDACTED]\",\"page\":1}"
+  },
+  {
+   "input": {
+    "cookie": "a=b",
+    "baUserKey": "k1",
+    "userIdNo": "77",
+    "idNo": "88",
+    "status": 200
+   },
+   "output": {
+    "cookie": "[REDACTED]",
+    "baUserKey": "[REDACTED]",
+    "userIdNo": "[REDACTED]",
+    "idNo": "[REDACTED]",
+    "status": 200
+   }
+  },
+  {
+   "input": "see https://mblogthumb-phinf.pstatic.net/a/b.jpg?type=w800&sig=SECRET now",
+   "output": "see https://mblogthumb-phinf.pstatic.net/a/b.jpg now"
+  },
+  {
+   "input": "https://m.blog.naver.com/api/blogs/x/post-list?page=2",
+   "output": "https://m.blog.naver.com/api/blogs/x/post-list?page=2"
+  },
+  {
+   "input": [
+    "token=t1&page=3",
+    {
+     "nested": {
+      "NID_SES": "s"
+     }
+    }
+   ],
+   "output": [
+    "token=[REDACTED]&page=3",
+    {
+     "nested": {
+      "NID_SES": "[REDACTED]"
+     }
+    }
+   ]
+  },
+  {
+   "input": "pageNo=2&idNo=123",
+   "output": "pageNo=2&idNo=[REDACTED]",
+   "fact": "A key's own name counts only as a whole word: pageNo is not idNo."
+  },
+  {
+   "input": {
+    "naverId": "someone",
+    "userId": "blog_id_ok"
+   },
+   "output": {
+    "naverId": "[REDACTED]",
+    "userId": "blog_id_ok"
+   },
+   "fact": "current-user's naverId is the login id (P2 R18); the blog id stays."
+  }
+ ]
+}

@@ -1,1 +1,0 @@
-${THREADS_TASK_REPLIES_URL} 답글 여론이 어떻게 갈리는지 끝까지 읽고 정리해줘.

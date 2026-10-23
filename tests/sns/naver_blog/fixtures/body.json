@@ -1,0 +1,401 @@
+{
+ "about": "Post HTML → PostDoc (appendix A 27-32 and the fields the current parser drops). file is a synthetic page; request is what was asked for; expect lists what the parse must yield (a field not listed is not checked here); outcome is a refusal. lines are the body's text lines in order (a line may hold a newline inside one paragraph block). Picture numbers (images <post> N), link host/link_id, own-money cards, product and blogNo fields are implemented and asserted by test_body.py; these are current parser contracts.",
+ "full": {
+  "file": "posts/smart_full.html",
+  "request": {
+   "blog_id": "cafe_note",
+   "log_no": "224000000001"
+  },
+  "items": "27-31 and the new fields",
+  "expect": {
+   "blog_id": "cafe_note",
+   "blog_no": "123456",
+   "log_no": "224000000001",
+   "title": "성수 카페 후기",
+   "created_at": "2026-10-18T14:05+09:00",
+   "category_no": "12",
+   "category_name": "카페 & 디저트",
+   "tags": [
+    "성수카페",
+    "디저트",
+    "내돈내산"
+   ],
+   "comment_count": 31,
+   "own_money": false,
+   "has_product": true,
+   "product_count": 2,
+   "coverage": {
+    "components": 16,
+    "full": 16,
+    "partial": 0,
+    "empty": 0,
+    "label": "text[full]",
+    "unhandled": []
+   },
+   "lines": [
+    "성수 카페 후기",
+    "앞중간뒤\n둘째 줄 입니다",
+    "## 메뉴",
+    "> 인생 라떼",
+    "[image 1: 입구]",
+    "[image 2: 창가 자리]",
+    "[image 3: 디저트]",
+    "[sticker: image 4]",
+    "---",
+    "link: 무선청소기 최대 혜택 (https://mkt.shopping.naver.com/link/6811aaa6000000000000abcd)",
+    "쿠팡 링크 · 짧은 링크 · 브랜드 · 위로",
+    "아메리카노 | 5,000원",
+    "라떼 | 5,500원",
+    "[map: 샘플 카페 성수점 — 서울 성동구 성수이로 1 · image 5]",
+    "[video: 라떼아트]",
+    "[embed: 유튜브 영상 (https://www.youtube.com/watch?v=synthetic)]",
+    "[book: 커피 책 (https://search.shopping.naver.com/book/catalog/1)] · image 6"
+   ],
+   "images": [
+    {
+     "n": 1,
+     "url": "https://postfiles.pstatic.net/MjAyNjEw/one.jpg?type=w800",
+     "caption": "입구",
+     "kind": "photo",
+     "host": "postfiles.pstatic.net"
+    },
+    {
+     "n": 2,
+     "url": "https://postfiles.pstatic.net/MjAyNjEw/two.jpg?type=w800",
+     "caption": "창가 자리",
+     "kind": "photo",
+     "host": "postfiles.pstatic.net"
+    },
+    {
+     "n": 3,
+     "url": "https://postfiles.pstatic.net/MjAyNjEw/three.jpg?type=w800",
+     "caption": "디저트",
+     "kind": "photo",
+     "host": "postfiles.pstatic.net"
+    },
+    {
+     "n": 4,
+     "url": "https://storep-phinf.pstatic.net/ogq_sample/original_1.png",
+     "caption": null,
+     "kind": "sticker",
+     "host": "storep-phinf.pstatic.net"
+    },
+    {
+     "n": 5,
+     "url": "https://simg.pstatic.net/static.map/v2/map/staticmap.bin?caller=smarteditor&w=700&h=315",
+     "caption": "샘플 카페 성수점",
+     "kind": "map",
+     "host": "simg.pstatic.net"
+    },
+    {
+     "n": 6,
+     "url": "https://shopping-phinf.pstatic.net/book/cover.jpg",
+     "caption": "커피 책",
+     "kind": "cover",
+     "host": "shopping-phinf.pstatic.net"
+    }
+   ],
+   "links": [
+    {
+     "url": "https://mkt.shopping.naver.com/link/6811aaa6000000000000abcd",
+     "text": "무선청소기 최대 혜택",
+     "host": "mkt.shopping.naver.com",
+     "link_id": "6811aaa6000000000000abcd"
+    },
+    {
+     "url": "https://link.coupang.com/a/bXyZ12",
+     "text": "링크",
+     "host": "link.coupang.com",
+     "link_id": "bXyZ12"
+    },
+    {
+     "url": "https://naver.me/AbCd12Ef",
+     "text": "짧은 링크",
+     "host": "naver.me",
+     "link_id": "AbCd12Ef"
+    },
+    {
+     "url": "https://brand.naver.com/samplebrand/products/123",
+     "text": "브랜드",
+     "host": "brand.naver.com",
+     "link_id": null
+    }
+   ],
+   "attachments": [
+    {
+     "kind": "video",
+     "title": "라떼아트",
+     "url": null,
+     "thumbnail_url": "https://phinf.pstatic.net/video/thumb.jpg"
+    },
+    {
+     "kind": "embed",
+     "title": "유튜브 영상",
+     "url": "https://www.youtube.com/watch?v=synthetic",
+     "thumbnail_url": null
+    },
+    {
+     "kind": "book",
+     "title": "커피 책",
+     "url": "https://search.shopping.naver.com/book/catalog/1",
+     "thumbnail_url": null
+    }
+   ],
+   "never_in_output": [
+    "viewer_me",
+    "778899",
+    "bk-SYNTHETIC-SECRET"
+   ],
+   "viewer_id": "viewer_me",
+   "own_money_cards": []
+  },
+  "facts": [
+   "Text and markup keep document order (앞<strong>중간</strong>뒤 is 앞중간뒤, not 앞뒤중간).",
+   "data-lazy-src is the real picture; src is a blurred placeholder; each picture of a group keeps its own caption.",
+   "Every picture, sticker and card cover is numbered in document order, so images <post> N names one exactly; a sticker can be a disclosure banner the text never states.",
+   "An implicitly closed <td> still makes its own cell; a table row is cells joined by ' | '.",
+   "A video module with only a thumbnail keeps url null (a thumbnail is not the video); an oembed is an embed, not called a video.",
+   "A known family holding nothing (an empty text paragraph) is a spacer and counts as full.",
+   "A link's host and link_id travel with it: mkt.shopping.naver.com/link/<id> (a seller's marketing link), link.coupang.com/a/<id>, naver.me/<code>; other hosts carry no id. Page anchors (#top) are not links.",
+   "The page's viewer identifiers (userId, userIdNo, baUserKey) never reach the record; userId only refreshes the session.",
+   "The title loses Naver's ' : 네이버 블로그' suffix; tags are split on commas and trimmed; page variables are read in the forms pages use (P2): single or double quotes (var blogNo = '123456'), numbers (var gnCategoryNo = 5) and the comparison var isBuyWithMyOwnMoneyPost = 'false' === 'true' (read as its boolean result).",
+   "A place card (placesMap, P2 shape) carries a static map picture and the place's name and address in its link data; the map picture is numbered as kind map."
+  ]
+ },
+ "partial": {
+  "file": "posts/smart_partial.html",
+  "request": {
+   "blog_id": "popup_blog",
+   "log_no": "224000000002"
+  },
+  "items": "29,30",
+  "expect": {
+   "title": "팝업 일정",
+   "tags": [],
+   "comment_count": 0,
+   "coverage": {
+    "components": 6,
+    "full": 3,
+    "partial": 3,
+    "empty": 0,
+    "label": "text[partial: 3 of 6 components reduced]",
+    "unhandled": [
+     "schedule",
+     "text",
+     "placesMap"
+    ]
+   },
+   "lines": [
+    "이번 주 팝업 정리",
+    "[image 1 — hosted at www.reviewplace.example, outside Naver]",
+    "link: 상품 (https://smartstore.naver.com/x/products/1) · image 2",
+    "10월 20일 팝업",
+    "[image 3]",
+    "영상도 있어요",
+    "[media: 숏폼]"
+   ],
+   "images": [
+    {
+     "n": 1,
+     "url": "https://www.reviewplace.example/blog_traffic.php?key=abc",
+     "caption": null,
+     "kind": "photo",
+     "host": "www.reviewplace.example"
+    },
+    {
+     "n": 2,
+     "url": "https://dthumb-phinf.pstatic.net/?src=%22https%3A%2F%2Fshop-phinf.pstatic.net%2Fa.jpg%22&type=ff120",
+     "caption": "상품",
+     "kind": "thumbnail",
+     "host": "dthumb-phinf.pstatic.net"
+    },
+    {
+     "n": 3,
+     "url": "https://postfiles.pstatic.net/x/poster.jpg?type=w800",
+     "caption": null,
+     "kind": "photo",
+     "host": "postfiles.pstatic.net"
+    }
+   ]
+  },
+  "facts": [
+   "An unfamiliar family keeps its text, pictures and links and counts as partial.",
+   "A component holding another component with a module (a video inside a text block) is partial, and what its rule missed is salvaged as [media: …].",
+   "A map with neither module data nor text is partial, not a spacer.",
+   "An empty gsTagName is a post with no tags ([]), not unknown.",
+   "A picture hosted outside Naver (P6: a review-campaign platform's blog_traffic.php banner) is numbered and named with its host: it cannot be saved through the read surface, and the host itself can be the signal."
+  ]
+ },
+ "legacy": {
+  "file": "posts/legacy.html",
+  "request": {
+   "blog_id": "travel_2009",
+   "log_no": "80000000001"
+  },
+  "items": "27,28,30",
+  "expect": {
+   "title": "2009 제주",
+   "tags": [
+    "제주"
+   ],
+   "created_at": "2009-07-01T10:00+09:00",
+   "coverage": {
+    "components": 0,
+    "label": "text[legacy]"
+   },
+   "lines": [
+    "2009년 여행기",
+    "둘째 문단 강조",
+    "셋째 문단",
+    "A B",
+    "C D",
+    "[image 1]",
+    "원문 기사",
+    "○○ 기자, 취재협조=제주특별자치도"
+   ],
+   "images": [
+    {
+     "n": 1,
+     "url": "https://blogfiles.pstatic.net/old/1.jpg",
+     "caption": null,
+     "kind": "photo",
+     "host": "blogfiles.pstatic.net"
+    }
+   ],
+   "links": [
+    {
+     "url": "http://www.example-travel.kr/article/1",
+     "text": "원문 기사",
+     "host": "www.example-travel.kr",
+     "link_id": null
+    }
+   ]
+  },
+  "facts": [
+   "An empty se-main-container beside a legacy container is not SmartEditor: the container is chosen by finding components, not by an attribute.",
+   "An open <p> is closed by the next <p> even under an inline <span>; a stray </span> is ignored.",
+   "Legacy table cells are separated (A B), not run together (AB).",
+   "A legacy picture is numbered in place too."
+  ]
+ },
+ "pages": [
+  {
+   "file": "posts/no_container.html",
+   "request": {
+    "blog_id": "x",
+    "log_no": "1"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "drift"
+   },
+   "fact": "Neither container (a maintenance page, a redesign): drift."
+  },
+  {
+   "file": "posts/legacy_empty.html",
+   "request": {
+    "blog_id": "x",
+    "log_no": "1"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "drift"
+   },
+   "fact": "A legacy container with nothing extractable: drift."
+  },
+  {
+   "file": "posts/no_tags.html",
+   "request": {
+    "blog_id": "notag_blog",
+    "log_no": "5"
+   },
+   "expect": {
+    "tags": "unknown",
+    "lines": [
+     "본문"
+    ]
+   },
+   "fact": "No gsTagName at all: tags unknown (not 'no tags')."
+  },
+  {
+   "file": "posts/domain_page.html",
+   "request": {
+    "blog_id": "mydomain",
+    "log_no": "224000000003"
+   },
+   "expect": {
+    "blog_id": "canonical_id",
+    "blog_no": "444"
+   },
+   "fact": "Same post number, different blog id: the page names the canonical blog (a domain address)."
+  },
+  {
+   "file": "posts/domain_page.html",
+   "request": {
+    "blog_id": "canonical_id",
+    "log_no": "224000000099"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "drift"
+   },
+   "fact": "A page for another post number is refused: mixing two posts is worse than failing."
+  },
+  {
+   "file": "posts/own_money.html",
+   "request": {
+    "blog_id": "honest_blog",
+    "log_no": "224000000004"
+   },
+   "expect": {
+    "own_money": true,
+    "tags": [
+     "내돈내산"
+    ],
+    "own_money_cards": [
+     {
+      "kind": "shopping",
+      "category": "쇼핑",
+      "title": "샘플 무선 청소기 초경량",
+      "date": "2026.09. 구매확정",
+      "url": "https://smartstore.naver.com/main/products/1"
+     }
+    ],
+    "lines": [
+     "직접 샀어요",
+     "[own-money card: 쇼핑 · 샘플 무선 청소기 초경량 · 2026.09. 구매확정 · https://smartstore.naver.com/main/products/1]"
+    ],
+    "coverage": {
+     "components": 2,
+     "full": 2,
+     "partial": 0
+    }
+   },
+   "fact": "Naver's 내돈내산 인증 card (a se-custom component holding not_sponsored_component, P6): a purchase or visit Naver recorded (shopping order, reservation, receipt, payment — attachment_type buy_with_my_own_money_*) that the writer attached. It is what search --own-money matches; the page variable isBuyWithMyOwnMoneyPost stays false beside it, so it is not the signal."
+  }
+ ],
+ "deep": {
+  "items": "28",
+  "fact": "Markup nests deeper than Python's stack: parsing, finding and text extraction are iterative.",
+  "cases": [
+   {
+    "name": "deep-divs",
+    "template": "<div class=\"se-main-container\"><div class=\"se-component se-text\">{open}깊은 글{close}</div></div>",
+    "open": "<div>",
+    "close": "</div>",
+    "repeat": 5000,
+    "expect_lines": [
+     "깊은 글"
+    ]
+   },
+   {
+    "name": "open-paragraphs",
+    "template": "<div id=\"viewTypeSelector\">{open}</div>",
+    "open": "<p><span>줄",
+    "close": "",
+    "repeat": 3000,
+    "expect_line_count": 3000
+   }
+  ]
+ }
+}

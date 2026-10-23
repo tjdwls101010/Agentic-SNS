@@ -1,0 +1,13 @@
+{
+  "p4": {"status": "P4가 실행해야 함", "behavior": "cases 전부: 진단 마스킹은 [REDACTED], CDN 쿼리 제거. 옛 테스트는 이 파일을 읽지 않음."},
+  "about": "Diagnostic scrubbing (appendix A 12): what is removed from any message, warning, fix or --verbose metadata before it is printed. Keys matching ct0, auth_token, cookie, authorization, csrf or bearer (any case) have their values replaced; a Bearer token and a key=value or key: value of those names inside text are replaced; a pbs.twimg.com URL loses its query string. source: code (previous errors.py). All values are synthetic.",
+  "cases": [
+    {"name": "keys", "item": "12", "input": {"ct0": "SYNTHCSRF", "Authorization": "Bearer SYNTHTOKEN", "x-csrf-token": "SYNTHCSRF", "auth_token": "SYNTHAUTH", "Cookie": "a=b", "status": 200}, "expected": {"ct0": "[REDACTED]", "Authorization": "[REDACTED]", "x-csrf-token": "[REDACTED]", "auth_token": "[REDACTED]", "Cookie": "[REDACTED]", "status": 200}},
+    {"name": "nested", "item": "12", "input": {"headers": {"BEARER": "x"}, "list": [{"cookie": "y"}]}, "expected": {"headers": {"BEARER": "[REDACTED]"}, "list": [{"cookie": "[REDACTED]"}]}},
+    {"name": "bearer-in-text", "item": "12", "input": "request failed with authorization Bearer SYNTHTOKEN123 at path", "expected_absent": ["SYNTHTOKEN123"]},
+    {"name": "csrf-in-text", "item": "12", "input": "headers: x-csrf-token=SYNTHCSRF; other=1", "expected_absent": ["SYNTHCSRF"]},
+    {"name": "ct0-json-in-text", "item": "12", "input": "{\"ct0\": \"SYNTHCSRF\", \"ok\": 1}", "expected_absent": ["SYNTHCSRF"]},
+    {"name": "image-query-dropped", "item": "12", "input": "https://pbs.twimg.com/media/SYNTHmedia.jpg?format=jpg&name=small", "expected": "https://pbs.twimg.com/media/SYNTHmedia.jpg"},
+    {"name": "plain-text-untouched", "item": "12", "input": "nothing secret here", "expected": "nothing secret here"}
+  ]
+}

@@ -1,0 +1,475 @@
+{
+  "p4": {"status": "P4가 실행해야 함", "behavior": "9개 cases: nonce 지연·유실·같은 URL 배경 요청·plain 과대계수·열기 예약. 옛 테스트 미소비; 조기 설치 실측은 옛 test_cli_doctor.py:45,67,86 인라인도 이식."},
+ "about": "Request accounting (plan 'request accounting', reviews 1-3). A command's requests = its direct requests (exact: one per query sent, one when a call may have sent a request but its Aside result was lost) + the tab opening or reload reservation when it opened or reloaded the tab (an estimate, charged whole, never set off against later requests) + every x.com / api.x.com resource the tab's observer saw while the command ran that is not one of the skill's own requests. Static CDN hosts (abs.twimg.com, pbs.twimg.com, video.twimg.com, ton.twimg.com) are not counted. The skill's own request is told apart only by proof: each direct request's URL carries a fresh nonce in its fragment (#xs-<nonce>, not sent to the server, added after the signature is computed); an observed entry whose name carries a nonce the page issued is the skill's and is not counted again; any entry without one is background, even with the same URL. What the observer saw before a command's first look (between commands) is reported as unwatched and not charged. X empties its resource-timing buffer while the page loads, so what the page requested before the observer was installed is never seen: hence the whole reservation. Each scenario lists calls in order; each call reports the entries the observer delivered during it ({name, start}) and, for a query call, the direct request it sent ({nonce, path, result ok | lost}). expected: per command, charged {direct, background, opening}, unwatched, and the total. R stands for the opening reservation (an estimate set in P2 R1). An opening or reload is setup: reported beside requests=, never counted against --max-requests. mode fragment (the fragment survives in entry names; P2 R1 confirmed it on x.com on 2026-10-19 for fetch) or plain (it does not: no entry is ever proved the skill's, so a direct request the observer also saw is counted twice).",
+ "cases": [
+  {
+   "name": "open-late-load-direct-then-background",
+   "mode": "fragment",
+   "fact": "Opening clears X's buffer before the observer exists; the load's late requests arrive after installation and are background; the direct request's own entry (same call) is not counted again; requests between commands are unwatched in the next command.",
+   "commands": [
+    {
+     "opened": true,
+     "calls": [
+      {
+       "kind": "look",
+       "entries": [
+        {
+         "name": "https://x.com/i/api/graphql/aSYNTH/ViewerBadgeCounts?variables=%7B%7D",
+         "start": 900
+        },
+        {
+         "name": "https://abs.twimg.com/responsive-web/client-web/main.SYNTH.js",
+         "start": 905
+        },
+        {
+         "name": "https://api.x.com/1.1/jot/client_event.json",
+         "start": 910
+        }
+       ]
+      },
+      {
+       "kind": "query",
+       "direct": {
+        "nonce": "n1",
+        "path": "/i/api/graphql/bSYNTH/TweetDetail?variables=V1",
+        "result": "ok"
+       },
+       "entries": [
+        {
+         "name": "https://x.com/i/api/graphql/bSYNTH/TweetDetail?variables=V1#xs-n1",
+         "start": 1200
+        },
+        {
+         "name": "https://x.com/i/api/2/badge_count/badge_count.json",
+         "start": 1210
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "opened": false,
+     "calls": [
+      {
+       "kind": "look",
+       "entries": [
+        {
+         "name": "https://x.com/i/api/graphql/aSYNTH/ViewerBadgeCounts?variables=%7B%7D",
+         "start": 5000
+        },
+        {
+         "name": "https://x.com/i/api/1.1/flow/timeline.json",
+         "start": 5100
+        }
+       ]
+      },
+      {
+       "kind": "query",
+       "direct": {
+        "nonce": "n2",
+        "path": "/i/api/graphql/bSYNTH/TweetDetail?variables=V2",
+        "result": "ok"
+       },
+       "entries": [
+        {
+         "name": "https://x.com/i/api/graphql/bSYNTH/TweetDetail?variables=V2#xs-n2",
+         "start": 6000
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "charged": {
+      "direct": 1,
+      "background": 3,
+      "opening": "R"
+     },
+     "unwatched": 0,
+     "total": "R + 4",
+     "note": "the first look of a command that opened the tab is part of that command: ViewerBadgeCounts, client_event and badge_count are background; the main.js on abs.twimg.com is not counted",
+     "setup_outside_max_requests": true
+    },
+    {
+     "charged": {
+      "direct": 1,
+      "background": 0,
+      "opening": 0
+     },
+     "unwatched": 2,
+     "total": "1"
+    }
+   ]
+  },
+  {
+   "name": "direct-entry-arrives-next-call",
+   "mode": "fragment",
+   "fact": "Timing can be delivered late: the direct request's entry shows up in the next call and is still recognised by its nonce.",
+   "commands": [
+    {
+     "opened": false,
+     "calls": [
+      {
+       "kind": "look",
+       "entries": []
+      },
+      {
+       "kind": "query",
+       "direct": {
+        "nonce": "n3",
+        "path": "/i/api/graphql/cSYNTH/SearchTimeline?variables=S1",
+        "result": "ok"
+       },
+       "entries": []
+      },
+      {
+       "kind": "query",
+       "direct": {
+        "nonce": "n4",
+        "path": "/i/api/graphql/cSYNTH/SearchTimeline?variables=S2",
+        "result": "ok"
+       },
+       "entries": [
+        {
+         "name": "https://x.com/i/api/graphql/cSYNTH/SearchTimeline?variables=S1#xs-n3",
+         "start": 100
+        },
+        {
+         "name": "https://x.com/i/api/graphql/cSYNTH/SearchTimeline?variables=S2#xs-n4",
+         "start": 200
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "charged": {
+      "direct": 2,
+      "background": 0,
+      "opening": 0
+     },
+     "unwatched": 0,
+     "total": "2"
+    }
+   ]
+  },
+  {
+   "name": "direct-entry-arrives-in-next-command",
+   "mode": "fragment",
+   "fact": "A direct request's entry that arrives only in the next command's first look is the skill's, not unwatched background.",
+   "commands": [
+    {
+     "opened": false,
+     "calls": [
+      {
+       "kind": "look",
+       "entries": []
+      },
+      {
+       "kind": "query",
+       "direct": {
+        "nonce": "n5",
+        "path": "/i/api/graphql/dSYNTH/UserTweets?variables=U1",
+        "result": "ok"
+       },
+       "entries": []
+      }
+     ]
+    },
+    {
+     "opened": false,
+     "calls": [
+      {
+       "kind": "look",
+       "entries": [
+        {
+         "name": "https://x.com/i/api/graphql/dSYNTH/UserTweets?variables=U1#xs-n5",
+         "start": 100
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "charged": {
+      "direct": 1,
+      "background": 0,
+      "opening": 0
+     },
+     "unwatched": 0,
+     "total": "1"
+    },
+    {
+     "charged": {
+      "direct": 0,
+      "background": 0,
+      "opening": 0
+     },
+     "unwatched": 0,
+     "total": "0"
+    }
+   ]
+  },
+  {
+   "name": "direct-entry-never-arrives",
+   "mode": "fragment",
+   "fact": "When no entry carries the nonce nothing is subtracted; the direct request is still counted once.",
+   "commands": [
+    {
+     "opened": false,
+     "calls": [
+      {
+       "kind": "look",
+       "entries": []
+      },
+      {
+       "kind": "query",
+       "direct": {
+        "nonce": "n6",
+        "path": "/i/api/graphql/eSYNTH/Followers?variables=F1",
+        "result": "ok"
+       },
+       "entries": [
+        {
+         "name": "https://x.com/i/api/2/badge_count/badge_count.json",
+         "start": 50
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "charged": {
+      "direct": 1,
+      "background": 1,
+      "opening": 0
+     },
+     "unwatched": 0,
+     "total": "2"
+    }
+   ]
+  },
+  {
+   "name": "missing-direct-entry-same-url-background",
+   "mode": "fragment",
+   "fact": "Codex round 3 A: the skill's own entry never arrives and the app later requests the very same URL; that later entry has no nonce and is background — it is never taken for the skill's request.",
+   "commands": [
+    {
+     "opened": false,
+     "calls": [
+      {
+       "kind": "look",
+       "entries": []
+      },
+      {
+       "kind": "query",
+       "direct": {
+        "nonce": "n7",
+        "path": "/i/api/graphql/fSYNTH/Viewer?variables=W",
+        "result": "ok"
+       },
+       "entries": [
+        {
+         "name": "https://x.com/i/api/graphql/fSYNTH/Viewer?variables=W",
+         "start": 400
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "charged": {
+      "direct": 1,
+      "background": 1,
+      "opening": 0
+     },
+     "unwatched": 0,
+     "total": "2"
+    }
+   ]
+  },
+  {
+   "name": "several-same-url-candidates",
+   "mode": "fragment",
+   "fact": "Several entries with the same URL: only the one carrying the nonce is the skill's.",
+   "commands": [
+    {
+     "opened": false,
+     "calls": [
+      {
+       "kind": "look",
+       "entries": []
+      },
+      {
+       "kind": "query",
+       "direct": {
+        "nonce": "n8",
+        "path": "/i/api/graphql/fSYNTH/Viewer?variables=W",
+        "result": "ok"
+       },
+       "entries": [
+        {
+         "name": "https://x.com/i/api/graphql/fSYNTH/Viewer?variables=W",
+         "start": 300
+        },
+        {
+         "name": "https://x.com/i/api/graphql/fSYNTH/Viewer?variables=W#xs-n8",
+         "start": 310
+        },
+        {
+         "name": "https://x.com/i/api/graphql/fSYNTH/Viewer?variables=W",
+         "start": 320
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "charged": {
+      "direct": 1,
+      "background": 2,
+      "opening": 0
+     },
+     "unwatched": 0,
+     "total": "3"
+    }
+   ]
+  },
+  {
+   "name": "lost-result-charged-and-recognised-later",
+   "mode": "fragment",
+   "fact": "A call whose Aside result was lost may have sent its request: it is charged 1; its nonce was issued in the page, so its entry seen in a later call is recognised and not charged again.",
+   "commands": [
+    {
+     "opened": false,
+     "calls": [
+      {
+       "kind": "look",
+       "entries": []
+      },
+      {
+       "kind": "query",
+       "direct": {
+        "nonce": "n9",
+        "path": "/i/api/graphql/gSYNTH/TweetDetail?variables=T",
+        "result": "lost"
+       },
+       "entries": null
+      },
+      {
+       "kind": "query",
+       "direct": {
+        "nonce": "n10",
+        "path": "/i/api/graphql/gSYNTH/TweetDetail?variables=T",
+        "result": "ok"
+       },
+       "entries": [
+        {
+         "name": "https://x.com/i/api/graphql/gSYNTH/TweetDetail?variables=T#xs-n9",
+         "start": 100
+        },
+        {
+         "name": "https://x.com/i/api/graphql/gSYNTH/TweetDetail?variables=T#xs-n10",
+         "start": 900
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "charged": {
+      "direct": 2,
+      "background": 0,
+      "opening": 0
+     },
+     "unwatched": 0,
+     "total": "2"
+    }
+   ]
+  },
+  {
+   "name": "plain-mode-double-counts",
+   "mode": "plain",
+   "fact": "If Chrome drops the fragment from entry names (P2 R1), no entry is proved the skill's: the direct request counts once as direct and again as background — an over-count, never an under-count; doctor reports this mode.",
+   "commands": [
+    {
+     "opened": false,
+     "calls": [
+      {
+       "kind": "look",
+       "entries": []
+      },
+      {
+       "kind": "query",
+       "direct": {
+        "nonce": "n11",
+        "path": "/i/api/graphql/hSYNTH/TweetDetail?variables=Q",
+        "result": "ok"
+       },
+       "entries": [
+        {
+         "name": "https://x.com/i/api/graphql/hSYNTH/TweetDetail?variables=Q",
+         "start": 100
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "charged": {
+      "direct": 1,
+      "background": 1,
+      "opening": 0
+     },
+     "unwatched": 0,
+     "total": "2"
+    }
+   ]
+  },
+  {
+   "name": "reload-is-charged-whole",
+   "mode": "fragment",
+   "fact": "A recovery reload (rotation case 2 or 4) is charged like an opening (P2 R1 decision): measured when the kit was installed before the new document's app ran, otherwise the whole reservation plus what the kit saw; reported as setup and kept apart from --max-requests. This case is the late install with nothing seen after it.",
+   "commands": [
+    {
+     "opened": false,
+     "reloaded": true,
+     "calls": [
+      {
+       "kind": "look",
+       "entries": []
+      }
+     ]
+    }
+   ],
+   "expected": [
+    {
+     "charged": {
+      "direct": 0,
+      "background": 0,
+      "opening": "R"
+     },
+     "setup_outside_max_requests": true,
+     "unwatched": 0,
+     "total": "R"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,648 @@
+{
+  "p4": {"removed": {"signals.cases.unidentified-429": "픽스처 문제: P2 R6에서 hook은 URL을 항상 안다고 결론; test_classify.py:42가 건너뛰는 실재 불가능한 설계 사례"}, "behavior": "URL로 GraphQL 작업 또는 REST 경로 버킷을 항상 결정하는 계약은 P4가 검증한다."},
+ "about": "Response classification (appendix A 1-11). responses: one GraphQL response as the tab's query snippet returns it ({status, body, headers}; headers holds only the x-rate-limit-* values), the operation it was for, and root, the dotted path where that operation's data must be (from the operation table; a [] segment is a list). outcome: ok (with the number of warnings: errors that came with data), blocked (reason challenge | account_locked: indefinite, a person clears it), rate_limited (bucket = the operation; reset = Unix seconds from the header, or null when there was none and the guard uses 900 s), login (X wants a logged-in session), csrf (X refused the ct0 token: re-read it once and retry, stop if the account changed), signature_rejected (recovery 4), contract_changed (variables no longer fit: exit 6, the skill needs an update), features_missing (names: retried once with store values, recovery 3), rotated (recovery 1-2), transient (exit 6), unavailable (exit 9), shape_changed (exit 6, the skill needs an update). Order when several apply: challenge, account_locked, rate_limited, login, csrf, signature_rejected, contract_changed, features_missing, rotated, transient, unavailable, shape_changed. signals: what the tab's hook saw in the app's own responses between or during commands, and what the guard does with it. source: code (previous transport.py), measured (planning session 2026-10-18), plan, P2 (inferred, confirmed in recon).",
+ "responses": [
+  {
+   "name": "challenge-html-403",
+   "item": "1",
+   "source": "code",
+   "fact": "403 with an HTML body (a doctype, an html tag or Cloudflare's cf- markers) is a browser challenge.",
+   "operation": "SearchTimeline",
+   "root": "data.search_by_raw_query.search_timeline.timeline.instructions",
+   "envelope": {
+    "status": 403,
+    "body": "<!DOCTYPE html><html><head><title>Just a moment...</title></head><body class=\"cf-challenge\"></body></html>",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "blocked",
+    "reason": "challenge"
+   }
+  },
+  {
+   "name": "403-json-is-not-challenge",
+   "item": "1,9",
+   "source": "code",
+   "fact": "A 403 with a JSON body and no lock code is not a challenge; it is a failed read.",
+   "operation": "UserTweets",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "envelope": {
+    "status": 403,
+    "body": "{\"errors\":[{\"code\":200,\"message\":\"Forbidden.\"}]}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "transient"
+   }
+  },
+  {
+   "name": "suspended-64",
+   "item": "2",
+   "source": "code",
+   "fact": "Error code 64 (suspended) is an account lock.",
+   "operation": "HomeTimeline",
+   "root": "data.home.home_timeline_urt.instructions",
+   "envelope": {
+    "status": 403,
+    "body": "{\"errors\":[{\"code\":64,\"message\":\"Your account is suspended and is not permitted to access this feature.\"}]}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "blocked",
+    "reason": "account_locked"
+   }
+  },
+  {
+   "name": "locked-326-with-200",
+   "item": "2",
+   "source": "code",
+   "fact": "Error code 326 (locked) is an account lock whatever the HTTP status.",
+   "operation": "TweetDetail",
+   "root": "data.threaded_conversation_with_injections_v2.instructions",
+   "envelope": {
+    "status": 200,
+    "body": "{\"errors\":[{\"code\":326,\"message\":\"To protect our users from spam and other malicious activity, this account is temporarily locked.\"}]}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "blocked",
+    "reason": "account_locked"
+   }
+  },
+  {
+   "name": "lock-outranks-rate-limit",
+   "item": "2,3",
+   "source": "code",
+   "fact": "A lock code in a 429 is still a lock: the person must clear it.",
+   "operation": "SearchTimeline",
+   "root": "data.search_by_raw_query.search_timeline.timeline.instructions",
+   "envelope": {
+    "status": 429,
+    "body": "{\"errors\":[{\"code\":326,\"message\":\"locked\"}]}",
+    "headers": {
+     "x-rate-limit-limit": "50",
+     "x-rate-limit-remaining": "0",
+     "x-rate-limit-reset": "1792300000"
+    }
+   },
+   "outcome": {
+    "outcome": "blocked",
+    "reason": "account_locked"
+   }
+  },
+  {
+   "name": "rate-limit-with-reset",
+   "item": "3",
+   "source": "code",
+   "fact": "429 is this operation's bucket running out; it resets at x-rate-limit-reset. It is not an account block.",
+   "operation": "SearchTimeline",
+   "root": "data.search_by_raw_query.search_timeline.timeline.instructions",
+   "envelope": {
+    "status": 429,
+    "body": "{\"errors\":[{\"code\":88,\"message\":\"Rate limit exceeded\"}]}",
+    "headers": {
+     "x-rate-limit-limit": "50",
+     "x-rate-limit-remaining": "0",
+     "x-rate-limit-reset": "1792300000"
+    }
+   },
+   "outcome": {
+    "outcome": "rate_limited",
+    "bucket": "SearchTimeline",
+    "reset": 1792300000
+   }
+  },
+  {
+   "name": "rate-limit-without-header",
+   "item": "3",
+   "source": "code",
+   "fact": "A 429 without the reset header resets after 900 s (the guard computes it from its clock).",
+   "operation": "UserTweets",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "envelope": {
+    "status": 429,
+    "body": "Rate limit exceeded\n",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "rate_limited",
+    "bucket": "UserTweets",
+    "reset": null
+   }
+  },
+  {
+   "name": "logged-out-401",
+   "item": "4",
+   "source": "code",
+   "fact": "401 means X wants a logged-in session.",
+   "operation": "Viewer",
+   "root": "data.viewer.user_results.result",
+   "envelope": {
+    "status": 401,
+    "body": "{\"errors\":[{\"code\":32,\"message\":\"Could not authenticate you.\"}]}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "login"
+   }
+  },
+  {
+   "name": "code-32-with-200",
+   "item": "4",
+   "source": "code",
+   "fact": "Code 32 means not authenticated whatever the status.",
+   "operation": "UserByScreenName",
+   "root": "data.user.result",
+   "envelope": {
+    "status": 200,
+    "body": "{\"errors\":[{\"code\":32,\"message\":\"Could not authenticate you.\"}]}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "login"
+   }
+  },
+  {
+   "name": "csrf-353",
+   "item": "4",
+   "source": "code",
+   "fact": "Code 353 is a refused CSRF token: re-read ct0 once and retry; if the logged-in account changed in between, the command stops with exit 4 (the account changed: log in to the account the command started with, or rerun).",
+   "operation": "UserTweets",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "envelope": {
+    "status": 403,
+    "body": "{\"errors\":[{\"code\":353,\"message\":\"This request requires a matching csrf cookie and header.\"}]}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "csrf"
+   }
+  },
+  {
+   "name": "signature-rejected-404-empty",
+   "item": "5",
+   "source": "code",
+   "fact": "404 with an empty body is X refusing the request signature (x-client-transaction-id).",
+   "operation": "SearchTimeline",
+   "root": "data.search_by_raw_query.search_timeline.timeline.instructions",
+   "envelope": {
+    "status": 404,
+    "body": "",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "signature_rejected"
+   }
+  },
+  {
+   "name": "signature-rejected-whitespace",
+   "item": "5",
+   "source": "code",
+   "fact": "Whitespace only counts as empty.",
+   "operation": "SearchTimeline",
+   "root": "data.search_by_raw_query.search_timeline.timeline.instructions",
+   "envelope": {
+    "status": 404,
+    "body": " \n",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "signature_rejected"
+   }
+  },
+  {
+   "name": "contract-422",
+   "item": "6",
+   "source": "code",
+   "fact": "422 means the variables no longer fit the query; guessing new ones is not safe.",
+   "operation": "TweetDetail",
+   "root": "data.threaded_conversation_with_injections_v2.instructions",
+   "envelope": {
+    "status": 422,
+    "body": "{\"errors\":[{\"message\":\"Unprocessable\"}]}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "contract_changed"
+   }
+  },
+  {
+   "name": "contract-message",
+   "item": "6",
+   "source": "code",
+   "fact": "A validation message (must be defined, coerced Null value, GRAPHQL_VALIDATION_FAILED) is a variable contract change at any status.",
+   "operation": "UserTweets",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "envelope": {
+    "status": 400,
+    "body": "{\"errors\":[{\"message\":\"Variable \\\"$userId\\\" of required type \\\"NumericString!\\\" was not provided. must be defined\",\"extensions\":{\"code\":\"GRAPHQL_VALIDATION_FAILED\"}}]}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "contract_changed"
+   }
+  },
+  {
+   "name": "features-cannot-be-null",
+   "item": "7",
+   "source": "code",
+   "fact": "400 'features cannot be null: a, b' names feature switches the request lacked. New contract (plan recovery 3): add those names with the store's values (false when unknown) and retry once; the previous skill recorded them and failed.",
+   "operation": "SearchTimeline",
+   "root": "data.search_by_raw_query.search_timeline.timeline.instructions",
+   "envelope": {
+    "status": 400,
+    "body": "{\"errors\":[{\"code\":336,\"message\":\"The following features cannot be null: example_new_feature_enabled, another_flag_enabled\"}]}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "features_missing",
+    "names": [
+     "example_new_feature_enabled",
+     "another_flag_enabled"
+    ]
+   }
+  },
+  {
+   "name": "errors-without-data-200",
+   "item": "8",
+   "source": "code",
+   "fact": "200 or 404 with errors and no data suggests a rotated query id.",
+   "operation": "UserTweets",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "envelope": {
+    "status": 200,
+    "body": "{\"errors\":[{\"message\":\"Query: Unspecified\"}]}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "rotated"
+   }
+  },
+  {
+   "name": "errors-without-data-404",
+   "item": "8",
+   "source": "code",
+   "fact": "The same with 404 and a body.",
+   "operation": "Bookmarks",
+   "root": "data.bookmark_timeline_v2.timeline.instructions",
+   "envelope": {
+    "status": 404,
+    "body": "{\"errors\":[{\"message\":\"Not found\"}]}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "rotated"
+   }
+  },
+  {
+   "name": "server-error",
+   "item": "9",
+   "source": "code",
+   "fact": "A 5xx is transient.",
+   "operation": "HomeTimeline",
+   "root": "data.home.home_timeline_urt.instructions",
+   "envelope": {
+    "status": 503,
+    "body": "{\"data\":{}}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "transient"
+   }
+  },
+  {
+   "name": "non-json-200",
+   "item": "9",
+   "source": "code",
+   "fact": "A 200 that is not JSON is transient.",
+   "operation": "HomeTimeline",
+   "root": "data.home.home_timeline_urt.instructions",
+   "envelope": {
+    "status": 200,
+    "body": "<html>maintenance</html>",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "transient"
+   }
+  },
+  {
+   "name": "empty-200",
+   "item": "9",
+   "source": "code",
+   "fact": "An empty 200 is transient.",
+   "operation": "HomeTimeline",
+   "root": "data.home.home_timeline_urt.instructions",
+   "envelope": {
+    "status": 200,
+    "body": "",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "transient"
+   }
+  },
+  {
+   "name": "user-empty-data",
+   "item": "10",
+   "source": "code",
+   "fact": "UserByScreenName answering data {} means no such account.",
+   "operation": "UserByScreenName",
+   "root": "data.user.result",
+   "envelope": {
+    "status": 200,
+    "body": "{\"data\":{}}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "unavailable"
+   }
+  },
+  {
+   "name": "user-unavailable",
+   "item": "10",
+   "source": "code",
+   "fact": "A user root typed UserUnavailable (suspended, deactivated) is unavailable.",
+   "operation": "UserByScreenName",
+   "root": "data.user.result",
+   "envelope": {
+    "status": 200,
+    "body": "{\"data\":{\"user\":{\"result\":{\"__typename\":\"UserUnavailable\",\"reason\":\"Suspended\"}}}}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "unavailable"
+   }
+  },
+  {
+   "name": "user-root-without-numeric-id",
+   "item": "10",
+   "source": "code",
+   "fact": "A user root must carry a numeric rest_id; otherwise X changed its shape.",
+   "operation": "UserByScreenName",
+   "root": "data.user.result",
+   "envelope": {
+    "status": 200,
+    "body": "{\"data\":{\"user\":{\"result\":{\"__typename\":\"User\",\"rest_id\":\"abc\"}}}}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "shape_changed"
+   }
+  },
+  {
+   "name": "batch-users-one-unavailable",
+   "item": "10",
+   "source": "code",
+   "fact": "In a batch lookup an unavailable member is not a failure; it is reported as unresolved by the feature.",
+   "operation": "UsersByScreenNames",
+   "root": "data.users[].result",
+   "envelope": {
+    "status": 200,
+    "body": "{\"data\":{\"users\":[{\"result\":{\"__typename\":\"User\",\"rest_id\":\"1000000001\"}},{\"result\":{\"__typename\":\"UserUnavailable\"}}]}}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "ok",
+    "warnings": 0
+   }
+  },
+  {
+   "name": "missing-root",
+   "item": "10",
+   "source": "code",
+   "fact": "A 200 with data but without the operation's root is a shape change.",
+   "operation": "UserTweets",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "envelope": {
+    "status": 200,
+    "body": "{\"data\":{\"user\":{\"result\":{\"__typename\":\"User\",\"rest_id\":\"1000000001\"}}}}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "shape_changed"
+   }
+  },
+  {
+   "name": "instructions-not-a-list",
+   "item": "10",
+   "source": "code",
+   "fact": "Timeline instructions must be a list of objects.",
+   "operation": "UserTweets",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "envelope": {
+    "status": 200,
+    "body": "{\"data\":{\"user\":{\"result\":{\"timeline\":{\"timeline\":{\"instructions\":{\"type\":\"TimelineAddEntries\"}}}}}}}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "shape_changed"
+   }
+  },
+  {
+   "name": "data-with-errors-is-warning",
+   "item": "11",
+   "source": "code",
+   "fact": "Errors that come with data are warnings (shown scrubbed), not a failure.",
+   "operation": "TweetDetail",
+   "root": "data.threaded_conversation_with_injections_v2.instructions",
+   "envelope": {
+    "status": 200,
+    "body": "{\"data\":{\"threaded_conversation_with_injections_v2\":{\"instructions\":[]}},\"errors\":[{\"message\":\"Partial: one item failed\",\"path\":[\"x\"]}]}",
+    "headers": {
+     "x-rate-limit-limit": "300",
+     "x-rate-limit-remaining": "299",
+     "x-rate-limit-reset": "1792300000"
+    }
+   },
+   "outcome": {
+    "outcome": "ok",
+    "warnings": 1
+   }
+  },
+  {
+   "name": "focal-tombstone-is-not-classify",
+   "item": "10,24",
+   "source": "code",
+   "fact": "A thread whose focal post is a tombstone is a valid response; the thread reader (not classification) answers unavailable.",
+   "operation": "TweetDetail",
+   "root": "data.threaded_conversation_with_injections_v2.instructions",
+   "envelope": {
+    "status": 200,
+    "body": "{\"data\":{\"threaded_conversation_with_injections_v2\":{\"instructions\":[{\"type\":\"TimelineAddEntries\",\"entries\":[{\"entryId\":\"tweet-1850000000000000009\",\"content\":{\"itemContent\":{\"tweet_results\":{\"result\":{\"__typename\":\"TweetTombstone\",\"tombstone\":{\"text\":{\"text\":\"This post was deleted by the post author.\"}}}}}}}]}]}}}",
+    "headers": {}
+   },
+   "outcome": {
+    "outcome": "ok",
+    "warnings": 0
+   }
+  }
+ ],
+ "buckets": {
+  "item": "3,30",
+  "source": "code+plan",
+  "fact": "A response's x-rate-limit-limit, -remaining and -reset (all integers, reset in Unix seconds) describe the bucket of the operation that was asked; a response without all three leaves the bucket as it was. The operation name is the bucket key (the previous skill keyed by query id, which changes on rotation and would lose the bucket — plan X4).",
+  "cases": [
+   {
+    "operation": "TweetDetail",
+    "headers": {
+     "x-rate-limit-limit": "300",
+     "x-rate-limit-remaining": "287",
+     "x-rate-limit-reset": "1792300000"
+    },
+    "expected": {
+     "bucket": "TweetDetail",
+     "limit": 300,
+     "remaining": 287,
+     "reset": 1792300000
+    }
+   },
+   {
+    "operation": "TweetDetail",
+    "headers": {
+     "x-rate-limit-limit": "300"
+    },
+    "expected": null
+   },
+   {
+    "operation": "TweetDetail",
+    "headers": {
+     "x-rate-limit-limit": "300",
+     "x-rate-limit-remaining": "x",
+     "x-rate-limit-reset": "1792300000"
+    },
+    "expected": null
+   }
+  ]
+ },
+ "signals": {
+  "item": "1-4,plan",
+  "source": "plan (2nd review ②), P2 R6 for the unidentified case",
+  "fact": "The tab's hook reads the app's own /i/api/ responses (XHR and fetch) and keeps each that may matter as a signal {path, status, codes, rate (x-rate-limit-* when readable), at}; it also notes a document move to /account/access, /i/flow/login or /login. The guard turns a signal into protection state before the next request: a lock code or a challenge or a move to /account/access is an indefinite block (exit 5); a move to a login path or code 32/401 is a login stop (exit 4); a 429 or remaining 0 is that bucket's limit only, recorded and acknowledged, stopping a command only when it uses that bucket. The bucket of a GraphQL path /i/api/graphql/<id>/<Operation> is <Operation>; of a REST path it is the path without its query.",
+  "cases": [
+   {
+    "name": "background-429-own-bucket",
+    "signal": {
+     "path": "/i/api/graphql/abcSYNTH/ViewerBadgeCounts",
+     "status": 429,
+     "codes": [
+      88
+     ],
+     "rate": {
+      "limit": 180,
+      "remaining": 0,
+      "reset": 1792300000
+     }
+    },
+    "expected": {
+     "outcome": "rate_limited",
+     "bucket": "ViewerBadgeCounts",
+     "reset": 1792300000
+    }
+   },
+   {
+    "name": "background-rest-429",
+    "signal": {
+     "path": "/i/api/1.1/flow/timeline.json?x=1",
+     "status": 429,
+     "codes": [],
+     "rate": null
+    },
+    "expected": {
+     "outcome": "rate_limited",
+     "bucket": "/i/api/1.1/flow/timeline.json",
+     "reset": null
+    }
+   },
+   {
+    "name": "background-lock",
+    "signal": {
+     "path": "/i/api/graphql/abcSYNTH/HomeTimeline",
+     "status": 200,
+     "codes": [
+      326
+     ],
+     "rate": null
+    },
+    "expected": {
+     "outcome": "blocked",
+     "reason": "account_locked"
+    }
+   },
+   {
+    "name": "background-challenge",
+    "signal": {
+     "path": "/i/api/graphql/abcSYNTH/HomeTimeline",
+     "status": 403,
+     "codes": [],
+     "html": true,
+     "rate": null
+    },
+    "expected": {
+     "outcome": "blocked",
+     "reason": "challenge"
+    }
+   },
+   {
+    "name": "moved-to-access",
+    "signal": {
+     "moved": "/account/access"
+    },
+    "expected": {
+     "outcome": "blocked",
+     "reason": "account_locked"
+    }
+   },
+   {
+    "name": "moved-to-login-flow",
+    "signal": {
+     "moved": "/i/flow/login"
+    },
+    "expected": {
+     "outcome": "login"
+    }
+   },
+   {
+    "name": "moved-to-login",
+    "signal": {
+     "moved": "/login"
+    },
+    "expected": {
+     "outcome": "login"
+    }
+   },
+   {
+    "name": "background-401",
+    "signal": {
+     "path": "/i/api/graphql/abcSYNTH/ViewerBadgeCounts",
+     "status": 401,
+     "codes": [
+      32
+     ],
+     "rate": null
+    },
+    "expected": {
+     "outcome": "login"
+    }
+   },
+   {
+    "name": "background-low-remaining-is-bucket-only",
+    "signal": {
+     "path": "/i/api/graphql/abcSYNTH/ViewerBadgeCounts",
+     "status": 200,
+     "codes": [],
+     "rate": {
+      "limit": 180,
+      "remaining": 0,
+      "reset": 1792300000
+     }
+    },
+    "expected": {
+     "outcome": "rate_limited",
+     "bucket": "ViewerBadgeCounts",
+     "reset": 1792300000
+    }
+   }
+  ]
+ }
+}

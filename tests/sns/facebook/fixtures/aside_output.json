@@ -1,0 +1,152 @@
+{
+  "p4": {"status": "P4가 실행해야 함", "behavior": "12개 cases 전부 실행 중이지만 실제 subprocess.TimeoutExpired/timeout outcome 사례는 없음. timeout 경로를 추가 실행한다."},
+  "about": "What one `aside repl` run prints and how it is read (appendix A 9), in the protocol of aside/program.js: zero or more {\"kind\":\"chunk\",\"index\":i,\"body\"} lines, then one {\"kind\":\"result\",\"chunks\":n,\"body\"} line, or one {\"kind\":\"error\",\"error\"} line. Each case gives the process result (stdout, stderr, exit; timed_out when it did not finish) and the outcome: value (what the page function returned) or error with its kind: invalid, tab_missing, lost (time limit or lost connection), failed (other nonzero exit), timeout.",
+  "facts": {
+    "process_timeout_seconds": 125,
+    "repl_timeout_seconds": 120,
+    "log_line_ceiling_bytes_measured": 12582912,
+    "chunk_size_chars": 524288,
+    "single_line_result_max_chars": 2097152
+  },
+  "cases": [
+    {
+      "name": "plain-result",
+      "item": "9",
+      "fact": "The last line is the result; its body is the JSON of what the page function returned.",
+      "stdout": "{\"kind\": \"result\", \"chunks\": 0, \"body\": \"{\\\"status\\\":200}\"}\n",
+      "stderr": "",
+      "exit": 0,
+      "outcome": {
+        "value": {
+          "status": 200
+        }
+      }
+    },
+    {
+      "name": "ansi-and-noise-lines",
+      "item": "9",
+      "fact": "ANSI colour codes are stripped and only lines starting with { are JSON; Aside status lines and update notices are noise.",
+      "stdout": "\u001b[33mAside CLI 9.9 is available\u001b[0m\n✔︎ Opened a tab\n\u001b[32m{\"kind\": \"result\", \"chunks\": 0, \"body\": \"[1,2]\"}\u001b[0m\n\u001b[2m[ok | 12ms]\u001b[0m\n",
+      "stderr": "",
+      "exit": 0,
+      "outcome": {
+        "value": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "name": "chunked-result",
+      "item": "9,14",
+      "fact": "A large result arrives as chunk lines in index order before a result line whose chunks equals their count.",
+      "stdout": "{\"kind\": \"chunk\", \"index\": 0, \"body\": \"{\\\"a\\\":\"}\n{\"kind\": \"chunk\", \"index\": 1, \"body\": \"\\\"b\\\"}\"}\n{\"kind\": \"result\", \"chunks\": 2, \"body\": \"\"}\n",
+      "stderr": "",
+      "exit": 0,
+      "outcome": {
+        "value": {
+          "a": "b"
+        }
+      }
+    },
+    {
+      "name": "chunk-count-mismatch",
+      "item": "9",
+      "fact": "chunks must equal the number of chunk lines.",
+      "stdout": "{\"kind\": \"chunk\", \"index\": 0, \"body\": \"{\\\"a\\\":1}\"}\n{\"kind\": \"result\", \"chunks\": 2, \"body\": \"\"}\n",
+      "stderr": "",
+      "exit": 0,
+      "outcome": {
+        "error": "invalid"
+      }
+    },
+    {
+      "name": "chunk-order-mismatch",
+      "item": "9",
+      "fact": "Chunk indexes must run 0, 1, 2 ... in order.",
+      "stdout": "{\"kind\": \"chunk\", \"index\": 1, \"body\": \"\\\"b\\\"}\"}\n{\"kind\": \"chunk\", \"index\": 0, \"body\": \"{\\\"a\\\":\"}\n{\"kind\": \"result\", \"chunks\": 2, \"body\": \"\"}\n",
+      "stderr": "",
+      "exit": 0,
+      "outcome": {
+        "error": "invalid"
+      }
+    },
+    {
+      "name": "two-results",
+      "item": "9",
+      "fact": "Exactly one result line ends a run.",
+      "stdout": "{\"kind\": \"result\", \"chunks\": 0, \"body\": \"1\"}\n{\"kind\": \"result\", \"chunks\": 0, \"body\": \"2\"}\n",
+      "stderr": "",
+      "exit": 0,
+      "outcome": {
+        "error": "invalid"
+      }
+    },
+    {
+      "name": "no-json",
+      "item": "9",
+      "fact": "No JSON line at all is an invalid response.",
+      "stdout": "something went wrong\n",
+      "stderr": "",
+      "exit": 0,
+      "outcome": {
+        "error": "invalid"
+      }
+    },
+    {
+      "name": "tab-missing",
+      "item": "9",
+      "fact": "A tab that no longer exists is reported so the caller can reopen it.",
+      "stdout": "{\"kind\": \"error\", \"error\": \"tab_missing\", \"message\": \"no tab\"}\n",
+      "stderr": "",
+      "exit": 0,
+      "outcome": {
+        "error": "tab_missing"
+      }
+    },
+    {
+      "name": "evaluate-failed",
+      "item": "9",
+      "fact": "A page function that threw is an Aside failure, not a Facebook answer.",
+      "stdout": "{\"kind\": \"error\", \"error\": \"evaluate_failed\", \"message\": \"TypeError\"}\n",
+      "stderr": "",
+      "exit": 0,
+      "outcome": {
+        "error": "failed"
+      }
+    },
+    {
+      "name": "other-side-closed",
+      "item": "9",
+      "fact": "A nonzero exit mentioning 'other side closed' is the REPL time limit or a lost connection.",
+      "stdout": "",
+      "stderr": "Error: other side closed\n",
+      "exit": 1,
+      "outcome": {
+        "error": "lost"
+      }
+    },
+    {
+      "name": "daemon-unreachable",
+      "item": "9",
+      "fact": "A nonzero exit mentioning 'daemon is not reachable' is a lost connection.",
+      "stdout": "Aside daemon is not reachable\n",
+      "stderr": "",
+      "exit": 1,
+      "outcome": {
+        "error": "lost"
+      }
+    },
+    {
+      "name": "other-nonzero-exit",
+      "item": "9",
+      "fact": "Any other nonzero exit is a failed Aside call.",
+      "stdout": "",
+      "stderr": "TypeError: x is not a function\n",
+      "exit": 1,
+      "outcome": {
+        "error": "failed"
+      }
+    }
+  ]
+}

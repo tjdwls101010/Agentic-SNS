@@ -1,0 +1,138 @@
+{
+  "p4": {"status": "P4가 실행해야 함", "behavior": "tokens.expected와 graphql_request의 일부 및 profile_window.cases만 옛 테스트가 소비. 새 런타임 모듈·provider override·청크 한계·12개 READ_QUERIES 일치·정렬·live 회복은 P4 계약 테스트로 연결한다."},
+  "about": "How requests to Facebook are built (appendix A 11-20). Values are Facebook's web-client conventions as observed; derived numbers (jazoest, base64 tokens, unix times) were computed by hand or with the standard library, not by the skill.",
+  "tokens": {
+    "item": "11",
+    "fact": "Tokens come from getAsyncParams('POST') in the dedicated page, or CurrentUserInitialData, DTSGInitialData, LSD and SiteData runtime modules. They are never persisted. Fallback jazoest is '2' + the sum of fb_dtsg code points; __rev equals __spin_r.",
+    "expected": {"user_id": "1000123", "fb_dtsg": "AB:cd", "lsd": "lsdTok", "__spin_r": "1027000000", "__rev": "1027000000", "jazoest": "2388"},
+    "missing_token_outcome": "getAsyncParams without fb_dtsg triggers the runtime-module fallback; an unavailable fallback token module fails page evaluation before fetch.",
+    "modules": {
+      "CurrentUserInitialData": {
+        "USER_ID": "1000123"
+      },
+      "DTSGInitialData": {
+        "token": "AB:cd"
+      },
+      "LSD": {
+        "token": "lsdTok"
+      },
+      "SiteData": {
+        "__spin_r": 1027000000
+      }
+    }
+  },
+  "graphql_request": {
+    "item": "12",
+    "fact": "A GraphQL read is a POST of a urlencoded form to https://www.facebook.com/api/graphql/ with the browser's cookies.",
+    "method": "POST",
+    "url": "https://www.facebook.com/api/graphql/",
+    "form_fields_in_order": ["av", "__user", "__a", "__comet_req", "fb_dtsg", "jazoest", "lsd", "__spin_r", "__rev", "server_timestamps", "fb_api_caller_class", "fb_api_req_friendly_name", "variables", "doc_id"],
+    "fixed_values": {"__a": "1", "__comet_req": "15", "server_timestamps": "true", "fb_api_caller_class": "RelayModern"},
+    "from_tokens": {"av": "user_id", "__user": "user_id", "fb_dtsg": "fb_dtsg", "jazoest": "jazoest", "lsd": "lsd", "__spin_r": "__spin_r", "__rev": "__rev"},
+    "headers": {"content-type": "application/x-www-form-urlencoded", "x-fb-friendly-name": "<friendly name>", "x-fb-lsd": "<lsd>"},
+    "read_only": "Only the read queries named in query_names are ever sent; any other friendly name is refused before a request."
+  },
+  "relay_provider_flags": {
+    "item": "13",
+    "fact": "Live .graphql params.providedVariables providers are evaluated with provider.get(); live provider values override caller variables. With only a live id, stored flags fill in. This is not an HTML scan or a constant-value filter.",
+    "modules": {
+      "CometNewsFeedPaginationQuery.graphql": {
+        "params": {
+          "id": "555",
+          "providedVariables": {
+            "__relay_internal__pv__FooBarrelayprovider": true
+          }
+        }
+      }
+    },
+    "variables": {
+      "count": 3,
+      "__relay_internal__pv__FooBarrelayprovider": false
+    },
+    "expected": {
+      "count": 3,
+      "__relay_internal__pv__FooBarrelayprovider": true
+    }
+  },
+  "large_body": {
+    "item": "13",
+    "fact": "The program serializes the whole page result to JSON; over 2 MiB characters it emits ordered {kind: chunk, index, body} lines of at most 512 KiB characters, then {kind: result, chunks, body: \"\"}. A chunk never splits a surrogate pair.",
+    "chunk_chars": 524288,
+    "threshold_chars": 2097152,
+    "case": "body = 'a' * 524287 + U+1F600 + 'b' * 9437184: the first chunk is the 524287 'a's, the second starts with U+1F600; joined, the chunks equal the body."
+  },
+  "doc_id_discovery": {
+    "item": "15",
+    "fact": "Resolve .graphql params.id and live providers, then _facebookRelayOperation id, then stored id/flags (bundled snapshot is the last fallback). A rejected stored id routes once to its screen with pushState/popstate, 15-second deadline and 2.5-second quiet interval. A rejected live id currently fails with 6; P4 must add verified recovery.",
+    "sources": [
+      "live",
+      "live_id",
+      "stored"
+    ],
+    "modules": {
+      "CometNewsFeedPaginationQuery.graphql": {
+        "params": {
+          "id": "555",
+          "providedVariables": {}
+        }
+      },
+      "ProfileCometTimelineFeedRefetchQuery_facebookRelayOperation": "888"
+    },
+    "expected": {
+      "CometNewsFeedPaginationQuery": "555",
+      "ProfileCometTimelineFeedRefetchQuery": "888"
+    },
+    "route": {
+      "path": "/",
+      "deadline_ms": 15000,
+      "quiet_ms": 2500
+    }
+  },
+  "query_names": {
+    "item": "16",
+    "fact": "All 13 read queries (12 from the 2026-10-16 snapshot, the notifications list query added 2026-10-21; its next-page query answered nothing live and is not used); friendly name, response root and cursor variable must match READ_QUERIES. No real ids are copied here. Depth2 has no snapshot id and must be learned.",
+    "queries": {
+      "about": {"name": "ProfileCometAboutAppSectionQuery", "expected_key": "about_app_sections", "kind": "connection", "cursor_var": null},
+      "timeline": {"name": "ProfileCometTimelineFeedRefetchQuery", "expected_key": "timeline_list_feed_units", "kind": "connection", "cursor_var": "cursor"},
+      "newsfeed": {"name": "CometNewsFeedPaginationQuery", "expected_key": "news_feed", "kind": "connection", "cursor_var": "cursor"},
+      "group": {"name": "GroupsCometFeedRegularStoriesPaginationQuery", "expected_key": "group_feed", "kind": "connection", "cursor_var": "cursor"},
+      "search": {"name": "SearchCometResultsPaginatedResultsQuery", "expected_key": "results", "kind": "connection", "cursor_var": "cursor"},
+      "post": {"name": "CometSinglePostDialogContentQuery", "expected_key": "node_v2", "kind": "object", "cursor_var": null},
+      "comments": {"name": "CommentListComponentsRootQuery", "expected_key": "comments", "kind": "connection", "cursor_var": null},
+      "comments_page": {"name": "CommentsListComponentsPaginationQuery", "expected_key": "comments", "kind": "connection", "cursor_var": "commentsAfterCursor"},
+      "replies": {"name": "Depth1CommentsListPaginationQuery", "expected_key": "replies_connection", "kind": "connection", "cursor_var": "repliesAfterCursor"},
+      "replies_deep": {"name": "Depth2CommentsListPaginationQuery", "expected_key": "replies_connection", "kind": "connection", "cursor_var": "repliesAfterCursor"},
+      "group_root": {"name": "CometGroupRootQuery", "expected_key": "group", "kind": "object", "cursor_var": null},
+      "group_about": {"name": "CometGroupAboutRootQuery", "expected_key": "group", "kind": "object", "cursor_var": null},
+      "notifications": {"name": "CometNotificationsRootQuery", "expected_key": "notifications_page", "kind": "connection", "cursor_var": null}
+    },
+    "requires_live_learning": ["replies_deep"]
+  },
+  "sort_tokens": {
+    "item": "17",
+    "feed": {"top": {"orderby": ["TOP_STORIES"], "feedStyle": "DEFAULT"}, "recent": {"orderby": ["MOST_RECENT"], "feedStyle": "MOST_RECENT_FEED_DEFAULT"}},
+    "group": {"top": "TOP_POSTS", "recent": "CHRONOLOGICAL", "activity": "RECENT_ACTIVITY"},
+    "comments": {"all": "RANKED_UNFILTERED_INTENT_V1", "relevant": "RANKED_FILTERED_INTENT_V1", "newest": "REVERSE_CHRONOLOGICAL_UNFILTERED_INTENT_V1"}
+  },
+  "search_types": {
+    "item": "18",
+    "fact": "args.experience.type selects the vertical; all five share one doc_id.",
+    "map": {"top": "GLOBAL_SEARCH", "posts": "POSTS_TAB", "people": "PEOPLE_TAB", "pages": "PAGES_TAB", "groups": "GROUPS_TAB"}
+  },
+  "about_tokens": {
+    "item": "19",
+    "fact": "sectionToken is base64 of app_section:<id>:2327158227; pageID and userID are both the target id; the overview uses collectionToken null and each collection costs one more request.",
+    "cases": [
+      {"id": "4", "sectionToken": "YXBwX3NlY3Rpb246NDoyMzI3MTU4MjI3"},
+      {"id": "1000123", "sectionToken": "YXBwX3NlY3Rpb246MTAwMDEyMzoyMzI3MTU4MjI3"}
+    ]
+  },
+  "profile_window": {
+    "item": "20",
+    "fact": "A profile window is sent as afterTime and beforeTime: unix seconds at the start of --since and the end of --until in the local time zone; Facebook filters on the server.",
+    "cases": [
+      {"tz": "Asia/Seoul", "since": "2026-09-01", "until": "2026-09-30", "afterTime": 1788188400, "beforeTime": 1790780399},
+      {"tz": "UTC", "since": "2026-09-01", "until": "2026-09-30", "afterTime": 1788220800, "beforeTime": 1790812799}
+    ]
+  }
+}

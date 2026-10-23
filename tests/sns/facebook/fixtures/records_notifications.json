@@ -1,0 +1,84 @@
+{
+  "about": "Synthetic GraphQL bodies for the rows of the notifications list (S13). Same case format as records_posts.json. A row is a NOTIFICATION (a record) or layout (BUCKET_HEADER, SEE_PREVIOUS_BUTTON: never a record); tracking and the settings UI are never exported.",
+  "cases": [
+    {
+      "name": "notification-rows-and-layout-rows",
+      "fact": "Only NOTIFICATION rows become records, in server order. id is notif.notif_id; url is notif.url (where the notification leads); created_at is creation_time.timestamp (epoch seconds) as UTC; notification_type is notif_type; text is body.text; seen maps UNSEEN to unseen, SEEN_BUT_UNREAD to seen and SEEN_AND_READ to read. Layout rows are skipped without a note.",
+      "parser": "notifications",
+      "body_lines": [
+        {"data": {"viewer": {"notifications_unseen_count": 1, "notifications_page": {"edges": [
+          {"node": {"row_type": "BUCKET_HEADER", "title": {"text": "Earlier"}}},
+          {"node": {"row_type": "NOTIFICATION", "notif": {"id": "gid-1", "notif_id": "N1", "seen_state": "UNSEEN", "creation_time": {"timestamp": 1788307200}, "notif_type": "feed_comment_reply", "body": {"text": "Sample Person replied to your comment"}, "url": "https://www.facebook.com/example/posts/1", "notif_image": {"uri": "https://example.invalid/a.jpg"}, "icon_data": {"name": "x"}, "notif_attachments": [{"kind": "settings"}], "tracking": "OPAQUE"}}},
+          {"node": {"row_type": "NOTIFICATION", "notif": {"id": "gid-2", "notif_id": "N2", "seen_state": "SEEN_BUT_UNREAD", "creation_time": {"timestamp": 1788300000}, "notif_type": "tagged", "body": {"text": "Sample Person tagged you"}, "url": "https://www.facebook.com/example/posts/2"}}},
+          {"node": {"row_type": "NOTIFICATION", "notif": {"id": "gid-3", "notif_id": "N3", "seen_state": "SEEN_AND_READ", "creation_time": {"timestamp": 1788290000}, "notif_type": "birthday", "body": {"text": "It is a friend's birthday"}, "url": "https://www.facebook.com/example/3"}}},
+          {"node": {"row_type": "SEE_PREVIOUS_BUTTON"}}
+        ], "page_info": {"has_next_page": true, "end_cursor": "NC1"}}}}}
+      ],
+      "expected": {
+        "records": [
+          {"kind": "notification", "id": "N1", "url": "https://www.facebook.com/example/posts/1", "created_at": "2026-09-02T00:00:00Z", "notification_type": "feed_comment_reply", "text": "Sample Person replied to your comment", "seen": "unseen"},
+          {"kind": "notification", "id": "N2", "seen": "seen", "notification_type": "tagged"},
+          {"kind": "notification", "id": "N3", "seen": "read", "text": "It is a friend's birthday"}
+        ],
+        "page_info": {"has_next_page": true, "end_cursor": "NC1"},
+        "has_items": true,
+        "issues": []
+      }
+    },
+    {
+      "name": "sparse-notification-takes-what-it-has",
+      "fact": "A notification with only an id keeps it (notif_id first, else id); every field it lacks is null, seen included, and nothing is invented or noted.",
+      "parser": "notifications",
+      "body_lines": [
+        {"data": {"viewer": {"notifications_page": {"edges": [
+          {"node": {"row_type": "NOTIFICATION", "notif": {"id": "gid-9"}}}
+        ], "page_info": {"has_next_page": false, "end_cursor": null}}}}}
+      ],
+      "expected": {
+        "records": [
+          {"kind": "notification", "id": "gid-9", "url": null, "created_at": null, "notification_type": null, "text": null, "seen": null}
+        ],
+        "has_items": true,
+        "issues": []
+      }
+    },
+    {
+      "name": "unknown-seen-state-is-null-and-noted",
+      "fact": "A seen_state this skill does not know becomes seen null and one response issue (however many rows), so a new Facebook value is noticed rather than guessed.",
+      "parser": "notifications",
+      "body_lines": [
+        {"data": {"viewer": {"notifications_page": {"edges": [
+          {"node": {"row_type": "NOTIFICATION", "notif": {"id": "gid-1", "notif_id": "N1", "seen_state": "SNOOZED"}}},
+          {"node": {"row_type": "NOTIFICATION", "notif": {"id": "gid-2", "notif_id": "N2", "seen_state": "SNOOZED"}}}
+        ], "page_info": {"has_next_page": false, "end_cursor": null}}}}}
+      ],
+      "expected": {
+        "records": [{"id": "N1", "seen": null}, {"id": "N2", "seen": null}],
+        "issues": ["unknown_seen_state"]
+      }
+    },
+    {
+      "name": "unreadable-notification-row-has-items-but-no-record",
+      "fact": "A NOTIFICATION row with no readable notif or id yields no record but the page still had items, so zero records means Facebook changed its answer.",
+      "parser": "notifications",
+      "body_lines": [
+        {"data": {"viewer": {"notifications_page": {"edges": [
+          {"node": {"row_type": "NOTIFICATION"}},
+          {"node": {"row_type": "NOTIFICATION", "notif": {"seen_state": "UNSEEN"}}}
+        ], "page_info": {"has_next_page": true, "end_cursor": "NC2"}}}}}
+      ],
+      "expected": {"records": [], "has_items": true}
+    },
+    {
+      "name": "layout-rows-only-is-an-empty-page",
+      "fact": "BUCKET_HEADER and SEE_PREVIOUS_BUTTON rows are layout: a page of them alone has no items to read.",
+      "parser": "notifications",
+      "body_lines": [
+        {"data": {"viewer": {"notifications_page": {"edges": [
+          {"node": {"row_type": "BUCKET_HEADER"}}, {"node": {"row_type": "SEE_PREVIOUS_BUTTON"}}
+        ], "page_info": {"has_next_page": false, "end_cursor": null}}}}}
+      ],
+      "expected": {"records": [], "has_items": false}
+    }
+  ]
+}

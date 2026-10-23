@@ -1,0 +1,56 @@
+{
+  "p4": {"status": "P4가 실행해야 함", "behavior": "모든 scenarios가 파일 미소비. collection/handles/protection 계약을 코어에 연결; protection.unblock은 옛 무검증 삭제를 기록하므로 검증 완료 후 해제로 P4 변경. 계정별 상태 및 단조 핸들 유지."},
+  "about": "Local state scenarios on a real filesystem (appendix A 48-50). Each scenario states the starting files, the action, and what must hold afterwards. Contexts are the query identity a file or handle is bound to.",
+  "collection": {
+    "item": "48",
+    "fact": "--out writes NDJSON: a header line (query context, format version, started_at), then records, each page closed by a kind:page marker (cursor, ids, n, stop_reason, skipped, coverage). Only complete pages are trusted: on resume the tail after the last marker is dropped and re-read. A file for another query or an older format is refused before any byte changes. A marker whose ids or n disagree with the records above it is an integrity failure. The file is locked without waiting; writes are fsynced; --limit counts what is saved (parent comments for comments).",
+    "scenarios": [
+      {"name": "new-file-gets-header", "start": null, "action": "open with context X", "after": "first line is a header carrying context X and the current format; nothing else"},
+      {"name": "page-commit", "start": "header X", "action": "commit records [A, B] with cursor CUR1", "after": "lines: header, A, B, page marker {ids:[A,B], n:2, cursor:CUR1}; the file is fsynced"},
+      {"name": "interrupted-tail-replayed", "start": "header X, A, B, marker(A,B), C (no marker)", "action": "reopen with context X", "after": "C is dropped; resume continues from the marker's cursor; ids seen = {A, B}"},
+      {"name": "partial-line-replayed", "start": "header X, A, marker(A), '{\"id\":\"B\"' (no newline)", "action": "reopen with context X", "after": "the partial line is dropped"},
+      {"name": "other-query-refused-byte-identical", "start": "header Y, A, marker(A)", "action": "open with context X", "after": "refused with an argument error naming another query; the file's bytes are unchanged"},
+      {"name": "older-format-refused-byte-identical", "start": "header X with an older format, A, marker(A)", "action": "open with context X", "after": "refused as written by an earlier version; bytes unchanged"},
+      {"name": "previous-skill-file-refused", "start": "a file written by the previous skill version (format 2 header)", "action": "open with any context", "after": "refused; bytes unchanged"},
+      {"name": "integrity-failure", "start": "header X, A, B, marker {ids:[A], n:1}", "action": "reopen with context X", "after": "refused as an integrity failure; bytes unchanged"},
+      {"name": "complete-file", "start": "header X, A, marker(A, stop_reason exhausted)", "action": "reopen with context X", "after": "reported complete; nothing is requested"},
+      {"name": "dedupe-across-pages", "start": "header X, A, marker(A)", "action": "commit [A, B]", "after": "only B is written in the new page"},
+      {"name": "concurrent-writer-refused", "start": "file locked by another process", "action": "open", "after": "refused at once without waiting"},
+      {"name": "limit-counts-saved", "start": "header X (comments), parent P1, reply R1, parent P2, marker", "action": "--limit 2", "after": "two parents are already saved: nothing more is requested"}
+    ]
+  },
+  "handles": {
+    "item": "49",
+    "fact": "A handle is a monotonically increasing number bound to its query context (command, target, order, filters, the Facebook account). The counter reservation is fsynced before the handle file is written, so a crash leaves a gap, never a reused number. Files are 0600 in a 0700 directory.",
+    "scenarios": [
+      {"name": "monotonic", "action": "save three handles", "after": "numbers n, n+1, n+2"},
+      {"name": "counter-survives-cleanup", "start": "handles 1..3 and the counter", "action": "delete the handle files only, save again", "after": "the new number is 4"},
+      {"name": "seeded-counter", "start": "counter file holding 1064", "action": "save", "after": "number 1065"},
+      {"name": "context-mismatch", "start": "handle 5 bound to context X", "action": "load 5 with context Y", "after": "argument error: rerun the original query"},
+      {"name": "account-mismatch", "start": "handle 5 bound to context X for account 111", "action": "load 5 with context X for account 222", "after": "argument error"},
+      {"name": "expired", "start": "handle 5 created longer ago than the TTL", "action": "load 5", "after": "argument error: expired, rerun the original query"},
+      {"name": "older-format", "start": "handle 5 written with an older format", "action": "load 5", "after": "argument error: from an earlier version"},
+      {"name": "missing", "start": "no file 99", "action": "load 99", "after": "argument error: missing"},
+      {"name": "not-a-number", "action": "load '../x'", "after": "argument error before touching the filesystem"},
+      {"name": "permissions", "action": "save", "after": "handle file mode 0600, directory 0700"}
+    ]
+  },
+  "protection": {
+    "item": "50,2,4",
+    "fact": "Account protection state is written atomically (temporary file, fsync, replace). State that cannot be read counts as blocked (fail closed). The next allowed time is recorded before a request starts, so a process killed mid-request cannot erase it. A checkpoint blocks until a person clears it; a rate limit blocks for 30 minutes. Requests are spaced 1-2 seconds apart at random. Check, budget, pacing, the request, its classification and a new block happen under one cross-process lock.",
+    "scenarios": [
+      {"name": "no-state-is-open", "start": null, "action": "request", "after": "allowed"},
+      {"name": "checkpoint-blocks-indefinitely", "start": "block {reason: checkpoint, expires_at: null}", "action": "request", "after": "blocked; no request is made"},
+      {"name": "rate-limit-expires", "start": "block {reason: rate_limit, expires_at: now - 1}", "action": "request", "after": "allowed"},
+      {"name": "rate-limit-active", "start": "block {reason: rate_limit, expires_at: now + 600}", "action": "request", "after": "blocked"},
+      {"name": "unreadable-block-fails-closed", "start": "block file containing 'not json'", "action": "request", "after": "blocked as unreadable"},
+      {"name": "unknown-reason-fails-closed", "start": "block {reason: other}", "action": "request", "after": "blocked as unreadable"},
+      {"name": "unreadable-pace-fails-closed", "start": "pace file {next_allowed_at: 'soon'}", "action": "request", "after": "blocked as unreadable"},
+      {"name": "pace-waits", "start": "pace {next_allowed_at: now + 1.5}", "action": "request", "after": "the request starts no earlier than that time"},
+      {"name": "pace-recorded-before-request", "action": "request that is killed before it returns", "after": "pace file holds a time 1-2 s after the request started"},
+      {"name": "block-recorded-inside-lock", "action": "two processes; the first gets a checkpoint", "after": "the second sees the block before making its request"},
+      {"name": "rate-limit-sets-30-minutes", "action": "a response classified as rate limit", "after": "block {reason: rate_limit, expires_at: about now + 1800}"},
+      {"name": "unblock", "start": "checkpoint block", "action": "doctor --unblock", "after": "block cleared; pace state kept"}
+    ]
+  }
+}

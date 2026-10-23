@@ -1,0 +1,107 @@
+{
+  "p4": {"status": "executed", "behavior": "first_read.cases run through the cli (test_cli_thread.py); merge.expansion-in-sibling-slot and batching.same-descriptor-twice-stalls-only-that-gap run on the tree policy (test_tree.py)."},
+  "about": "Comment trees (appendix A 21-26): how a response is walked and validated, how comments are put in place, how a gap (a more pointer) is expanded and merged, and what coverage says. Comments are written compactly: {id, parent (fullname), body?, replies: [...]} for a t1 and {more: [ids], parent, count} for a more pointer ({more: [], count: 0} is 'continue this thread': Reddit sends it as a more with id '_' and no children, P2 R1). The P3 tests turn these into Reddit's raw shapes. All ids are synthetic.",
+  "walk": {
+    "item": "21",
+    "fact": "A response is walked through arrays, Listings, t1, t3, more and the morechildren json envelope. Each item's parent_id is a string; a more's children are (t1_)?[A-Za-z0-9]+ strings and its count a non-negative integer; a t1's replies is '' or a Listing. Anything else is a malformed response (exit 6).",
+    "cases": [
+      {"name": "listing-with-replies", "raw": [{"kind": "Listing", "data": {"children": [{"kind": "t3", "data": {"id": "aaa1", "name": "t3_aaa1"}}]}}, {"kind": "Listing", "data": {"children": [{"kind": "t1", "data": {"id": "c1", "name": "t1_c1", "parent_id": "t3_aaa1", "replies": {"kind": "Listing", "data": {"children": [{"kind": "t1", "data": {"id": "c2", "name": "t1_c2", "parent_id": "t1_c1", "replies": ""}}]}}}}, {"kind": "more", "data": {"children": ["c3", "t1_c4"], "count": 2, "parent_id": "t3_aaa1"}}]}}], "ok": true, "things": ["t3_aaa1", "t1_c1", "t1_c2", "more"]},
+      {"name": "morechildren-envelope", "raw": {"json": {"errors": [], "data": {"things": [{"kind": "t1", "data": {"id": "c3", "name": "t1_c3", "parent_id": "t3_aaa1", "replies": ""}}]}}}, "ok": true, "things": ["t1_c3"]},
+      {"name": "parent-not-string", "raw": {"kind": "t1", "data": {"id": "c1", "name": "t1_c1", "parent_id": 5}}, "ok": false},
+      {"name": "more-child-bad-id", "raw": {"kind": "more", "data": {"children": ["c-1"], "count": 1, "parent_id": "t3_aaa1"}}, "ok": false},
+      {"name": "more-negative-count", "raw": {"kind": "more", "data": {"children": [], "count": -1, "parent_id": "t3_aaa1"}}, "ok": false},
+      {"name": "replies-not-listing", "raw": {"kind": "t1", "data": {"id": "c1", "name": "t1_c1", "parent_id": "t3_aaa1", "replies": {"kind": "t1"}}}, "ok": false},
+      {"name": "name-kind-mismatch", "raw": {"kind": "t1", "data": {"id": "c1", "name": "t3_c1", "parent_id": "t3_aaa1"}}, "ok": false},
+      {"name": "envelope-with-errors", "raw": {"json": {"errors": [["X"]], "data": {"things": []}}}, "ok": false}
+    ]
+  },
+  "ingest": {
+    "item": "22",
+    "fact": "Comments go in in response order; a fullname already present is skipped (its first-seen time and whether it was shown are kept); a parent cycle is malformed (6); a more pointer is kept once per (parent, ids); a comment whose parent has not arrived waits as an orphan and is reconnected when the parent comes; depth is recomputed from the tree.",
+    "cases": [
+      {"name": "duplicate-keeps-first", "post": "aaa1",
+       "responses": [[{"id": "c1", "parent": "t3_aaa1", "body": "first"}], [{"id": "c1", "parent": "t3_aaa1", "body": "edited later"}]],
+       "expected": {"order": ["t1_c1"], "texts": {"t1_c1": "first"}}},
+      {"name": "cycle-is-malformed", "post": "aaa1",
+       "responses": [[{"id": "c1", "parent": "t1_c2"}, {"id": "c2", "parent": "t1_c1"}]], "expected": {"error": 6}},
+      {"name": "more-pointer-once", "post": "aaa1",
+       "responses": [[{"more": ["c5", "c6"], "parent": "t3_aaa1", "count": 2}], [{"more": ["c6", "c5"], "parent": "t3_aaa1", "count": 2}]],
+       "expected": {"gaps": 1, "note": "the old key is (parent, ids in order); the same ids in another order make a second gap there — P3 keys gaps by (parent, sorted ids)"}},
+      {"name": "orphan-reconnected", "post": "aaa1",
+       "responses": [[{"id": "c2", "parent": "t1_c1", "body": "child first"}], [{"id": "c1", "parent": "t3_aaa1", "body": "parent later"}]],
+       "expected": {"after_first": {"orphans": 1}, "after_second": {"orphans": 0, "order": ["t1_c1", "t1_c2"], "depths": {"t1_c1": 0, "t1_c2": 1}}}}
+    ]
+  },
+  "first_read": {
+    "item": "23",
+    "fact": "The first read asks for limit=500, depth=10. If the post in the answer is not the one asked for, or a linked comment is not in the answer, the target cannot be read (exit 9).",
+    "cases": [
+      {"name": "other-post-in-answer", "target": {"post_id": "aaa1"}, "answer_post": "bbb2", "expected": {"error": 9}},
+      {"name": "anchor-missing", "target": {"post_id": "aaa1", "comment_id": "zz9"}, "answer_post": "aaa1", "answer_comments": [{"id": "c1", "parent": "t3_aaa1"}], "expected": {"error": 9}},
+      {"name": "anchor-present", "target": {"post_id": "aaa1", "comment_id": "c2"}, "answer_post": "aaa1", "answer_comments": [{"id": "c1", "parent": "t3_aaa1", "replies": [{"id": "c2", "parent": "t1_c1"}]}], "expected": {"ok": true}}
+    ]
+  },
+  "merge": {
+    "item": "24",
+    "fact": "An expansion's comments take the place of the gap they came from, in order among its siblings; requested, received and missing ids accumulate. A gap without ids under a comment ('continue this thread') is read as that comment's subtree (/comments/<post>/_/<parent>.json, context 0); one under the post itself cannot be followed and stays unresolved.",
+    "cases": [
+      {"name": "expansion-in-sibling-slot", "post": "aaa1",
+       "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": ["c2", "c3"], "parent": "t3_aaa1", "count": 2}, {"id": "c4", "parent": "t3_aaa1"}],
+       "expansions": [{"request": {"kind": "ids", "ids": ["c2", "c3"]}, "answer": [{"id": "c2", "parent": "t3_aaa1"}, {"id": "c3", "parent": "t3_aaa1", "replies": [{"id": "c5", "parent": "t1_c3"}]}]}],
+       "expected": {"order": ["t1_c1", "t1_c2", "t1_c3", "t1_c5", "t1_c4"], "requested": ["c2", "c3"], "received": ["c2", "c3", "c5"], "missing": []}},
+      {"name": "continue-this-thread", "post": "aaa1",
+       "initial": [{"id": "c1", "parent": "t3_aaa1", "replies": [{"id": "c2", "parent": "t1_c1", "replies": [{"more": [], "parent": "t1_c2", "count": 0}]}]}],
+       "expansions": [{"request": {"kind": "subtree", "comment": "c2"}, "answer": [{"id": "c2", "parent": "t1_c1", "replies": [{"id": "c6", "parent": "t1_c2"}, {"id": "c7", "parent": "t1_c2"}]}]}],
+       "expected": {"order": ["t1_c1", "t1_c2", "t1_c6", "t1_c7"], "gaps_left": 0}},
+      {"name": "top-level-continue-unresolved", "post": "aaa1",
+       "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": [], "parent": "t3_aaa1", "count": 0}],
+       "expected": {"unresolved": 1, "complete": false}},
+      {"name": "missing-ids-counted", "post": "aaa1",
+       "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": ["c2", "c3"], "parent": "t3_aaa1", "count": 2}],
+       "expansions": [{"request": {"kind": "ids", "ids": ["c2", "c3"]}, "answer": [{"id": "c2", "parent": "t3_aaa1"}]}],
+       "expected": {"missing": ["c3"], "gaps_left": 0, "requests": 1, "note": "the reply holds one thing, far from a cut, so c3 is gone at once (P2 R1)"}}
+    ]
+  },
+  "coverage": {
+    "item": "26",
+    "fact": "Coverage counts: top-level comments present, comments parsed, shown, not yet shown, ids still unexpanded and the fewest requests to expand them (ceil(ids / 100)), orphans, missing, and whether the thread is complete.",
+    "cases": [
+      {"name": "after-first-batch", "post": "aaa1", "num_comments": 12,
+       "initial": [{"id": "c1", "parent": "t3_aaa1", "replies": [{"id": "c2", "parent": "t1_c1"}]}, {"id": "c3", "parent": "t3_aaa1"}, {"more": ["c4", "c5", "c6"], "parent": "t3_aaa1", "count": 3}],
+       "shown": 2,
+       "expected": {"top_level": 2, "parsed": 3, "shown": 2, "unshown": 1, "unexpanded_ids": 3, "min_requests": 1, "orphans": 0, "missing": 0, "complete": false, "reported": 12}}
+    ]
+  },
+  "stall": {
+    "item": "25",
+    "fact": "The old reader stops the whole thread as stalled after one expansion that adds nothing new (no comment and no new gap), and after any unresolved gap; it also spends one request per more pointer (most hold 1-3 ids). Measured live: a 795-comment thread stopped at 626 after 24 requests with 57 ids never expanded. Fixed: see the batching scenarios.",
+    "cases": [
+      {"name": "empty-expansion-stops-other-gaps", "post": "aaa1",
+       "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": ["d1"], "parent": "t3_aaa1", "count": 1}, {"id": "c2", "parent": "t3_aaa1"}, {"more": ["c3"], "parent": "t3_aaa1", "count": 1}],
+       "server": {"d1": null, "c3": {"id": "c3", "parent": "t3_aaa1"}},
+       "old": {"stalled": true, "c3_read": false},
+       "expected": {"stalled": false, "c3_read": true, "missing": ["d1"], "complete": true, "requests": 1, "note": "d1 and c3 go in one batch (across gaps); the reply was not cut, so d1 is gone"}}
+    ]
+  },
+  "batching": {
+    "item": "24,25 (P2 R1)",
+    "fact": "The new expansion plan: when no comment is left to show, take the first gap in depth-first order and gather not-yet-requested ids of the same post across gaps, up to 100, into one morechildren request; the descriptor remembers each id's gap and its order inside that gap; the reply's requested comments go back into their own gap's place in the gap's own id order (Reddit's reply order differs), descendants under their parents in reply order, a new more under its parent as a new gap. Reddit cuts a reply at about 100 things and drops whole requested comments from a cut reply, so an id absent from a cut reply (90 things or more) is asked again in a batch of only such ids, half as large each time; an id absent from a reply that was not cut, or asked alone, is gone (P2 R1: a 100-id reply of 99 things lacked 38 ids, 31 of which came in the next 38-id reply of 88 things; the last 7 asked alone came back empty). Progress is a new comment, a new gap or a requested id finished (received or missing). Only a subtree descriptor planned again without progress stalls that gap. Id-bearing gaps finish missing ids through cut-answer halving and singleton retries; they do not use the subtree stalled branch. An id-less gap under a comment is that comment's subtree in one request.",
+    "scenarios": [
+      {"name": "two-gaps-same-parent", "post": "aaa1",
+       "initial": [{"id": "c1", "parent": "t3_aaa1"}, {"more": ["a1", "a2"], "parent": "t3_aaa1", "count": 2}, {"id": "x1", "parent": "t3_aaa1"}, {"more": ["b1"], "parent": "t3_aaa1", "count": 1}],
+       "server_order": "a reply returns things in any order (P2 R1 records Reddit's)",
+       "expected_order": ["t1_c1", "t1_a1", "t1_a2", "t1_x1", "t1_b1"], "expected_requests": "one (3 ids)"},
+      {"name": "deleted-only-batches-then-normal", "post": "aaa1",
+       "fact": "Two batches whose ids all come back missing, then a batch that answers: everything is read; only the deleted ids are missing.",
+       "initial_spec": "top-level comments t1..t5, then gaps g1 (100 deleted ids), g2 (100 deleted ids), g3 (40 live ids)",
+       "expected": {"complete": true, "missing": 200, "requests": "filled in P3 after R1"}},
+      {"name": "large-thread-795", "post": "aaa1",
+       "fact": "A synthetic thread shaped like the measured one: 795 reported, the first answer holding 458 comments with 62 gaps of 1-3 ids and 8 'continue this thread' gaps; 4 requested ids never come back.",
+       "spec": {"reported": 795, "first_answer": 458, "gaps": {"ids": 62, "ids_per_gap": [1, 3], "continue": 8}, "missing": 4},
+       "expected": {"complete_except_missing": true, "requests_at_most": "set in P3 from R1 (old reader: 24 requests, stalled at 626)"}},
+      {"name": "same-descriptor-twice-stalls-only-that-gap", "post": "aaa1",
+       "fact": "A subtree gap whose reply brings nothing new is planned once more at most, then that gap alone is stalled; other gaps go on.",
+       "expected": {"stalled_gaps": 1, "other_gaps_read": true}}
+    ]
+  }
+}

@@ -1,0 +1,1 @@
+이 글(${SNS_TASK_NAVER_MENU_POST})에 나온 메뉴 가격 정리해줘.

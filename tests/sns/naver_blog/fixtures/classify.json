@@ -1,0 +1,585 @@
+{
+  "p4": {"status": "P4가 실행해야 함", "behavior": "35 cases는 실행 중. about의 30-minute block 표현은 S14의 자동 만료 hold로 P4 정리; current-user.networkBlocked 순서는 test_cli_doctor.py:53 인라인으로 고정."},
+ "about": "Response classification (appendix A 3-5, 7, 54). Each case is one response as fetch.js returns it ({status, url, body, location}) for one operation of the ledger (op: the new row name; old_op: the current code's row, for the differential check). outcome is ok, or the exit code with its reason: transient (6, retry later), rate_limit (5, 30-minute block), login (4), noPost / owner_only / not_exist_blog / not_exist_post / blog_id_invalidate / not_exist_category (9), argument (2, a skill bug), drift (6, the response shape changed), query_restricted (8, whatever arrived is kept: kept counts the items). The order of the steps is the contract: a transport failure beats a block, a block beats a login wall, a login wall beats a missing target, a missing target beats a contract error, and a policy restriction is read only from an otherwise valid answer. All ids are synthetic. An outcome without a reason accepts any reason for that exit code.",
+ "cases": [
+  {
+   "name": "server-error-is-transient",
+   "item": "4",
+   "fact": "5xx is a transport failure: retry later, never a block.",
+   "op": "post_list",
+   "old_op": "post_list",
+   "response": {
+    "status": 502,
+    "url": "https://m.blog.naver.com/api/blogs/sample_blog/post-list",
+    "body": "<html>Bad Gateway</html>"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "transient"
+   }
+  },
+  {
+   "name": "server-error-beats-a-login-hop",
+   "item": "4",
+   "fact": "Nothing below step 1 can read a body that never arrived intact.",
+   "op": "my_buddies",
+   "old_op": "my_buddies",
+   "response": {
+    "status": 503,
+    "url": "https://m.blog.naver.com/api/blogs/me_blog/my-buddies",
+    "body": "",
+    "location": "https://nid.naver.com/nidlogin.login"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "transient"
+   }
+  },
+  {
+   "name": "429-is-a-rate-limit",
+   "item": "4",
+   "fact": "HTTP 429 is the only block Naver has been seen to send: 30 minutes.",
+   "op": "search_posts",
+   "old_op": "search_posts",
+   "response": {
+    "status": 429,
+    "url": "https://m.blog.naver.com/api/search/v1/post",
+    "body": ""
+   },
+   "outcome": {
+    "code": 5,
+    "reason": "rate_limit"
+   }
+  },
+  {
+   "name": "429-beats-a-login-hop",
+   "item": "4",
+   "fact": "A block outranks a login wall.",
+   "op": "search_posts",
+   "old_op": "search_posts",
+   "response": {
+    "status": 429,
+    "url": "https://m.blog.naver.com/api/search/v1/post",
+    "body": "",
+    "location": "https://nid.naver.com/nidlogin.login"
+   },
+   "outcome": {
+    "code": 5,
+    "reason": "rate_limit"
+   }
+  },
+  {
+   "name": "login-host-hop",
+   "item": "4",
+   "fact": "A redirect to exactly nid.naver.com is a login wall for every operation.",
+   "op": "feed",
+   "old_op": "feed_html",
+   "response": {
+    "status": 302,
+    "url": "https://m.blog.naver.com/FeedList.naver",
+    "body": "",
+    "location": "https://nid.naver.com/nidlogin.login?url=https%3A%2F%2Fm.blog.naver.com%2FFeedList.naver"
+   },
+   "outcome": {
+    "code": 4,
+    "reason": "login"
+   }
+  },
+  {
+   "name": "login-path-hop",
+   "item": "4",
+   "fact": "A /nidlogin path counts too.",
+   "op": "post_html",
+   "old_op": "post_html",
+   "response": {
+    "status": 302,
+    "url": "https://m.blog.naver.com/PostView.naver",
+    "body": "",
+    "location": "/nidlogin.login?mode=form"
+   },
+   "outcome": {
+    "code": 4,
+    "reason": "login"
+   }
+  },
+  {
+   "name": "login-beats-a-missing-post",
+   "item": "4",
+   "fact": "A login wall outranks a missing target: reporting the weaker one hides the stronger.",
+   "op": "post_html",
+   "old_op": "post_html",
+   "response": {
+    "status": 302,
+    "url": "https://m.blog.naver.com/PostView.naver",
+    "body": "<a href=\"/MobileErrorView.naver?errorType=noPost\">",
+    "location": "https://nid.naver.com/nidlogin.login"
+   },
+   "outcome": {
+    "code": 4,
+    "reason": "login"
+   }
+  },
+  {
+   "name": "lookalike-login-host-is-not-login",
+   "item": "4",
+   "fact": "Only the exact host counts: nid.naver.com.example is not Naver's login. (Any exit but 4; an unexpected redirect on a JSON surface is a failure, never a login.)",
+   "op": "post_list",
+   "old_op": "post_list",
+   "response": {
+    "status": 302,
+    "url": "https://m.blog.naver.com/api/blogs/sample_blog/post-list",
+    "body": "",
+    "location": "https://nid.naver.com.example/nidlogin"
+   },
+   "outcome": {
+    "code": 6
+   }
+  },
+  {
+   "name": "not-logged-in-code-on-a-login-surface",
+   "item": "4",
+   "fact": "A not-logged-in code on a surface that needs login is a login wall.",
+   "op": "my_buddies",
+   "old_op": "my_buddies",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/blogs/me_blog/my-buddies",
+    "body": "{\"isSuccess\":false,\"error\":{\"code\":\"notlogined\",\"message\":\"login\"}}"
+   },
+   "outcome": {
+    "code": 4,
+    "reason": "login"
+   }
+  },
+  {
+   "name": "not-logged-in-code-elsewhere-is-drift",
+   "item": "4",
+   "fact": "The same code on a public surface is unexplained: a contract error, not a login.",
+   "op": "post_list",
+   "old_op": "post_list",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/blogs/sample_blog/post-list",
+    "body": "{\"isSuccess\":false,\"error\":{\"code\":\"notlogined\",\"message\":\"login\"}}"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "drift"
+   }
+  },
+  {
+   "name": "no-post-error-page",
+   "item": "4",
+   "fact": "HTML 404 that names MobileErrorView?errorType=noPost: deleted, private and buddy-only posts answer alike.",
+   "op": "post_html",
+   "old_op": "post_html",
+   "response": {
+    "status": 404,
+    "url": "https://m.blog.naver.com/PostView.naver",
+    "body": "<script>location.href='/MobileErrorView.naver?errorType=noPost';</script>"
+   },
+   "outcome": {
+    "code": 9,
+    "reason": "noPost"
+   }
+  },
+  {
+   "name": "unknown-error-page",
+   "item": "4",
+   "fact": "Any other errorType has never been seen: name it, transient.",
+   "op": "post_html",
+   "old_op": "post_html",
+   "response": {
+    "status": 404,
+    "url": "https://m.blog.naver.com/PostView.naver",
+    "body": "<script>location.href='/MobileErrorView.naver?errorType=inspection';</script>"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "inspection"
+   }
+  },
+  {
+   "name": "owner-only-surface",
+   "item": "4",
+   "fact": "403 with not_blog_owner: the surface belongs to its owner.",
+   "op": "my_buddies",
+   "old_op": "my_buddies",
+   "response": {
+    "status": 403,
+    "url": "https://m.blog.naver.com/api/blogs/other_blog/my-buddies",
+    "body": "{\"isSuccess\":false,\"error\":{\"code\":\"not_blog_owner\",\"message\":\"owner\"}}"
+   },
+   "outcome": {
+    "code": 9,
+    "reason": "owner_only"
+   }
+  },
+  {
+   "name": "missing-blog",
+   "item": "4",
+   "fact": "not_exist_blog is a missing target (exit 9) — and the trigger for one domain-address hop.",
+   "op": "blog_card",
+   "old_op": "blog_card",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/blogs/nosuch",
+    "body": "{\"isSuccess\":false,\"error\":{\"code\":\"not_exist_blog\",\"message\":\"x\"}}"
+   },
+   "outcome": {
+    "code": 9,
+    "reason": "not_exist_blog"
+   }
+  },
+  {
+   "name": "missing-post",
+   "item": "4",
+   "fact": "not_exist_post.",
+   "op": "comments_info",
+   "old_op": "comments_info",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/blogs/sample_blog/posts/1/comments-info",
+    "body": "{\"isSuccess\":false,\"error\":{\"code\":\"not_exist_post\",\"message\":\"x\"}}"
+   },
+   "outcome": {
+    "code": 9,
+    "reason": "not_exist_post"
+   }
+  },
+  {
+   "name": "invalid-blog-id",
+   "item": "4",
+   "fact": "blog_id_invalidate (the older shape of a missing blog).",
+   "op": "blog_card",
+   "old_op": "blog_card",
+   "response": {
+    "status": 400,
+    "url": "https://m.blog.naver.com/api/blogs/x",
+    "body": "{\"isSuccess\":false,\"error\":{\"code\":\"blog_id_invalidate\",\"message\":\"x\"}}"
+   },
+   "outcome": {
+    "code": 9,
+    "reason": "blog_id_invalidate"
+   }
+  },
+  {
+   "name": "missing-category",
+   "item": "4",
+   "fact": "not_exist_category.",
+   "op": "post_list",
+   "old_op": "post_list",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/blogs/sample_blog/post-list",
+    "body": "{\"isSuccess\":false,\"error\":{\"code\":\"not_exist_category\",\"message\":\"x\"}}"
+   },
+   "outcome": {
+    "code": 9,
+    "reason": "not_exist_category"
+   }
+  },
+  {
+   "name": "bad-parameter-is-a-skill-bug",
+   "item": "4",
+   "fact": "param_is_invalidate: the CLI should have refused it before spending a request (exit 2).",
+   "op": "post_list",
+   "old_op": "post_list",
+   "response": {
+    "status": 400,
+    "url": "https://m.blog.naver.com/api/blogs/sample_blog/post-list",
+    "body": "{\"isSuccess\":false,\"error\":{\"code\":\"param_is_invalidate\",\"message\":\"itemCount\"}}"
+   },
+   "outcome": {
+    "code": 2,
+    "reason": "argument"
+   }
+  },
+  {
+   "name": "bad-request-is-a-skill-bug",
+   "item": "4",
+   "fact": "bad_request likewise.",
+   "op": "search_posts",
+   "old_op": "search_posts",
+   "response": {
+    "status": 400,
+    "url": "https://m.blog.naver.com/api/search/v1/post",
+    "body": "{\"isSuccess\":false,\"error\":{\"code\":\"bad_request\",\"message\":\"x\"}}"
+   },
+   "outcome": {
+    "code": 2,
+    "reason": "argument"
+   }
+  },
+  {
+   "name": "empty-403-is-the-referer-contract",
+   "item": "4",
+   "fact": "A 403 with no reason is the referer contract breaking: drift.",
+   "op": "categories",
+   "old_op": "categories",
+   "response": {
+    "status": 403,
+    "url": "https://m.blog.naver.com/api/blogs/sample_blog/category-list",
+    "body": ""
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "drift"
+   }
+  },
+  {
+   "name": "other-4xx-is-transient",
+   "item": "4",
+   "fact": "Any other 4xx without a known code.",
+   "op": "categories",
+   "old_op": "categories",
+   "response": {
+    "status": 404,
+    "url": "https://m.blog.naver.com/api/blogs/sample_blog/category-list",
+    "body": "{}"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "transient"
+   }
+  },
+  {
+   "name": "unparseable-json-is-transient",
+   "item": "3",
+   "fact": "A truncated body is a transient failure, not a shape change.",
+   "op": "directories",
+   "old_op": "directories",
+   "response": {
+    "status": 200,
+    "url": "https://section.blog.naver.com/ajax/DirectoryList.naver",
+    "body": ")]}',\n{\"result\":[{\"name\":\"엔터"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "transient"
+   }
+  },
+  {
+   "name": "json-that-is-not-an-envelope",
+   "item": "4",
+   "fact": "A list or a bare null is valid JSON and still not an envelope.",
+   "op": "categories",
+   "old_op": "categories",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/blogs/sample_blog/category-list",
+    "body": "[1,2]"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "transient"
+   }
+  },
+  {
+   "name": "unknown-error-code-is-drift",
+   "item": "4",
+   "fact": "An error code this reader does not know is a contract error.",
+   "op": "categories",
+   "old_op": "categories",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/blogs/sample_blog/category-list",
+    "body": "{\"isSuccess\":false,\"error\":{\"code\":\"something_new\",\"message\":\"x\"}}"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "drift"
+   }
+  },
+  {
+   "name": "missing-success-flag-is-drift",
+   "item": "4",
+   "fact": "An m.blog answer without isSuccess true.",
+   "op": "categories",
+   "old_op": "categories",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/blogs/sample_blog/category-list",
+    "body": "{\"result\":{\"mylogCategoryList\":[]}}"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "drift"
+   }
+  },
+  {
+   "name": "wrong-leaf-type-is-drift",
+   "item": "4",
+   "fact": "The declared leaf must have its declared type.",
+   "op": "categories",
+   "old_op": "categories",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/blogs/sample_blog/category-list",
+    "body": "{\"isSuccess\":true,\"result\":{\"mylogCategoryList\":{}}}"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "drift"
+   }
+  },
+  {
+   "name": "answer-about-another-post-is-drift",
+   "item": "7",
+   "fact": "Every comment's objectId must name the requested logNo.",
+   "op": "comments",
+   "old_op": "comments",
+   "ids": {
+    "blogNo": "123456",
+    "logNo": "224000000001"
+   },
+   "response": {
+    "status": 200,
+    "url": "https://apis.naver.com/commentBox/cbox/web_naver_list_json.json",
+    "body": "{\"success\":true,\"code\":\"1000\",\"result\":{\"commentList\":[{\"commentNo\":1,\"objectId\":\"123456_201_224000000999\"}],\"pageModel\":{\"totalPages\":1}}}"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "drift"
+   }
+  },
+  {
+   "name": "comment-box-envelope",
+   "item": "5",
+   "fact": "The comment box answers success true and code 1000.",
+   "op": "comments",
+   "old_op": "comments",
+   "ids": {
+    "blogNo": "123456",
+    "logNo": "224000000001"
+   },
+   "response": {
+    "status": 200,
+    "url": "https://apis.naver.com/commentBox/cbox/web_naver_list_json.json",
+    "body": "{\"success\":true,\"code\":\"1000\",\"result\":{\"commentList\":[{\"commentNo\":1,\"objectId\":\"123456_201_224000000001\"}],\"pageModel\":{\"totalPages\":1}}}"
+   },
+   "outcome": {
+    "outcome": "ok"
+   }
+  },
+  {
+   "name": "comment-box-code-is-drift",
+   "item": "5",
+   "fact": "Any CBOX code other than 1000 (3300 also comes from a wrong pool) is a contract error.",
+   "op": "comments",
+   "old_op": "comments",
+   "ids": {
+    "blogNo": "123456",
+    "logNo": "224000000001"
+   },
+   "response": {
+    "status": 200,
+    "url": "https://apis.naver.com/commentBox/cbox/web_naver_list_json.json",
+    "body": "{\"success\":false,\"code\":\"3300\",\"message\":\"pool\"}"
+   },
+   "outcome": {
+    "code": 6,
+    "reason": "drift"
+   }
+  },
+  {
+   "name": "section-xssi-prefix",
+   "item": "3",
+   "fact": "Section hosts prefix )]}', which is stripped before parsing.",
+   "op": "directories",
+   "old_op": "directories",
+   "response": {
+    "status": 200,
+    "url": "https://section.blog.naver.com/ajax/DirectoryList.naver",
+    "body": ")]}',\n{\"result\":[{\"name\":\"엔터테인먼트·예술\",\"directoryList\":[{\"seq\":5,\"name\":\"문학·책\"}]}]}"
+   },
+   "outcome": {
+    "outcome": "ok"
+   }
+  },
+  {
+   "name": "card-under-its-canonical-id",
+   "item": "6",
+   "fact": "A blog card asked for by a domain address comes back under the canonical id; that is not a mismatch.",
+   "op": "blog_card",
+   "old_op": "blog_card",
+   "ids": {
+    "blogId": "mydomain"
+   },
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/blogs/mydomain",
+    "body": "{\"isSuccess\":true,\"result\":{\"blogId\":\"canonical_id\",\"blogNo\":1}}"
+   },
+   "outcome": {
+    "outcome": "ok"
+   }
+  },
+  {
+   "name": "shield-restriction-keeps-results",
+   "item": "4",
+   "fact": "blockedByBifrostShield marks a restricted query; the results that did arrive are kept.",
+   "op": "search_posts",
+   "old_op": "search_posts",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/search/v1/post",
+    "body": "{\"isSuccess\":true,\"result\":{\"blockedByBifrostShield\":true,\"list\":[{\"logNo\":1,\"blogId\":\"a\"},{\"logNo\":2,\"blogId\":\"b\"}]}}"
+   },
+   "outcome": {
+    "code": 8,
+    "reason": "query_restricted",
+    "kept": 2
+   }
+  },
+  {
+   "name": "forbidden-query",
+   "item": "4",
+   "fact": "queryControlInfo.isForbidden true.",
+   "op": "search_posts",
+   "old_op": "search_posts",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/search/v1/post",
+    "body": "{\"isSuccess\":true,\"result\":{\"queryControlInfo\":{\"isForbidden\":true},\"list\":[]}}"
+   },
+   "outcome": {
+    "code": 8,
+    "reason": "query_restricted",
+    "kept": 0
+   }
+  },
+  {
+   "name": "suicide-word",
+   "item": "4",
+   "fact": "suicideWord true, anywhere in the envelope.",
+   "op": "search_tags",
+   "old_op": "search_tags",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/tags/search/post",
+    "body": "{\"isSuccess\":true,\"result\":{\"meta\":{\"suicideWord\":true},\"items\":[]}}"
+   },
+   "outcome": {
+    "code": 8,
+    "reason": "query_restricted",
+    "kept": 0
+   }
+  },
+  {
+   "name": "false-flags-are-not-a-restriction",
+   "item": "4",
+   "fact": "Only a true flag restricts.",
+   "op": "search_posts",
+   "old_op": "search_posts",
+   "response": {
+    "status": 200,
+    "url": "https://m.blog.naver.com/api/search/v1/post",
+    "body": "{\"isSuccess\":true,\"result\":{\"blockedByBifrostShield\":false,\"queryControlInfo\":{\"isForbidden\":false},\"list\":[]}}"
+   },
+   "outcome": {
+    "outcome": "ok"
+   }
+  }
+ ]
+}

@@ -1,0 +1,369 @@
+{
+ "about": "What leaves the process (appendix A 1, 2, 6, 34, 51, 52, plan '읽기 허용 목록'). allowlist: a (host, path, query) the request gate must allow or refuse — both cli-side (operations) and inside fetch.js, which must agree; a refused request is never sent. headers: what fetch.js sends per host (no user-agent override: the REPL's own browser UA stands). builds: the request an operation assembles from identifiers alone (callers never pass composed parameters). redirects: whether a domain-address hop may be followed. All ids are synthetic.",
+ "allowlist": {
+  "item": "2",
+  "fact": "Full matches, not prefixes; GET only; traversal (.., backslash, %2e, %2f, %5c, a leading //) is refused before matching because fetch() normalizes it away; a query may not carry # or a backslash. Write APIs that ship in the same app bundle (command.blog.naver.com, sympathy, buddy add/delete, block, hide, notify) are not on the list.",
+  "cases": [
+   {
+    "host": "m.blog.naver.com",
+    "path": "/api/blogs/sample_blog/post-list",
+    "allowed": true
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/PostView.naver",
+    "query": "blogId=sample_blog&logNo=224000000001",
+    "allowed": true
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/PostView.naver.evil",
+    "allowed": false,
+    "why": "prefix match"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/api/../PostWrite.naver",
+    "allowed": false,
+    "why": "traversal"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/api/%2e%2e/PostWrite.naver",
+    "allowed": false,
+    "why": "encoded traversal"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/api/blogs/a%2fb",
+    "allowed": false,
+    "why": "encoded slash"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/api\\blogs",
+    "allowed": false,
+    "why": "backslash"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "//evil.example/api",
+    "allowed": false,
+    "why": "protocol-relative"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/api/blogs/sample_blog/post-list",
+    "query": "page=1#x",
+    "allowed": false,
+    "why": "fragment in query"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/PostWrite.naver",
+    "allowed": false,
+    "why": "write screen"
+   },
+   {
+    "host": "section.blog.naver.com",
+    "path": "/ajax/DirectoryList.naver",
+    "allowed": true
+   },
+   {
+    "host": "section.blog.naver.com",
+    "path": "/ajax/../BuddyAdd.naver",
+    "allowed": false,
+    "why": "traversal"
+   },
+   {
+    "host": "apis.naver.com",
+    "path": "/commentBox/cbox/web_naver_list_json.json",
+    "allowed": true
+   },
+   {
+    "host": "apis.naver.com",
+    "path": "/commentBox/cbox/web_naver_create_json.json",
+    "allowed": false,
+    "why": "comment write"
+   },
+   {
+    "host": "blog.naver.com",
+    "path": "/mydomain",
+    "allowed": true,
+    "why": "the one domain-address hop"
+   },
+   {
+    "host": "blog.naver.com",
+    "path": "/mydomain/extra",
+    "allowed": false
+   },
+   {
+    "host": "naver.me",
+    "path": "/AbCd12Ef",
+    "allowed": true,
+    "why": "one short-link hop"
+   },
+   {
+    "host": "naver.me",
+    "path": "/AbCd12Ef/x",
+    "allowed": false
+   },
+   {
+    "host": "mblogthumb-phinf.pstatic.net",
+    "path": "/MjAyNjEwMTlf/IMG_0001.jpg",
+    "query": "type=w800",
+    "allowed": true,
+    "why": "a post photo"
+   },
+   {
+    "host": "evil.pstatic.net.example",
+    "path": "/a.jpg",
+    "allowed": false,
+    "why": "lookalike host"
+   },
+   {
+    "host": "command.blog.naver.com",
+    "path": "/api/blogs/sample_blog/posts/1/sympathy",
+    "allowed": false,
+    "why": "write host"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/api/blogs/sample_blog/posts/224000000001/sympathy",
+    "allowed": false,
+    "why": "sympathy write"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/api/blogs/sample_blog/buddies",
+    "allowed": false,
+    "why": "buddy add/delete"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/api/blogs/sample_blog/block",
+    "allowed": false,
+    "why": "block"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/api/blogs/sample_blog/posts/1/hide",
+    "allowed": false,
+    "why": "hide"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "path": "/api/blogs/sample_blog/notify",
+    "allowed": false,
+    "why": "notify"
+   },
+   {
+    "host": "www.naver.com",
+    "path": "/",
+    "allowed": false,
+    "why": "unknown host"
+   }
+  ],
+  "methods": {
+   "fact": "Only GET is sent; any other method is refused before sending.",
+   "cases": [
+    {
+     "method": "GET",
+     "allowed": true
+    },
+    {
+     "method": "POST",
+     "allowed": false
+    },
+    {
+     "method": "DELETE",
+     "allowed": false
+    }
+   ]
+  }
+ },
+ "headers": {
+  "item": "1",
+  "fact": "Naver's only header contract is a referer per host (apis.naver.com takes m.blog's). The user-agent is the REPL's own (a real browser version); a hand-written one is a mismatched fingerprint. accept follows what is asked for: json, html or an image. redirect is always manual.",
+  "cases": [
+   {
+    "host": "m.blog.naver.com",
+    "accept": "json",
+    "referer": "https://m.blog.naver.com/",
+    "accept_header": "application/json, text/plain, */*"
+   },
+   {
+    "host": "m.blog.naver.com",
+    "accept": "html",
+    "referer": "https://m.blog.naver.com/",
+    "accept_header": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+   },
+   {
+    "host": "section.blog.naver.com",
+    "accept": "json",
+    "referer": "https://section.blog.naver.com/"
+   },
+   {
+    "host": "apis.naver.com",
+    "accept": "json",
+    "referer": "https://m.blog.naver.com/"
+   },
+   {
+    "host": "blog.naver.com",
+    "accept": "html",
+    "referer": "https://blog.naver.com/"
+   },
+   {
+    "host": "naver.me",
+    "accept": "html",
+    "referer": null
+   },
+   {
+    "host": "mblogthumb-phinf.pstatic.net",
+    "accept": "image",
+    "referer": null,
+    "accept_header": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8"
+   }
+  ],
+  "always": {
+   "accept-language": "ko-KR,ko;q=0.9,en;q=0.8",
+   "redirect": "manual",
+   "method": "GET",
+   "user-agent": "absent (not overridden)"
+  }
+ },
+ "builds": {
+  "items": [
+   "34",
+   "51",
+   "52"
+  ],
+  "cases": [
+   {
+    "name": "comment-box-key",
+    "item": "51",
+    "fact": "The comment box is keyed by objectId {blogNo}_201_{logNo} and groupId blogNo, with fixed paging parameters; callers pass only blogNo and logNo.",
+    "op": "comments",
+    "ids": {
+     "blogNo": "123456",
+     "logNo": "224000000001"
+    },
+    "page": 1,
+    "query_has": {
+     "objectId": "123456_201_224000000001",
+     "groupId": "123456",
+     "ticket": "blog",
+     "pool": "blogid",
+     "pageSize": "100",
+     "replyPageSize": "10",
+     "page": "1"
+    }
+   },
+   {
+    "name": "blog-search-takes-query",
+    "item": "52",
+    "fact": "Inside-blog search takes query= (keyword= answers 500).",
+    "op": "blog_search",
+    "ids": {
+     "blogId": "sample_blog",
+     "query": "성수 카페",
+     "sortType": "date"
+    },
+    "page": 1,
+    "path": "/api/blogs/sample_blog/search/post",
+    "query_has": {
+     "query": "성수 카페",
+     "sortType": "date",
+     "page": "1"
+    },
+    "query_lacks": [
+     "keyword"
+    ]
+   },
+   {
+    "name": "post-list-30",
+    "item": "34",
+    "fact": "post-list itemCount above 30 is param_is_invalidate; the row sends 30.",
+    "op": "post_list",
+    "ids": {
+     "blogId": "sample_blog",
+     "categoryNo": 0
+    },
+    "page": 2,
+    "path": "/api/blogs/sample_blog/post-list",
+    "query_has": {
+     "itemCount": "30",
+     "categoryNo": "0",
+     "page": "2"
+    }
+   },
+   {
+    "name": "path-value-also-in-query",
+    "item": "51",
+    "fact": "category-related-posts names the blog in its path and again as a parameter; filling the path must not drop it from the query.",
+    "op": "related_category",
+    "ids": {
+     "blogId": "sample_blog",
+     "categoryNo": "7",
+     "logNo": "224000000001"
+    },
+    "path": "/api/blogs/sample_blog/v1/category-related-posts",
+    "query_has": {
+     "blogId": "sample_blog",
+     "categoryNo": "7",
+     "logNo": "224000000001"
+    }
+   },
+   {
+    "name": "missing-identifier",
+    "item": "51",
+    "fact": "An operation missing a required identifier is a skill bug, refused before sending.",
+    "op": "comments",
+    "ids": {
+     "logNo": "224000000001"
+    },
+    "refused": true
+   }
+  ]
+ },
+ "redirects": {
+  "item": "6, P2 R13",
+  "fact": "A domain address answers not_exist_blog; one hop to blog.naver.com/{id} names the canonical blog id: in a 3xx location's blogId, or (as observed for an ordinary blog) in the 200 frameset page's var blogId and its mainFrame src. The id must match the blog-id pattern; a location off the read surface is drift; 404 means no such blog.",
+  "cases": [
+   {
+    "status": 302,
+    "location": "https://blog.naver.com/PostList.naver?blogId=canonical_id",
+    "canonical": "canonical_id"
+   },
+   {
+    "status": 302,
+    "location": "https://evil.example/PostList.naver?blogId=x",
+    "outcome": {
+     "code": 6,
+     "reason": "drift"
+    }
+   },
+   {
+    "status": 200,
+    "body": "<script>var blogId = 'canonical_id'; var blogURL = 'https://blog.naver.com';</script><iframe id=\"mainFrame\" src=\"/PostList.naver?blogId=canonical_id&widgetTypeCall=true\"></iframe>",
+    "canonical": "canonical_id"
+   },
+   {
+    "status": 200,
+    "body": "<script>var blogId = 'bad id';</script>",
+    "outcome": {
+     "code": 6,
+     "reason": "drift"
+    }
+   },
+   {
+    "status": 404,
+    "body": "<html>없는 블로그</html>",
+    "outcome": {
+     "code": 9,
+     "reason": "not_exist_blog"
+    }
+   }
+  ]
+ }
+}

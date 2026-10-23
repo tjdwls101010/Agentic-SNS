@@ -1,0 +1,479 @@
+{
+  "p4": {"status": "P4가 실행해야 함", "behavior": "empty_public_buddies/new_surfaces는 파일 기대값 소비자 없음. 공개 이웃 비공개 기본값은 test_cli_neighbors.py:98, 새 응답은 cli_responses.json 출처를 연결."},
+ "about": "Blog-side records (appendix A 22-25, 49) and the new surfaces' measured fields. raw is one item as sent; expect is the record or null. relation is how the viewer stands to the blog: neighbor, mutual-neighbor, or null. All ids are synthetic.",
+ "cards": [
+  {
+   "name": "card",
+   "item": "22",
+   "fact": "blogName (not blogNameWithTag), nickName, blogDesc, subscriberCount (buddyCount on older shapes), visitor counts, mylogPostCount, directory, official and market flags, the viewer's relation.",
+   "raw": {
+    "blogId": "cafe_note",
+    "blogNo": 123456,
+    "blogName": "카페 기록",
+    "blogNameWithTag": "<b>카페</b> 기록",
+    "nickName": "카페노트",
+    "blogDesc": "성수 &amp; 연남 카페",
+    "subscriberCount": 1520,
+    "dayVisitorCount": 340,
+    "totalVisitorCount": 880000,
+    "mylogPostCount": 712,
+    "blogDirectoryName": "맛집",
+    "officialBlog": false,
+    "isMarketBlog": true,
+    "bothNeighbor": true,
+    "neighbor": true,
+    "powerBlog": true
+   },
+   "expect": {
+    "id": "blog:cafe_note",
+    "blog_id": "cafe_note",
+    "blog_no": "123456",
+    "name": "카페 기록",
+    "nickname": "카페노트",
+    "description": "성수 & 연남 카페",
+    "url": "https://blog.naver.com/cafe_note",
+    "buddy_count": 1520,
+    "today_visitors": 340,
+    "total_visitors": 880000,
+    "post_count": 712,
+    "directory": "맛집",
+    "official": false,
+    "market": true,
+    "relation": "mutual-neighbor",
+    "labels": [
+     "power-blog"
+    ]
+   }
+  },
+  {
+   "name": "older-buddy-count-and-one-way",
+   "item": "22",
+   "raw": {
+    "blogId": "old_shape",
+    "buddyCount": 9,
+    "neighbor": true,
+    "block": true
+   },
+   "expect": {
+    "id": "blog:old_shape",
+    "blog_id": "old_shape",
+    "blog_no": null,
+    "name": null,
+    "nickname": null,
+    "description": null,
+    "url": "https://blog.naver.com/old_shape",
+    "buddy_count": 9,
+    "today_visitors": null,
+    "total_visitors": null,
+    "post_count": null,
+    "directory": null,
+    "official": false,
+    "market": false,
+    "relation": "neighbor",
+    "labels": [
+     "blocked"
+    ]
+   }
+  },
+  {
+   "name": "no-blog-id",
+   "item": "22",
+   "raw": {
+    "blogName": "x"
+   },
+   "expect": null
+  }
+ ],
+ "categories": {
+  "item": "23",
+  "fact": "divisionLine rows and categoryType S are layout dividers, not categories; depth follows parentCategoryNo; openYN N is closed (its posts are counted, not listed).",
+  "raw": [
+   {
+    "categoryNo": 0,
+    "categoryName": "전체보기",
+    "postCnt": 120
+   },
+   {
+    "divisionLine": true,
+    "categoryNo": 99
+   },
+   {
+    "categoryNo": 1,
+    "categoryName": "맛집",
+    "postCnt": 80
+   },
+   {
+    "categoryNo": 2,
+    "categoryName": "서울",
+    "parentCategoryNo": 1,
+    "postCnt": 50
+   },
+   {
+    "categoryNo": 3,
+    "categoryName": "성수",
+    "parentCategoryNo": 2,
+    "postCnt": 20
+   },
+   {
+    "categoryNo": 4,
+    "categoryName": "구분",
+    "categoryType": "S"
+   },
+   {
+    "categoryNo": 5,
+    "categoryName": "비밀",
+    "openYN": "N",
+    "postCnt": 7
+   },
+   {
+    "categoryName": "번호 없음"
+   }
+  ],
+  "expect": [
+   {
+    "kind": "category",
+    "id": "category:sample_blog/0",
+    "blog_id": "sample_blog",
+    "category_no": "0",
+    "name": "전체보기",
+    "parent_no": null,
+    "depth": 0,
+    "post_count": 120,
+    "open": true,
+    "url": "https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=0",
+    "created_at": null
+   },
+   {
+    "kind": "category",
+    "id": "category:sample_blog/1",
+    "blog_id": "sample_blog",
+    "category_no": "1",
+    "name": "맛집",
+    "parent_no": null,
+    "depth": 0,
+    "post_count": 80,
+    "open": true,
+    "url": "https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=1",
+    "created_at": null
+   },
+   {
+    "kind": "category",
+    "id": "category:sample_blog/2",
+    "blog_id": "sample_blog",
+    "category_no": "2",
+    "name": "서울",
+    "parent_no": "1",
+    "depth": 1,
+    "post_count": 50,
+    "open": true,
+    "url": "https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=2",
+    "created_at": null
+   },
+   {
+    "kind": "category",
+    "id": "category:sample_blog/3",
+    "blog_id": "sample_blog",
+    "category_no": "3",
+    "name": "성수",
+    "parent_no": "2",
+    "depth": 2,
+    "post_count": 20,
+    "open": true,
+    "url": "https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=3",
+    "created_at": null
+   },
+   {
+    "kind": "category",
+    "id": "category:sample_blog/5",
+    "blog_id": "sample_blog",
+    "category_no": "5",
+    "name": "비밀",
+    "parent_no": null,
+    "depth": 0,
+    "post_count": 7,
+    "open": false,
+    "url": "https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=5",
+    "created_at": null
+   }
+  ]
+ },
+ "buddies": [
+  {
+   "name": "buddy",
+   "item": "24",
+   "raw": {
+    "blogId": "friend_a",
+    "blogName": "A의 블로그",
+    "nickName": "에이",
+    "bothNeighbor": true,
+    "updateTime": 1792368000000,
+    "groupId": 3
+   },
+   "expect": {
+    "id": "buddy:friend_a",
+    "blog_id": "friend_a",
+    "name": "A의 블로그",
+    "nickname": "에이",
+    "url": "https://blog.naver.com/friend_a",
+    "mutual": true,
+    "official": false,
+    "updated_at": "2026-10-19T09:00+09:00",
+    "group_id": "3"
+   }
+  },
+  {
+   "name": "buddy-group-zero",
+   "item": "24",
+   "raw": {
+    "blogId": "friend_b",
+    "officialBlog": true,
+    "recentlyUpdate": "2026-10-17T08:00:00+0900",
+    "groupId": 0
+   },
+   "expect": {
+    "id": "buddy:friend_b",
+    "blog_id": "friend_b",
+    "name": null,
+    "nickname": null,
+    "url": "https://blog.naver.com/friend_b",
+    "mutual": false,
+    "official": true,
+    "updated_at": "2026-10-17T08:00+09:00",
+    "group_id": null
+   }
+  },
+  {
+   "name": "no-blog-id",
+   "item": "24",
+   "raw": {
+    "nickName": "x"
+   },
+   "expect": null
+  }
+ ],
+ "topics": {
+  "item": "25",
+  "fact": "The directory is groups of topics; a topic is addressed by its seq.",
+  "raw": [
+   {
+    "name": "엔터테인먼트·예술",
+    "directoryList": [
+     {
+      "seq": 5,
+      "name": "문학·책"
+     },
+     {
+      "seq": 6,
+      "name": "영화"
+     }
+    ]
+   },
+   {
+    "name": "생활·노하우·쇼핑",
+    "directoryList": [
+     {
+      "seq": 20,
+      "name": "맛집"
+     },
+     {
+      "name": "번호 없음"
+     }
+    ]
+   },
+   "not a group"
+  ],
+  "expect": [
+   {
+    "kind": "topic",
+    "id": "topic:5",
+    "seq": "5",
+    "name": "문학·책",
+    "group": "엔터테인먼트·예술",
+    "url": null,
+    "created_at": null
+   },
+   {
+    "kind": "topic",
+    "id": "topic:6",
+    "seq": "6",
+    "name": "영화",
+    "group": "엔터테인먼트·예술",
+    "url": null,
+    "created_at": null
+   },
+   {
+    "kind": "topic",
+    "id": "topic:20",
+    "seq": "20",
+    "name": "맛집",
+    "group": "생활·노하우·쇼핑",
+    "url": null,
+    "created_at": null
+   }
+  ]
+ },
+ "empty_public_buddies": {
+  "item": "49",
+  "fact": "Public neighbor lists are private by default: an empty list is not 'no neighbors' — the card's own count usually says otherwise, and the command says so."
+ },
+ "new_surfaces": {
+  "status": "Documentary field inventory, not executable raw/expect cases. Synthetic shapes from the shipped old CLI tests are in cli_responses.json with source lines; there are no local Naver captures in this P1 run. P4 must consume those fixtures. buddy_total is not a shipped route; the sympathy person list remains subject to S13/P3.",
+  "surfaces": [
+   {
+    "op": "search_blogs",
+    "path": "/api/search/v2/blog",
+    "fact": "v2 blog search carries blogStatus, relationType and badges beside the card fields; the record is a Blog with the viewer's relation.",
+    "fields": [
+     "blogId",
+     "blogName",
+     "nickName",
+     "blogStatus",
+     "relationType",
+     "badges"
+    ]
+   },
+   {
+    "op": "search_clips",
+    "path": "/api/search/v1/moment",
+    "fact": "Clip results include docNo (the permalink /<blogId>/clip/<docNo>), originTitle, playTime and momentNo; momentNo is not the permalink id.",
+    "fields": [
+     "docNo",
+     "momentNo",
+     "originTitle",
+     "playTime",
+     "blogId"
+    ]
+   },
+   {
+    "op": "popular_keywords",
+    "path": "/api/v1/popular-keywords",
+    "fact": "Twelve keywords with the date Naver computed them (keywordDate); a Keyword record keeps rank order.",
+    "fields": [
+     "keywordDate",
+     "keyword",
+     "rank"
+    ]
+   },
+   {
+    "op": "related_keywords",
+    "path": "/api/related-keywords",
+    "fact": "About fifteen related keywords for one keyword.",
+    "fields": [
+     "keyword"
+    ]
+   },
+   {
+    "op": "sympathy",
+    "path": "/api/blogs/{blogId}/posts/{logNo}/sympathy-users",
+    "fact": "sympathy yields exact totalCount and reactionCounts. The old implementation does not expose the owner-only person list; S13 requires fresh P3 reconnaissance before adding it.",
+    "fields": [
+     "totalCount",
+     "reactionCounts"
+    ]
+   },
+   {
+    "op": "contents_count",
+    "path": "/api/blogs/{blogId}/contents-count",
+    "fact": "The blog's post and clip totals.",
+    "fields": [
+     "postCount",
+     "momentCount"
+    ]
+   },
+   {
+    "op": "current_user",
+    "path": "/api/current-user",
+    "fact": "userId (the viewer's blog id), loggedIn, blogNo, networkBlocked, writeBlocked; idNo and baUserKey are viewer identifiers that never reach output or diagnostics.",
+    "fields": [
+     "userId",
+     "loggedIn",
+     "blogNo",
+     "networkBlocked",
+     "writeBlocked",
+     "idNo",
+     "baUserKey"
+    ]
+   },
+   {
+    "op": "feed",
+    "path": "/api/blogs/{me}/feed/v1",
+    "fact": "Page-numbered (totalCount, page), groupId filter; items carry groupId, relationType, buyWithMyOwnMoney, likeCount, commentCount, shareCount, isRss, briefContents.",
+    "fields": [
+     "totalCount",
+     "page",
+     "groupId",
+     "relationType",
+     "buyWithMyOwnMoney",
+     "likeCount",
+     "commentCount",
+     "shareCount",
+     "isRss",
+     "briefContents"
+    ]
+   },
+   {
+    "op": "buddy_groups",
+    "path": "/api/blogs/{me}/buddy-groups",
+    "fact": "Neighbor groups carry blogId, blogNo, groupId and groupName; the shipped record does not assert a count.",
+    "fields": [
+     "blogId",
+     "blogNo",
+     "groupId",
+     "groupName"
+    ]
+   },
+   {
+    "op": "buddy_total",
+    "path": "/api/blogs/{me}/buddies/total-count",
+    "fact": "How many neighbors.",
+    "fields": [
+     "totalCount"
+    ],
+    "status": "not in the shipped 35-route ledger; documentary observation only, no P4 route implied"
+   },
+   {
+    "op": "followers",
+    "path": "/api/blogs/{me}/me-buddies",
+    "fact": "The blogs that added the viewer (pageNo).",
+    "fields": [
+     "pageNo",
+     "blogId"
+    ]
+   },
+   {
+    "op": "monthly_issues",
+    "path": "/api/thismonthblog/year-month-list",
+    "fact": "The published issues (year, month).",
+    "fields": [
+     "year",
+     "month"
+    ]
+   },
+   {
+    "op": "monthly_blogs",
+    "path": "/api/thismonthblog/directory-blogid-list",
+    "fact": "Six topics with blog ids for one issue (?year&month; none = latest).",
+    "fields": [
+     "directoryName",
+     "blogIdList"
+    ]
+   },
+   {
+    "op": "monthly_profiles",
+    "path": "/api/blogs/profiles/profile-relation-list",
+    "fact": "The result.blogProfileAndRelationView list contains cards for blogIdList.",
+    "fields": [
+     "result.blogProfileAndRelationView"
+    ]
+   },
+   {
+    "op": "monthly_posts",
+    "path": "/api/blogs/posts/popular-post-list",
+    "fact": "Representative posts for a list of blog ids.",
+    "fields": [
+     "blogIdList"
+    ]
+   }
+  ]
+ }
+}
