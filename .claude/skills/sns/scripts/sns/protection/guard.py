@@ -681,17 +681,6 @@ class Guard:
                     entries.append({**mark, 'at': now})
                     self._write('imported.json', {'entries': entries})
 
-    def note_export(self, path, sha256):
-        """Record that the converter wrote `path` with this content hash (so it never imports it back, and deletes it
-        only while it is unchanged)."""
-        entries = [e for e in self._provenance() if not (e['kind'] == 'exported' and e.get('path') == str(path))]
-        entries.append({'kind': 'exported', 'path': str(path), 'sha256': sha256, 'at': self.clock.time()})
-        self._write('imported.json', {'entries': entries})
-
-    def forget_export(self, path):
-        entries = [e for e in self._provenance() if not (e['kind'] == 'exported' and e.get('path') == str(path))]
-        self._write('imported.json', {'entries': entries})
-
 
 def open_guard(platform, account, policy, deadline, *, title, site):
     """The protection of one invocation: `policy` is the platform's limits.LimitPolicy, `deadline` the invocation's."""

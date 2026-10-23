@@ -447,15 +447,6 @@ def test_merge_refuses_a_reason_this_platform_does_not_have(data_dir, clock):
         guard('threads', clock).merge(person={'reason': 'challenge', 'at': 1}, source={'path': 'a', 'sha256': 'b'})
 
 
-def test_exports_are_recorded_and_forgotten(data_dir, clock):
-    g = guard('threads', clock)
-    g.note_export('/old/blocked.json', 'f00')
-    assert [(e['kind'], e['path'], e['sha256']) for e in g.snapshot()['provenance']] == \
-        [('exported', '/old/blocked.json', 'f00')]
-    g.forget_export('/old/blocked.json')
-    assert g.snapshot()['provenance'] == []
-
-
 def test_accounts_keep_separate_state(data_dir, clock):
     with guard('threads', clock, account='u0').request() as slot:
         slot.block('checkpoint')
