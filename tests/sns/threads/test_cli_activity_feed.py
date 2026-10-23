@@ -158,3 +158,12 @@ def test_an_explicit_empty_activity_list_is_empty_not_failed(browser):
     code, out, _ = run(browser, 'activity', '--json')
     result = json.loads(out)
     assert code == 7 and result['results'] == [] and result['stop_reason'] == 'exhausted', result
+
+
+def test_a_body_is_dropped_only_when_it_repeats_the_title(browser):
+    """Found in the pre-merge review: a short body that happened to occur inside the title was dropped."""
+    nodes = [row('short', title='alice replied to your thread', body='to'), row('same', body='Someone replied')]
+    known_tab(browser).respond('threads.query', query_result(inbox(nodes)))
+    code, out, _ = run(browser, 'activity', '--json')
+    records = json.loads(out)['results']
+    assert code == 0 and [r['text'] for r in records] == ['alice replied to your thread\nto', 'Someone replied']

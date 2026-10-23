@@ -28,7 +28,7 @@ NOTES = {
     'url': 'the ufi_media post URL, else the first actor profile URL, else null',
     'created_at': 'notification timestamp as ISO 8601 UTC; null when Threads sent no usable time',
     'notification_type': 'Threads notif_name; the set of type words is open',
-    'text': 'title text, then body text on a new line when it adds anything; never shortened in JSON',
+    'text': 'title text, then body text on a new line unless it repeats the title; never shortened in JSON',
     'unseen': 'true after NEW, false after EARLIER, null before a header or after an unknown bucket; not changed',
     'actors': 'usernames from sender_users, in their received order, without @',
     'post': '{url, like_count, direct_reply_count, quote_count, repost_count} from ufi_media; null without media; '
@@ -93,7 +93,7 @@ def notifications_page(data):
         identity, title, body = node.get('edge_id'), _text(node.get('title')), _text(node.get('body'))
         if not isinstance(identity, str) or not identity or not (title or body):
             raise _changed('An activity row has no identity or readable text.')
-        text = '\n'.join(part for part in (title, body if body not in title else '') if part)
+        text = '\n'.join(part for part in (title, body if body != title else '') if part)
         senders = node.get('sender_users')
         edges = senders.get('edges') if isinstance(senders, dict) else None
         if not isinstance(edges, list):
