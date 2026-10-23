@@ -21,7 +21,7 @@ def _limits(envelope):
             shown = int(remaining) if isinstance(remaining, float) and remaining.is_integer() else remaining
             total = state.get('limit')
             total = int(total) if isinstance(total, float) and total.is_integer() else total
-            parts.append(f'limit {line(scope)} {shown}/{total} resets {local(state.get("reset_at"), seconds=False)}')
+            parts.append(f'limit {line(scope)} {shown} of {total} left resets {local(state.get("reset_at"), seconds=False)}')
         elif state.get('status') == 'unknown':
             parts.append(f'{line(scope)} window not reported')
     return parts

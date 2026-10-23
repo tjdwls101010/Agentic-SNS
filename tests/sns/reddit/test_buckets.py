@@ -70,7 +70,7 @@ def test_a_spent_general_bucket_does_not_stop_the_wiki(reddit, data_dir):
     assert reddit.run('reddit', 'doctor')[0] == 10, 'the general bucket is spent: not sent to'
     reddit.json('/r/example/wiki/index.json', {'kind': 'wikipage', 'data': {'content_md': 'x', 'revision_id': 'r'}})
     code, out, _ = reddit.run('reddit', 'wiki', 'r/example')
-    assert code == 0 and 'limit wiki 599/600' in out.splitlines()[0]
+    assert code == 0 and 'limit wiki 599 of 600 left' in out.splitlines()[0]
 
 
 def test_a_challenge_blocks_every_bucket_until_a_person_clears_it(reddit, data_dir):

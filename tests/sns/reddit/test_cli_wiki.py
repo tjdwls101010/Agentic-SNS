@@ -13,7 +13,7 @@ def test_a_wiki_page_in_full_from_the_wiki_bucket(reddit, data_dir):
     reddit.json('/r/example/wiki/index.json', PAGE)
     code, out, _ = reddit.run('reddit', 'wiki', 'r/example')
     first = out.splitlines()[0]
-    assert code == 0 and 'limit wiki 599/600' in first
+    assert code == 0 and 'limit wiki 599 of 600 left' in first
     assert '[w1] r/example wiki index · revised' in out and 'by u/example_mod' in out and 'FAQ (https://' in out
     assert 'url: https://www.reddit.com/r/example/wiki/index' in out
     scopes = json.loads((data_dir / 'reddit/u0/protection/scopes.json').read_text())

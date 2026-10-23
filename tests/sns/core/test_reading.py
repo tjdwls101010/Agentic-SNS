@@ -251,7 +251,7 @@ def test_the_tab_is_opened_once_counted_apart_and_a_low_limit_shows(capsys, brow
     beta_page(browser, None, [item(1)], 'C2', remaining=10)
     code, out = run(capsys, browser, monkeypatch, 'beta', 'feed')
     first = out.splitlines()[0]
-    assert code == 0 and 'tab opened (+5 requests)' in first and 'limit general 10/100 resets' in first
+    assert code == 0 and 'tab opened (+5 requests)' in first and 'limit general 10 of 100 left resets' in first
     assert [c['op'] for c in browser.calls()].count('open') == 1
     browser.respond('beta.state', {'viewer': 'carl'})
     beta_page(browser, None, [item(2)], 'C3')

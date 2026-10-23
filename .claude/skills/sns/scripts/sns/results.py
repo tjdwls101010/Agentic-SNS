@@ -271,7 +271,7 @@ ENVELOPE = {
 
 TEXT = {
     'header': '<platform> <command>[ · key=value …] · <n> shown · stopped=<stop_reason> · requests=<n>[ · tab opened '
-              '(+<n> requests)][ · unwatched=<n>][ · limit <scope> <remaining>/<limit> resets <local time>]',
+              '(+<n> requests)][ · unwatched=<n>][ · limit <scope> <remaining> of <limit> left resets <local time>]',
     'window': 'dated reads add a second line: window <since>..<until> <tz> · <coverage>',
     'records': 'one record per label ([p1] post, [r1] reply, [c1] comment, [a1] account, …); each record ends with the '
                'arguments of the next command (url: <command> <url> opens it alone; replies <handle> reads more under '

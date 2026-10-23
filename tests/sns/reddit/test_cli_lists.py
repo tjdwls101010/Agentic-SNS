@@ -19,7 +19,7 @@ def test_a_page_of_100_is_shown_25_and_the_rest_waits_in_the_handle(reddit):
     code, out, _ = reddit.run('reddit', 'sub', 'r/example')
     assert code == 0
     first = out.splitlines()[0]
-    assert first.startswith('reddit sub · sort=hot · 25 shown · stopped=limit_reached · requests=2 · limit general 98/100')
+    assert first.startswith('reddit sub · sort=hot · 25 shown · stopped=limit_reached · requests=2 · limit general 98 of 100 left')
     assert out.count('\n[p') == 25 and 'url: https://www.reddit.com/r/example/comments/p0/t/' in out
     assert reddit.paths() == ['/api/me.json', '/r/example/hot.json']
     reddit.me()  # a continued reading checks the account it was read with
