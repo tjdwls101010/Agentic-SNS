@@ -140,9 +140,29 @@ def test_a_limit_counts_what_it_shows_and_keeps_the_rest_for_more(browser):
     assert code == 0 and 'replies: 1 direct and 1 nested shown of 40' in out, out
     more = next(line for line in out.splitlines() if line.startswith('more: '))
     browser.respond('x.state', state())
-    code, out, _ = rerun(browser, more)  # more: carries --limit 1
+    code, out, _ = rerun(browser, more)
     assert code == 0 and 'post 104' in out and 'requests=0' in out.splitlines()[0], out
     assert len(queries(browser)) == 1  # the cut replies came from the handle
+
+
+def test_a_cut_thread_keeps_its_branch_handle_and_more_shows_the_rest_of_the_batch(browser):
+    """Found in the pre-merge review: a cut reply with replies under it came back from more: without its replies
+    <handle>, and more: carried post's --limit (threads) into replies, where --limit counts replies."""
+    batch = detail([single(tweet('100', text='the parent')),
+                    single(tweet('101', reply_to='100', text=LONG, reply_count=40)),
+                    module('102', tweet('102', B, '101'), tweet('103', A, '102')),
+                    module('104', tweet('104', B, '101', reply_count=3)),
+                    module('107', tweet('107', A, '101')),
+                    cursor('Bottom', 'NEXTCUR')])
+    known_tab(browser).respond('x.query', query_result(batch, headers=RATE))
+    code, out, _ = post(browser, '101', '--limit', '1')
+    more = next(line for line in out.splitlines() if line.startswith('more: '))
+    assert code == 0 and '--limit' not in more, more
+    browser.respond('x.state', state())
+    code, out, _ = rerun(browser, more)
+    assert code == 0 and 'post 104' in out and 'post 107' in out, out  # the rest of the first batch, both threads
+    assert re.search(r'url: "https://x.com/replier_b/status/104"   author: "replier_b"   replies \d+', out), out
+    assert len(queries(browser)) == 1
 
 
 def test_a_deleted_post_is_unavailable(browser):

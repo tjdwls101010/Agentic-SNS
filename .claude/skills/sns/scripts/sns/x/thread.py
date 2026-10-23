@@ -45,8 +45,8 @@ def post(platform, invocation):
                     'nested_shown': sum(1 for r in replies if (r.get('depth') or 0) > 0)}  # what is shown, not received
         result = {'results': records, 'stop_reason': 'exhausted', 'details': {'replies': coverage},
                   'coverage': _coverage(coverage)}
-        for record in records:
-            if record.get('role') == 'reply' and _has_more(record, records):
+        for record in page.records:  # a cut reply keeps its handle: more: shows it without fetching it again
+            if record.get('role') == 'reply' and _has_more(record, page.records):
                 number = _handle(connection, result, _branch(record, sort))
                 if number is not None:
                     record['replies_handle'] = number
@@ -64,7 +64,9 @@ def post(platform, invocation):
                                               'cursor': page.cursor or END, 'seen': shown_ids, 'pending': cut}) \
             if page.cursor or cut else None
         if number is not None:
-            result['next'] = command_line(invocation.cli_path, words(platform.key, 'replies', str(number), [], options))
+            # post's --limit counts threads, replies' counts replies: more: shows the rest of the batch instead
+            result['next'] = command_line(invocation.cli_path, words(platform.key, 'replies', str(number), [], options,
+                                                                     limit=None))
             result['stop_reason'] = 'limit_reached'
             result['continuable'] = True
         return result
