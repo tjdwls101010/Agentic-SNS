@@ -17,7 +17,7 @@ the links are cut before anything is copied, and summary.json is written.
 A --fake run uses tests/sns/fakes/fake_aside.py with SCENARIO and a throwaway data directory (from --data-template when
 given, e.g. one holding a recorded block) and its shell is held by the OS sandbox; a live run only by the permission
 rules (aside cannot sign its daemon challenge inside the OS sandbox) — that is not OS isolation, and reports never call
-it that. Before a set of live runs, legacy_hook('import'); after it and right after a block signal, legacy_hook('export').
+it that.
 
 Outputs go to $SNS_WORK/runs/<RUN>/ (outside the repository: they hold other people's posts): work/, settings.json,
 events.jsonl, summary.json.
@@ -58,16 +58,6 @@ import ledger  # noqa: E402
 def work_dir():
     return Path(os.environ.get('SNS_WORK') or Path.home() / '.claude/projects/-Users-seongjin-Coding-Agentic-SNS'
                 / 'sns-unification')
-
-
-def legacy_hook(action):
-    """import or export protection state between the old skills and sns while both exist; nothing once the converter
-    is gone (the last commit of the sns PR removes it with the old skills)."""
-    script = HERE / 'legacy_state.py'
-    if not script.exists():
-        return None
-    done = subprocess.run(['uv', 'run', str(script), action], capture_output=True, text=True)
-    return done.stdout if done.returncode == 0 else f'legacy {action} failed: {done.stderr[-500:]}'
 
 
 def platforms_of(platform):
@@ -195,8 +185,7 @@ def run(args):
         with (root / 'events.jsonl').open('w') as events, (root / 'stderr.txt').open('w') as errors:
             child = subprocess.Popen(command, cwd=scratch, env=env, stdout=events, stderr=errors,
                                      start_new_session=True)
-            watched = ledger.watch(child, logs=lambda: ledger.request_logs(data_dir, platforms), started_at=started,
-                                   on_signal=None if args.fake else (lambda _: legacy_hook('export')))
+            watched = ledger.watch(child, logs=lambda: ledger.request_logs(data_dir, platforms), started_at=started)
     finally:
         if child is not None and child.poll() is None:
             ledger.stop_group(child)

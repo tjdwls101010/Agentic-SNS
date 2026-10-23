@@ -1,1 +1,0 @@
-${REDDIT_TASK_CROSSPOST_URL} 이 글이 다른 커뮤니티에서는 어떻게 받아들여졌어?

@@ -2,8 +2,5 @@
 __pycache__/
 *.pyc
 .claude/histories
-tests/threads/captures/
-tests/twitter/captures/
-tests/reddit/captures/
 tests/sns/captures/
 contrast/sns/triggers/evals/results/

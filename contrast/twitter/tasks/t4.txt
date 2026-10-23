@@ -1,1 +1,0 @@
-${TWITTER_TASK_QUOTES_URL}을 사람들이 어떻게 인용하며 반응했는지 정리해줘.

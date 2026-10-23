@@ -76,7 +76,7 @@ def block_signal(logs, since):
 def watch(process, *, logs, started_at, poll=1.0, on_signal=None):
     """Wait for `process` (started with start_new_session=True); stop its whole group at the first block signal the
     skill logged since `started_at`. `logs` returns the request logs to read; on_signal(signal) runs right after the
-    stop (the export of protection state to the old skills)."""
+    stop."""
     while True:
         seen = block_signal(logs(), started_at)
         if seen:

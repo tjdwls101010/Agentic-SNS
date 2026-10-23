@@ -1,1 +1,0 @@
-r/${REDDIT_TASK_WIKI_SUB} 위키에 초보자용 추천 자료 있어?
