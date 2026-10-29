@@ -1,0 +1,18 @@
+{
+  "name": "agentic-sns-demo-video",
+  "private": true,
+  "description": "Demo video for the README and launch posts. Numbers and quotes come from src/scenes.json (see build_scenes.py).",
+  "scripts": {
+    "studio": "remotion studio src/index.js",
+    "render": "remotion render src/index.js Demo ../media/demo.mp4 && remotion render src/index.js DemoSquare ../media/demo-square.mp4",
+    "stills": "remotion still src/index.js SocialCard ../media/social-preview.png && remotion still src/index.js Demo ../media/x-card.png --frame=1060 --scale=0.625",
+    "gif": "ffmpeg -y -ss 24 -t 15 -i ../media/demo.mp4 -vf \"fps=12,scale=880:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96[p];[b][p]paletteuse=dither=bayer:bayer_scale=4\" ../media/demo.gif"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.535",
+    "@remotion/google-fonts": "4.0.535",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "remotion": "4.0.535"
+  }
+}
