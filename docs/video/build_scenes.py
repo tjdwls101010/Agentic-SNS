@@ -20,7 +20,7 @@ CATEGORIES = {
     "A": "It's absurdly overpriced",
     "C": "Defending it — someone will buy",
     "B": "\"For that money you could buy…\"",
-    "E": "Is it AI-driven memory prices? (argued)",
+    "E": "Blame memory-chip prices? (argued)",
     "D": "The specs don't match the price",
     "F": "Wanted a different product",
     "G": "Jokes & off-topic",
@@ -41,14 +41,17 @@ DELETED = {"", "[deleted]", "[removed]"}
 def build(reading: Path, summary: str) -> dict:
     rows = [json.loads(line) for line in reading.read_text().splitlines() if line.strip()]
     post = next(r for r in rows if r.get("kind") == "post")
-    comments = {r["id"]: r for r in rows if r.get("kind") == "comment"}
+    comment_rows = [r for r in rows if r.get("kind") == "comment"]
+    comments = {r["id"]: r for r in comment_rows}
+    if len(comments) != len(comment_rows):
+        raise SystemExit("the reading repeats a comment id")
     labels = json.loads(LABELS.read_text())
 
     deleted = [cid for cid, c in comments.items() if (c.get("text") or "").strip() in DELETED]
     unlabeled = [cid for cid in comments if cid not in labels and cid not in deleted]
-    stale = [cid for cid in labels if cid not in comments]
+    stale = [cid for cid in labels if cid not in comments or cid in deleted]
     if unlabeled or stale:
-        raise SystemExit(f"labels out of step with the reading: unlabeled {unlabeled}, not in reading {stale}")
+        raise SystemExit(f"labels out of step with the reading: unlabeled {unlabeled}, deleted or not in reading {stale}")
     unknown = sorted({v for v in labels.values()} - CATEGORIES.keys())
     if unknown:
         raise SystemExit(f"unknown labels {unknown}")
@@ -65,8 +68,12 @@ def build(reading: Path, summary: str) -> dict:
     counts = Counter(labels.values())
     requests = re.search(r"requests=(\d+)", summary)
     stopped = re.search(r"stopped=(\w+)", summary)
-    if not requests or not stopped:
-        raise SystemExit("summary line lacks requests= or stopped=")
+    saved = re.search(r"(\d+) saved", summary)
+    if not requests or not stopped or not saved:
+        raise SystemExit("summary line lacks N saved, requests= or stopped=")
+    # --out saves the post once, then every comment.
+    if int(saved.group(1)) != 1 + len(comments):
+        raise SystemExit(f"summary says {saved.group(1)} saved but the reading holds the post and {len(comments)} comments")
     # The path in the summary is this computer's; the video shows only the file name.
     shown_summary = re.sub(r'saved to "[^"]*/([^"/]+)"', r'saved to "\1"', summary.strip())
 

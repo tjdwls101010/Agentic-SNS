@@ -20,7 +20,7 @@ npx skills add tjdwls101010/Agentic-SNS
 Or copy the folder by hand — it is self-contained and writes state only to its own `data/`:
 
 ```sh
-git clone https://github.com/tjdwls101010/Agentic-SNS && cp -R Agentic-SNS/.claude/skills/sns ~/.claude/skills/
+git clone https://github.com/tjdwls101010/Agentic-SNS && mkdir -p ~/.claude/skills && cp -R Agentic-SNS/.claude/skills/sns ~/.claude/skills/
 ```
 
 You also need [Claude Code](https://claude.com/claude-code) and [uv](https://docs.astral.sh/uv/); the CLI is a dependency-free PEP 723 script (Python 3.11+), so `uv run` is all it takes.
@@ -36,12 +36,12 @@ No platform name needed — a bare link is enough for the skill to pick one.
 
 ## Why this one
 
-| | API-key servers | Cookie-copy scrapers | **Agentic SNS** |
+| | Typical API-key servers | Typical cookie-copy scrapers | **Agentic SNS** |
 |---|---|---|---|
 | Where requests come from | The platform's paid or rate-capped API | A background browser loaded with copied cookies | **Your own browser, in a tab of its own** — your other tabs are untouched |
-| Writes to your account | Often (post, like, follow) | Sometimes | **Never.** No posting, replying, reacting, following, saving or DMs |
+| Writes to your account | Depends on the tool | Depends on the tool | **Never.** No posting, replying, reacting, following, saving or DMs |
 | When the platform pushes back | The API returns an error | Varies by tool | **Stops** on a checkpoint or lock and waits until you clear it yourself |
-| Threads, Facebook, Naver Blog | Rare | Rare | **Yes**, alongside X and Reddit |
+| Threads, Facebook, Naver Blog | Seldom covered | Seldom covered | **Yes**, alongside X and Reddit |
 
 ## What it reads
 
