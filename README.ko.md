@@ -1,5 +1,7 @@
 # Agentic SNS
 
+[English](README.md) · **한국어**
+
 Claude Code가 사용자가 로그인한 Aside 브라우저로 X(Twitter), Threads, Reddit, Facebook, 네이버 블로그를 **읽게** 해 주는 스킬 `sns`를 담은 레포입니다. 글쓰기·답글·반응·팔로우·저장·DM은 하지 않습니다.
 
 API 키 없이 사용자가 브라우저에서 보는 그대로 읽습니다. 그래서 모든 요청이 사용자의 실제 계정으로 나가며, 스킬은 계정을 지키는 쪽으로 설계되어 있습니다(아래 [계정 보호](#계정-보호)).
@@ -23,6 +25,10 @@ API 키 없이 사용자가 브라우저에서 보는 그대로 읽습니다. �
 - Aside 브라우저와 `aside` CLI, 그리고 읽을 플랫폼에 로그인된 상태
 
 ## 설치
+
+```sh
+npx skills add tjdwls101010/Agentic-SNS
+```
 
 이 레포에서 Claude Code를 열면 프로젝트 스킬로 바로 쓰입니다. 다른 곳에서 쓰려면 스킬 폴더만 복사합니다. 폴더 하나로 완결되어 있고 상태도 그 안의 `data/`에만 씁니다.
 
@@ -70,6 +76,8 @@ Aside 계정이 여럿이면 `SNS_ASIDE_ACCOUNT`(플랫폼별로는 `SNS_ASIDE_A
     └── sns/               공용 코어(보호·쪽 넘김·기한·출력)와 플랫폼 패키지(x, threads, reddit, facebook, naver_blog)
 tests/sns/                 가짜 Aside로 도는 테스트, 플랫폼별 합성 픽스처
 contrast/sns/              SKILL.md를 다듬은 대조 실행 하네스, 채점표, 트리거 평가
+docs/video/                데모 영상 소스(Remotion), 숫자는 build_scenes.py가 실제 읽기 결과에서 만듦
+docs/media/                렌더된 영상·GIF·X 카드·GitHub social preview
 ```
 
 ## 개발
