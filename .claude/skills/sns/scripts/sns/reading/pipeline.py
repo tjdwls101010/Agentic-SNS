@@ -458,21 +458,37 @@ EMPTY_SNIPPETS = {'close': '// sns-snippet: {platform}.close\n() => { window.clo
 
 def empty_tab(platform, aside, tab):
     """Close the tab (or empty it to about:blank) the way the platform declares first, the other way when that does
-    not take; True once the tab is gone or blank. Makes no request to the platform."""
+    not take; True once the tab is gone or blank. A tab left blank is then closed: Aside 1.26 no longer closes an
+    emptied tab by itself (measured 2026-11-15), and window.close() takes on about:blank even where the platform's own
+    page refuses it. Makes no request to the platform."""
     first = platform.idle_action or 'blank'
     for action in (first, 'blank' if first == 'close' else 'close', 'blank'):
-        snippet = EMPTY_SNIPPETS[action].replace('{platform}', platform.key)
-        try:
-            aside.evaluate(tab, snippet, {}, seconds=10)
-        except SnsError as error:
-            if error.reason == 'tab_missing':
-                return True
-        for _ in range(6):
-            try:
-                found = next((t for t in aside.tabs(seconds=10) if t['target_id'] == tab), None)
-            except SnsError:
-                break
-            if found is None or found['url'] in ('about:blank', ''):
-                return True
-            aside.deadline.clock.sleep(0.3)
+        state = _empty_once(platform, aside, tab, action)
+        if state == 'gone':
+            return True
+        if state == 'blank':
+            _empty_once(platform, aside, tab, 'close')  # nothing polls from a blank tab: closing it is tidiness
+            return True
     return False
+
+
+def _empty_once(platform, aside, tab, action):
+    """Run one emptying action and look at the tab a few times: 'gone', 'blank', or None (still a page)."""
+    snippet = EMPTY_SNIPPETS[action].replace('{platform}', platform.key)
+    try:
+        aside.evaluate(tab, snippet, {}, seconds=10)
+    except SnsError as error:
+        if error.reason == 'tab_missing':
+            return 'gone'
+    for _ in range(6):
+        try:
+            found = next((t for t in aside.tabs(seconds=10) if t['target_id'] == tab), None)
+        except SnsError:
+            return None
+        if found is None:
+            return 'gone'
+        if found['url'] in ('about:blank', ''):
+            if action != 'close':
+                return 'blank'
+        aside.deadline.clock.sleep(0.3)
+    return 'blank' if found['url'] in ('about:blank', '') else None
