@@ -167,7 +167,7 @@ COMMUNITY_TABS = {'posts': 'CommunityTweetsTimeline', 'media': 'CommunityMediaTi
 
 
 def community(platform, invocation):
-    """A community's posts, media or card; without a target, the communities X suggests to this account."""
+    """A community's posts, media, members or card; without a target, the communities X suggests to this account."""
     options = invocation.options
     if not options.get('target'):
         return _discovery(platform, invocation)
@@ -179,6 +179,10 @@ def community(platform, invocation):
         client = connection.client
         if tab == 'about':
             return {'results': [client.community(target.community_id)], 'stop_reason': 'not_paginable'}
+        if tab == 'members':
+            return surface(connection, state, out, order='finite', command='community', kinds=('account',),
+                           target=target.url, identity=identity, words=flags(identity), idle_limit=ACCOUNT_IDLE_PAGES,
+                           fetch=lambda cursor: client.community_members(target.community_id, cursor))
         variables = {'communityId': target.community_id}
         if tab == 'posts':
             variables['rankingMode'] = 'Recency' if sort == 'recent' else 'Relevance'

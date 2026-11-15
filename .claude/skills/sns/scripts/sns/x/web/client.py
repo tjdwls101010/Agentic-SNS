@@ -25,7 +25,7 @@ from urllib.parse import urlsplit
 
 from sns.errors import SnsError, diagnostic
 from sns.x.web import classify
-from sns.x.web.records import (account_record, community_record, list_page, list_record, missing_community,
+from sns.x.web.records import (ListPage, account_record, community_record, list_page, list_record, missing_community,
                                missing_list, missing_space, post_page, post_record, space_record)
 from sns.x.web.snippets import SNIPPETS
 
@@ -608,6 +608,24 @@ class Client:
     def feed(self, variant, cursor):
         """One page of the home feed: for you (HomeTimeline) or following (HomeLatestTimeline)."""
         return self.timeline('HomeLatestTimeline' if variant == 'following' else 'HomeTimeline', {}, cursor)
+
+    def community_members(self, community_id, cursor):
+        # The members slice as x.com's own members page receives it (captured 2026-11-16): data.communityResults.result.
+        # members_slice = {items_results: [{id, result: User}], slice_info: {next_cursor}}; variables {communityId, cursor}.
+        operation = 'membersSliceTimeline_Query'
+        root, warnings = self.query(operation, {'communityId': community_id, **({'cursor': cursor} if cursor else {})})
+        if not isinstance(root, dict) or not isinstance(root.get('items_results'), list) or not isinstance(root.get('slice_info'), dict) or 'next_cursor' not in root['slice_info']:
+            raise _changed(operation)
+        next_cursor = root['slice_info']['next_cursor']
+        if next_cursor is not None and not isinstance(next_cursor, str):
+            raise _changed(operation)
+        nodes = [item.get('result') if isinstance(item, dict) else None for item in root['items_results']]
+        records = [account_record(node) if isinstance(node, dict) and node.get('__typename') in ('User', 'UserUnavailable') else None for node in nodes]
+        unreadable = sum(record is None for record in records)
+        page = ListPage([record for record in records if record is not None], next_cursor, bool(next_cursor), unreadable=unreadable, unreadable_kinds=['account'] * unreadable)
+        page.warnings = warnings
+        self.confirm()
+        return page
 
     def post_page(self, post_id, *, sort, cursor=None):
         """A post read: the post, its parents and a batch of its replies (first page), or a further batch by cursor —
