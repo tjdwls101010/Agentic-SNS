@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 from sns.errors import SnsError
 
-FEED_SORTS = ('best', 'hot', 'new', 'top', 'rising')
+FEED_SORTS = ('best', 'hot', 'new', 'top', 'rising', 'controversial')
 SUB_SORTS = ('hot', 'new', 'top', 'rising', 'controversial')
 COMMENT_SORTS = ('best', 'top', 'new', 'controversial', 'old', 'qa')
 PROFILE_TYPES = ('overview', 'posts', 'comments')
@@ -18,7 +18,7 @@ PROFILE_SORTS = ('new', 'hot', 'top', 'controversial')
 SEARCH_TYPES = ('posts', 'subs', 'users')
 SEARCH_SORTS = ('relevance', 'hot', 'top', 'new', 'comments')
 TIMES = ('hour', 'day', 'week', 'month', 'year', 'all')
-ME_COLLECTIONS = ('subs', 'saved', 'upvoted', 'comment-replies', 'post-replies', 'mentions')
+ME_COLLECTIONS = ('subs', 'saved', 'upvoted', 'downvoted', 'hidden', 'comment-replies', 'post-replies', 'mentions')
 # What others sent the account, read with mark=false so reading never marks it read (measured 2026-10-21: the unread
 # count and each item's `new` stayed); /message/inbox is not used because it carries private messages too.
 _INBOX = {'comment-replies': 'comments', 'post-replies': 'selfreply', 'mentions': 'mentions'}
@@ -31,13 +31,13 @@ GENERAL, WIKI, SHARE = 'general', 'wiki', 'share'
 _SUB = r'[A-Za-z0-9_]+'
 _ID = r'[A-Za-z0-9]+'
 _ROUTES = (
-    (r'/(best|hot|new|top|rising)\.json', GENERAL),
+    (r'/(best|hot|new|top|rising|controversial)\.json', GENERAL),
     (rf'/r/{_SUB}(\+{_SUB})*/(hot|new|top|rising|controversial|search)\.json', GENERAL),
     (rf'/r/{_SUB}/about(/rules|/moderators)?\.json', GENERAL),
     (rf'/r/{_SUB}/wiki/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)?\.json', WIKI),
     (rf'/(r/{_SUB}/)?comments/{_ID}(/[^/]+/{_ID})?\.json', GENERAL),
     (rf'/duplicates/{_ID}\.json', GENERAL),
-    (r'/user/[A-Za-z0-9_-]+/(about|overview|submitted|comments|saved|upvoted)\.json', GENERAL),
+    (r'/user/[A-Za-z0-9_-]+/(about|overview|submitted|comments|saved|upvoted|downvoted|hidden)\.json', GENERAL),
     (r'/(search|subreddits/search|subreddits/mine/subscriber|api/me|api/morechildren)\.json', GENERAL),
     (r'/message/(comments|selfreply|mentions)\.json', GENERAL),
 )
@@ -137,7 +137,7 @@ def related(post_id, after=None):
 
 
 def mine(collection, name, after=None):
-    """The user's own lists; saved and upvoted are read under the logged-in name the account check returned."""
+    """The user's own lists; saved, upvoted, downvoted and hidden are read under the logged-in name the account check returned."""
     if collection in _INBOX:
         return Request(f'/message/{_INBOX[collection]}.json', _query(limit=PAGE_SIZE, after=after, mark='false'),
                        personal=True, inbox=True)

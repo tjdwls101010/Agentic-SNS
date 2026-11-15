@@ -73,7 +73,7 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Surface | Where on the site | Status |
 |---|---|---|
 | Home feed: best, hot, new, top, rising | Home sort | command: `reddit feed --sort …` |
-| Home feed: controversial | Home sort | in recon (R10a) |
+| Home feed: controversial | Home sort | command: `reddit feed --sort controversial` |
 | Home feed: For You, Following tabs | Home tabs | in recon (R17j) |
 | Custom feeds | Left menu | in recon (R18a) |
 | A community's listing (hot, new, top, rising, controversial), r/a+b, r/popular, r/all | Community page | command: `reddit sub SUB --sort …` |
@@ -81,7 +81,7 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Community wiki | Community wiki | command: `reddit wiki SUB [PAGE]` |
 | A user's overview, posts, comments | Profile tabs | command: `reddit profile USER --tab overview\|posts\|comments` |
 | Your subscriptions, saved, upvoted | Profile tabs, Manage Communities | command: `reddit me subs\|saved\|upvoted` |
-| Your downvoted, hidden | Profile tabs | in recon (R10b) |
+| Your downvoted, hidden | Profile tabs | command: `reddit me downvoted\|hidden` |
 | Replies to your comments and posts, mentions | Inbox | command: `reddit me comment-replies\|post-replies\|mentions` |
 | A post with its comments, a comment in full, the next batch | Post page | command: `reddit post POST`, `reddit comments POST` |
 | Other discussions of the same link | Post "other discussions" | command: `reddit related POST` |

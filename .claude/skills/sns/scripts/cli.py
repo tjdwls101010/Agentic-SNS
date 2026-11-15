@@ -747,7 +747,7 @@ def _reddit_surface(platform):
             'run': _command(platform.listing_feed), 'check': platform.listing_window_check,
             'arguments': [(('--sort',), {'choices': platform.web_FEED_SORTS, 'help': 'best (default) and hot are Reddit\'s ranking '
                                                                             'for this account; new is newest first; top '
-                                                                            'with --time'}), TIME, *WINDOW, *LIST],
+                                                                            'or controversial with --time'}), TIME, *WINDOW, *LIST],
             'epilog': ["The home feed is Reddit's choice for this account (its subscriptions and what it ranks), not Reddit as a whole. best and hot never end by themselves: --out needs --limit there.",
                        WINDOWS],
             'requests': LISTING,
@@ -833,14 +833,14 @@ def _reddit_surface(platform):
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
         },
         'me': {
-            'help': 'Read your own subscriptions, saved or upvoted items, or the replies and mentions others sent you.',
+            'help': 'Read your own subscriptions, saved, upvoted, downvoted or hidden items, or the replies and mentions others sent you.',
             'run': _command(platform.listing_me),
             'arguments': [(('collection',), {'choices': platform.web_ME_COLLECTIONS, 'help': 'subs (subscribed communities), saved, '
-                                                                                    'upvoted, comment-replies (replies to '
+                                                                                    'upvoted, downvoted, hidden, comment-replies (replies to '
                                                                                     'your comments), post-replies (replies '
                                                                                     'to your posts) or mentions (of your '
                                                                                     'name)'}), *LIST],
-            'epilog': ['Lists of the Reddit account the Aside browser is logged in to (the account check names it). saved and upvoted hold posts and comments, newest saved or upvoted first. comment-replies, post-replies and mentions are what other accounts sent you, newest first; reading them never marks them read (unread says which are still new). Private messages are not read.'],
+            'epilog': ['Lists of the Reddit account the Aside browser is logged in to (the account check names it). saved and upvoted hold posts and comments, newest saved or upvoted first; downvoted and hidden also hold posts and comments. comment-replies, post-replies and mentions are what other accounts sent you, newest first; reading them never marks them read (unread says which are still new). Private messages are not read.'],
             'requests': LISTING,
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
         },
