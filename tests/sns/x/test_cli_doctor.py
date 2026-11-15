@@ -18,6 +18,7 @@ OTHER = '1000000098'
 VIEWER = {'data': {'viewer': {'user_results': {'result': {'__typename': 'User', 'rest_id': ACCOUNT,
                                                           'core': {'screen_name': 'example_viewer'}}}}}}
 RATE = {'x-rate-limit-limit': '100', 'x-rate-limit-remaining': '99', 'x-rate-limit-reset': str(int(time.time()) + 600)}
+RATE_AHEAD = 600  # the reset is set before each test (conftest.fresh_rate_window)
 LOCK_SIGNAL = {'path': '/i/api/graphql/abc/HomeTimeline', 'status': 200, 'codes': [326], 'html': False, 'rate': None,
                'at': 5}
 
