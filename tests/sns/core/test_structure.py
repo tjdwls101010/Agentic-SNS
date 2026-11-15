@@ -12,6 +12,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tests.sns.support import tree
+
 REPO = Path(__file__).resolve().parents[3]
 SKILL = REPO / '.claude/skills/sns'
 SCRIPTS = SKILL / 'scripts'
@@ -33,6 +35,7 @@ PRESENT = {p.name for p in PACKAGE.iterdir() if p.name in PLATFORMS} if PACKAGE.
 
 def python_files(root):
     return [p for p in root.rglob('*.py') if '__pycache__' not in p.parts]
+
 
 
 def unit_of(path):
@@ -100,10 +103,10 @@ def classify(dotted):
 
 def test_skill_top_level_is_fixed():
     allowed = {'SKILL.md', 'references', 'data', 'scripts'}
-    present = {p.name for p in SKILL.iterdir() if p.name != '.DS_Store'}
+    present = set(tree.children(SKILL))
     assert present <= allowed, present - allowed
     assert {'SKILL.md', 'data', 'scripts'} <= present
-    scripts = {p.name for p in SCRIPTS.iterdir() if p.name not in ('__pycache__', '.DS_Store')}
+    scripts = set(tree.children(SCRIPTS))
     assert scripts == {'cli.py', 'sns'}
 
 
@@ -112,8 +115,7 @@ def test_package_name_does_not_shadow_stdlib():
 
 
 def test_package_holds_only_known_units():
-    found = {p.name[:-3] if p.suffix == '.py' else p.name for p in PACKAGE.iterdir()
-             if p.name not in ('__pycache__', '__init__.py', '.DS_Store')}
+    found = {name[:-3] if name.endswith('.py') else name for name in tree.children(PACKAGE) if name != '__init__.py'}
     assert found <= SHARED | PLATFORMS, found - SHARED - PLATFORMS
     assert SHARED <= found, SHARED - found
     for name in STORES | SYSTEMS | FEATURES:
@@ -125,7 +127,7 @@ def test_platform_folders_hold_features_web_and_their_own_store_only():
         root = PACKAGE / platform
         assert (root / '__init__.py').is_file()
         assert (root / 'web' / '__init__.py').is_file(), platform
-        folders = {p.name for p in root.iterdir() if p.is_dir() and p.name != '__pycache__'}
+        folders = tree.folders(root)
         assert folders <= {'web'} | PLATFORM_STORES.get(platform, set()), (platform, folders)
         for store in PLATFORM_STORES.get(platform, set()) & folders:
             assert (root / store / '__init__.py').is_file()

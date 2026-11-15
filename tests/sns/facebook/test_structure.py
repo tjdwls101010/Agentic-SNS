@@ -8,6 +8,7 @@ from pathlib import Path
 
 from sns import facebook
 from sns.facebook import web
+from tests.sns.support import tree
 from tests.sns.support.policies import POLICIES
 
 PACKAGE = Path(facebook.__file__).resolve().parent
@@ -21,7 +22,7 @@ def sources(root=PACKAGE):
 
 def test_the_facebook_package_is_its_interface_its_feature_modules_and_the_system_web():
     modules = {p.stem for p in PACKAGE.glob('*.py')} - {'__init__'}
-    folders = {p.name for p in PACKAGE.iterdir() if p.is_dir() and p.name != '__pycache__'}
+    folders = tree.folders(PACKAGE)
     assert modules == FEATURES and folders == {'web'}  # web is the only folder; Facebook has no store of its own
 
 

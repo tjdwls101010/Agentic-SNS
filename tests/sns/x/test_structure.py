@@ -6,6 +6,7 @@ from pathlib import Path
 
 from sns import x
 from sns.x import web
+from tests.sns.support import tree
 
 PACKAGE = Path(x.__file__).resolve().parent
 WEB = PACKAGE / 'web'
@@ -18,7 +19,7 @@ def sources(root=PACKAGE):
 
 def test_the_x_package_is_its_interface_its_feature_modules_and_the_system_web():
     modules = {p.stem for p in PACKAGE.glob('*.py')} - {'__init__'}
-    folders = {p.name for p in PACKAGE.iterdir() if p.is_dir() and p.name != '__pycache__'}
+    folders = tree.folders(PACKAGE)
     assert FEATURES <= modules and folders == {'web'}  # web is the only folder; X has no store of its own
 
 
