@@ -2,8 +2,8 @@
 text, a tool's output limit) can be read again from disk without asking the platform again.
 
 A file is the --json envelope of one read, its own path included as `saved`. Numbers are reserved under a lock and
-never reused, like handles. A file more than a day old is removed by the next read that saves one (and by the idle
-cleanup) — not at the hour: if the skill is not used again, it stays until it is. A file holds other people's posts.
+never reused, like handles. A file more than a day old is removed by the next read command, whatever it finds (and by the
+idle cleanup) — not at the hour: if the skill is not used again, it stays until it is. A file holds other people's posts.
 """
 import fcntl
 import json
@@ -37,9 +37,10 @@ def prune():
 
 
 def keep(envelope):
-    """Write `envelope` to a new result file after putting its path in envelope['saved']; when it cannot be written,
+    """Write `envelope` to a new result file after putting its path in envelope['saved'] (day-old files are pruned when
+    the read starts, see reading.pipeline.run); when it cannot be written,
     envelope['saved'] is 'unavailable' and a coverage line says so (the read itself stands). Returns the envelope."""
-    prune()
+    path = None
     try:
         directory = _directory()
         with open(directory / 'counter', 'a+b') as counter:
@@ -59,6 +60,11 @@ def keep(envelope):
             stream.flush()
             os.fsync(stream.fileno())
     except (OSError, ValueError, TypeError, SnsError):
+        if path is not None and envelope.get('saved') == str(path):
+            try:
+                path.unlink()  # a file written in part is not the result it would name
+            except OSError:
+                pass
         envelope['saved'] = 'unavailable'
         envelope['coverage'] = [*(envelope.get('coverage') or []), _FAILED]
     return envelope

@@ -166,6 +166,7 @@ def run(platform, invocation, *, command, target, identity, reader, window=None,
     options = invocation.options
     out_path = options.get('out')
     public = identity
+    saved.prune()  # the first read after a day removes day-old result files, whatever this read finds
     identity = with_window(identity, options)  # a different window is a different query for handles and files
     connection, reading = None, None
     try:

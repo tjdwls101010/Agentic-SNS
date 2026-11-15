@@ -597,3 +597,16 @@ def test_a_stop_that_ends_continuing_still_keeps_the_saved_pictures(browser, mon
                               fetch=fetch)
     assert [r['n'] for r in result['results']] == [1] and result['failure'].kind == 'login'
     assert not result.get('next') and not result.get('continuable')
+
+
+def test_idle_cleanup_removes_result_files_a_day_old(capsys, browser, monkeypatch, data_dir):
+    import os
+    import time
+    browser.respond('beta.state', {'viewer': 'carl'})
+    beta_page(browser, None, [item(1)], None)
+    run(capsys, browser, monkeypatch, 'beta', 'feed')
+    [kept] = (data_dir / 'results').glob('*.json')
+    past = time.time() - 25 * 3600
+    os.utime(kept, (past, past))
+    reading.idle(BETA.PLATFORM, reading.Invocation({}, Deadline(30), {}, cli.__file__), 'u0', 'any', 0)
+    assert not kept.exists()

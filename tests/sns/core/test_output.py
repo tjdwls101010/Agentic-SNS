@@ -94,8 +94,9 @@ def test_a_read_keeps_its_whole_result_in_a_private_file_the_first_line_names(ca
     me(browser)
     feed(browser, None, [item(1), item(2)], 'C2')
     code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--limit', '1')
-    first = out.splitlines()[0]
-    assert first.endswith(' · saved=' + first.rsplit('saved=', 1)[1]) and first.rsplit('saved=', 1)[1] != path
+    named = out.splitlines()[0].split(' · saved=')[1]  # the last thing on the first line
+    assert named != path and json.loads(open(named).read())['saved'] == named  # a new file, the one this read wrote
+    assert [r['id'] for r in json.loads(open(named).read())['results']] == [r['id'] for r in envelope['results']]
 
 
 def test_no_file_for_a_read_without_records_or_one_collected_into_out(capsys, browser, monkeypatch, data_dir, tmp_path):
@@ -136,3 +137,52 @@ def test_a_file_that_cannot_be_written_does_not_fail_the_read(capsys, browser, m
     envelope = json.loads(out)
     assert code == 0 and envelope['saved'] == 'unavailable'
     assert any('saved' in line or 'file' in line for line in envelope['coverage'])
+
+
+def age(path, hours=25):
+    import os
+    import time
+    past = time.time() - hours * 3600
+    os.utime(path, (past, past))
+
+
+def test_a_day_old_file_goes_at_the_next_read_whatever_that_read_finds(capsys, browser, monkeypatch, data_dir):
+    """Not only a read that saves a file: an empty one (7) and a failed one (6) remove day-old files too."""
+    import json
+    import os
+    for answer in ('empty', 'failed'):
+        me(browser)
+        feed(browser, None, [item(1)], None)
+        code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--json')
+        old = json.loads(out)['saved']
+        age(old)
+        if answer == 'empty':
+            me(browser)
+            feed(browser, None, [], None)
+        else:
+            browser.respond('alpha.get', {'status': 500, 'body': {}}, path='/me')
+        code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--json')
+        assert code == (7 if answer == 'empty' else 6), out
+        assert not os.path.exists(old), answer
+
+
+def test_a_file_that_could_not_be_written_whole_is_not_left_behind(capsys, browser, monkeypatch, data_dir):
+    import json
+    from sns import saved
+    import os
+    import sys
+    real = os.fsync
+    calls = []
+    def broken(fd):
+        # the disk fills while the result file itself is written (its counter, before it, is written fine)
+        if sys._getframe(1).f_code.co_filename == saved.__file__:
+            calls.append(fd)
+            if len(calls) == 2:
+                raise OSError('disk full')
+        return real(fd)
+    monkeypatch.setattr(os, 'fsync', broken)
+    me(browser)
+    feed(browser, None, [item(1)], None)
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--json')
+    assert code == 0 and json.loads(out)['saved'] == 'unavailable'
+    assert not list((data_dir / 'results').glob('*.json'))
