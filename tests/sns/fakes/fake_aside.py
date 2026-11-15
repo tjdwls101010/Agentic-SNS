@@ -207,7 +207,7 @@ def main(argv):
         return open_tab(argv[0], account)
     with locked():
         response = answer(argv[1], account)
-    if isinstance(response, int):
+    if isinstance(response, int) and not isinstance(response, bool):  # an exit code; True is an answer
         return response
     if isinstance(response, dict):
         for path, text in (response.get('__write') or {}).items():
