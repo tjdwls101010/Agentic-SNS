@@ -126,7 +126,7 @@ def test_popular_is_one_page_with_view_counts(naver):
     naver.respond(M, '/api/blogs/cafe_note/popular-post-list', json={'isSuccess': True, 'result': {
         'popularPostList': blog_posts(3, viewCount=10)}})
     code, out, _ = naver.run('naver-blog', 'profile', 'cafe_note', '--tab', 'popular')
-    assert code == 0 and 'shelf=popular' in first_line(out) and 'stopped=not_paginable' in out and 'views=10' in out
+    assert code == 0 and 'tab=popular' in first_line(out) and 'stopped=not_paginable' in out and 'views=10' in out
     assert more_line(out) is None
 
 

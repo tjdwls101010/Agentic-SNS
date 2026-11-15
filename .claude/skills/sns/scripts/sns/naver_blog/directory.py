@@ -41,7 +41,7 @@ def check(options):
 def topic(platform, invocation):
     options = invocation.options
     wanted = options.get('target')
-    identity = {'topic': wanted, 'shelf': 'featured' if options.get('tab') == 'featured' else None}
+    identity = {'topic': wanted, 'tab': 'featured' if options.get('tab') == 'featured' else None}
     words = ['--tab', 'featured'] if options.get('tab') == 'featured' else []
 
     def read(connection, state, out):

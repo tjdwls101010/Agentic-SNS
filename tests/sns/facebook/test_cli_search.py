@@ -105,6 +105,7 @@ def test_search_inside_one_group(browser):
     code, out, _ = run(browser, 'search', 'pandas', '--in', 'examplegroup', '--json')
     result = json.loads(out)
     assert code == 0 and [r['id'] for r in result['results']] == ['G1'] and result['request_count'] == 2
+    assert 'in' in result['query'] and 'in_group' not in result['query']  # the word of the option that set it
     args = queries(browser)[0]['args']['variables']
     assert args['args']['callsite'] == 'comet:scoped:group' and args['renderLocation'] == 'group_serp'
     assert args['args']['experience']['type'] == 'GROUPS_SCOPED' and args['args']['experience']['fbid'] == '700'

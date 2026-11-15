@@ -130,7 +130,7 @@ def profile(platform, invocation):
     target = web.require(web.parse_target(options['target']), 'profile')
     kind = options.get('tab') or 'overview'
     shown, sort, sort_words = resolve_sort(options, 'new')
-    identity = {'sort': shown, 'time': options.get('time'), 'type': kind}
+    identity = {'sort': shown, 'time': options.get('time'), 'tab': kind}
     words = ['--tab', kind] + sort_words + (['--time', options['time']] if options.get('time') else [])
     order = 'newest_first' if sort == 'new' else 'ranked'
     unfiltered = not (options.get('after') or options.get('since') or options.get('until') or options.get('time'))
