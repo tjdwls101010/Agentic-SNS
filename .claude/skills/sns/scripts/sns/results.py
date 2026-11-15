@@ -21,6 +21,8 @@ STOP_REASONS = {
     'not_paginable': ('This surface is one batch.', 'Nothing.'),
     'server_capped': ('The platform serves no more than this (its own cap or sample), though it may report a larger '
                       'total; what lies beyond cannot be asked for.', 'Narrow the query to reach other records.'),
+    'not_built': ('This skill does not read this surface past what it read: the platform may have more (a later '
+                  'version may read it).', 'Use another surface, or narrow the read; nothing to retry.'),
     'pagination_stalled': ('The platform kept serving the same records, so reading stopped there.',
                            'Retry later with more:.'),
     'time_limit': ('The command reached its time limit (it must end within about two minutes).',

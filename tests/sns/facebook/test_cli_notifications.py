@@ -52,7 +52,7 @@ def test_one_page_of_notifications_skips_layout_rows_and_is_all_there_is_to_read
     code, out, _ = run(browser, 'me', 'notifications')
     assert code == 0, out
     lines = regrouped(out)
-    assert lines[0] == 'facebook me · 2 shown · stopped=server_capped · requests=1'
+    assert lines[0] == 'facebook me · 2 shown · stopped=not_built · requests=1'
     assert lines[1] == '[n1] 2026-09-12T03:00+00:00 · feed_comment_reply · read'
     assert lines[2] == '     text[37 of 37 chars shown]: "Sample Person replied to your comment"'
     assert lines[3] == '     url: "https://www.facebook.com/example/posts/N1"'
@@ -71,7 +71,7 @@ def test_a_limit_above_one_page_still_reads_one_page(browser):
     browser.respond('facebook.query', page([notif('N1'), notif('N2')], cursor='NC1'))
     code, out, _ = run(browser, 'me', 'notifications', '--limit', '30', '--json')
     result = json.loads(out)
-    assert code == 0 and [r['id'] for r in result['results']] == ['N1', 'N2'] and result['stop_reason'] == 'server_capped'
+    assert code == 0 and [r['id'] for r in result['results']] == ['N1', 'N2'] and result['stop_reason'] == 'not_built'
     assert sent(browser) == [FIRST] and 'next' not in result
 
 

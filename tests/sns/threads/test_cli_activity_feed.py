@@ -80,7 +80,7 @@ def test_limit_is_the_first_variable_and_a_server_cap_is_never_paginated(browser
     result = json.loads(out)
     assert code == 0, result
     assert len(queries(browser)) == 1 and queries(browser)[0]['args']['variables']['first'] == limit
-    assert result['stop_reason'] == 'server_capped' and not result.get('next')
+    assert result['stop_reason'] == 'not_built' and not result.get('next')
     assert any('older activity' in note and 'only this page' in note for note in result['coverage'])
 
 
@@ -134,7 +134,7 @@ def test_text_renders_notification_labels_seen_state_and_full_text(browser):
 def test_activity_help_explains_the_read_coverage_and_seen_caveat(browser):
     code, out, _ = run(browser, 'me', 'activity', '--help')
     assert code == 0, out
-    assert 'one page' in out and 'server_capped' in out and 'requests: 1.' in out
+    assert 'one page' in out and 'not_built' in out and 'requests: 1.' in out
     assert ('Reading the list sends no seen change (the app marks notifications seen only when its activity screen '
             'opens, which this skill never does); seen state as observed on 2026-10-22.') in out
     assert '[n1] notification' in out and 'the dedicated tab:' in out

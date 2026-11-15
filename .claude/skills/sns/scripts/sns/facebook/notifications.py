@@ -18,7 +18,7 @@ def notifications(platform, invocation):
             issues.extend(batch.issues)
             page = paged(batch)
             if page.next is not None:
-                page.next, page.stop = None, 'server_capped'
+                page.next, page.stop = None, 'not_built'
                 capped.append(True)
             return page
 

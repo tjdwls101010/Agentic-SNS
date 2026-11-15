@@ -21,7 +21,7 @@ def test_followers_report_the_profiles_total_and_stop_at_threads_sample(browser)
     code, out, _ = run(browser, 'graph', '@example.author', 'followers', '--json')
     result = json.loads(out)
     assert code == 0, result
-    assert result['stop_reason'] == 'server_capped' and result['reported_total'] == 5000
+    assert result['stop_reason'] == 'not_built' and result['reported_total'] == 5000
     assert [r['username'] for r in result['results']] == ['a.one', 'b.two']
     call = [c['args'] for c in browser.calls() if c['op'] == 'threads.query'][1]
     assert call['name'] == 'BarcelonaFriendshipsFollowersTabQuery' and call['variables']['userID'] == '1000000001'
@@ -33,7 +33,7 @@ def test_followers_stay_one_sample_even_when_threads_offers_a_cursor(browser):
     known_tab(browser).respond('threads.query', by_name()).respond('threads.query', query_result(first))
     code, out, _ = run(browser, 'graph', '@example.author', 'followers', '--limit', '5', '--json')
     result = json.loads(out)
-    assert code == 0 and result['stop_reason'] == 'server_capped' and 'next' not in result
+    assert code == 0 and result['stop_reason'] == 'not_built' and 'next' not in result
     assert browser.ops().count('threads.query') == 2
 
 

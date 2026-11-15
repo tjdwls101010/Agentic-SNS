@@ -569,7 +569,7 @@ def _threads_surface(platform):
             'arguments': [(('target',), {'help': 'Threads @handle or profile URL'}),
                           (('relation',), {'choices': GRAPH_RELATIONS, 'help': 'followers or following'}),
                           *LIST],
-            'epilog': ['followers: Threads may send its own sample rather than the whole list (stopped=server_capped); the coverage line gives the count the profile reports. following pages on.',
+            'epilog': ['followers: the skill reads the first page Threads sends and not the next (stopped=not_built: Threads may have more); the coverage line gives the count the profile reports. following pages on.',
                        'Without --limit or --out it reads one page; more: continues.',
                        'requests: 1 to find the profile, then 1 per page of about 20 accounts.'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
@@ -579,7 +579,7 @@ def _threads_surface(platform):
             'run': lambda invocation: (platform.listing_notifications if invocation.options['collection'] == 'activity' else platform.listing_me)(PLATFORM, invocation),
             'check': check_me,
             'arguments': [(('collection',), {'choices': ME_COLLECTIONS, 'metavar': 'KIND', 'help': 'liked, saved or activity'}), (('--tab',), {'choices': ACTIVITY_FILTERS, 'help': 'App activity filter (default: all); requests means follow requests'}), (('--limit',), {'type': _activity_limit, 'help': 'Rows to show (activity: default 20, 1 to 50)'}), 'chars', 'after', 'out', 'json'],
-            'epilog': ['For liked and saved, one batch as Threads sends it (stopped=not_paginable): not your whole history. For activity, one page in Threads\' order; when older activity exists, stopped=server_capped and no next page is requested. --tab applies only to activity.',
+            'epilog': ['For liked and saved, one batch as Threads sends it (stopped=not_paginable): not your whole history. For activity, one page in Threads\' order; when older activity exists, stopped=not_built and no next page is requested. --tab applies only to activity.',
                        'Reading the list sends no seen change (the app marks notifications seen only when its activity screen opens, which this skill never does); seen state as observed on 2026-10-22.',
                        'requests: 1.'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8),
@@ -593,7 +593,7 @@ def _threads_surface(platform):
                                          'help': 'Rows to request in this page (default 20; 1 to 50)'}),
                           'json', (('--chars',), {'type': _chars, 'metavar': 'N',
                                                 'help': 'Characters of each notification to show (default 180; 0 = all)'})],
-            'epilog': ['Reads one page in Threads\' order. If Threads says older activity exists, stopped=server_capped '
+            'epilog': ['Reads one page in Threads\' order. If Threads says older activity exists, stopped=not_built '
                        'and the coverage line say only this page was read; no next page is requested.',
                        'Reading the list sends no seen change (the app marks notifications seen only when its activity '
                        'screen opens, which this skill never does); seen state as observed on 2026-10-22.',
@@ -1054,7 +1054,7 @@ def _facebook_surface(platform):
                           'chars', 'out', 'json'],
             'epilog': ['A handle names a batch: the first batch of a comment\'s replies, or the batch after one already shown (more: prints that one). It is not used up: running it again reads the same batch again, live.',
                        'Each reply that has replies of its own ends with replies <handle>, which reads that deeper branch. Facebook\'s reply count includes those deeper replies.',
-                       'A deeper branch (the replies under a reply, Facebook\'s last level) is one batch: asked for more, Facebook sends the same replies again, so it ends with stopped=server_capped and a coverage line counting what was not sent. Each of its replies names the comment it answers as its parent, which can be the top comment or another reply in the branch.',
+                       'A deeper branch (the replies under a reply, Facebook\'s last level) is read as one batch: the next-batch request this skill knows brings the same replies again, so it ends with stopped=not_built (Facebook may have more) and a coverage line counting what was not sent. Each of its replies names the comment it answers as its parent, which can be the top comment or another reply in the branch.',
                        'requests: 1 per batch of about 10 replies.'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8),
             'check': check_replies,
@@ -1110,7 +1110,7 @@ def _facebook_surface(platform):
                        'Reading the list sends no seen or read change (those are separate requests this skill never sends); whether Facebook counts a read as seen by itself was not observable when this was measured (no unseen notification at the time). If Facebook stops accepting the stored notifications query the command ends with exit 6 and does not open the notifications screen to relearn it, because opening that screen is what makes the app mark notifications seen.',
                        'It reads the first page (about 15 notifications), which is all it can: asked for the page after, '
                        'Facebook answered nothing when this was measured, so when Facebook says older ones follow it ends '
-                       'with stopped=server_capped and a coverage line instead of more:.',
+                       'with stopped=not_built and a coverage line instead of more:.',
                        'requests: 1.'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8),
         },

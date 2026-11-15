@@ -89,12 +89,12 @@ def test_images_names_the_tab_and_how_its_numbers_match_the_post():
 
 
 def test_replies_says_a_deeper_branch_is_one_batch():
-    assert 'stopped=server_capped' in help_of('replies')
+    assert 'stopped=not_built' in help_of('replies')
 
 
 def test_notifications_say_that_reading_marks_nothing_and_what_was_not_observed():
     text = ' '.join(help_of('me').split())
     assert 'Reading the list sends no seen or read change' in text
     assert 'whether Facebook counts a read as seen by itself was not observable when this was measured' in text
-    assert 'stopped=server_capped' in text and 'instead of more:' in text and 'requests: 1.' in text
+    assert 'stopped=not_built' in text and 'instead of more:' in text and 'requests: 1.' in text
     assert '[n1] notification' in text

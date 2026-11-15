@@ -79,7 +79,7 @@ def notifications_page(data):
     info = connection.get('page_info')
     if not isinstance(info, dict) or type(info.get('has_next_page')) is not bool:
         raise _changed('The activity response has no page_info.has_next_page.')
-    page = Page(stop='server_capped' if info['has_next_page'] else None)
+    page = Page(stop='not_built' if info['has_next_page'] else None)  # the next page is not read (plan R5)
     captured_at, unseen = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z'), None
     for edge in connection['edges']:
         node = edge.get('node') if isinstance(edge, dict) else None
