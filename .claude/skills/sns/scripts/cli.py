@@ -601,7 +601,7 @@ def _threads_surface(platform):
             'arguments': [(('target',), {'help': 'Threads @handle or profile URL'}),
                           (('relation',), {'choices': GRAPH_RELATIONS, 'help': 'followers or following'}),
                           *LIST],
-            'epilog': ['followers: the skill reads the first page Threads sends and not the next (stopped=not_built: Threads may have more); the coverage line gives the count the profile reports. following pages on.'],
+            'epilog': ['followers: one sample Threads sends (stopped=server_capped; stopped=not_built when Threads offers a next page this skill does not read); the coverage line gives the count the profile reports. following pages on.'],
             'requests': '1 to find the profile, then 1 per page of about 20 accounts.',
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
         },
