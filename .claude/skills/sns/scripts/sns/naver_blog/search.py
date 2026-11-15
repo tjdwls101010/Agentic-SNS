@@ -52,7 +52,7 @@ def search(platform, invocation):
     op, key, sorts, dates, _, server_dates = SURFACES[(kind, bool(blog_text))]
     sort = (options.get('sort') or 'relevance') if sorts else None
     local = web.parse_target(blog_text, 'blog') if blog_text else None
-    identity = {'type': kind, 'sort': sort, 'blog': local and (local.blog_id or 'naver.me/' + local.short),
+    identity = {'type': kind, 'sort': sort, 'in': local and (local.blog_id or 'naver.me/' + local.short),
                 'own_money': True if options.get('own_money') else None}
     words = ['--type', kind] + (['--sort', sort] if options.get('sort') else []) + \
         (['--in', blog_text] if blog_text else []) + (['--own-money'] if options.get('own_money') else [])

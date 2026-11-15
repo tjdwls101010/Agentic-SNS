@@ -9,7 +9,7 @@ def test_a_visible_history(reddit):
     reddit.me().json('/user/example_user/comments.json', listing([profile_comment('c1'), profile_comment('c2')]),
                      query={'sort': 'new', 'limit': 100})
     code, out, _ = reddit.run('reddit', 'profile', 'u/example_user', '--tab', 'comments')
-    assert code == 0 and out.startswith('reddit profile · sort=new · type=comments · 2 shown') and 'said c1' in out
+    assert code == 0 and out.startswith('reddit profile · sort=new · tab=comments · 2 shown') and 'said c1' in out
 
 
 def test_an_empty_history_with_karma_is_not_visible(reddit):

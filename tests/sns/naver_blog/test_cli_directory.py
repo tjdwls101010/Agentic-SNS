@@ -43,7 +43,7 @@ def test_featured_posts_are_one_page(naver):
     naver.respond(SECTION, '/ajax/DirectoryTopPostList.naver', body=XSSI + json.dumps({'result': topic_posts(3)}),
                   query={'directorySeq': '5'})
     code, out, _ = naver.run('naver-blog', 'topic', '5', '--tab', 'featured')
-    assert code == 0 and 'shelf=featured' in first_line(out) and 'stopped=not_paginable' in out
+    assert code == 0 and 'tab=featured' in first_line(out) and 'stopped=not_paginable' in out
     assert 'more:' not in out
 
 

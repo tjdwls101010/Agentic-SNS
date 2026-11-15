@@ -9,7 +9,7 @@ def search(platform, invocation):
     text, vertical = options['target'], options['type']
     recent = bool(options.get('recent'))
     group = web.normalize_group(options['within']) if options.get('within') else None
-    identity = {'type': vertical, 'recent': True if recent else None, 'in_group': group}
+    identity = {'type': vertical, 'recent': True if recent else None, 'in': group}
     words = ['--type', vertical] + (['--recent'] if recent else []) + (['--in', group] if group else [])
 
     def read(connection, state, out):

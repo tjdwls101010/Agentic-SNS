@@ -156,7 +156,7 @@ def me(platform, invocation):
 def notifications(platform, invocation):
     """Your activity list: only the first page has been verified to answer without marking anything seen."""
     options = invocation.options
-    identity = {'filter': (options.get('tab') or 'all')}
+    identity = {'tab': (options.get('tab') or 'all')}
 
     def read(connection, state, out):
         page = connection.client.notifications((options.get('tab') or 'all'), (options.get('limit') or 20))

@@ -70,6 +70,7 @@ def test_filter_words_are_the_apps_wire_values(browser, word, expected):
     known_tab(browser).respond('threads.query', query_result(inbox([row()])))
     code, out, _ = run(browser, 'me', 'activity', '--tab', word, '--json')
     assert code == 0, out
+    assert json.loads(out)['query'].get('tab') == word  # the word of the option that set it
     assert queries(browser)[0]['args']['variables']['selected_filters'] == expected
 
 

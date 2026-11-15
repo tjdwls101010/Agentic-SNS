@@ -107,7 +107,7 @@ def test_one_blogs_own_search(naver):
                   query={'query': '맛집', 'sortType': 'sim', 'page': 1})
     code, out, _ = naver.run('naver-blog', 'search', '맛집', '--in', 'https://blog.naver.com/own')
     assert code == 0, out
-    assert 'blog=own' in first_line(out) and '4 shown' in first_line(out)
+    assert 'in=own' in first_line(out) and '4 shown' in first_line(out)  # the word of the option that set it
 
 
 def test_one_blogs_tag_search(naver):

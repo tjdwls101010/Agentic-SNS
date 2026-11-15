@@ -90,7 +90,7 @@ def posts(platform, invocation):
     target = web.parse_target(options['target'], 'blog')
     shelf_name = options.get('tab') if options.get('tab') in ('popular', 'notices') else None
     wanted = target.category_no or options.get('category')
-    identity = {'blog': target.blog_id or 'naver.me/' + target.short, 'category': wanted, 'shelf': shelf_name}
+    identity = {'blog': target.blog_id or 'naver.me/' + target.short, 'category': wanted, 'tab': shelf_name}
     words = ['--category', str(wanted)] if wanted else []
 
     def read(connection, state, out):
