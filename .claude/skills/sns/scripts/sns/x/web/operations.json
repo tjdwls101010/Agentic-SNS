@@ -83,6 +83,21 @@
    "chunk_hint": null,
    "source": "direct"
   },
+  "UserRepostsTimeline": {
+   "query_id": "bWzOK-jDN4SYVcF6AQ22Qw",
+   "root": "data.user.result.timeline.timeline.instructions",
+   "variables": {
+    "count": 20,
+    "includePromotedContent": true,
+    "withVoice": true
+   },
+   "field_toggles": {
+    "withPayments": false,
+    "withArticlePlainText": false
+   },
+   "chunk_hint": null,
+   "source": "direct"
+  },
   "UserRepliesTimeline": {
    "query_id": "X9Te-FyiGcoV2qNrnx9w3w",
    "root": "data.user.result.timeline.timeline.instructions",

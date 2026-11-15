@@ -16,7 +16,7 @@ _HANDLE = re.compile(r'[A-Za-z0-9_]{1,15}')
 _RESERVED = {'home', 'i', 'messages', 'notifications', 'settings', 'search', 'explore', 'compose', 'login', 'logout',
              'signup', 'tos', 'privacy', 'account', 'intent', 'share', 'hashtag', 'jobs'}
 # A profile URL's tab path → the profile tab it shows; the graph paths name the account only
-_TABS = {'with_replies': 'replies', 'media': 'media', 'highlights': 'highlights', 'articles': 'articles',
+_TABS = {'with_replies': 'replies', 'reposts': 'reposts', 'media': 'media', 'highlights': 'highlights', 'articles': 'articles',
          'lists': 'lists', 'lists/memberships': 'memberships'}
 _PLURAL = {'list': 'lists', 'community': 'communities', 'space': 'spaces'}
 _ACCOUNT_PATHS = set(_TABS) | {'followers', 'following', 'verified_followers', 'followers_you_follow', ''}

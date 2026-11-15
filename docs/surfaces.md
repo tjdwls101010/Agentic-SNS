@@ -19,7 +19,7 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 |---|---|---|
 | Home feed: For you, Following | Home tabs | command: `x feed --tab foryou\|following` |
 | Profile: posts, replies, media, highlights, articles | Profile tabs | command: `x profile ACCOUNT --tab …` |
-| Profile: reposts tab | Profile tab `/<account>/reposts` (new) | in recon (R17a) |
+| Profile: reposts tab | Profile tab `/<account>/reposts` (new) | command: `x profile ACCOUNT --tab reposts` |
 | Profile: lists, list memberships | Profile ⋯ menu | command: `x profile ACCOUNT --tab lists\|memberships` |
 | Account card | Profile header | command: `x about ACCOUNT` |
 | Following, followers, verified followers, followers you know, similar accounts | Profile counts and tabs | command: `x graph ACCOUNT following\|followers\|verified\|known\|similar` |
