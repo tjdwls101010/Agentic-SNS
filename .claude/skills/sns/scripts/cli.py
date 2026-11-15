@@ -14,7 +14,7 @@ from datetime import date, datetime, time, timedelta
 from sns.clock import Deadline
 from sns.errors import SnsError
 from sns.maintenance import objects, schema
-from sns.reading import Invocation, doctor, foreign, idle
+from sns.reading import Invocation, adopt_all, doctor, foreign, idle
 from sns.render import page, summary
 from sns.results import failure_envelope
 
@@ -54,7 +54,7 @@ TEXT_OUTPUT = ('output: a first line "<platform> <command> · … · N shown · 
 JSON_OUTPUT = '--json: one JSON envelope instead, with full texts; <platform> schema result describes every field.'
 OUT_OUTPUT = ('--out FILE: records go to an NDJSON file a whole page at a time (so it can hold a little more than '
               '--limit) and stdout gets one summary line; rerun the same command with the same file to resume. Its '
-              'directory must exist, and it cannot be inside the skill\'s data/. The file holds other people\'s '
+              'directory must exist, and it cannot be inside the skill\'s state directory. The file holds other people\'s '
               'posts: keep it outside the repository.')
 FAILURE = ('failure: one JSON envelope (ok false, error, message, fix) when nothing was read; records read before a '
            'failure print as usual, followed by "coverage: incomplete — <message> fix: <fix>".')
@@ -126,11 +126,12 @@ def shared_commands(platform):
                                             'help': f'Only after a person has checked {platform.site} in the Aside '
                                                     'browser and cleared what it showed: make one check and lift a '
                                                     'saved block if the answer is normal'})],
-            'epilog': [f'output: one JSON envelope; results[0] holds aside, aside_account, login, viewer (the '
-                       f'{platform.title} account in use), blocked, block_reason, hold_until, limits, '
+            'epilog': [f'output: one JSON envelope; results[0] holds aside, aside_version, aside_account, login, '
+                       f'viewer (the {platform.title} account in use), blocked, block_reason, hold_until, limits, '
                        'requests_last_hour and requests_last_day (every command of this account), idle_seconds, '
-                       'data_dir, protection_state, holds_personal_data and the platform\'s own checks. A saved block '
-                       'is reported as exit 5 without touching the browser.',
+                       'data_dir (the state every install of the skill on this computer shares), imported_from (an old '
+                       'install\'s data/ taken in), protection_state, holds_personal_data and the platform\'s own '
+                       'checks. A saved block is reported as exit 5 without touching the browser.',
                        '--unblock keeps the block while it checks with one request; only an answer for the account '
                        'the block was recorded for lifts it, and anything else leaves it (exit 5 with '
                        'verification_reason). '
@@ -255,9 +256,11 @@ def main(argv=None, platforms=None):
         hidden = len(argv) >= 2 and argv[1] == 'idle'
         options = vars(parser(platforms, hidden=hidden).parse_args(argv))
         module = platforms[options['platform']]
+        # an old install's data/, for every platform, before anything else (a later reinstall removes it again)
+        adopt_all([m.PLATFORM for m in platforms.values()], deadline, own=module.PLATFORM.key)
         if options['command'] == 'idle':
-            outcome = idle(module.PLATFORM, Invocation(options, deadline, platforms, cli_path()), options['account'],
-                           options['token'], options['after'])
+            outcome = idle(module.PLATFORM, Invocation(options, deadline, {w: m.PLATFORM for w, m in platforms.items()},
+                                                       cli_path()), options['account'], options['token'], options['after'])
             print(json.dumps({'ok': True, 'command': 'idle', 'outcome': outcome}))
             return 0
         spec = surface(module)[options['command']]

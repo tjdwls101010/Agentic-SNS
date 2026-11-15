@@ -14,6 +14,7 @@ Server-announced limits are one mechanism: a scope with a limit, a remaining cou
 requests are spaced out until the reset; spent, it stops until then. There is no request budget: a command ends at its
 deadline, its natural end, or a platform's signal.
 """
+import hashlib
 import json
 import math
 import os
@@ -31,6 +32,8 @@ from sns.paths import scope as state_scope
 PROBE_SECONDS = 125   # the longest an Aside call can be in flight: a dead owner's probe counts as sent until then
 CALL_SECONDS = 3      # the least time a browser call needs: a wait that leaves less is a stop, not a lost request
 LOG_SECONDS = 24 * 3600
+# what an old install's protection/ holds that is worth taking in (its lock and its own provenance are not)
+LEGACY_FILES = ('blocks.json', 'scopes.json', 'pace.json', 'requests.jsonl')
 _STATUSES = {'known': ('limit', 'remaining', 'reset_at'), 'probe': ('pid', 'started_at'), 'unknown': ()}
 _REASONS = {
     'checkpoint': 'asked this account to pass a security checkpoint',
@@ -42,6 +45,23 @@ _REASONS = {
 
 def _number(value):
     return type(value) in (int, float) and math.isfinite(value)
+
+
+def _valid_scope(entry):
+    """Whether a stored scope record has every field its status needs, each a number."""
+    if not isinstance(entry, dict) or not isinstance(entry.get('status'), str) or entry['status'] not in _STATUSES:
+        return False
+    return all(_number(entry.get(key)) for key in _STATUSES[entry['status']]) and \
+        all(_number(entry[key]) for key in ('slow_until', 'blocked_until', 'observed_at') if key in entry)
+
+
+def _identity(person):
+    """What names one person block across stores: its reason, when it was recorded and for which account; a block for
+    an old install's unreadable files is named by the content it stands for, which does not change between tries."""
+    source = person.get('source')
+    if person.get('reason') == 'unreadable' and isinstance(source, dict) and source.get('broken_sha256'):
+        return {'reason': 'unreadable', 'path': source.get('path'), 'broken_sha256': source['broken_sha256']}
+    return {'reason': person.get('reason'), 'at': person.get('at'), 'viewer': person.get('viewer')}
 
 
 def _alive(pid):
@@ -168,7 +188,7 @@ class Guard:
         return SnsError('blocked', f'Account protection state {what}, so requests are refused.',
                         f'Check {self.site} in the Aside browser, then run {self.word} doctor --unblock: it sets the '
                         'unreadable files aside and keeps the block until its check passes. Do not delete the '
-                        'skill\'s data/ by hand.', reason='unreadable')
+                        'skill\'s state directory by hand.', reason='unreadable')
 
     def _fix(self):
         return (f'Stop requests. After a person checks {self.site} in the Aside browser (and clears what it shows '
@@ -227,15 +247,8 @@ class Guard:
 
     def _scopes(self):
         record = self._read('scopes.json') or {}
-        for name, entry in record.items():
-            if not isinstance(entry, dict) or entry.get('status') not in _STATUSES:
-                raise self._unreadable()
-            for key in _STATUSES[entry['status']]:
-                if not _number(entry.get(key)):
-                    raise self._unreadable()
-            for key in ('slow_until', 'blocked_until', 'observed_at'):
-                if key in entry and not _number(entry[key]):
-                    raise self._unreadable()
+        if not all(_valid_scope(entry) for entry in record.values()):
+            raise self._unreadable()
         return record
 
     def _next_allowed(self):
@@ -454,9 +467,20 @@ class Guard:
         if person is None:
             return
         blocks = self._blocks()
-        if blocks['person'] == person:
-            blocks['person'] = None
-            self._write('blocks.json', blocks)
+        if blocks['person'] != person:
+            return
+        # a block an old install still owed (another stood when it came in) takes this one's place in the same write,
+        # so no moment passes with neither standing; the queue and the record of this clear follow. Should the second
+        # write not happen, the next clear finds this block's own copy in the queue and drops it
+        entries = self._provenance()
+        cleared = _identity(person)
+        waiting = [e for e in entries if e['kind'] == 'owed' and _identity(e['person']) != cleared]
+        blocks['person'] = waiting[0]['person'] if waiting else None
+        self._write('blocks.json', blocks)
+        placed = _identity(waiting[0]['person']) if waiting else None
+        entries = [e for e in entries if not (e['kind'] == 'owed' and _identity(e['person']) in (cleared, placed))]
+        entries.append({'kind': 'cleared', 'at': self.clock.time(), 'person': cleared})
+        self._write('imported.json', {'entries': entries})
 
     # --- requests ------------------------------------------------------------------------------------------------
 
@@ -581,7 +605,7 @@ class Guard:
             except OSError:
                 raise SnsError('blocked', f'Account protection file {name} is not a readable file, so requests are '
                                           'refused and it cannot be set aside.',
-                               f'A person should repair or remove it in the skill\'s data/ after checking {self.site} '
+                               f'A person should repair or remove it in the skill\'s state directory after checking {self.site} '
                                'in the Aside browser.', reason='unreadable') from None
         blocks = {'person': None, 'hold': None} if 'blocks.json' in broken else self._blocks()
         blocks['person'] = blocks['person'] or {'reason': 'unreadable', 'at': self.clock.time(), 'viewer': None}
@@ -626,7 +650,8 @@ class Guard:
     def _provenance(self):
         record = self._read('imported.json') or {'entries': []}
         entries = record.get('entries')
-        if not isinstance(entries, list) or not all(isinstance(e, dict) and e.get('kind') in ('imported', 'exported')
+        if not isinstance(entries, list) or not all(isinstance(e, dict) and e.get('kind') in ('imported', 'exported',
+                                                                                               'cleared', 'owed')
                                                     for e in entries):
             raise self._unreadable()
         return entries
@@ -645,41 +670,223 @@ class Guard:
         if person is not None and person.get('reason') not in (*self.policy.person, 'unreadable'):
             raise ValueError(f'{person.get("reason")!r} is not a person reason of {self.platform}')
         with self._locked(self._time_limit):
-            now = self.clock.time()
-            blocks = self._blocks()
-            if person is not None and blocks['person'] is None:
-                blocks['person'] = {'reason': person['reason'], 'at': person.get('at') or now,
-                                    'viewer': person.get('viewer') if isinstance(person.get('viewer'), str) else None,
-                                    'source': source}
-            if hold is not None and _number(hold.get('until')) and hold['until'] > now:
-                current = self._active_hold(blocks)
-                if not current or current['until'] < hold['until']:
-                    blocks['hold'] = {'reason': 'rate_limit', 'at': hold.get('at') or now, 'until': hold['until'],
-                                      'source': source}
-            self._write('blocks.json', blocks)
-            stored = self._scopes()
-            for name, given in (scopes or {}).items():
-                entry = self._settle(stored.get(name), now)
-                for key in ('blocked_until', 'slow_until'):
-                    if _number(given.get(key)) and given[key] > max(now, entry.get(key, 0)):
-                        entry[key] = given[key]
-                if all(_number(given.get(k)) for k in ('limit', 'remaining', 'reset_at')) and given['reset_at'] > now:
-                    if entry['status'] == 'known':
-                        entry['remaining'] = min(entry['remaining'], given['remaining'])
-                        entry['reset_at'] = max(entry['reset_at'], given['reset_at'])
-                    else:
-                        entry.update(status='known', limit=given['limit'], remaining=given['remaining'],
-                                     reset_at=given['reset_at'])
-                        entry.pop('pid', None)
-                        entry.pop('started_at', None)
-                stored[name] = entry
-            self._write('scopes.json', stored)
+            self._merge(person, hold, scopes, source)
             if source is not None:
                 entries = self._provenance()
                 mark = {'kind': 'imported', 'path': source.get('path'), 'sha256': source.get('sha256')}
                 if not any({k: e.get(k) for k in mark} == mark for e in entries):
-                    entries.append({**mark, 'at': now})
+                    entries.append({**mark, 'at': self.clock.time()})
                     self._write('imported.json', {'entries': entries})
+
+    def _merge(self, person, hold, scopes, source):
+        """merge() inside the lock: the stricter side of each slot."""
+        now = self.clock.time()
+        blocks = self._blocks()
+        if person is not None and blocks['person'] is None:
+            blocks['person'] = {'reason': person['reason'], 'at': person.get('at') or now,
+                                'viewer': person.get('viewer') if isinstance(person.get('viewer'), str) else None,
+                                'source': source}
+        if hold is not None and _number(hold.get('until')) and hold['until'] > now:
+            current = self._active_hold(blocks)
+            if not current or current['until'] < hold['until']:
+                blocks['hold'] = {'reason': 'rate_limit', 'at': hold.get('at') or now, 'until': hold['until'],
+                                  'source': source}
+        self._write('blocks.json', blocks)
+        stored = self._scopes()
+        for name, given in (scopes or {}).items():
+            entry = self._settle(stored.get(name), now)
+            for key in ('blocked_until', 'slow_until'):
+                if _number(given.get(key)) and given[key] > max(now, entry.get(key, 0)):
+                    entry[key] = given[key]
+            spent = entry['status'] == 'known' and entry['remaining'] <= 0
+            later = entry['status'] != 'probe' or given.get('started_at', 0) > entry.get('started_at', 0)
+            if given.get('status') == 'probe' and not spent and later and _valid_scope(given) and \
+                    self._settle(given, now)['status'] == 'probe':
+                # an old copy's request in flight in this scope: no other request until it is answered or reclaimable
+                # (a spent scope already stops until its reset; of two probes the later one is kept)
+                # 성진: 옛 사본 둘이 같은 범위에 동시에 요청 중일 때 하나만 남긴다 — 둘 다 기록해야 할 사례가 보이면 목록으로
+                entry = {'status': 'probe', 'pid': given['pid'], 'started_at': given['started_at'],
+                         **self._lasting(entry, now)}
+            if all(_number(given.get(k)) for k in ('limit', 'remaining', 'reset_at')) and given['reset_at'] > now:
+                if entry['status'] == 'known':
+                    entry['remaining'] = min(entry['remaining'], given['remaining'])
+                    entry['reset_at'] = max(entry['reset_at'], given['reset_at'])
+                else:
+                    entry.update(status='known', limit=given['limit'], remaining=given['remaining'],
+                                 reset_at=given['reset_at'])
+                    entry.pop('pid', None)
+                    entry.pop('started_at', None)
+            stored[name] = entry
+        self._write('scopes.json', stored)
+
+    def adopt(self, legacy):
+        """Take in the protection state an install from before the state moved left in `legacy` (its old
+        data/<platform>/<account>/protection/), every time its content differs from what was last taken from that
+        path (a copy of the old version still writing there, or one put back by hand), inside this lock. A person
+        block stays whichever side has it, unless it is the very block a person cleared here; a hold and a scope stop
+        keep the later end; pacing keeps the later next request; the request log takes the old lines of the last day
+        it does not have yet. An old file that cannot be read is a person block for unreadable state (doctor --unblock
+        lifts it), and what the other old files hold is still taken in. True when something was taken in."""
+        names = [name for name in LEGACY_FILES if (legacy / name).exists() or (legacy / name).is_symlink()]
+        if not names:
+            return False
+        raw, broken = {}, []
+        for name in names:
+            try:
+                raw[name] = (legacy / name).read_bytes()
+            except OSError:
+                broken.append(name)
+        digest = hashlib.sha256()
+        for name in names:
+            digest.update(name.encode() + b'\0' + raw.get(name, b'unreadable') + b'\0')
+        mark = {'kind': 'imported', 'path': str(legacy), 'sha256': digest.hexdigest()}
+        try:
+            if self._last_import(self._provenance(), mark['path']) == mark['sha256']:
+                return False  # the usual case, without waiting for the lock
+        except SnsError:
+            pass  # unreadable provenance: decided under the lock, which reports it
+        with self._locked(self._time_limit):
+            entries = self._provenance()
+            if self._last_import(entries, mark['path']) == mark['sha256']:
+                return False
+            now = self.clock.time()
+            source = {'path': mark['path'], 'sha256': mark['sha256']}
+            parsed, unreadable = self._legacy_state(raw)
+            broken += unreadable
+            # every person block this old state stands for: its own, and one for each file that could not be read;
+            # one person block stands at a time, so the source counts as taken in only once each of them has stood
+            # (it stands now, or a person cleared it) — until then every command of this install tries again, and
+            # the holds, scopes, pacing and log merge the same way each time
+            owed = []
+            if parsed['person'] is not None:
+                owed.append(dict(parsed['person']))
+            synthesized = None
+            if broken:
+                # named by the broken files alone, so an old copy that keeps writing its log does not bring it back
+                damaged = hashlib.sha256()
+                for name in sorted(broken):
+                    damaged.update(name.encode() + b'\0' + raw.get(name, b'unreadable') + b'\0')
+                synthesized = {'reason': 'unreadable', 'at': now, 'viewer': None,
+                               'source': {**source, 'files': sorted(broken), 'broken_sha256': damaged.hexdigest()}}
+                owed.append(synthesized)
+            cleared = [e.get('person') for e in entries if e['kind'] == 'cleared']
+            waiting = [_identity(e['person']) for e in entries if e['kind'] == 'owed']
+            standing = self._blocks()['person']
+            owed = [b for b in owed if _identity(b) not in cleared and _identity(b) not in waiting and
+                    (standing is None or _identity(standing) != _identity(b))]
+            place = owed.pop(0) if owed and standing is None else None
+            self._merge(place, parsed['hold'], parsed['scopes'], source)
+            if place is not None and place is synthesized:
+                blocks = self._blocks()  # _merge records its own source; the unreadable block keeps the one naming files
+                blocks['person']['source'] = place['source']
+                self._write('blocks.json', blocks)
+            if parsed['next_allowed_at'] > self._next_allowed():
+                self._write('pace.json', {'next_allowed_at': parsed['next_allowed_at']})
+            self._adopt_log(parsed['log'])
+            # the rest wait in this store, not in the old folder (a later update may remove it): each takes the
+            # standing block's place when a person clears that one
+            for block in owed:
+                entries.append({'kind': 'owed', 'at': now,
+                                'person': {**block, 'source': block.get('source') or source}})
+            entries.append({**mark, 'at': now})
+            self._write('imported.json', {'entries': entries})
+            return True
+
+    @staticmethod
+    def _last_import(entries, path):
+        last = next((e for e in reversed(entries) if e['kind'] == 'imported' and e.get('path') == path), None)
+        return last.get('sha256') if last else None
+
+    def _legacy_state(self, raw):
+        """The old protection files read with this store's own rules, file by file: (what could be read, the names
+        of the files that could not)."""
+        state = {'person': None, 'hold': None, 'scopes': {}, 'next_allowed_at': 0.0, 'log': []}
+        broken = []
+
+        def load(name):
+            value = json.loads(raw[name].decode('utf-8'))
+            if not isinstance(value, dict):
+                raise ValueError(name)
+            return value
+        if 'blocks.json' in raw:
+            try:
+                blocks = load('blocks.json')
+            except (ValueError, UnicodeError):
+                blocks = None
+            if blocks is None:
+                broken.append('blocks.json')
+            else:
+                # each record on its own: a broken person record does not take a valid hold beside it down
+                person, hold = blocks.get('person'), blocks.get('hold')
+                if person is None or self._valid_person(person):
+                    state['person'] = person
+                else:
+                    broken.append('blocks.json')
+                if hold is None or (isinstance(hold, dict) and _number(hold.get('until'))):
+                    state['hold'] = hold
+                elif 'blocks.json' not in broken:
+                    broken.append('blocks.json')
+                if set(blocks) - {'person', 'hold'} and 'blocks.json' not in broken:
+                    broken.append('blocks.json')
+        if 'scopes.json' in raw:
+            try:
+                scopes = load('scopes.json')
+            except (ValueError, UnicodeError):
+                scopes = None
+            if scopes is None:
+                broken.append('scopes.json')
+            else:
+                # the records this store would accept come in; any other makes the file unreadable
+                state['scopes'] = {name: entry for name, entry in scopes.items() if _valid_scope(entry)}
+                if len(state['scopes']) != len(scopes):
+                    broken.append('scopes.json')
+        if 'pace.json' in raw:
+            try:
+                next_allowed = load('pace.json').get('next_allowed_at')
+                if not _number(next_allowed):
+                    raise ValueError('pace')
+                state['next_allowed_at'] = next_allowed
+            except (ValueError, UnicodeError):
+                broken.append('pace.json')
+        if 'requests.jsonl' in raw:
+            # a log line that cannot be read is skipped, as the store's own log reader does
+            state['log'] = [line for line in raw['requests.jsonl'].decode('utf-8', 'replace').splitlines()
+                            if line.strip()]
+        return state, broken
+
+    def _adopt_log(self, lines):
+        """Add the old log's lines of the last day this log does not have yet (the same line twice is one request),
+        in time order, so requests_last_day goes on from both and taking the same lines in again adds nothing."""
+        cutoff, wanted = self.clock.time() - LOG_SECONDS, []
+        for line in lines:
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(entry, dict) and _number(entry.get('at')) and type(entry.get('n')) is int \
+                    and entry['at'] >= cutoff:
+                wanted.append(entry)
+        if not wanted:
+            return
+        mine = self._log_entries()
+        have = {json.dumps(entry, sort_keys=True) for entry in mine}
+        added = []
+        for entry in wanted:
+            key = json.dumps(entry, sort_keys=True)
+            if key not in have:
+                have.add(key)
+                added.append(entry)
+        if not added:
+            return
+        merged = sorted(mine + added, key=lambda entry: entry['at'])
+        path = self.directory / 'requests.jsonl'
+        temporary = path.with_name('.requests.jsonl.adopt')
+        try:
+            temporary.write_text(''.join(json.dumps(entry) + '\n' for entry in merged), encoding='utf-8')
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, path)
+        except OSError:
+            raise self._unreadable('could not be saved') from None
 
 
 def open_guard(platform, account, policy, deadline, *, title, site):

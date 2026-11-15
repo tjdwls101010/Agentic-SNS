@@ -5,6 +5,7 @@ from sns.reading.pipeline import (EMPTY_SNIPPETS, IDLE_SECONDS, Connection, cont
                                   stops_continuing)
 from sns.reading.pictures import IMAGE_SCHEMA, pictures
 from sns.reading.platform import Invocation, Platform, foreign
+from sns.reading.state import adopt, adopt_all
 
-__all__ = ['EMPTY_SNIPPETS', 'IDLE_SECONDS', 'IMAGE_SCHEMA', 'pictures', 'Connection', 'Invocation', 'Platform', 'context', 'doctor', 'empty_tab', 'foreign', 'idle',
+__all__ = ['adopt', 'adopt_all', 'EMPTY_SNIPPETS', 'IDLE_SECONDS', 'IMAGE_SCHEMA', 'pictures', 'Connection', 'Invocation', 'Platform', 'context', 'doctor', 'empty_tab', 'foreign', 'idle',
            'read_list', 'run', 'section', 'stops_continuing']

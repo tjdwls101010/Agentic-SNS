@@ -92,3 +92,41 @@ def test_a_fake_run_gets_a_launcher_that_runs_the_fake_aside(tmp_path):
                           env={'SNS_FAKE_SCENARIO': str(tmp_path / 'scenario.json'), 'SNS_FAKE_LOG': str(tmp_path / 'log'),
                                'PATH': '/usr/bin:/bin'})
     assert done.returncode == 0 and 'u0' in done.stdout, done.stderr
+
+
+def test_a_live_run_takes_the_old_state_in_before_linking_and_meets_its_block(tmp_path, monkeypatch):
+    """⑧ (plan P2) A contrast run may be the install's first: a block only the old data/ holds is taken into the real
+    state before the run's links are made, so the run's first command meets it and sends nothing."""
+    from tests.sns.support.browser import Browser
+    old = tmp_path / 'old-data'
+    blocks = old / 'reddit' / 'u0' / 'protection'
+    blocks.mkdir(parents=True)
+    (blocks / 'blocks.json').write_text(json.dumps({'person': {'reason': 'challenge', 'at': time.time() - 60,
+                                                               'viewer': None}, 'hold': None}))
+    real, data = tmp_path / 'real', tmp_path / 'run-data'
+    data.mkdir()
+    contrast.take_in_old_state(['reddit'], 'u0', real, legacy=old)
+    links = contrast.link_shared(data, ['reddit'], 'u0', real=real)
+    browser = Browser(tmp_path / 'browser')
+    browser.root.mkdir()
+    browser.write()
+    env = {k: v for k, v in __import__('os').environ.items()}
+    env.update(browser.env(), SNS_DATA_DIR=str(data))
+    done = subprocess.run([sys.executable, str(contrast.SKILL / 'scripts/cli.py'), 'reddit', 'sub', 'r/python'],
+                          capture_output=True, text=True, env=env, timeout=60)
+    assert done.returncode == 5, done.stdout
+    assert [c for c in browser.calls() if c['op'] == 'reddit.fetch'] == []
+    assert (real / 'reddit/u0/protection/blocks.json').exists()  # the block now lives in the real state
+    contrast.cut_links(links)
+
+
+def test_an_old_state_that_cannot_be_taken_in_stops_the_run_before_it_starts(tmp_path, monkeypatch):
+    old = tmp_path / 'old-data' / 'reddit' / 'u0' / 'protection'
+    old.mkdir(parents=True)
+    (old / 'blocks.json').write_text('{}')
+    real = tmp_path / 'real'
+    real.mkdir()
+    (real / 'reddit').write_text('a file where a directory must be')
+    with pytest.raises(SystemExit) as stopped:
+        contrast.take_in_old_state(['reddit'], 'u0', real, legacy=tmp_path / 'old-data')
+    assert 'old state' in str(stopped.value)
