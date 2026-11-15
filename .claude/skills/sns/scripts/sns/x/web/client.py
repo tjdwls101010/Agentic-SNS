@@ -244,14 +244,17 @@ class Client:
         early = isinstance(armed, dict) and (armed.get('buffer_intact') is True or
                                              (armed.get('ready_at_install') == 'loading' and not armed.get('app_at_install')))
         deadline = self.clock.monotonic() + min(LOAD_WAIT, max(1.0, self.guard.time_left() - 5))
-        # the document itself is a request too; counted up as the looks come in, charged however they end. A load whose
-        # looks ended before it settled (the tab gone, Aside lost, time up) was not measured to its end, however early
-        # the kit came: what the page requested after the last look was never read
+        # the document itself is a request too; counted up as the looks come in, charged however they end. However early
+        # the kit came, a load is not measured when no look came back, or when the tab vanished before it settled: what
+        # the page requested after the last look then went with it (a tab that stays, blocked or not, is read later)
         seen = [1, False]
         slot.classify('opened')
         try:
             state = self._wait_for_app(slot, deadline, seen)
-            seen[1] = True
+        except SnsError as error:
+            if error.reason == 'tab_missing':
+                seen[1] = False
+            raise
         finally:
             self.measured_open = measured = early and seen[1]
             slot.charge(before + (seen[0] if measured else OPEN_RESERVE + seen[0] - 1))
@@ -271,6 +274,7 @@ class Client:
                 self.clock.sleep(0.5)
                 continue
             seen[0] += _int(look.get('resources'))
+            seen[1] = True
             self._note(look)
             self._consume(look, slot)
             if ready is not None:
