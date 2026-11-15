@@ -169,11 +169,23 @@ def idle(browser, *extra):
     return done.returncode, json.loads(done.stdout)
 
 
-def test_the_idle_cleanup_empties_the_tab_to_about_blank_and_never_tries_to_close_it(browser):
+def test_the_idle_cleanup_empties_the_tab_to_about_blank_then_closes_the_blank_tab(browser):
+    """window.close() does not take on Facebook's page, so the tab is emptied first; Aside 1.26 no longer closes an
+    emptied tab by itself (measured 2026-11-15: a blank tab stayed over ten minutes), and on about:blank window.close()
+    does take, so the blank tab is closed then."""
     known_tab(browser)  # the cleanup's own look at the tab
     code, result = idle(browser)
     assert code == 0 and result['outcome'] == 'emptied'
-    assert 'facebook.blank' in browser.ops() and 'facebook.close' not in browser.ops()
+    ops = browser.ops()
+    assert 'facebook.blank' in ops and 'facebook.close' in ops and ops.index('facebook.blank') < ops.index('facebook.close')
+    assert 'T1' not in [t['id'] for t in json.loads(browser.path.read_text())['tabs']]
+
+
+def test_a_blank_tab_that_will_not_close_still_counts_as_emptied(browser):
+    """Nothing polls from about:blank; a tab that stays blank is left, not reported as a failed cleanup."""
+    known_tab(browser).flag(close_fails=True)
+    code, result = idle(browser)
+    assert code == 0 and result['outcome'] == 'emptied'
     assert next(t['url'] for t in json.loads(browser.path.read_text())['tabs'] if t['id'] == 'T1') == 'about:blank'
 
 
