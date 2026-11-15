@@ -245,15 +245,15 @@ class Client:
                                              (armed.get('ready_at_install') == 'loading' and not armed.get('app_at_install')))
         deadline = self.clock.monotonic() + min(LOAD_WAIT, max(1.0, self.guard.time_left() - 5))
         # the document itself is a request too; counted up as the looks come in, charged however they end. However early
-        # the kit came, a load is not measured when no look came back, or when the tab vanished before it settled: what
-        # the page requested after the last look then went with it (a tab that stays, blocked or not, is read later)
+        # the kit came, a load is measured only when its wait ended as it should: one that ended in an error (the tab
+        # gone, Aside lost, a block whose tab is then emptied) leaves what the page requested after the last look
+        # unread, and its kit's ledger goes with the tab
         seen = [1, False]
         slot.classify('opened')
         try:
             state = self._wait_for_app(slot, deadline, seen)
-        except SnsError as error:
-            if error.reason == 'tab_missing':
-                seen[1] = False
+        except SnsError:
+            seen[1] = False
             raise
         finally:
             self.measured_open = measured = early and seen[1]

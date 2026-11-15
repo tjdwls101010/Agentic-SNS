@@ -169,20 +169,21 @@ def test_an_opening_whose_tab_vanishes_after_a_look_is_charged_the_reserve(brows
     browser.respond('load:x.arm', {'installed_at': 300, 'location': START, 'ready_at_install': 'loading',
                                    'app_at_install': False})
     browser.respond('x.state', state(resources=0, app=False, store=False)).respond('x.state', gone)
-    browser.respond('open', {'tab': 'NEW2'})
-    browser.respond('load:x.arm', {'__raw_stdout': json.dumps({'kind': 'error', 'error': 'load_timeout',
-                                                                'message': 'x'}) + '\n'})
     code, result, _ = doctor(browser)
     assert code == 3, result
-    assert result['setup_requests'] >= 21  # the reserve and the placeholder for the first opening at least
+    assert browser.ops().count('open') == 1  # the opening ends the command: doctor does not reopen
+    assert result['setup_requests'] == 21  # the placeholder and the reserve (the one look saw nothing)
 
 
-def test_an_opening_stopped_by_a_lock_is_charged_what_it_loaded(browser):
+def test_an_opening_stopped_by_a_lock_is_charged_the_reserve_on_top_of_what_it_saw(browser):
     lock = {'path': '/i/api/graphql/abc/HomeTimeline', 'status': 200, 'codes': [326], 'html': False, 'rate': None,
             'at': 5}
     opening(browser, resources=13, signals=[lock])
     code, result, _ = doctor(browser)
-    assert code == 5 and result['request_count'] == 15 and result['setup_requests'] == 15
+    # the lock stops the wait and the tab is emptied with what the page requested after that look still unread: the
+    # load is charged the reserve on top of what was seen (1 placeholder + 20 + 13), never less
+    assert code == 5 and result['request_count'] == 34 and result['setup_requests'] == 34
+    assert result['results'] == [] and result['error'] == 'blocked'
 
 
 def test_an_opening_that_ends_logged_out_still_leaves_the_tab_to_the_idle_cleanup(browser):
