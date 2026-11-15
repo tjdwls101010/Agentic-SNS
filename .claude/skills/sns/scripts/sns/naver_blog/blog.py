@@ -42,9 +42,9 @@ def blog(platform, invocation):
                 reading.section(sections, name, lambda op=SHELVES[name]: shelf(client, op, blog_id))
         return {'sections': sections, 'stop_reason': 'not_paginable',
                 'coverage': ['a public neighbor list is private by default: the card\'s neighbor count is the figure, '
-                             'buddies <id> may show none']}
+                             'graph <id> buddies may show none']}
 
-    return reading.run(platform, invocation, command='blog', target=typed.handle, identity=identity, reader=read,
+    return reading.run(platform, invocation, command='about', target=typed.handle, identity=identity, reader=read,
                        bound=False)
 
 
@@ -64,7 +64,7 @@ def category_number(client, blog_id, wanted):
     matches = exact or [c for c in rows if lowered in (c.name or '').lower()]
     if not matches:
         raise SnsError('unavailable', f'This blog has no category matching {wanted!r}.',
-                       f'Run blog {blog_id} to see its categories.', reason='not_exist_category')
+                       f'Run about {blog_id} to see its categories.', reason='not_exist_category')
     if len(matches) > 1:
         raise SnsError('argument', f'{wanted!r} matches more than one category.', 'Pass --category with a number: ' +
                        ', '.join(f'{c.name} ({c.category_no})' for c in matches[:6]) + '.')
@@ -74,13 +74,12 @@ def category_number(client, blog_id, wanted):
 def check(options):
     """The argument rules of posts, before any request."""
     target = web.parse_target(options['target'], 'blog')
-    chosen = [flag for flag in ('category', 'popular', 'notices') if options.get(flag)]
-    if len(chosen) > 1:
-        raise SnsError('argument', 'Choose one of --category, --popular and --notices.', 'Run posts once per list.')
+    if options.get('category') and options.get('tab') in ('popular', 'notices'):
+        raise SnsError('argument', 'Choose either --category or --tab popular/notices.', 'Run profile once per list.')
     if target.category_no and options.get('category'):
         raise SnsError('argument', 'That URL already names a category.',
                        'Drop --category, or pass the blog id alone.')
-    if (options.get('popular') or options.get('notices')) and (options.get('since') or options.get('until')
+    if options.get('tab') in ('popular', 'notices') and (options.get('since') or options.get('until')
                                                                or options.get('after') or options.get('out')):
         raise SnsError('argument', 'Popular and notice posts are one page: no date window, no continuation, no file.',
                        'Drop --since/--until/--after/--out.')
@@ -89,7 +88,7 @@ def check(options):
 def posts(platform, invocation):
     options = invocation.options
     target = web.parse_target(options['target'], 'blog')
-    shelf_name = 'popular' if options.get('popular') else 'notices' if options.get('notices') else None
+    shelf_name = options.get('tab') if options.get('tab') in ('popular', 'notices') else None
     wanted = target.category_no or options.get('category')
     identity = {'blog': target.blog_id or 'naver.me/' + target.short, 'category': wanted, 'shelf': shelf_name}
     words = ['--category', str(wanted)] if wanted else []
@@ -110,13 +109,13 @@ def posts(platform, invocation):
         ids = {'blogId': blog_id, 'categoryNo': number or 0}
         result = listing.read_numbered(
             connection, state, out, op='post_list', source=listing.pages_of(
-                client, 'post_list', ids, lambda raw: web.post_record(raw, blog_id=blog_id)), command='posts',
+                client, 'post_list', ids, lambda raw: web.post_record(raw, blog_id=blog_id)), command='profile',
             target=target.handle or options['target'], identity=identity, words=words, order='newest_first',
             show=DISPLAY, blog=blog_id, carry={'category_no': number})
         if wanted and not str(wanted).isdigit():
             result.setdefault('coverage', []).append(f'category {wanted} is number {number}')
         return result
 
-    return reading.run(platform, invocation, command='posts', target=target.handle or options['target'],
+    return reading.run(platform, invocation, command='profile', target=target.handle or options['target'],
                        identity=identity, reader=read, bound=not shelf_name and account.binds(options, DISPLAY),
                        window=None if shelf_name else listing.window_of(options, 'newest_first'))

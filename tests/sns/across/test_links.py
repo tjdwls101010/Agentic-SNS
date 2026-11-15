@@ -18,7 +18,7 @@ LINKS = {
     'facebook': [('https://www.facebook.com/example.page/posts/pfbid0abc', 'post'),
                  ('https://www.facebook.com/groups/examplegroup/', 'group')],
     'naver-blog': [('https://blog.naver.com/exampleid/223000000001', 'post'),
-                   ('https://m.blog.naver.com/exampleid', 'blog')],
+                   ('https://m.blog.naver.com/exampleid', 'about')],
 }
 CASES = [(asked, owner, link, command) for owner, links in LINKS.items() for link, command in links
          for asked in LINKS if asked != owner]

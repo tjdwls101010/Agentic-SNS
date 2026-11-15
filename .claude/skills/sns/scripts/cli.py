@@ -185,7 +185,7 @@ def _x_surface(platform):
     TREND_TABS = list(platform.explore_TABS)
 
     CHOICES = {
-        'feed.feed': FEED_CHOICES, 'profile.tab': PROFILE_TABS, 'graph.relation': GRAPH_RELATIONS,
+        'feed.tab': FEED_CHOICES, 'profile.tab': PROFILE_TABS, 'graph.relation': GRAPH_RELATIONS,
         'me.collection': ME_COLLECTIONS, 'list.tab': LIST_TABS, 'community.tab': COMMUNITY_TABS,
         'community.sort': COMMUNITY_SORTS, 'post.sort': REPLY_SORTS, 'search.type': SEARCH_TYPES,
         'search.sort': SEARCH_SORTS, 'search.within': ['communities'], 'quotes.sort': REPLY_SORTS,
@@ -253,7 +253,7 @@ def _x_surface(platform):
         'feed': {
             'help': 'Read your home feed, a page at a time.',
             'run': _run(platform.listing_feed),
-            'arguments': [(('--feed',), {'choices': FEED_CHOICES, 'default': 'foryou',
+            'arguments': [(('--tab',), {'choices': FEED_CHOICES, 'default': 'foryou',
                                          'help': 'foryou: the posts X ranks for this account; following: from the accounts it follows'}),
                           'since', 'until', *LIST],
             'epilog': ['foryou is what X chose to show this account, not everything; following holds only the accounts it follows, and X does not serve it newest first either, so neither feed can close a --since window: a window keeps the posts dated inside it among those read (a sample, not the whole day). Neither feed ends by itself, so --out needs --limit.',
@@ -449,15 +449,15 @@ def _threads_surface(platform):
     FEED_CHOICES = ['foryou', 'following']
     PROFILE_TABS = ['threads', 'replies', 'reposts', 'media']
     GRAPH_RELATIONS = ['followers', 'following']
-    ME_COLLECTIONS = ['liked', 'saved']
+    ME_COLLECTIONS = ['liked', 'saved', 'activity']
     ACTIVITY_FILTERS = list(platform.web_ACTIVITY_FILTERS)
     REPLY_SORTS = ['top', 'recent']
     SEARCH_TYPES = ['posts', 'tags', 'accounts']
     SEARCH_SORTS = ['top', 'recent']
 
     CHOICES = {
-        'feed.feed': FEED_CHOICES, 'profile.tab': PROFILE_TABS, 'graph.relation': GRAPH_RELATIONS,
-        'me.collection': ME_COLLECTIONS, 'activity.filter': ACTIVITY_FILTERS,
+        'feed.tab': FEED_CHOICES, 'profile.tab': PROFILE_TABS, 'graph.relation': GRAPH_RELATIONS,
+        'me.collection': ME_COLLECTIONS, 'me.tab': ACTIVITY_FILTERS,
         'search.type': SEARCH_TYPES, 'search.sort': SEARCH_SORTS,
         'post.sort': REPLY_SORTS,
     }
@@ -497,10 +497,23 @@ def _threads_surface(platform):
         raise argparse.ArgumentTypeError('expected 0 (full text) or a positive integer')
 
 
+    def check_me(options):
+        if options['collection'] == 'activity':
+            if options.get('after') or options.get('out'):
+                raise SnsError('argument', 'Activity has no continuation or file.', 'Drop --after/--out.')
+            if options.get('limit') is not None and not 1 <= options['limit'] <= 50:
+                raise SnsError('argument', 'Activity limit is 1 to 50.', 'Choose a limit from 1 to 50.')
+        elif options.get('limit') is not None and options['limit'] < 1:
+            raise SnsError('argument', '--limit must be positive.', 'Choose a positive integer.')
+        elif options.get('tab') is not None:
+            raise SnsError('argument', '--tab selects an activity filter.', 'Use me activity or drop --tab.')
+
+
     def _activity_limit(value):
-        if value.isascii() and value.isdigit() and 1 <= int(value) <= 50:
+        try:
             return int(value)
-        raise argparse.ArgumentTypeError('expected an integer from 1 to 50')
+        except ValueError:
+            raise argparse.ArgumentTypeError('expected an integer') from None
 
 
     def _run(function):
@@ -511,11 +524,11 @@ def _threads_surface(platform):
         'feed': {
             'help': 'Read your home feed, a page at a time.',
             'run': _run(platform.listing_feed),
-            'arguments': [(('--feed',), {'choices': FEED_CHOICES, 'default': 'foryou',
+            'arguments': [(('--tab',), {'choices': FEED_CHOICES, 'default': 'foryou',
                                          'help': 'foryou: the posts Threads ranks for this account; following: the accounts it follows, newest first'}),
                           'since', 'until', *LIST],
             'epilog': ['foryou is what Threads chose to show this account, not everything; following holds only the accounts it follows. Neither feed ends by itself, so --out needs --limit.',
-                       'A window keeps the dated posts written on its days (posts without a date are left out and counted). Only --feed following can close a --since window (it stops at the first page wholly older than --since, while the feed stays newest first); foryou is a sample of the window: it keeps the posts dated inside it among the page read.',
+                       'A window keeps the dated posts written on its days (posts without a date are left out and counted). Only --tab following can close a --since window (it stops at the first page wholly older than --since, while the feed stays newest first); foryou is a sample of the window: it keeps the posts dated inside it among the page read.',
                        'A feed entry can carry several posts (a post and a reply to it, or an author continuing a post): they are shown together, and the later ones say reply-to= or continuation of.',
                        'Without --limit or --out it reads one page (following with a window reads on until it closes); more: continues.',
                        'requests: 1 per page of about 5-10 posts.'],
@@ -555,8 +568,9 @@ def _threads_surface(platform):
         },
         'me': {
             'help': 'Read the posts you liked or saved (one batch).',
-            'run': _run(platform.listing_me),
-            'arguments': [(('collection',), {'choices': ME_COLLECTIONS, 'help': 'liked or saved'}), *LIST],
+            'run': lambda invocation: (platform.listing_notifications if invocation.options['collection'] == 'activity' else platform.listing_me)(PLATFORM, invocation),
+            'check': check_me,
+            'arguments': [(('collection',), {'choices': ME_COLLECTIONS, 'metavar': 'KIND', 'help': 'liked, saved or activity'}), (('--tab',), {'choices': ACTIVITY_FILTERS, 'help': 'App activity filter (default: all); requests means follow requests'}), (('--limit',), {'type': _activity_limit, 'help': 'Rows to show (activity: default 20, 1 to 50)'}), 'chars', 'after', 'out', 'json'],
             'epilog': ['One batch, as Threads sends it (stopped=not_paginable): not your whole history.',
                        'requests: 1.'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8),
@@ -564,7 +578,7 @@ def _threads_surface(platform):
         'activity': {
             'help': 'Read your activity (notifications) list without marking it seen.',
             'run': _run(platform.listing_notifications),
-            'arguments': [(('--filter',), {'choices': ACTIVITY_FILTERS, 'default': 'all',
+            'arguments': [(('--tab',), {'choices': ACTIVITY_FILTERS, 'default': 'all',
                                            'help': 'App activity filter (default: all); requests means follow requests'}),
                           (('--limit',), {'type': _activity_limit, 'default': 20, 'metavar': 'N',
                                          'help': 'Rows to request in this page (default 20; 1 to 50)'}),
@@ -586,7 +600,7 @@ def _threads_surface(platform):
                           (('--sort',), {'choices': SEARCH_SORTS, 'default': 'top',
                                          'help': 'Posts and tags: top (Threads ranks them) or recent (newest first)'}),
                           'since', 'until',
-                          (('--from',), {'metavar': 'HANDLE', 'help': 'Posts and tags: only posts by this @handle'}),
+                          (('--from',), {'metavar': 'ACCOUNT', 'help': 'Posts and tags: only posts by this @handle'}),
                           *LIST],
             'epilog': ['Results are in Threads\' order for this account: top is a ranking, not a sample of opinion; recent is newest first. Accounts with the same or similar names are different results (compare url and verified).',
                        '--since, --until and --from are filters Threads applies itself (posts and tags), so a filtered search read to the end (stopped=exhausted) covers its window in either order: window ... closed (server-filtered); stopped by --limit or the time limit, it is still open. The days are judged in the zone the window was made in and keep that span across more:.',
@@ -668,6 +682,8 @@ def _threads_surface(platform):
         COMMANDS[_name]['epilog'] = [*COMMANDS[_name]['epilog'], RECORDS, TAB]
     COMMANDS['images']['epilog'] = [*COMMANDS['images']['epilog'], TAB]
 
+    COMMANDS['me']['epilog'] = COMMANDS['activity']['epilog'] + COMMANDS['me']['epilog']
+    del COMMANDS['activity']
     return COMMANDS, CHOICES
 
 
@@ -737,7 +753,7 @@ def _reddit_surface(platform):
             'help': 'Read a redditor\'s public activity: posts and comments, newest first by default.',
             'run': _command(platform.listing_profile), 'check': platform.listing_window_check,
             'arguments': [(('target',), {'help': 'u/<name> or a profile URL'}),
-                          (('--type',), {'choices': platform.web_PROFILE_TYPES, 'help': 'overview (posts and comments together, '
+                          (('--tab',), {'choices': platform.web_PROFILE_TYPES, 'help': 'overview (posts and comments together, '
                                                                                'default), posts or comments'}),
                           (('--sort',), {'choices': platform.web_PROFILE_SORTS, 'help': 'new (default), hot, top or controversial '
                                                                                '(with --time)'}),
@@ -761,7 +777,7 @@ def _reddit_surface(platform):
                        'less of). A user: karma by kind, account age, profile description, and the moderator, admin and '
                        'verified markers. Karma, age and flair say what an account did on Reddit, not who the person is.',
                        'One live read tied to no handle or file, so the Reddit account is not checked first.',
-                       'cost: 4 requests for a community (card, rules, moderators, the first page of hot for its pinned posts), '
+                       'requests: 4 requests for a community (card, rules, moderators, the first page of hot for its pinned posts), '
                        '1 for a user.'],
             'exits': (0, 2, 3, 4, 5, 6, 9, 10),
         },
@@ -779,7 +795,7 @@ def _reddit_surface(platform):
                        'line shows its window as wiki. One live read tied to no handle or file, so the Reddit account is '
                        'not checked first.',
                        'A page that does not exist, or a wiki that is off or private, is unavailable (exit 9).',
-                       'cost: 1 request.'],
+                       'requests: 1 request.'],
             'exits': (0, 2, 3, 4, 5, 6, 9, 10),
         },
         'search': {
@@ -854,7 +870,7 @@ def _reddit_surface(platform):
                        'contest mode (random order, hidden scores) are on the thread: line.',
                        'Every comment carries its permalink: comments <that url> opens it in full with what hangs under '
                        'it.',
-                       'cost: the account check (/api/me.json) + 1 request (a share link adds 1 per redirect, at most 3).'],
+                       'requests: the account check (/api/me.json) + 1 request (a share link adds 1 per redirect, at most 3).'],
             'exits': (0, 2, 3, 4, 5, 6, 8, 9, 10),
         },
         'comments': {
@@ -882,7 +898,7 @@ def _reddit_surface(platform):
                        'With --out the whole thread is written: the post once, then every comment flat (parent_id and '
                        'depth), a page per expansion; rerun the same command to resume the same reading even after its '
                        'snapshot expired. A tree whose last branches Reddit will not expand ends partial (8).',
-                       'cost: the account check (/api/me.json) + 1 request per expansion (or 1 for a new read); the time limit '
+                       'requests: the account check (/api/me.json) + 1 request per expansion (or 1 for a new read); the time limit '
                        'stops a large thread and more: continues.'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
         },
@@ -908,7 +924,7 @@ def _reddit_surface(platform):
     CHOICES = {
         'feed.sort': list(platform.web_FEED_SORTS), 'feed.time': list(platform.web_TIMES),
         'sub.sort': list(platform.web_SUB_SORTS), 'sub.time': list(platform.web_TIMES),
-        'profile.type': list(platform.web_PROFILE_TYPES), 'profile.sort': list(platform.web_PROFILE_SORTS), 'profile.time': list(platform.web_TIMES),
+        'profile.tab': list(platform.web_PROFILE_TYPES), 'profile.sort': list(platform.web_PROFILE_SORTS), 'profile.time': list(platform.web_TIMES),
         'search.type': list(platform.web_SEARCH_TYPES), 'search.sort': list(platform.web_SEARCH_SORTS), 'search.time': list(platform.web_TIMES),
         'me.collection': list(platform.web_ME_COLLECTIONS),
         'post.sort': list(platform.web_COMMENT_SORTS), 'comments.sort': list(platform.web_COMMENT_SORTS),
@@ -941,8 +957,8 @@ def _facebook_surface(platform):
         if not options['target'].strip():
             raise SnsError('argument', 'Search text must not be empty.', 'Pass the words to search for.')
         if options['type'] not in ('top', 'posts') and (options.get('recent') or options.get('since')
-                                                        or options.get('until') or options.get('in_group')):
-            raise SnsError('argument', '--recent, --since, --until and --in-group are for posts; use them with --type top '
+                                                        or options.get('until') or options.get('within')):
+            raise SnsError('argument', '--recent, --since, --until and --in are for posts; use them with --type top '
                                        'or posts.', 'Drop the option, or search --type posts.')
 
 
@@ -1043,11 +1059,11 @@ def _facebook_surface(platform):
                           (('--type',), {'choices': SEARCH_TYPES, 'default': 'top', 'help': 'top mixes posts with people, pages and groups in Facebook\'s order'}),
                           (('--recent',), {'action': 'store_true', 'help': 'Posts only (top, posts): Facebook\'s "recent posts" filter'}),
                           'since', 'until',
-                          (('--in-group',), {'metavar': 'GROUP', 'help': 'Search the posts of one group (its URL, vanity name or numeric id), as the group\'s own search box does'}),
+                          (('--in',), {'dest': 'within', 'metavar': 'GROUP', 'help': 'Search the posts of one group (its URL, vanity name or numeric id), as the group\'s own search box does'}),
                           *LIST],
             'epilog': ['Results are in Facebook\'s order for this account; people and pages with the same name are different results (compare url and verified).',
                        '--recent, --since and --until are Facebook\'s post filters (top and posts only): Facebook applies the dates, so reaching the end closes the window as far as search returns posts; results stay in Facebook\'s order, not by date. A result with no date cannot be placed in a window and is left out and counted.',
-                       '--in-group searches one group\'s posts (top or posts): requests: 1 to find the group id (none for a numeric id), then 1 per page.',
+                       '--in searches one group\'s posts (top or posts): requests: 1 to find the group id (none for a numeric id), then 1 per page.',
                        'Without --limit or --out it reads one page (about 5 results); more: continues.',
                        'requests: 1 per page of about 5 results.'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8),
@@ -1110,6 +1126,9 @@ def _facebook_surface(platform):
         COMMANDS[_name]['epilog'] = [*COMMANDS[_name]['epilog'], RECORDS, TAB]
     COMMANDS['images']['epilog'] = [*COMMANDS['images']['epilog'], TAB]
 
+    CHOICES['me.collection'] = ['notifications']
+    COMMANDS['me'] = COMMANDS.pop('notifications')
+    COMMANDS['me']['arguments'].insert(0, (('collection',), {'choices': ['notifications'], 'metavar': 'KIND', 'help': 'notifications'}))
     return COMMANDS, CHOICES
 
 
@@ -1143,9 +1162,9 @@ def _naver_blog_surface(platform):
                           (('--type',), {'choices': ['posts', 'blogs', 'tags', 'clips'], 'default': None,
                                          'help': 'posts (default), blogs (bloggers), tags (posts under an exact tag), or '
                                                  'clips (short videos)'}),
-                          (('--blog',), {'metavar': 'BLOG', 'help': 'Search inside one blog (id, URL or naver.me link): '
+                          (('--in',), {'dest': 'within', 'metavar': 'BLOG', 'help': 'Search inside one blog (id, URL or naver.me link): '
                                                                     '--type posts or tags'}),
-                          (('--sort',), {'choices': ['sim', 'date'], 'help': 'sim (Naver\'s relevance, default) or date '
+                          (('--sort',), {'choices': ['relevance', 'date'], 'help': 'relevance (Naver\'s relevance, default) or date '
                                                                              '(newest first); posts, blogs and clips'}),
                           'since', 'until',
                           (('--own-money',), {'action': 'store_true', 'help': 'Naver-wide post search: only posts carrying '
@@ -1155,8 +1174,8 @@ def _naver_blog_surface(platform):
                           'limit', 'chars', 'after', 'out', 'json'],
             'epilog': ['What each search honours (refused otherwise, before any request): posts — --sort, --since/--until '
                        '(Naver filters by KST day) and --own-money; blogs — --sort only; tags — no order (newest first), '
-                       'so --since/--until is applied here and closes the window; --blog posts — --sort and dates; --blog '
-                       'tags — neither, and it matches whole tags only. Relevance (sim) is Naver\'s ranking for this '
+                       'so --since/--until is applied here and closes the window; --in posts — --sort and dates; --in '
+                       'tags — neither, and it matches whole tags only. Relevance is Naver\'s ranking for this '
                        'account, not a sample of opinion.',
                        'Naver serves at most 1,000 results of any search: the read ends there as a natural end '
                        '(stopped=server_capped, exit 0, a coverage line says so); narrow the words or the dates to reach '
@@ -1164,7 +1183,7 @@ def _naver_blog_surface(platform):
                        'limit: --limit counts records. Without it one page is read (30 posts or tags, 20 blogs, clips or '
                        'in-blog posts) and 10 are shown. ' + PAGE + ' With --out whole pages are saved, so a little over '
                        '--limit.',
-                       'cost: 1 request per page; a --blog domain address costs one lookup. ' + ACCOUNT],
+                       'requests: 1 request per page; a --in domain address costs one lookup. ' + ACCOUNT],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
         },
         'keywords': {
@@ -1175,7 +1194,7 @@ def _naver_blog_surface(platform):
             'epilog': ['Popular: about 12 keywords and the day Naver computed them; related: about 15 keywords. Both are '
                        'Naver\'s own order — a ranking, not a share of searches or of opinion. search <keyword> reads '
                        'one.',
-                       'cost: 1 request.'],
+                       'requests: 1 request.'],
             'exits': (0, 2, 3, 4, 5, 6, 7),
         },
         'post': {
@@ -1199,7 +1218,7 @@ def _naver_blog_surface(platform):
                        'category, comments) is shown beside the others and makes the exit 8.',
                        'The post page names the logged-in account for free (kept as a hint); if it is not the account this '
                        'command started with (--out checks it first), the command ends as a changed login (exit 4).',
-                       'cost: 3 requests (the page, its reactions, the same-category posts), +1 with --comments (+1 when '
+                       'requests: 3 requests (the page, its reactions, the same-category posts), +1 with --comments (+1 when '
                        'the blog number is unknown), +1 for a naver.me link, +1 with --out for the account check.',
                        'output: the post section ([p1]: head, tags and flags, the label, the body lines, links:, url), '
                        'then same category ([p<n>] posts) and comments ([c<n>]). --json: one envelope whose sections hold '
@@ -1217,7 +1236,7 @@ def _naver_blog_surface(platform):
                        'deleted and blinded ones.',
                        'limit: --limit counts rows (comments and replies together). Without it one page of up to 100 rows '
                        'is read and 20 are shown. ' + PAGE,
-                       'cost: 1 request to find the blog number (a continuation carries it), then 1 per 100 rows. '
+                       'requests: 1 request to find the blog number (a continuation carries it), then 1 per 100 rows. '
                        + ACCOUNT],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
         },
@@ -1250,10 +1269,10 @@ def _naver_blog_surface(platform):
                        'link), its id; a Naver Blog post destination is named as post takes it.',
                        'Any number of links is read. When the time limit or a hold interrupts, the links not yet read go '
                        'on in the more: command, which names them.',
-                       'cost: 1 request per link.'],
+                       'requests: 1 request per link.'],
             'exits': (0, 2, 3, 4, 5, 6, 8),
         },
-        'blog': {
+        'about': {
             'help': 'Read a blog\'s card, post and clip counts, category tree, notices and popular posts.',
             'run': _command(platform.blog_blog),
             'arguments': [(('target',), {'metavar': 'BLOG', 'help': 'Blog id, blog URL (a post URL names its blog), or a '
@@ -1264,58 +1283,55 @@ def _naver_blog_surface(platform):
                        'clips, the viewer\'s relation (neighbor or mutual-neighbor), official/market/power-blog marks. '
                        'Categories are the tree ([n] name · posts; closed ones are counted, not listed). Popular posts are '
                        'the only surface with view counts. A domain address is resolved once to the blog\'s own id.',
-                       'cost: 5 requests (card, counts, categories, notices, popular); --brief 3; +1 for a domain address '
+                       'requests: 5 requests (card, counts, categories, notices, popular); --brief 3; +1 for a domain address '
                        'or a naver.me link.',
                        'output: sections blog ([b1]), categories, notices and popular ([p<n>]); a failed section is shown '
                        'and makes the exit 8.'],
             'exits': (0, 2, 3, 4, 5, 6, 8, 9),
         },
-        'posts': {
+        'profile': {
             'help': 'List one blog\'s posts newest first: all, one category, its notices or its popular posts.',
             'run': _command(platform.blog_posts), 'check': platform.blog_check,
             'arguments': [(('target',), {'metavar': 'BLOG', 'help': 'Blog id, blog URL (a PostList URL\'s categoryNo counts '
                                                                     'as --category), or a naver.me link'}),
                           (('--category',), {'metavar': 'N|NAME', 'help': 'A category number (free) or name (one request: '
                                                                           'exact match first, then part of a name)'}),
-                          (('--popular',), {'action': 'store_true', 'help': 'The popular posts (one page, with view '
-                                                                            'counts)'}),
-                          (('--notices',), {'action': 'store_true', 'help': 'The notice posts (one page)'}),
+                          (('--tab',), {'choices': ['posts', 'popular', 'notices'], 'default': 'posts', 'help': 'The posts, popular posts (one page, with view counts), or notice posts (one page)'}),
                           'since', 'until', 'limit', 'chars', 'after', 'out', 'json'],
             'epilog': ['The list is newest first, so --since closes it at the first post older than that day. Naver '
                        'reports no total here. Popular and notices are one page each: no window, file or more:.',
                        'limit: --limit counts posts. Without it one page of 30 is read and 10 are shown. ' + PAGE,
-                       'cost: 1 request per page of 30 (+1 for a category name, a domain address or a naver.me link). '
+                       'requests: 1 request per page of 30 (+1 for a category name, a domain address or a naver.me link). '
                        + ACCOUNT],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
         },
         'feed': {
             'help': 'Read the logged-in account\'s neighbor feed (이웃새글), newest first, a page at a time.',
             'run': _command(platform.neighbors_feed),
-            'arguments': [(('--group',), {'type': positive, 'metavar': 'N', 'help': 'Only one neighbor group (buddies '
-                                                                                   '--groups lists them)'}),
+            'arguments': [(('--group',), {'type': positive, 'metavar': 'N', 'help': 'Only one neighbor group (me '
+                                                                                   'groups lists them)'}),
                           'since', 'until', 'limit', 'chars', 'after', 'out', 'json'],
             'epilog': ['Only the blogs this account follows, newest first, so --since closes at the first post older than '
                        'that day. A coverage line gives Naver\'s count of feed posts.',
                        'limit: --limit counts posts. Without it one page of 20 is read and 10 are shown. ' + PAGE,
-                       'cost: 1 request per page of 20, after the account check (current-user, 1 request: the feed is '
+                       'requests: 1 request per page of 20, after the account check (current-user, 1 request: the feed is '
                        'addressed by the logged-in account\'s blog id, so it is always asked, and a continuation asks '
                        'again).'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8),
         },
-        'buddies': {
+        'graph': {
             'help': 'Read the logged-in account\'s neighbor list, or a blog\'s public one.',
             'run': _command(platform.neighbors_buddies), 'check': platform.neighbors_check,
             'arguments': [(('target',), {'nargs': '?', 'metavar': 'BLOG', 'help': 'A blog id or URL for its public neighbor '
                                                                                   'list; omitted: your own neighbors'}),
-                          (('--followers',), {'action': 'store_true', 'help': 'The blogs that added you as a neighbor'}),
+                          (('relation',), {'choices': ['buddies', 'followers'], 'metavar': 'RELATION', 'help': 'buddies or followers'}),
                           (('--group',), {'type': positive, 'metavar': 'N', 'help': 'Only your neighbors in one group'}),
-                          (('--groups',), {'action': 'store_true', 'help': 'Your neighbor groups (one page)'}),
                           'limit', 'chars', 'after', 'out', 'json'],
-            'epilog': ['--followers, --group and --groups read your own account and take no blog. Your own list (20 a '
+            'epilog': ['followers and --group read your own account and take no blog. Your own list (20 a '
                        'page) carries mutual (서로이웃) and your groups; a blog\'s public list (50 a page) is private by '
-                       'default, so an empty one (exit 7) does not mean no neighbors — blog <id> shows the card\'s count.',
+                       'default, so an empty one (exit 7) does not mean no neighbors — about <id> shows the card\'s count.',
                        'limit: --limit counts neighbors. Without it one page is read and 20 are shown. ' + PAGE,
-                       'cost: 1 request per page; your own lists ask the account first (current-user, 1 request), a '
+                       'requests: 1 request per page; your own lists ask the account first (current-user, 1 request), a '
                        'blog\'s public list does not.'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
         },
@@ -1324,14 +1340,13 @@ def _naver_blog_surface(platform):
             'run': _command(platform.directory_topic), 'check': platform.directory_check,
             'arguments': [(('target',), {'nargs': '?', 'metavar': 'TOPIC', 'help': 'Topic number (free) or name (one '
                                                                                    'request); omitted: the directory'}),
-                          (('--top',), {'action': 'store_true', 'help': 'The topic\'s featured posts (one page) instead '
-                                                                         'of its newest'}),
+                          (('--tab',), {'choices': ['newest', 'featured'], 'default': 'newest', 'help': 'The topic\'s newest or featured posts (one page)'}),
                           'since', 'until', 'limit', 'chars', 'after', 'out', 'json'],
             'epilog': ['A topic\'s posts are the ones Naver files under it, newest first (a window closes on them), up to '
                        '1,000 (then stopped=server_capped, a natural end). The directory and featured posts are one page '
                        'each: no window, file or more:.',
                        'limit: --limit counts posts. Without it one page of 10 is read and shown. ' + PAGE,
-                       'cost: 1 request per page of 10 (+1 for a topic name). ' + ACCOUNT],
+                       'requests: 1 request per page of 10 (+1 for a topic name). ' + ACCOUNT],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
         },
         'monthly': {
@@ -1342,14 +1357,16 @@ def _naver_blog_surface(platform):
             'epilog': ['A coverage line names the issue shown. A month with no issue (the current one before it is '
                        'published) is exit 9 naming the latest, never silently swapped for it. Each topic section lists '
                        'its blogs ([b] card) each followed by its first representative posts.',
-                       'cost: 4 requests (the issue list, the issue, the blogs\' cards, their posts).',
+                       'requests: 4 requests (the issue list, the issue, the blogs\' cards, their posts).',
                        'output: one section per topic: [b<n>] blog cards, each followed by [p<n>] posts.'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
         },
     }
 
+    COMMANDS['me'] = {**COMMANDS['graph'], 'help': 'Read your neighbor groups.', 'arguments': [(('collection',), {'choices': ['groups'], 'metavar': 'KIND', 'help': 'groups'}), 'limit', 'chars', 'after', 'out', 'json']}
+
     # The closed sets the commands offer (cli.py checks its parser's choices against this).
-    CHOICES = {'search.type': ['posts', 'blogs', 'tags', 'clips'], 'search.sort': ['sim', 'date']}
+    CHOICES = {'search.type': ['posts', 'blogs', 'tags', 'clips'], 'search.sort': ['relevance', 'date'], 'profile.tab': ['posts', 'popular', 'notices'], 'graph.relation': ['buddies', 'followers'], 'me.collection': ['groups'], 'topic.tab': ['newest', 'featured']}
 
     return COMMANDS, CHOICES
 
@@ -1389,6 +1406,7 @@ def parser(platforms, hidden=False, commands=None):
                          + '\n'.join(f'  {code:<2} {meaning}' for code, meaning in EXIT_SUMMARY.items()))
     root.add_argument('--verbose', action='store_true', help='Write scrubbed request metadata to stderr')
     branches = root.add_subparsers(dest='platform', required=True, metavar='<platform>', help=argparse.SUPPRESS)
+    templates = {'--tab': 'Choose the view.', '--sort': 'Choose the order.', '--type': 'Choose the result type.', '--in': 'Choose the search scope.', '--limit': 'How many to show; the description explains what is counted.', '--chars': 'Characters of each text to show; the description explains the default.'}
     for word, module in platforms.items():
         platform = module.PLATFORM
         platform_commands = surface(module, commands[word])
@@ -1399,9 +1417,26 @@ def parser(platforms, hidden=False, commands=None):
         for name, spec in platform_commands.items():
             leaf = leaves.add_parser(name, help=spec['help'], description=spec['help'], epilog=epilog(spec),
                                      formatter_class=argparse.RawTextHelpFormatter, prog=f'cli.py {word} {name}')
+            details = []
             for argument in spec['arguments']:
                 flags, settings = option(argument, platform) if isinstance(argument, str) else argument
+                settings = dict(settings)
+                if flags[0] == 'target':
+                    labels = {'profile': 'ACCOUNT', 'about': 'ACCOUNT', 'graph': 'ACCOUNT', 'sub': 'SUB', 'wiki': 'SUB', 'group': 'GROUP', 'list': 'LIST', 'community': 'COMMUNITY', 'post': 'POST', 'comments': 'POST', 'related': 'POST', 'images': 'POST', 'reposts': 'POST', 'quotes': 'POST', 'replies': 'HANDLE', 'search': 'TEXT', 'topic': 'TEXT', 'resolve': 'TEXT'}
+                    settings['metavar'] = 'BLOG' if word == 'naver-blog' and name in ('profile', 'about', 'graph') else labels.get(name, settings.get('metavar', 'TEXT'))
+                elif flags[0] == 'page':
+                    settings['metavar'] = 'PAGE'
+                elif flags[0] in ('collection', 'relation'):
+                    settings['metavar'] = 'KIND' if flags[0] == 'collection' else 'RELATION'
+                if flags[0] in templates or flags[0] in ('--limit', '--chars', '--after', '--out', '--json'):
+                    old_help = settings.get('help')
+                    generic = templates.get(flags[0]) or option(flags[0][2:], platform)[1]['help']
+                    if old_help and old_help != generic:
+                        details.append(f'{flags[0]}: {old_help}')
+                    settings['help'] = generic
                 leaf.add_argument(*flags, **settings)
+            if details:
+                leaf.epilog = leaf.epilog.replace('exit codes:\n', '\n'.join(details) + '\n\nexit codes:\n')
         if hidden:  # the idle cleanup the skill starts itself; not part of the help
             leaf = leaves.add_parser('idle', prog=f'cli.py {word} idle')
             leaf.add_argument('--account', required=True)

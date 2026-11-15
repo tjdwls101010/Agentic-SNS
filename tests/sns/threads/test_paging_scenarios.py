@@ -93,7 +93,7 @@ def plan(scenario):
     if options.get('policy') == 'capped':
         return 'graph', ['graph', '@example.author', 'followers', *limit], env
     if options.get('chronological'):
-        return 'feed', ['feed', '--feed', 'following', *window, *(limit if options['limit'] else [])], env
+        return 'feed', ['feed', '--tab', 'following', *window, *(limit if options['limit'] else [])], env
     if window:
         return 'search', ['search', 'words', '--sort', 'recent', *window, *limit], env
     return 'feed', ['feed', *limit], env

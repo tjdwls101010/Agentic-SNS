@@ -78,7 +78,7 @@ def test_search_filters_and_inside_a_group():
     group = target('GROUP')
     code, recent = cli('search', 'AI', '--type', 'posts', '--recent', '--limit', '3')
     assert code == 0 and recent['results'] and all(r['kind'] == 'post' for r in recent['results'])
-    code, scoped = cli('search', 'pandas', '--type', 'posts', '--in-group', group, '--limit', '3')
+    code, scoped = cli('search', 'pandas', '--type', 'posts', '--in', group, '--limit', '3')
     assert code == 0, scoped
     for record in scoped['results']:
         assert record['url'] is None or '/groups/' in record['url'], record['url']

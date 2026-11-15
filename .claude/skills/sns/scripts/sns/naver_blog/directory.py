@@ -27,22 +27,22 @@ def topic_number(client, wanted):
 
 def check(options):
     """The argument rules of topic, before any request."""
-    one_page = options.get('target') is None or options.get('top')
+    one_page = options.get('target') is None or options.get('tab') == 'featured'
     if one_page and (options.get('since') or options.get('until') or options.get('after') or options.get('out')):
         if options.get('target') is None:
             raise SnsError('argument', 'The topic directory is one page of names.',
                            'Name a topic to read its posts.')
         raise SnsError('argument', 'Featured posts are one page: no window, no continuation, no file.',
-                       'Drop --since/--until/--after/--out, or drop --top.')
-    if options.get('target') is None and options.get('top'):
+                       'Drop --since/--until/--after/--out, or drop --tab featured.')
+    if options.get('target') is None and options.get('tab') == 'featured':
         raise SnsError('argument', 'The topic directory is one page of names.', 'Name a topic to read its posts.')
 
 
 def topic(platform, invocation):
     options = invocation.options
     wanted = options.get('target')
-    identity = {'topic': wanted, 'shelf': 'featured' if options.get('top') else None}
-    words = ['--top'] if options.get('top') else []
+    identity = {'topic': wanted, 'shelf': 'featured' if options.get('tab') == 'featured' else None}
+    words = ['--tab', 'featured'] if options.get('tab') == 'featured' else []
 
     def read(connection, state, out):
         client = connection.client
@@ -50,7 +50,7 @@ def topic(platform, invocation):
             return {'results': [t.to_dict() for t in web.topics(client.get('directories')['result'])],
                     'stop_reason': 'not_paginable'}
         seq = listing.resumed(state, out).get('seq') or topic_number(client, wanted)
-        if options.get('top'):
+        if options.get('tab') == 'featured':
             rows = client.get('directory_top', directorySeq=seq)['result']
             records = [r.to_dict() for r in map(web.post_record, rows) if r][:options.get('limit') or DISPLAY]
             if not records:
@@ -68,7 +68,7 @@ def topic(platform, invocation):
         return result
 
     return reading.run(platform, invocation, command='topic', target=wanted, identity=identity, reader=read,
-                       bound=wanted is not None and not options.get('top') and account.binds(options, DISPLAY),
+                       bound=wanted is not None and not options.get('tab') == 'featured' and account.binds(options, DISPLAY),
                        window=listing.window_of(options, 'newest_first'))
 
 
@@ -124,6 +124,6 @@ def monthly(platform, invocation):
             sections.append({'name': (group.get('directory') or {}).get('name') or 'topic', 'ok': True, 'data': data})
         return {'sections': sections, 'stop_reason': 'not_paginable', 'details': {'issue': f'{issue[0]}-{issue[1]:02d}'},
                 'coverage': [f'issue {issue[0]}-{issue[1]:02d}', f'each blog shows its first {POSTS_PER_BLOG} '
-                             'representative posts; posts <id> --popular reads more']}
+                             'representative posts; profile <id> --tab popular reads more']}
 
     return reading.run(platform, invocation, command='monthly', target=None, identity={}, reader=read, bound=False)

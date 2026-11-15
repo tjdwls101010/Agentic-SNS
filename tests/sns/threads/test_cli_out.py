@@ -20,7 +20,7 @@ def test_collect_resume_and_complete(browser, tmp_path):
     assert text.startswith('threads feed · 2 saved to "') and 'stopped=limit_reached' in text and 'resume: ' in text
     assert [r.get('kind') for r in lines(out)] == ['header', 'post', 'post', 'page', 'page']  # the last: interrupted
     assert [r['id'] for r in lines(out) if r.get('kind') == 'post'] == [pk('A'), pk('B')]
-    assert text.strip().endswith(f'threads feed --feed foryou --limit 2 --out={out}'), text
+    assert text.strip().endswith(f'threads feed --tab foryou --limit 2 --out={out}'), text
 
     browser.respond('threads.state', state()).respond('threads.query', page(['B', 'C'], has_next=False))
     code, text, _ = run(browser, 'feed', '--out', str(out), '--limit', '10')
@@ -40,7 +40,7 @@ def test_a_file_of_another_query_is_refused_unchanged(browser, tmp_path):
     known_tab(browser).respond('threads.query', page(['A'], has_next=False))
     run(browser, 'feed', '--out', str(out), '--limit', '10')
     before = out.read_bytes()
-    code, text, _ = run(browser, 'feed', '--feed', 'following', '--out', str(out), '--limit', '10')
+    code, text, _ = run(browser, 'feed', '--tab', 'following', '--out', str(out), '--limit', '10')
     assert code == 2 and json.loads(text)['error'] == 'argument'
     assert out.read_bytes() == before
 

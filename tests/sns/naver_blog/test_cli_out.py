@@ -61,12 +61,12 @@ def test_a_stop_by_the_time_limit_is_not_done_and_the_same_command_resumes_to_th
                       query={'page': page})
     naver.respond(M, '/api/blogs/b/post-list', json=post_list(blog_posts(3, start=30 * 40, blog='b')),
                   query={'page': 41})
-    code, text, _ = naver.run('naver-blog', 'posts', 'b', '--out', str(out), env={'SNS_DEADLINE_SECONDS': '12'})
+    code, text, _ = naver.run('naver-blog', 'profile', 'b', '--out', str(out), env={'SNS_DEADLINE_SECONDS': '12'})
     assert code == 0 and 'stopped=time_limit' in text and 'resume: ' in text
     assert lines(out)[-1].get('end') == 'interrupted'
     naver.monkeypatch.delenv('SNS_DEADLINE_SECONDS')   # the pacing the first run left is still owed in the second
     naver.logged_in()
-    code, text, _ = naver.run('naver-blog', 'posts', 'b', '--out', str(out))
+    code, text, _ = naver.run('naver-blog', 'profile', 'b', '--out', str(out))
     assert code == 0 and 'stopped=exhausted' in text
     assert lines(out)[-1].get('end') == 'final'
     ids = [r['id'] for r in lines(out) if str(r.get('id', '')).startswith('post:')]
@@ -126,11 +126,11 @@ def test_an_out_resume_does_not_resolve_the_category_again(naver, tmp_path):
     for page in range(1, 31):
         naver.respond(M, '/api/blogs/b/post-list', json=post_list(blog_posts(30, start=30 * (page - 1), blog='b')),
                       query={'page': page, 'categoryNo': 3})
-    code, _, _ = naver.run('naver-blog', 'posts', 'b', '--category', '성수', '--out', str(out),
+    code, _, _ = naver.run('naver-blog', 'profile', 'b', '--category', '성수', '--out', str(out),
                            env={'SNS_DEADLINE_SECONDS': '8'})
     assert code == 0
     naver.monkeypatch.delenv('SNS_DEADLINE_SECONDS')
     naver.logged_in()
     naver.respond(M, '/api/blogs/b/post-list', json=post_list([]), query={'page': 31, 'categoryNo': 3})
-    naver.run('naver-blog', 'posts', 'b', '--category', '성수', '--out', str(out))
+    naver.run('naver-blog', 'profile', 'b', '--category', '성수', '--out', str(out))
     assert naver.paths().count('/api/blogs/b/category-list') == 1

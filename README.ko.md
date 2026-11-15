@@ -11,10 +11,10 @@ API 키 없이 사용자가 브라우저에서 보는 그대로 읽습니다. �
 | 플랫폼 | 명령 |
 |---|---|
 | `x` | feed profile about graph me list community post replies reposts quotes search trends images doctor schema |
-| `threads` | feed profile about graph me activity search post replies quotes reposts images doctor schema |
+| `threads` | feed profile about graph me search post replies quotes reposts images doctor schema |
 | `reddit` | feed sub profile about wiki search related me post comments images doctor schema |
-| `facebook` | feed profile group post comments replies search about images notifications doctor schema |
-| `naver-blog` | search keywords post comments images resolve blog posts feed buddies topic monthly doctor schema |
+| `facebook` | feed profile group post comments replies search about images me doctor schema |
+| `naver-blog` | search keywords post comments images resolve about profile feed graph me topic monthly doctor schema |
 
 피드, 글과 답글·댓글 트리, 인용·리포스트, 프로필과 팔로워, 검색, 서브레딧·위키, 페이스북 그룹·페이지, X 리스트·커뮤니티·트렌드, 네이버 블로그의 카테고리·이웃·주제, 글에 든 사진, 그리고 내 저장·좋아요·알림 목록을 읽습니다.
 

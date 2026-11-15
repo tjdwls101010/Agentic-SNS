@@ -39,7 +39,7 @@ def test_one_page_by_default_with_a_more_line(browser):
     code, out, err = feed(browser)
     assert code == 0, (out, err)
     lines = out.splitlines()
-    assert lines[0].startswith('x feed · feed=foryou · 2 shown · stopped=limit_reached · requests=1')
+    assert lines[0].startswith('x feed · tab=foryou · 2 shown · stopped=limit_reached · requests=1')
     assert '[p1] @example_author (Example)' in out and 'url: "https://x.com/example_author/status/1850000000000000001"' in out
     assert lines[-1].startswith('more: uv run "')
     [query] = queries(browser)
@@ -67,7 +67,7 @@ def test_the_following_feed_uses_its_own_operation_and_is_not_newest_first(brows
     known_tab(browser).respond('x.query', query_result(home([entry(post('1850000000000000001', at=posted))], bottom=None),
                                                                headers=RATE))
     # the window is the day of the post itself (TZ=UTC for the run), so the test does not depend on the hour it runs
-    code, out, _ = feed(browser, '--feed', 'following', '--since', time.strftime('%Y-%m-%d', time.gmtime(posted)))
+    code, out, _ = feed(browser, '--tab', 'following', '--since', time.strftime('%Y-%m-%d', time.gmtime(posted)))
     assert code == 0, out
     assert [c['args']['name'] for c in queries(browser)] == ['HomeLatestTimeline']
     assert 'sample (not in date order)' in out.splitlines()[1]
@@ -212,7 +212,7 @@ def test_out_refuses_an_endless_feed_without_a_limit_and_collects_with_one(brows
     """S2: with no request budget a feed that never ends needs --limit to know when to stop (both feeds are endless)."""
     known_tab(browser)
     for name in ('foryou', 'following'):
-        code, out, _ = feed(browser, '--feed', name, '--out', str(tmp_path / f'{name}.ndjson'))
+        code, out, _ = feed(browser, '--tab', name, '--out', str(tmp_path / f'{name}.ndjson'))
         envelope = json.loads(out)
         assert code == 2 and envelope['error'] == 'argument' and '--limit' in envelope['fix'], out
     assert queries(browser) == [] and not (tmp_path / 'foryou.ndjson').exists()

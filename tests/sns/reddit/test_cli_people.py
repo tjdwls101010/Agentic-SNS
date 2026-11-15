@@ -8,7 +8,7 @@ from tests.sns.reddit.shapes import about_user, listing, profile_comment
 def test_a_visible_history(reddit):
     reddit.me().json('/user/example_user/comments.json', listing([profile_comment('c1'), profile_comment('c2')]),
                      query={'sort': 'new', 'limit': 100})
-    code, out, _ = reddit.run('reddit', 'profile', 'u/example_user', '--type', 'comments')
+    code, out, _ = reddit.run('reddit', 'profile', 'u/example_user', '--tab', 'comments')
     assert code == 0 and out.startswith('reddit profile · sort=new · type=comments · 2 shown') and 'said c1' in out
 
 
@@ -25,7 +25,7 @@ def test_an_empty_history_with_karma_is_not_visible(reddit):
 def test_karma_of_the_kind_asked_decides(reddit):
     reddit.me().json('/user/example_user/submitted.json', listing([]))
     reddit.json('/user/example_user/about.json', about_user(0, 500))
-    code, out, _ = reddit.run('reddit', 'profile', 'u/example_user', '--type', 'posts', '--json')
+    code, out, _ = reddit.run('reddit', 'profile', 'u/example_user', '--tab', 'posts', '--json')
     envelope = json.loads(out)
     assert code == 7 and envelope['message'] == 'no visible posts; post karma is 0', 'observed, not proven absent'
 

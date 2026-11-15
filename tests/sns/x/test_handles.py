@@ -82,7 +82,7 @@ def test_a_handle_is_bound_to_the_command_the_feed_the_target_and_the_window_it_
     known_tab(browser)
     number, out = feed_handle(browser, '--since', '2026-10-01')
     assert '--since 2026-10-01' in out.splitlines()[-1]  # the window travels in the more: line
-    for args in (('feed', '--feed', 'following', '--since', '2026-10-01'),   # another feed
+    for args in (('feed', '--tab', 'following', '--since', '2026-10-01'),   # another feed
                  ('feed', '--since', '2026-10-02'),                          # another window
                  ('feed',),                                                  # no window
                  ('profile', '@author_a', '--since', '2026-10-01'),          # another command

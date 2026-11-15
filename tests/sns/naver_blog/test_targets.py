@@ -40,9 +40,9 @@ def test_short_link_destination(case):
     ('https://m.blog.naver.com/sample_blog/224000000001', ('post', 'https://m.blog.naver.com/sample_blog/224000000001')),
     ('https://blog.naver.com/PostView.naver?blogId=sample_blog&logNo=224000000001',
      ('post', 'https://blog.naver.com/PostView.naver?blogId=sample_blog&logNo=224000000001')),
-    ('https://blog.naver.com/sample_blog', ('blog', 'https://blog.naver.com/sample_blog')),
+    ('https://blog.naver.com/sample_blog', ('about', 'https://blog.naver.com/sample_blog')),
     ('https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=3',
-     ('posts', 'https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=3')),
+     ('profile', 'https://blog.naver.com/PostList.naver?blogId=sample_blog&categoryNo=3')),
     ('https://naver.me/AbCd12Ef', ('resolve', 'https://naver.me/AbCd12Ef')),
     ('naver.me/AbCd12Ef', ('resolve', 'naver.me/AbCd12Ef')),
 ])

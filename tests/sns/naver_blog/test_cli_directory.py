@@ -42,13 +42,13 @@ def test_a_topic_number_costs_no_lookup(naver):
 def test_featured_posts_are_one_page(naver):
     naver.respond(SECTION, '/ajax/DirectoryTopPostList.naver', body=XSSI + json.dumps({'result': topic_posts(3)}),
                   query={'directorySeq': '5'})
-    code, out, _ = naver.run('naver-blog', 'topic', '5', '--top')
+    code, out, _ = naver.run('naver-blog', 'topic', '5', '--tab', 'featured')
     assert code == 0 and 'shelf=featured' in first_line(out) and 'stopped=not_paginable' in out
     assert 'more:' not in out
 
 
-@pytest.mark.parametrize('args', [['--top'], ['--since', '2026-10-01'], ['5', '--top', '--since', '2026-10-01'],
-                                  ['5', '--top', '--out', 'f.ndjson']])
+@pytest.mark.parametrize('args', [['--tab', 'featured'], ['--since', '2026-10-01'], ['5', '--tab', 'featured', '--since', '2026-10-01'],
+                                  ['5', '--tab', 'featured', '--out', 'f.ndjson']])
 def test_one_page_surfaces_refuse_windows_and_files(naver, args):
     code, out, _ = naver.run('naver-blog', 'topic', *args)
     assert code == 2 and json.loads(out).get('command') == 'topic' and naver.fetches() == []
@@ -74,7 +74,7 @@ def test_monthly_names_the_issue_and_groups_blogs_by_topic(naver):
     assert 'requests=4' in first_line(out) and 'coverage: issue 2026-09' in out
     assert '공연·전시:' in out and '드라마:' in out and '[b1] mb1' in out
     assert out.count('대표 1-') == 2 and 'blocked' not in out
-    assert 'posts <id> --popular' in out
+    assert 'profile <id> --tab popular' in out
 
 
 def test_a_past_issue(naver):

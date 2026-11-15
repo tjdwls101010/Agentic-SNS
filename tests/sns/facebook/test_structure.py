@@ -35,7 +35,7 @@ def test_the_interface_is_platform_commands_and_choices():
     assert facebook.PLATFORM.key == 'facebook' and facebook.PLATFORM.word == 'facebook'
     assert facebook.PLATFORM.transport == 'tab' and facebook.PLATFORM.site == 'facebook.com'
     assert list(COMMANDS) == ['feed', 'profile', 'group', 'post', 'comments', 'replies', 'search', 'about',
-                                       'images', 'notifications']
+                                       'images', 'me']
     assert set(CHOICES) and all(key.split('.')[0] in COMMANDS for key in CHOICES)
 
 

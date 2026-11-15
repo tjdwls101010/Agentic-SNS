@@ -68,7 +68,7 @@ def test_a_file_of_another_query_is_refused_before_any_request(browser, tmp_path
     known_tab(browser).respond('x.query', page(['1'], None))
     run(browser, 'feed', '--out', str(out), '--limit', '5')
     before = out.read_bytes()
-    code, text, _ = run(browser, 'feed', '--feed', 'following', '--out', str(out), '--limit', '5')
+    code, text, _ = run(browser, 'feed', '--tab', 'following', '--out', str(out), '--limit', '5')
     assert code == 2 and out.read_bytes() == before
 
 

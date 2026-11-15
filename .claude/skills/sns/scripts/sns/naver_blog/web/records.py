@@ -448,7 +448,7 @@ NOTES = {
                                                     'address of its own',
                 'parent_comment_no': 'the comment this replies to; null for a top-level comment',
                 'depth': '1 for a reply', 'parent_shown': 'false when the reply\'s parent is on another page',
-                'author_blog_id': 'the commenter\'s blog: blog <id> is the next hop to a person',
+                'author_blog_id': 'the commenter\'s blog: about <id> is the next hop to a person',
                 'labels': 'deleted (text emptied), blinded (hidden by Naver), secret, best, status=<raw>',
                 'reply_count': 'replies Naver counts under it'},
     'blog': {'__doc__': 'A blog\'s card (blog), a blog search result, or a blogs-of-the-month profile.',
@@ -459,8 +459,8 @@ NOTES = {
              'relation': 'how the logged-in viewer stands to it: neighbor, mutual-neighbor or null',
              'labels': 'blocked, power-blog'},
     'category': {'__doc__': 'One category of a blog\'s tree (dividers left out).',
-                 'url': 'the category\'s list address; posts <url> reads it', 'created_at': 'null',
-                 'category_no': 'what posts --category takes', 'open': 'false for a closed category (its posts are '
+                 'url': 'the category\'s list address; profile <url> reads it', 'created_at': 'null',
+                 'category_no': 'what profile --category takes', 'open': 'false for a closed category (its posts are '
                                                                         'counted, not listed)'},
     'buddy': {'__doc__': 'A neighbor in a list (mine, a blog\'s public one, the blogs that added me).',
               'created_at': 'null: use updated_at', 'mutual': 'true for mutual neighbors (서로이웃)',
@@ -476,8 +476,8 @@ NOTES = {
              'url': 'the link as given', 'created_at': 'null',
              'destination': '{url, text, host, link_id} of the redirect target, or null when there is none',
              'post': 'blogId/logNo when the destination is a Naver Blog post'},
-    'group': {'__doc__': 'One of the logged-in account\'s neighbor groups (buddies --groups).', 'url': 'null',
-              'created_at': 'null', 'group_id': 'what buddies --group and feed --group take'},
+    'group': {'__doc__': 'One of the logged-in account\'s neighbor groups (me groups).', 'url': 'null',
+              'created_at': 'null', 'group_id': 'what graph buddies --group and feed --group take'},
 }
 
 

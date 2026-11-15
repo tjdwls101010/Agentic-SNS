@@ -54,8 +54,8 @@ def window_of(platform, options, order):
 
 def feed(platform, invocation):
     options = invocation.options
-    name = options.get('feed') or 'foryou'
-    identity = {'feed': name}
+    name = options.get('tab') or 'foryou'
+    identity = {'tab': name}
 
     def read(connection, state, out):
         return surface(connection, state, out, order='ranked', command='feed', target=None, identity=identity,

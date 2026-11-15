@@ -28,7 +28,7 @@ def test_the_feeds_help_says_out_needs_a_limit():
 
 def test_the_feeds_help_says_what_a_window_does_on_each_feed():
     text = body(help_of('feed'))
-    assert 'Only --feed following can close a --since window' in text and 'foryou is a sample of the window' in text
+    assert 'Only --tab following can close a --since window' in text and 'foryou is a sample of the window' in text
 
 
 def test_the_profile_help_says_the_dateless_tabs_need_the_end_to_cover_a_window():

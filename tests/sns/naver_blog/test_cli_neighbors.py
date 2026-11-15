@@ -108,14 +108,14 @@ def test_my_neighbors(naver):
     naver.logged_in()
     naver.respond(M, f'/api/blogs/{VIEWER}/my-buddies', json=buddy_page(buddies(20), VIEWER, pages=2),
                   query={'pageNo': 1})
-    code, out, _ = naver.run('naver-blog', 'buddies')
+    code, out, _ = naver.run('naver-blog', 'graph', 'buddies')
     assert code == 0 and '20 shown' in first_line(out) and 'mutual' in out and 'stopped=limit_reached' in first_line(out)
     assert '[b1] nb0' in out and 'kind=mine' in first_line(out)
 
 
 def test_a_blogs_public_neighbors_and_the_private_default(naver):
     naver.respond(M, '/api/blogs/other/public-buddies', json=response('buddy_page-1'))
-    code, out, _ = naver.run('naver-blog', 'buddies', 'other')
+    code, out, _ = naver.run('naver-blog', 'graph', 'other', 'buddies')
     assert code == 7 and 'private by default' in json.loads(out)['message']
     assert naver.paths() == ['/api/blogs/other/public-buddies'], 'a public list asks no account'
 
@@ -123,27 +123,25 @@ def test_a_blogs_public_neighbors_and_the_private_default(naver):
 def test_followers_are_the_blogs_that_added_me(naver):
     naver.logged_in()
     naver.respond(M, f'/api/blogs/{VIEWER}/me-buddies', json=response('test_cli_new-134'))
-    code, out, _ = naver.run('naver-blog', 'buddies', '--followers')
+    code, out, _ = naver.run('naver-blog', 'graph', 'followers')
     assert code == 0 and 'kind=followers' in first_line(out) and '[b1] fan1' in out
 
 
 def test_groups_list_and_one_group(naver):
     naver.logged_in()
     naver.respond(M, f'/api/blogs/{VIEWER}/buddy-groups', json=response('test_cli_new-142'))
-    code, out, _ = naver.run('naver-blog', 'buddies', '--groups')
+    code, out, _ = naver.run('naver-blog', 'me', 'groups')
     assert code == 0 and '[g1] group 1 · 맛집 친구' in out and 'stopped=not_paginable' in out
     naver.logged_in()
     naver.respond(M, f'/api/blogs/{VIEWER}/my-buddies', json=response('test_cli_new-146'), query={'groupId': 3})
-    code, out, _ = naver.run('naver-blog', 'buddies', '--group', '3')
+    code, out, _ = naver.run('naver-blog', 'graph', 'buddies', '--group', '3')
     assert code == 0 and 'group=3' in first_line(out)
 
 
-@pytest.mark.parametrize('args', [['other', '--followers'], ['--group', '1', '--groups'], ['other', '--group', '1'],
-                                  ['--followers', '--group', '1'], ['--groups', '--out', 'g.ndjson'],
-                                  ['--groups', '--after', '3']])
-def test_buddy_list_kinds_are_one_at_a_time_and_mine_only(naver, args):
-    code, out, _ = naver.run('naver-blog', 'buddies', *args)
-    assert code == 2 and naver.fetches() == [] and json.loads(out).get('command') == 'buddies'
+@pytest.mark.parametrize('command,args', [('graph', ['other', 'followers']), ('graph', ['other', 'buddies', '--group', '1']), ('graph', ['followers', '--group', '1']), ('me', ['groups', '--out', 'g.ndjson']), ('me', ['groups', '--after', '3'])])
+def test_buddy_list_kinds_are_one_at_a_time_and_mine_only(naver, command, args):
+    code, out, _ = naver.run('naver-blog', command, *args)
+    assert code == 2 and naver.fetches() == [] and json.loads(out).get('command') == command
 
 
 def test_the_feed_of_one_group(naver):
@@ -157,5 +155,5 @@ def test_an_owner_only_surface_is_exit_9(naver):
     naver.logged_in()
     naver.respond(M, f'/api/blogs/{VIEWER}/my-buddies', status=403,
                   json={'isSuccess': False, 'error': {'code': 'not_blog_owner', 'message': 'x'}})
-    code, out, _ = naver.run('naver-blog', 'buddies')
+    code, out, _ = naver.run('naver-blog', 'graph', 'buddies')
     assert code == 9

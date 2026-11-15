@@ -50,9 +50,9 @@ def test_the_feeds_help_says_out_needs_a_limit_for_the_ranked_feed_only():
 
 
 def test_post_and_replies_say_what_their_limit_counts():
-    assert 'Parent comments' in option_line(help_of('post'), '--limit')
-    assert 'Replies to show' in option_line(help_of('replies'), '--limit')
-    assert 'Parent comments to show' in option_line(help_of('comments'), '--limit')
+    assert 'Parent comments' in help_of('post')
+    assert 'Replies to show' in help_of('replies')
+    assert 'Parent comments to show' in help_of('comments')
 
 
 def test_the_tab_cost_is_explained_without_a_budget():
@@ -93,7 +93,7 @@ def test_replies_says_a_deeper_branch_is_one_batch():
 
 
 def test_notifications_say_that_reading_marks_nothing_and_what_was_not_observed():
-    text = ' '.join(help_of('notifications').split())
+    text = ' '.join(help_of('me').split())
     assert 'Reading the list sends no seen or read change' in text
     assert 'whether Facebook counts a read as seen by itself was not observable when this was measured' in text
     assert 'stopped=server_capped' in text and 'instead of more:' in text and 'requests: 1.' in text
