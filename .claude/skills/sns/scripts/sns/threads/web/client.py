@@ -502,7 +502,9 @@ class Client:
             if verdict.error:
                 raise verdict.error
             if verdict.kind != 'ok':
-                raise SnsError('failed', f'Threads did not run {spec["name"]}.', classify.REJECTED_FIX, reason='stale')
+                why = f' (the page did not send it: {result["missing"]})' if isinstance(result.get('missing'), str) else ''
+                raise SnsError('failed', f'Threads did not run {spec["name"]}{why}.', classify.REJECTED_FIX,
+                               reason='stale')
             if used.get('source') in ('live', 'live_id') and isinstance(used.get('doc_id'), str):
                 flags = learn.provider_values(used.get('flags') or {}) if used.get('flags') else None
                 self.session.learn(spec['name'], used['doc_id'], flags)
