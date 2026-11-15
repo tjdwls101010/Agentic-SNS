@@ -22,7 +22,7 @@ def record_key(record):
         key = '@' + str(record['username']).lower()
     else:
         key = record.get('url')
-    return ('ad', key) if record.get('promoted') and key is not None else key
+    return f'ad:{key}' if record.get('promoted') and key is not None else key  # a string: it is saved in handles
 
 
 def _cursor_of(page):

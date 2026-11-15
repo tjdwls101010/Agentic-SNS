@@ -25,7 +25,8 @@ TIMELINE = ['node', 'timeline_list_feed_units']
 PATH = {'newest_first': FEED, 'ranked': FEED, 'server': TIMELINE}
 # what changed against the file's expectation: scenario → the new `expected` keys
 CHANGED = {
-    'newest-first-window-closes-at-boundary-page': {'shown': ['P1', 'P4'], 'undated_left_out': 1},
+    # P5: an ad (P3, sponsored and dated outside the window) is shown marked whatever its date
+    'newest-first-window-closes-at-boundary-page': {'shown': ['P1', 'P3', 'P4'], 'undated_left_out': 1},
 }
 
 

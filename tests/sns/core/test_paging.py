@@ -153,3 +153,4 @@ def test_an_ad_and_the_same_item_shown_as_itself_do_not_hide_each_other():
     from sns.paging import record_key
     organic, ad = {'id': '555', 'kind': 'post'}, {'id': '555', 'kind': 'post', 'promoted': True}
     assert record_key(organic) != record_key(ad) and record_key(organic) == '555'
+    assert isinstance(record_key(ad), str)  # it is saved with a continuation (JSON)
