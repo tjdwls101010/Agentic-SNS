@@ -116,7 +116,7 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Replies under a reply: next batches | Post page, depth 2 | in recon (R7) |
 | Share, reel and watch links | Shared links | in recon (R1) |
 | Who reacted to a post | Post reactions | in recon (R18d) |
-| Reaction counts by kind | Post reactions | in recon (R15) |
+| Reaction counts by kind | Post reactions | command: `facebook post` / `feed` (reactions field) |
 | Search: top, posts, people, pages, groups | Search filters | command: `facebook search TEXT --type …` |
 | Search: videos, events | Search filters | in recon (R17s) |
 | Post pictures | Post media | command: `facebook images POST` |

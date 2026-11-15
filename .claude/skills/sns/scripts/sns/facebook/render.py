@@ -19,6 +19,13 @@ def _media(record):
     return ' · '.join(parts)
 
 
+def _reactions(record):
+    total = _count(record.get('reaction_count'))
+    kinds = record.get('reactions') or {}
+    detail = ', '.join(f'{_line(name)}={_count(count)}' for name, count in kinds.items())
+    return total + (f' ({detail})' if detail else '')
+
+
 def post(record, index, chars):
     labels = [_line((record.get('author') or {}).get('name') or 'unavailable')]
     if record.get('created_at') or not record.get('promoted'):
@@ -26,7 +33,7 @@ def post(record, index, chars):
     labels += [flag for flag in ('pinned', 'incomplete') if record.get(flag)]
     if record.get('text_truncated'):
         labels.append('text cut by Facebook')
-    labels += [record.get('type', 'unknown'), f'reactions={_count(record.get("reaction_count"))} '
+    labels += [record.get('type', 'unknown'), f'reactions={_reactions(record)} '
                                               f'comments={_count(record.get("comment_count"))} '
                                               f'shares={_count(record.get("share_count"))}']
     lines = [('[ad] ' if record.get('promoted') else '') + f'[p{index}] ' + ' · '.join(labels), '     ' + _shown(record.get('text'), chars)]
@@ -52,7 +59,7 @@ def comment(record, index, parent_label, chars):
     kinds = ','.join(_line(a.get('kind')) for a in record.get('attachments') or [])
     tail = f'   replies {record["replies_handle"]}' if record.get('replies_handle') else ''
     return (f'{indent}[c{index}{parent}] {_line((record.get("author") or {}).get("name") or "unavailable")} · '
-            f'{_time(record.get("created_at"))} · reactions={_count(record.get("reaction_count"))} '
+            f'{_time(record.get("created_at"))} · reactions={_reactions(record)} '
             f'replies={_count(record.get("reply_count"))}\n'
             f'{indent}     {_shown(record.get("text"), chars)}' + (f' · attachment={kinds}' if kinds else '') + '\n'
             f'{indent}     author: {_handle((record.get("author") or {}).get("url"))}{tail}')

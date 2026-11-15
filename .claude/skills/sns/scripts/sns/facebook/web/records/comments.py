@@ -5,6 +5,7 @@ the post, 1 a reply, 2 a reply to a reply. Pieces of one comment merge by id. Re
 replies are read with its feedback id and expansion token, a batch at a time.
 """
 from sns.facebook.web.records.moment import iso, timestamp
+from sns.facebook.web.records.reactions import read as read_reactions
 from sns.facebook.web.records.parse import deep_merge, pieces, top_page_info, unplaced
 
 FIELDS = {
@@ -18,6 +19,7 @@ FIELDS = {
     'depth': 'integer — 0 for a comment on the post, 1 for a reply, 2 for a reply to a reply',
     'parent_id': 'string | null — id of the comment this one replies to; null at depth 0',
     'reaction_count': 'integer | null — reactions; null when not sent, never guessed from an abbreviation like 1.2K',
+    'reactions': 'object | null — counts by reaction kind in Facebook order; known ids use English names, unknown ids use localized_name when sent or id:<id>; null when not sent',
     'reply_count': 'integer | null — replies Facebook reports under this comment, deeper replies included; null when '
                    'not sent',
     'replies_handle': 'integer | null — the handle of its first reply batch: run replies <handle>; null when there '
@@ -127,6 +129,7 @@ def build(node, *, post_id, captured_at):
         'depth': node['depth'] if type(node.get('depth')) is int else 0,
         'parent_id': str(parent['id']) if parent.get('id') else None,
         'reaction_count': reaction_count(node),
+        'reactions': read_reactions(node.get('feedback')),
         'reply_count': _count(node, 'feedback', 'replies_fields', 'total_count'),
         'replies_handle': None,
         'attachments': attachments,

@@ -13,7 +13,7 @@ READ_FIELDS = frozenset({
     'message', 'text', 'body', 'creation_time', 'created_time', 'actors', 'author', 'name', 'url', 'permalink_url',
     'wwwURL', 'attachments', 'media', 'image', 'photo_image', 'uri', 'width', 'height', 'playable_url',
     'playable_url_quality_hd', 'accessibility_caption', 'title', 'description', 'attached_story', 'feedback',
-    'reaction_count', 'share_count', 'count', 'comment_rendering_instance', 'comments', 'total_count', 'reactors',
+    'reaction_count', 'top_reactions', 'share_count', 'count', 'comment_rendering_instance', 'comments', 'total_count', 'reactors',
     'count_reduced', 'replies_fields', 'expansion_info', 'expansion_token', 'comment_action_links',
     'comment_direct_parent', 'depth', 'is_sponsored', 'sponsored_data', 'ad_id', 'is_pinned', 'is_pinned_story',
     'is_featured', 'preferred_body', 'style_list',
