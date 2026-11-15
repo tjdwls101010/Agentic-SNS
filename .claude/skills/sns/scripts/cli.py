@@ -243,7 +243,7 @@ def _x_surface(platform):
     FEED_CHOICES = ['foryou', 'following']
     PROFILE_TABS = ['posts', 'replies', 'reposts', 'media', 'highlights', 'articles', 'lists', 'memberships']
     GRAPH_RELATIONS = ['following', 'followers', 'verified', 'known', 'similar']
-    ME_COLLECTIONS = ['bookmarks', 'likes', 'notifications', 'mentions']
+    ME_COLLECTIONS = ['bookmarks', 'likes', 'notifications', 'verified', 'mentions']
     LIST_TABS = ['posts', 'members', 'about']
     COMMUNITY_TABS = ['posts', 'media', 'members', 'about']
     COMMUNITY_SORTS = ['top', 'recent']
@@ -365,7 +365,7 @@ def _x_surface(platform):
         'me': {
             'help': 'Read your own bookmarks, likes, notifications or mentions.',
             'run': _run(platform.listing_me),
-            'arguments': [(('collection',), {'choices': ME_COLLECTIONS, 'help': 'bookmarks, likes (nobody else\'s likes are public on X), notifications or mentions'}),
+            'arguments': [(('collection',), {'choices': ME_COLLECTIONS, 'help': 'bookmarks, likes (X shows only your own), notifications, verified or mentions'}),
                           *LIST],
             'epilog': ["In X's order (most recently saved or liked first, as X serves it); each post keeps its own date, not when you saved or liked it. There is no date window: X does not serve these in date order.",
                        'notifications are X\'s notification tab as records (what happened, when, which accounts and posts); "suggested by X" marks X recommending something, not anyone\'s act. mentions are the posts that mention you. The skill never opens X\'s notifications screen, which marks them as read; the unread count X shows stayed the same for two minutes after a read when this was measured (X\'s own refresh of it was not observed). A notification\'s message names other people.'],

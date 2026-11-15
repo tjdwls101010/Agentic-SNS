@@ -323,6 +323,16 @@ def test_my_mentions_are_posts(browser):
     assert query_args(browser)[-1]['variables']['timeline_type'] == 'Mentions'
 
 
+def test_my_verified_notifications_are_the_verified_tab(browser):
+    """X's notifications screen has a Verified tab: the same timeline with timeline_type Verified (read, never the
+    screen, which marks notifications seen — it cleared the badge when opened in recon, 2026-11-16)."""
+    mention = {'entryId': 'tweet-42', 'content': {'itemContent': {'itemType': 'TimelineTweet', 'tweet_results': {'result': post('42')}}}}
+    known_tab(browser).respond('x.query', notifications([mention]))
+    code, out, _ = run(browser, 'me', 'verified')
+    assert code == 0 and 'post 42' in out, out
+    assert query_args(browser)[-1]['variables']['timeline_type'] == 'Verified'
+
+
 def test_an_empty_timeline_object_is_empty_not_a_shape_change(browser):
     # measured 2026-10-19: ListMemberships for an account in no lists answers {"timeline": {}} under the user
     empty = query_result({'data': {'user': {'result': {'__typename': 'User', 'timeline': {}}}}}, headers=RATE)

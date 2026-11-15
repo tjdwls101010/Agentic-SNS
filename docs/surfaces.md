@@ -27,7 +27,7 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Bookmarks, likes | History page `/i/history`, `/i/history/likes` (moved from the menu) | command: `x me bookmarks\|likes` |
 | Bookmark folders | Bookmarks (Premium) | none — this account does not show it (a Premium feature; reopen with a Premium account; R17b) |
 | Notifications, mentions | Notifications page tabs | command: `x me notifications\|mentions` |
-| Notifications: Verified tab | Notifications page tab | in recon (R17c) |
+| Notifications: Verified tab | Notifications page tab | command: `x me verified` |
 | A post with its replies, hidden replies, a reply's branch | Post page | command: `x post POST`, `x replies HANDLE` |
 | Reposts and quotes of a post | Post engagements | command: `x reposts POST`, `x quotes POST` |
 | Search: posts (top, latest), accounts, media | Search tabs | command: `x search TEXT --type … --sort …` |
