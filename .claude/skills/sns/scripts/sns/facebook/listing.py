@@ -8,6 +8,7 @@ page: advertisements are included before the window weighs the page's order.
 from datetime import date, datetime, time
 
 from sns import reading
+from sns.errors import SnsError
 from sns.page import Page
 from sns.window import Window
 from sns.facebook import web
@@ -70,14 +71,18 @@ def window_of(platform, options, order):
 
 def feed(platform, invocation):
     options = invocation.options
-    sort = options['sort']
+    tab = options.get('tab') or 'all'
+    sort = options.get('sort') or ('top' if tab == 'all' else 'recent')
+    if tab != 'all' and sort != 'recent':
+        raise SnsError('argument', f'The {tab} feed is newest first only; Facebook has no ranked order for it.',
+                       f'Drop --sort {sort}, or read the whole feed (--tab all) ranked.')
     order = 'ranked' if sort == 'top' else 'newest_first'
-    identity = {'sort': sort}
-    words = ['--sort', sort]
+    identity = {'sort': sort, **({'tab': tab} if tab != 'all' else {})}
+    words = ['--sort', sort] + (['--tab', tab] if tab != 'all' else [])
 
     def read(connection, state, out):
         return surface(connection, state, out, order=order, command='feed', target=None, identity=identity,
-                       words=words, fetch=lambda cursor: connection.client.feed(sort, cursor))
+                       words=words, fetch=lambda cursor: connection.client.feed(sort, cursor, tab))
 
     # the ranked feed never ends by itself, so --out needs --limit
     return reading.run(platform, invocation, command='feed', target=None, identity=identity, reader=read,

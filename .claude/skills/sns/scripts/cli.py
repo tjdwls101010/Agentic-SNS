@@ -913,6 +913,7 @@ def _reddit_surface(platform):
 def _facebook_surface(platform):
     PLATFORM = platform.PLATFORM
     FEED_SORTS = ['top', 'recent']
+    FEED_TABS = ['all', 'favorites', 'friends', 'groups', 'pages']
     GROUP_SORTS = ['top', 'recent', 'activity']
     COMMENT_SORTS = ['all', 'relevant', 'newest']
     SEARCH_TYPES = ['top', 'posts', 'people', 'pages', 'groups', 'videos']
@@ -921,7 +922,7 @@ def _facebook_surface(platform):
     GRAPH_RELATIONS = ['followers', 'friends']
     GROUP_TABS = ['posts', 'members']
 
-    CHOICES = {'feed.sort': FEED_SORTS, 'profile.tab': PROFILE_TABS, 'graph.relation': GRAPH_RELATIONS,
+    CHOICES = {'feed.sort': FEED_SORTS, 'feed.tab': FEED_TABS, 'profile.tab': PROFILE_TABS, 'graph.relation': GRAPH_RELATIONS,
                'group.tab': GROUP_TABS, 'group.sort': GROUP_SORTS, 'post.sort': COMMENT_SORTS, 'comments.sort': COMMENT_SORTS,
                'search.type': SEARCH_TYPES}
 
@@ -986,11 +987,12 @@ def _facebook_surface(platform):
         'feed': {
             'help': 'Read your home feed, a page at a time.',
             'run': _run(platform.listing_feed),
-            'arguments': [(('--sort',), {'choices': FEED_SORTS, 'default': 'top', 'help': 'top: the order Facebook ranks; recent: newest first'}),
+            'arguments': [(('--tab',), {'choices': FEED_TABS, 'default': 'all', 'help': 'all (default) or a filter, newest first'}),
+                          (('--sort',), {'choices': FEED_SORTS, 'help': 'top: the order Facebook ranks; recent: newest first'}),
                           'since', 'until',
                           *LIST],
-            'epilog': ['The feed is what Facebook chose to show this account, not everything its friends and pages posted. Advertisements are included, marked [ad], and count toward --limit.',
-                       "top is Facebook's ranking, which cannot close a --since window: a window keeps the posts dated inside it among those read (a sample, not the whole span), on one page too. recent is newest first, so a --since window closes at the first page with a dated, unpinned post older than --since; a feed that ends before --since is partial, because Facebook shows no older posts here. A post with no date cannot be placed in a window and is left out and counted. The top feed never ends by itself, so --out needs --limit."],
+            'epilog': ['The feed is what Facebook chose to show this account, not everything its friends and pages posted. Ads are included, marked [ad], and count toward --limit.',
+                       "top is Facebook's ranking: a --since window keeps dated posts inside it among those read (a sample). recent and filters are newest first: a window closes at the first page with a dated, unpinned post older than --since; a feed that ends before --since is partial, because Facebook shows no older posts here. An undated post is left out and counted. The top feed never ends by itself, so --out needs --limit."],
             'requests': '1 per page of about 5-10 posts.',
             'exits': (0, 2, 3, 4, 5, 6, 7, 8),
         },

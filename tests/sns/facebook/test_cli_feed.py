@@ -189,3 +189,27 @@ def test_feed_text_shows_reaction_kinds_beside_the_total(browser):
     code, out, _ = run(browser, 'feed')
     assert code == 0, out
     assert 'reactions=7 (like=5, love=2) comments=? shares=?' in out
+
+
+def test_a_feed_filter_asks_for_that_feed_newest_first_and_its_more_keeps_it(browser):
+    """The home feed's filters (favorites, friends, groups, pages) are the same feed query with Facebook's feedStyle
+    for that filter, newest first, as the site asks for them (recon 2026-11-16, the filter pages' preloaded variables)."""
+    known_tab(browser)
+    browser.respond('facebook.query', page([story('A'), story('B')], cursor='CUR1'))
+    code, out, _ = run(browser, 'feed', '--tab', 'friends', '--limit', '1')
+    assert code == 0, out
+    assert head(out.splitlines()[0]).startswith('facebook feed · sort=recent · tab=friends · 1 shown')
+    variables = queries(browser)[0]['args']['variables']
+    assert variables['feedStyle'] == 'MOST_RECENT_FRIENDS_FEED' and variables['orderby'] == ['MOST_RECENT']
+    assert '--tab friends' in more_of(out)
+    for tab, style in (('favorites', 'FAVORITES_FEED'), ('groups', 'MOST_RECENT_GROUPS_FEED'),
+                       ('pages', 'MOST_RECENT_PAGES_FEED')):
+        known_tab(browser)
+        browser.respond('facebook.query', page([story('A')], has_next=False))
+        code, out, _ = run(browser, 'feed', '--tab', tab)
+        assert code == 0 and queries(browser)[-1]['args']['variables']['feedStyle'] == style, (tab, out)
+
+
+def test_a_filtered_feed_is_newest_first_only(browser):
+    code, out, _ = run(browser, 'feed', '--tab', 'groups', '--sort', 'top')
+    assert code == 2 and 'newest first' in json.loads(out)['message']
