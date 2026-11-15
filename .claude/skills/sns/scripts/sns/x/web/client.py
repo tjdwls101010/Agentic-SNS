@@ -67,13 +67,8 @@ def _host(url):
 
 
 def _placeholder(url, nonce):
-    """Whether `url` is the placeholder this opening asked for: its page and its nonce, not a copy elsewhere."""
-    try:
-        parts, wanted = urlsplit(url or ''), urlsplit(PLACEHOLDER)
-    except ValueError:
-        return False
-    return (parts.scheme, parts.hostname, parts.path, parts.fragment) == \
-        (wanted.scheme, wanted.hostname, wanted.path, nonce)
+    """Whether `url` is the placeholder this opening asked for, exactly (Aside lists a tab's URL with its fragment)."""
+    return url == f'{PLACEHOLDER}#{nonce}'
 
 
 def _verification(error):

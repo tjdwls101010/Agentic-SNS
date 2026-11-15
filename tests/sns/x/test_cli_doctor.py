@@ -71,7 +71,9 @@ def test_a_tab_elsewhere_carrying_the_same_fragment_is_not_taken_for_the_placeho
     opening(browser, resources=13).respond('x.modules', MODULES)
     browser.scenario['responses'][0]['response']['before'] = [
         {'id': 'COPY1', 'url': 'https://example.org/#{fragment}'},
-        {'id': 'COPY2', 'url': 'https://x.com/home#{fragment}'}]
+        {'id': 'COPY2', 'url': 'https://x.com/home#{fragment}'},
+        {'id': 'COPY3', 'url': PLACEHOLDER.replace('x.com', 'x.com:8443') + '#{fragment}'},
+        {'id': 'COPY4', 'url': PLACEHOLDER + '?other=1#{fragment}'}]
     code, result, _ = doctor(browser)
     assert code == 0, result
     assert [c['tab'] for c in browser.calls() if c['op'] == 'load:x.arm'] == ['NEW1']
