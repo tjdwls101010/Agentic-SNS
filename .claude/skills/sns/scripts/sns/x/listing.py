@@ -226,9 +226,10 @@ def me(platform, invocation):
         if collection == 'likes':
             def fetch(cursor):
                 return client.timeline('Likes', {'userId': connection.viewer()}, cursor)
-        elif collection in ('notifications', 'mentions'):
-            # only the read: X's notifications screen is never opened (opening it marks them read, P2 R5)
-            kind = 'Mentions' if collection == 'mentions' else 'All'
+        elif collection in ('notifications', 'verified', 'mentions'):
+            # only the read: X's notifications screen is never opened (opening it marks them read, P2 R5; recon R17c
+            # saw it clear the badge)
+            kind = {'mentions': 'Mentions', 'verified': 'Verified'}.get(collection, 'All')
 
             def fetch(cursor):
                 return client.timeline('NotificationsTimeline', {'timeline_type': kind}, cursor)
@@ -237,6 +238,6 @@ def me(platform, invocation):
                 return client.timeline('Bookmarks', {}, cursor)
         return surface(connection, state, out, order='ranked', command='me', target=None, identity=identity,
                        words=[collection], fetch=fetch,
-                       kinds=('notification', 'post') if collection in ('notifications', 'mentions') else ('post',))
+                       kinds=('notification', 'post') if collection in ('notifications', 'verified', 'mentions') else ('post',))
 
     return reading.run(platform, invocation, command='me', target=None, identity=identity, reader=read)
