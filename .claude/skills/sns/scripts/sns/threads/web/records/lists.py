@@ -152,6 +152,10 @@ def connection_page(data, surface):
                 record['unit'] = unit
         page.groups.append(group)
         page.records.extend(group)
+    offered = (connection.get('page_info') or {}).get('has_next_page') is True  # Threads itself says more follow
+    if policy == CAPPED and page.reported_total is not None and len(page.records) >= page.reported_total \
+            and not offered:
+        page.stop = None  # the whole list arrived: nothing is left that the skill did not read
     return page
 
 
