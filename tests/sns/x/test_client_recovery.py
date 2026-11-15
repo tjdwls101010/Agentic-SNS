@@ -42,7 +42,7 @@ def test_a_tab_lost_again_after_it_was_replaced_stops_the_command(browser):
     opening(browser, 'NEW2').respond('x.query', query_result(home('2', None), headers=RATE))
     code, out, _ = run(browser, 'feed', '--limit', '40')
     assert code == 8 and 'post 1' in out and 'post 2' not in out, out
-    assert browser.ops().count('opener') == 1
+    assert browser.ops().count('open') == 1
 
 
 def test_a_background_limit_whose_reset_has_passed_is_not_held_again(browser):

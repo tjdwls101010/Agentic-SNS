@@ -11,8 +11,8 @@ import time
 
 from sns.session import Session
 from tests.sns.support.cli import CLI, run_cli
-from tests.sns.x.scenes import (ACCOUNT, ASIDE, ENVIRONMENT, MODULES, START, guard, known_tab, limits, opening,
-                                queries, query_result, run, stand_block, stand_limit, state, state_of)
+from tests.sns.x.scenes import (ACCOUNT, ASIDE, ENVIRONMENT, MODULES, PLACEHOLDER, START, guard, known_tab, limits,
+                                opening, queries, query_result, run, stand_block, stand_limit, state, state_of)
 
 OTHER = '1000000098'
 VIEWER = {'data': {'viewer': {'user_results': {'result': {'__typename': 'User', 'rest_id': ACCOUNT,
@@ -32,27 +32,55 @@ def requests_logged():
     return guard().recent()['last_day']
 
 
-def test_opens_a_tab_without_an_agent_and_measures_what_the_load_cost(browser):
+def test_opens_a_tab_on_a_placeholder_and_measures_what_the_load_cost(browser):
+    """Aside 1.26 keeps only a tab its agent opened (`aside <url>`) and runs piped REPL code only at EOF, so the held
+    opener of October never answers (live: x doctor exit 3 after 36 s). The agent opens a placeholder that runs no app;
+    the tab is then sent to x.com with the kit armed, so the load is still measured from its first request."""
     opening(browser, resources=13).respond('x.modules', MODULES)
     code, result, _ = doctor(browser)
     assert code == 0, result
     check = result['results'][0]
     assert check['tab'] == {'target_id': 'NEW1', 'opened_now': True, 'reopened': False, 'opening_measured': True}
     assert check['viewer'] == ACCOUNT and check['login'] == 'ready' and check['aside_account'] == ASIDE
-    assert result['request_count'] == 14 and result['setup_requests'] == 14  # 13 seen + the document
+    # 13 seen + the x.com document + the placeholder's document
+    assert result['request_count'] == 15 and result['setup_requests'] == 15
     ops = [op for op in browser.ops() if op not in ('tabs', 'account_status')]
-    assert ops[:2] == ['opener', 'load:x.arm'] and ops.index('opener_end') > ops.index('load:x.arm')
+    assert ops[:2] == ['open', 'load:x.arm'] and 'stdin_repl' not in ops
+    opened = next(c['url'] for c in browser.calls() if c['op'] == 'open')
+    assert opened.startswith(PLACEHOLDER + '#sns-') and len(opened) > len(PLACEHOLDER) + 10
     assert [c['url'] for c in browser.calls() if c['op'] == 'load:x.arm'] == [START]
     assert Session('x', ASIDE).tab == 'NEW1'
-    assert requests_logged() == 14
+    assert requests_logged() == 15
+
+
+def test_the_new_tab_is_told_apart_by_its_nonce_when_another_command_opens_one_meanwhile(browser):
+    """Observed live (D10, 2026-10-21): five platforms started together and a before/after diff of the tab list showed
+    two new tabs, so X could not tell its own (exit 3). Its tab is the one whose fragment carries this opening's nonce;
+    another X placeholder or another platform's new tab is not it."""
+    browser.tab('OTHER1', url=PLACEHOLDER + '#sns-0000000000000000').tab('OTHER2', url='https://www.threads.com/')
+    opening(browser, resources=13).respond('x.modules', MODULES)
+    code, result, _ = doctor(browser)
+    assert code == 0, result
+    assert result['results'][0]['tab']['target_id'] == 'NEW1'
+    assert [c['tab'] for c in browser.calls() if c['op'] == 'load:x.arm'] == ['NEW1']
+
+
+def test_an_agent_that_opens_no_tab_is_reported_once_and_not_retried(browser):
+    """`aside <url>` runs Aside's browser agent: without a model it can use it answers (exit 0) and opens nothing."""
+    browser.respond('open', {'no_tab': True})
+    code, result, _ = doctor(browser)
+    assert code == 3 and 'browser agent' in result['message'], result
+    assert browser.ops().count('open') == 1 and 'load:x.arm' not in browser.ops()
+    assert Session('x', ASIDE).tab is None
 
 
 def test_what_the_page_requests_after_the_load_settles_is_charged_in_the_same_command(browser):
     opening(browser, resources=6).respond('x.modules', {**MODULES, 'resources': 4, 'statuses': [200] * 4})
     code, result, _ = doctor(browser)
     assert code == 0, result
-    # the opening (6 + the document) is setup; the 4 the page made while doctor looked at it are the command's own
-    assert result['request_count'] == 11 and result['setup_requests'] == 7
+    # the opening (6 + the document + the placeholder) is setup; the 4 the page made while doctor looked at it are the
+    # command's own
+    assert result['request_count'] == 12 and result['setup_requests'] == 8
 
 
 def test_what_the_load_requests_after_the_app_is_ready_is_part_of_the_opening(browser):
@@ -63,48 +91,50 @@ def test_what_the_load_requests_after_the_app_is_ready_is_part_of_the_opening(br
     browser.respond('x.modules', MODULES)
     code, result, _ = doctor(browser)
     assert code == 0, result
-    assert result['setup_requests'] == 18 and result['request_count'] == 18  # 13 + 4 + the document
+    assert result['setup_requests'] == 19 and result['request_count'] == 19  # 13 + 4 + the document + the placeholder
 
 
 def test_an_opening_the_kit_saw_too_late_is_charged_the_reserve(browser):
     opening(browser, resources=3, early=False).respond('x.modules', MODULES)
     code, result, _ = doctor(browser)
     assert code == 0, result
-    # the reserve stands for what the kit could not see; the 3 it saw after installing come on top, never set off
-    assert result['setup_requests'] == 23 and result['results'][0]['tab']['opening_measured'] is False
+    # the reserve stands for what the kit could not see; the 3 it saw after installing and the placeholder come on top,
+    # never set off
+    assert result['setup_requests'] == 24 and result['results'][0]['tab']['opening_measured'] is False
 
 
 def test_an_opening_whose_timing_buffer_was_still_whole_is_measured_even_after_the_app_started(browser):
-    browser.respond('opener', {'tabs': ['NEW1']})
+    browser.respond('open', {'tab': 'NEW1'})
     browser.respond('load:x.arm', {'installed_at': 478, 'location': START, 'ready_at_install': 'interactive',
                                    'app_at_install': True, 'buffer_intact': True})
     browser.respond('x.state', state(resources=13)).respond('x.state', state()).respond('x.state', state())
     browser.respond('x.modules', MODULES)
     code, result, _ = doctor(browser)
     assert code == 0, result
-    assert result['setup_requests'] == 14 and result['results'][0]['tab']['opening_measured'] is True
+    assert result['setup_requests'] == 15 and result['results'][0]['tab']['opening_measured'] is True
 
 
-def test_a_tab_that_closes_with_its_opener_is_reported_not_reopened_again_and_again(browser):
-    opening(browser).flag(opener_end_closes_tab=True)
+def test_a_tab_that_vanishes_after_every_opening_is_replaced_once_then_reported(browser):
+    """If Aside stops keeping the agent's tab too, a command opens at most twice (REOPEN_LIMIT) instead of feeding a
+    loop."""
+    gone = {'__raw_stdout': json.dumps({'kind': 'error', 'error': 'tab_missing', 'message': 'x'}) + '\n'}
+    for target in ('NEW1', 'NEW2'):
+        browser.respond('open', {'tab': target})
+        browser.respond('load:x.arm', {'installed_at': 300, 'location': START, 'ready_at_install': 'loading',
+                                       'app_at_install': False})
+        browser.respond('x.state', gone)
     code, result, _ = doctor(browser)
-    assert code == 3 and 'behaviour has changed' in result['message']
-    assert browser.ops().count('opener') == 1
-    assert result['setup_requests'] == 20  # the page loaded x.com before it closed: charged the reserve, not 1
+    assert code == 3, result
+    assert browser.ops().count('open') <= 2
 
 
 def test_a_load_that_does_not_finish_is_charged_the_reserve(browser):
-    browser.respond('opener', {'tabs': ['NEW1']})
+    browser.respond('open', {'tab': 'NEW1'})
     browser.respond('load:x.arm', {'__raw_stdout': json.dumps({'kind': 'error', 'error': 'load_timeout',
                                                                 'message': 'x'}) + '\n'})
     code, result, _ = doctor(browser)
-    assert code == 3 and result['setup_requests'] == 20  # the tab was sent to x.com: its load went unmeasured
-
-
-def test_an_opening_that_fails_after_the_load_is_charged_the_reserve(browser):
-    opening(browser).flag(tabs_fail_after_load=True)
-    code, result, _ = doctor(browser)
-    assert code == 3 and result['setup_requests'] == 20
+    # the tab was sent to x.com: its load went unmeasured (the reserve), after the placeholder's document
+    assert code == 3 and result['setup_requests'] == 21
 
 
 def test_an_opening_stopped_by_a_lock_is_charged_what_it_loaded(browser):
@@ -112,7 +142,7 @@ def test_an_opening_stopped_by_a_lock_is_charged_what_it_loaded(browser):
             'at': 5}
     opening(browser, resources=13, signals=[lock])
     code, result, _ = doctor(browser)
-    assert code == 5 and result['request_count'] == 14 and result['setup_requests'] == 14
+    assert code == 5 and result['request_count'] == 15 and result['setup_requests'] == 15
 
 
 def test_an_opening_that_ends_logged_out_still_leaves_the_tab_to_the_idle_cleanup(browser):
@@ -141,7 +171,7 @@ def test_reuses_the_known_tab_and_reports_what_it_did_between_commands(browser):
     known_tab(browser, resources=7, statuses=[200] * 7).respond('x.modules', MODULES)
     code, result, _ = doctor(browser)
     assert code == 0, result
-    assert 'opener' not in browser.ops() and result['request_count'] == 0
+    assert 'open' not in browser.ops() and result['request_count'] == 0
     assert result['unwatched_requests'] == 7
     assert requests_logged() == 7  # logged as seen, never charged to the command
 
