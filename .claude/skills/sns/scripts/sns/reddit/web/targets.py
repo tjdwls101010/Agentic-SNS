@@ -9,6 +9,7 @@ from sns.errors import SnsError
 BASE = 'https://www.reddit.com'
 _HOSTS = {'reddit.com', 'www.reddit.com', 'old.reddit.com', 'np.reddit.com', 'sh.reddit.com', 'redd.it'}
 _POST_ID = r'[A-Za-z0-9]{1,10}'
+_COMMENT_ID = r'[A-Za-z0-9]{1,16}'  # comment ids reached 13 characters in 2026 (posts stay at 7)
 _SUB = r'[A-Za-z0-9_]{1,21}'
 _USER = r'[A-Za-z0-9_-]{3,20}'
 _PAGE = r'[A-Za-z0-9_-]{1,64}(?:/[A-Za-z0-9_-]{1,64})?'
@@ -142,7 +143,7 @@ def parse_target(value):
             raise _invalid() from None
     comment_id = None
     if len(segments) == 4:
-        comment_id = _checked(segments[3].removesuffix('.json'), _POST_ID).lower()
+        comment_id = _checked(segments[3].removesuffix('.json'), _COMMENT_ID).lower()
     return Target('comment' if comment_id else 'post', sub=sub, post_id=post_id, comment_id=comment_id)
 
 

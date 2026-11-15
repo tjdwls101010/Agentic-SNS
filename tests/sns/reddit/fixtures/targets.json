@@ -43,6 +43,7 @@
     {"input": "r/example+other_sub/comments/aaa1/", "item": "13", "refused": true, "why": "a combination has no sub-paths"},
     {"input": "https://www.reddit.com/r/example/comments/aaa1/some_title/ccc3/", "item": "14", "target": {"kind": "comment", "sub": "example", "post_id": "aaa1", "comment_id": "ccc3"}},
     {"input": "https://www.reddit.com/comments/aaa1/_/ccc3/", "item": "14", "target": {"kind": "comment", "post_id": "aaa1", "comment_id": "ccc3"}},
+    {"input": "https://www.reddit.com/r/example/comments/aaa1/some_title/ccc3ddd4eee5f/", "item": "14", "target": {"kind": "comment", "post_id": "aaa1", "comment_id": "ccc3ddd4eee5f"}, "fact": "Reddit's comment ids grew to 13 characters (live, 2026-11-16); the skill prints such permalinks itself"},
     {"input": "https://www.reddit.com/comments/aaa1/", "item": "14", "target": {"kind": "post", "sub": null, "post_id": "aaa1"}},
     {"input": "https://www.reddit.com/gallery/aaa1", "item": "14", "target": {"kind": "post", "post_id": "aaa1"}},
     {"input": "https://www.reddit.com/r/example/gallery/aaa1", "item": "14", "refused": true, "why": "gallery is only without a community"},
