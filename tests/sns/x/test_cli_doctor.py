@@ -406,8 +406,10 @@ def test_unblock_on_the_access_page_keeps_the_block(browser):
 
 def test_unblock_out_of_time_keeps_the_block(browser):
     stand_block('account_locked')
-    known_tab(browser)
-    code, result, _ = doctor(browser, '--unblock', env={'SNS_DEADLINE_SECONDS': '0.5'})
+    # the check's one request outlasts the deadline, so the time runs out in the check, never before it (a loaded
+    # machine could spend a 0.5 s deadline on starting up and end exit 6 instead)
+    known_tab(browser).respond('x.query', {'__sleep': 30, **query_result(VIEWER, headers=RATE)})
+    code, result, _ = doctor(browser, '--unblock', env={'SNS_DEADLINE_SECONDS': '5'})
     assert code == 5 and result['verification_reason'] == 'time_limit'
     assert state_of()['block_reason'] == 'account_locked'
 
