@@ -67,7 +67,7 @@ def feed(platform, invocation):
     order = 'newest_first' if sort == 'new' else 'ranked'
 
     def read(connection, state, out):
-        return read_pages(connection, state, out, request=lambda after: web.routes.feed(sort, options.get('time'), after),
+        return read_pages(connection, state, out, request=lambda after: web.route_feed(sort, options.get('time'), after),
                           command='feed', target=None, identity=identity, words=words, order=order)[0]
 
     # 성진: 홈 best·hot은 개인화된 끝없는 표면이다 — --out은 --limit이 있어야 끝을 안다(계획 '자연 종료 규칙')
@@ -85,7 +85,7 @@ def sub(platform, invocation):
     order = 'newest_first' if sort == 'new' else 'ranked'
 
     def read(connection, state, out):
-        return read_pages(connection, state, out, request=lambda after: web.routes.listing(
+        return read_pages(connection, state, out, request=lambda after: web.route_listing(
             target.sub, sort, options.get('time'), after), command='sub', target=target.name, identity=identity,
             words=words, order=order)[0]
 
@@ -98,7 +98,7 @@ def related(platform, invocation):
     target = web.require(web.parse_target(invocation.options['target']), 'related')
 
     def read(connection, state, out):
-        return read_pages(connection, state, out, request=lambda after: web.routes.related(target.post_id, after),
+        return read_pages(connection, state, out, request=lambda after: web.route_related(target.post_id, after),
                           command='related', target=target.name, identity={}, words=[], order='finite')[0]
 
     return reading.run(platform, invocation, command='related', target=target.name, identity={}, reader=read)
@@ -111,7 +111,7 @@ def me(platform, invocation):
 
     def read(connection, state, out):
         name = connection.viewer()  # the account check names whose lists these are (a bound read has made it already)
-        return read_pages(connection, state, out, request=lambda after: web.routes.mine(collection, name, after),
+        return read_pages(connection, state, out, request=lambda after: web.route_mine(collection, name, after),
                           command='me', target=None, identity=identity, words=[collection], order='finite')[0]
 
     return reading.run(platform, invocation, command='me', target=None, identity=identity, reader=read)
@@ -136,7 +136,7 @@ def profile(platform, invocation):
     unfiltered = not (options.get('after') or options.get('since') or options.get('until') or options.get('time'))
 
     def read(connection, state, out):
-        result, received = read_pages(connection, state, out, request=lambda after: web.routes.profile(
+        result, received = read_pages(connection, state, out, request=lambda after: web.route_profile(
             target.user, kind, sort, options.get('time'), after), command='profile', target=target.name,
             identity=identity, words=words, order=order)
         empty = result.get('stop_reason') == 'exhausted' and result.get('failure') is None and not any(received) \

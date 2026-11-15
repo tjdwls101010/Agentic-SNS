@@ -29,6 +29,8 @@ def connect(connection):
 
 
 PLATFORM = reading.Platform(
+    secret_fields=('nid_aut', 'nid_ses', 'nid_jkl', 'nid_inf', 'nnb', 'userkey', 'bauserkey', 'useridno', 'idno', 'naverid',),
+    signed_image_hosts=('pstatic.net',),
     key='naver_blog', title='Naver Blog', site='blog.naver.com', transport='fetch', policy=POLICY,
     window=WindowPolicy(tz=KST), connect=connect, render=render.render, schemas=RECORDS, locate=web.locate,
     unblock_scope=None, idle_action=None)

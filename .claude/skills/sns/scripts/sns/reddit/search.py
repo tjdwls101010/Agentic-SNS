@@ -29,7 +29,7 @@ def search(platform, invocation):
     order = 'newest_first' if sort == 'new' else 'ranked'
 
     def read(connection, state, out):
-        return read_pages(connection, state, out, request=lambda after: web.routes.search(
+        return read_pages(connection, state, out, request=lambda after: web.route_search(
             text, kind, sort, options.get('time'), within, bool(options.get('nsfw')), after), command='search',
             target=text, identity=identity, words=words, order=order)[0]
 

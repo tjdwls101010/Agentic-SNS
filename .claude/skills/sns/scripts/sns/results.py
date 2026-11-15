@@ -52,7 +52,7 @@ KINDS = {
                 'account hold before any record (it passes at the time given), or unreadable protection state.', False),
     'unavailable': ('The target cannot be read by this account: deleted, private, suspended or never existed. '
                     'Retrying does not change it.', False),
-    'scope_limit': ('A named limit (an X operation, a Reddit bucket) ran out before any record: not an account problem; '
+    'scope_limit': ('A named operation or bucket limit ran out before any record: not an account problem; '
                     'other commands still work.', False),
     'failed': ('A request failed before any record was read (including a changed answer and the time limit).', False),
     'empty': ('The platform explicitly returned nothing, or nothing fell inside the window.', False),
@@ -241,7 +241,7 @@ def finish(reading, *, platform, command, report=None, identity=None, out=None):
 
 ENVELOPE = {
     'ok': 'boolean — false only for the kinds whose ok is false (see kinds)',
-    'platform': 'string — x, threads, reddit, facebook or naver-blog',
+    'platform': 'string — the platform name',
     'command': 'string — the command that ran',
     'query': 'object — the options that make this query what it is (sort, tab, type, feed, …)',
     'stop_reason': 'string — why reading stopped; see stop_reasons (absent for argument errors)',

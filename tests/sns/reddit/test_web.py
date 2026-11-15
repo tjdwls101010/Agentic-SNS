@@ -92,41 +92,40 @@ ROUTES = fixture('routes.json')
                          [c for c in ROUTES['after_recon']['cases'] if 'path' in c], ids=lambda c: c['path'])
 def test_paths(case):
     if case['allowed']:
-        assert web.routes.bucket_of(case['path']) == case.get('bucket', 'general')
+        assert web.bucket_of(case['path']) == case.get('bucket', 'general')
     else:
         with pytest.raises(SnsError):
-            web.routes.bucket_of(case['path'])
+            web.bucket_of(case['path'])
 
 
 def build(case):
     o, target = case['options'], case.get('target')
     surface = case['surface']
-    routes = web.routes
     if surface == 'feed':
-        return routes.feed(o['sort'], o.get('time'))
+        return web.route_feed(o['sort'], o.get('time'))
     if surface == 'sub':
-        return routes.listing(web.parse_target(target).sub, o['sort'], after=o.get('after'))
+        return web.route_listing(web.parse_target(target).sub, o['sort'], after=o.get('after'))
     if surface == 'post':
         t = web.parse_target(target)
-        return routes.post(t.post_id, o['sort'], t.comment_id, o.get('context'))
+        return web.route_post(t.post_id, o['sort'], t.comment_id, o.get('context'))
     if surface == 'morechildren':
-        return routes.morechildren(target, o['children'], o['sort'])
+        return web.route_morechildren(target, o['children'], o['sort'])
     if surface == 'subtree':
-        return routes.subtree(target, o['comment'], o['sort'])
+        return web.route_subtree(target, o['comment'], o['sort'])
     if surface == 'profile':
-        return routes.profile(web.parse_target(target).user, o['type'], o['sort'], o.get('time'))
+        return web.route_profile(web.parse_target(target).user, o['type'], o['sort'], o.get('time'))
     if surface == 'search':
         sub = web.parse_target(target).sub if target else None
-        return routes.search(o['text'], o['type'], o.get('sort', 'relevance'), sub=sub, nsfw=o.get('nsfw', False))
+        return web.route_search(o['text'], o['type'], o.get('sort', 'relevance'), sub=sub, nsfw=o.get('nsfw', False))
     if surface == 'related':
-        return routes.related(web.parse_target(target).post_id)
+        return web.route_related(web.parse_target(target).post_id)
     if surface == 'me':
-        return routes.mine(o['collection'], 'example_viewer')
+        return web.route_mine(o['collection'], 'example_viewer')
     if surface in ('about', 'rules'):
         t = web.parse_target(target)
-        return routes.user(t.user) if t.kind == 'user' else (routes.community if surface == 'about' else routes.rules)(t.sub)
+        return web.route_user(t.user) if t.kind == 'user' else (web.route_community if surface == 'about' else web.route_rules)(t.sub)
     if surface == 'me_check':
-        return routes.me()
+        return web.route_me()
     raise AssertionError(surface)
 
 
@@ -135,14 +134,14 @@ def test_requests(case):
     request = build(case)
     expected_path = case['path'].replace('/user/me/', '/user/example_viewer/')
     assert (request.path, request.query) == (expected_path, case['query'])
-    web.routes.bucket_of(request.path)
+    web.bucket_of(request.path)
 
 
 @pytest.mark.parametrize('case', [c for c in ROUTES['after_recon']['cases'] if 'url' in c], ids=lambda c: c['url'])
 def test_a_share_link_has_a_bucket_of_its_own_that_is_never_measured(case):
-    request = web.routes.share(case['url'])
+    request = web.route_share(case['url'])
     assert request.bucket == case['bucket'] == 'share' and request.measured is False
-    assert web.routes.feed('best').measured and web.routes.wiki_page('example', 'index').bucket == 'wiki'
+    assert web.route_feed('best').measured and web.route_wiki_page('example', 'index').bucket == 'wiki'
 
 
 def records(name):

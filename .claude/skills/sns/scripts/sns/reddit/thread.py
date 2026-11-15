@@ -231,10 +231,10 @@ def plan(state):
                 for i in gaps[key]['ids']]
         retry = [(k, i) for k, i in pool if state['tries'].get(i)]
         if retry:  # ids a cut answer dropped: only them, in a batch half as large as the last one that dropped them
-            size = max(1, web.routes.BATCH >> max(state['tries'][i] for _, i in retry))
+            size = max(1, web.BATCH >> max(state['tries'][i] for _, i in retry))
             chosen = retry[:size]
         else:
-            chosen = pool[:web.routes.BATCH]
+            chosen = pool[:web.BATCH]
         return {'kind': 'ids', 'ids': [i for _, i in chosen],
                 'slots': {i: [k, gaps[k]['order'].index(i)] for k, i in chosen}}
     return None
@@ -297,7 +297,7 @@ def coverage(state, shown_now, hidden):
     return {'reported': post.get('num_comments'), 'received': len(state['nodes']),
             'shown': sum(1 for n in state['nodes'].values() if n['shown']), 'shown_now': shown_now,
             'hidden_by_depth': hidden, 'unexpanded': ids, 'continue_threads': subtrees,
-            'min_requests': math.ceil(ids / web.routes.BATCH) + subtrees, 'missing': len(state['missing']),
+            'min_requests': math.ceil(ids / web.BATCH) + subtrees, 'missing': len(state['missing']),
             'stalled': stalled, 'sort': state['sort'], 'suggested_sort': post.get('suggested_sort'),
             'contest_mode': post.get('contest_mode'), 'observed_at': _iso(state['observed_at']),
             'expanded_at': _iso(state['expanded_at'][-1]) if state['expanded_at'] else None,

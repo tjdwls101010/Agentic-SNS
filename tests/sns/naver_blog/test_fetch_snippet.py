@@ -10,7 +10,7 @@ import pytest
 
 from sns.naver_blog import web
 
-FETCH = Path(web.__file__).with_name('fetch.js').read_text(encoding='utf-8')
+FETCH = (Path(__file__).resolve().parents[3] / '.claude/skills/sns/scripts/sns/naver_blog/web/fetch.js').read_text(encoding='utf-8')
 RUNNER = '''
 const sent = [];
 const answer = %s;

@@ -14,11 +14,11 @@ from datetime import date, datetime, time, timedelta
 from sns.clock import Deadline
 from sns.errors import SnsError
 from sns.maintenance import objects, schema
+from sns.platforms import PLATFORM_PACKAGES
 from sns.reading import Invocation, adopt_all, doctor, foreign, idle
 from sns.render import page, summary
 from sns.results import failure_envelope
 
-PLATFORM_PACKAGES = ('x', 'threads', 'reddit', 'facebook', 'naver_blog')
 
 # The one table from a result's kind to its exit code (units raise kinds, never numbers).
 EXIT_CODES = {

@@ -7,6 +7,8 @@ from sns.threads.render import render
 from sns.window import WindowPolicy
 
 PLATFORM = reading.Platform(
+    secret_fields=('fb_dtsg', 'lsd', 'jazoest', 'datr', 'sb', 'c_user', 'xs', 'csrftoken', 'ds_user_id', 'mid', 'x-csrftoken', 'x-fb-lsd', '__hs', '__hsi', '__dyn', '__csr', '__spin_t', '__s', '__aaid', '__hsdp', '__hblp', '__sjsp', '__crn',),
+    signed_image_hosts=('fbcdn.net', 'cdninstagram.com',),
     key='threads', title='Threads', site='threads.com', transport='tab',
     # Threads announces no limit windows: a 429 holds the account for 30 minutes; a checkpoint needs a person
     policy=LimitPolicy(scope='account', hold_seconds=1800, person=('checkpoint',), pace=(1.0, 2.0)),

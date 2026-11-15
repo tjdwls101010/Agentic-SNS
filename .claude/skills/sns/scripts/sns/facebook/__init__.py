@@ -7,6 +7,8 @@ from sns.limits import LimitPolicy
 from sns.window import WindowPolicy
 
 PLATFORM = reading.Platform(
+    secret_fields=('fb_dtsg', 'lsd', 'jazoest', 'datr', 'sb', 'c_user', 'xs', 'csrftoken', 'ds_user_id', 'mid', 'x-csrftoken', 'x-fb-lsd', '__hs', '__hsi', '__dyn', '__csr', '__spin_t', '__s', '__aaid', '__hsdp', '__hblp', '__sjsp', '__crn',),
+    signed_image_hosts=('fbcdn.net', 'cdninstagram.com',),
     key='facebook', title='Facebook', site='facebook.com', transport='tab',
     # Facebook announces no limit: a 429 on any of the tab's requests holds the account for 30 minutes; a checkpoint
     # is the one block only a person clears

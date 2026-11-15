@@ -24,7 +24,7 @@ clean, stamp, UNKNOWN, record_schema, RECORD_NOTES = (records.clean, records.sta
 parse_post, link_of, PostDoc = body.parse, body.link_of, body.PostDoc
 POST_READ_NOTES = body.NOTES
 
-__all__ = ['Blog', 'Buddy', 'Category', 'Client', 'Clip', 'Comment', 'Fetched', 'Group', 'OPERATIONS', 'Policy', 'Post',
+__all__ = ['Blog', 'Buddy', 'Category', 'Client', 'Clip', 'Comment', 'Fetched', 'Group', 'Keyword', 'OPERATIONS', 'Policy', 'Post',
            'PostDoc', 'POST_READ_NOTES', 'RECORD_NOTES', 'ROUTES', 'Resolved', 'Target', 'Topic', 'UNKNOWN',
            'allowed', 'at', 'blog_record', 'build_request', 'buddy_record', 'categories', 'classify', 'clean',
            'clip_record', 'comment_counts', 'comment_record', 'encoded', 'frame_blog_id', 'group_record',

@@ -7,6 +7,8 @@ from sns.x import about, explore, images, listing, search, thread, web
 from sns.x.render import render
 
 PLATFORM = reading.Platform(
+    secret_fields=('ct0', 'auth_token', 'twid', 'x-csrf-token', 'x-client-transaction-id', 'guest_id', 'kdt', 'att',),
+    signed_image_hosts=('pbs.twimg.com',),
     key='x', title='X', site='x.com', transport='tab',
     # X's windows are per operation (15 minutes), slowed below 20% left; a 429 without a reset waits one window
     policy=LimitPolicy(scope='operation', slow='fraction', slow_fraction=0.2, hold_seconds=900,
