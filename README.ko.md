@@ -16,6 +16,8 @@ API 키 없이 사용자가 브라우저에서 보는 그대로 읽습니다. �
 | `facebook` | feed profile group post comments replies search about images me doctor schema |
 | `naver-blog` | search keywords post comments images resolve about profile feed graph me topic monthly doctor schema |
 
+사이트마다 로그인한 사람에게 보이는 표면 전부와, 스킬이 그것을 읽는지(읽지 않으면 왜인지)는 [docs/surfaces.md](docs/surfaces.md)에 있습니다.
+
 피드, 글과 답글·댓글 트리, 인용·리포스트, 프로필과 팔로워, 검색, 서브레딧·위키, 페이스북 그룹·페이지, X 리스트·커뮤니티·트렌드, 네이버 블로그의 카테고리·이웃·주제, 글에 든 사진, 그리고 내 저장·좋아요·알림 목록을 읽습니다.
 
 ## 필요한 것

@@ -600,6 +600,31 @@ Codex(`gpt-6.1-terra`, high, read-only) 둘 — 실행 `20261115-155512-plan-fea
 | R17 | 전부 | 표면 목록(P7a)에서 새로 드러나는 줄 — 출발점: X 리스트 구독자·커뮤니티 멤버·북마크 폴더·알림의 Verified 탭, facebook 피드 필터·내 그룹 목록·그룹 멤버·이벤트·프로필의 사진/영상 탭·영상/이벤트 검색·협찬 표시 필드, naver 안부글·클립 | 없음 | 실제 사이트에 있는지부터 |
 | R18 | reddit·threads·facebook | 예전에 일부러 뺐다가 A12로 다시 여는 것: reddit 커스텀 피드, threads 커스텀 피드, facebook 친구 목록(`graph ACCOUNT friends`)·글에 반응한 사람 목록 | 제외였음 | 읽기 경로, 쪽 넘김, 비공개 설정일 때의 답(9와 구분). **X DM은 계속 제외**(A12) |
 
+**하위 항목(P7a, 2026-11-16).** `docs/surfaces.md`의 `in recon` 줄이 한 항목씩 가리키도록, 여러 플랫폼·여러 표면에 걸친 항목을 나눴고 P7a의 메뉴·탭 조사(R17)에서 드러난 줄을 번호로 붙였다. 판정은 하위 항목마다 따로 낸다.
+
+| # | 플랫폼 | 항목 |
+|---|---|---|
+| R2a / R2b / R2c | reddit / facebook / naver | 댓글에 달린 사진 |
+| R10a / R10b | reddit | 홈 피드 `controversial` / `me downvoted`·`me hidden` |
+| R14a–e | x / threads / reddit / facebook / naver | 영상의 자막·대본 |
+| R16a / R16b | x / threads | 투표 |
+| R17a | x | 프로필의 새 Reposts 탭(`/<account>/reposts`) |
+| R17b | x | 북마크 폴더(북마크·좋아요는 `/i/history`로 옮겨 감 — `me bookmarks\|likes`가 그대로 되는지도) |
+| R17c | x | 알림의 Verified 탭(알림 화면을 열지 않고 — 읽음 처리) |
+| R17d / R17e | x | 리스트 구독자 / 커뮤니티 멤버 |
+| R17f | x | Creator Studio의 내 게시물 분석 |
+| R17g / R17h / R17i | threads | 인사이트 / 유령 게시물(`/ghost_posts/`) / 보관함(`/archive/`) |
+| R17j | reddit | 홈의 For You·Following 탭 |
+| R17k | facebook | 피드 필터(`/?filter=…`: 즐겨찾기·친구·그룹·페이지) |
+| R17l / R17m / R17n | facebook | 페이지 팔로워 목록 / 페이지 라이브 영상 / 프로필의 사진·영상 탭 |
+| R17o / R17p | facebook | 내 그룹 목록 / 그룹 멤버 |
+| R17q / R17r | facebook | 이벤트 / 과거의 오늘(`/onthisday/`) |
+| R17s / R17t | facebook | 영상·이벤트 검색 / 협찬 표시 필드 |
+| R17u / R17v | naver | 안부글 / 블로그의 클립 |
+| R17w / R17x | naver | 공식블로그 목록 / 챌린지 프로그램 |
+| R18a / R18b | reddit / threads | 커스텀 피드 |
+| R18c / R18d | facebook | 친구 목록(`graph ACCOUNT friends`) / 글에 반응한 사람 목록 |
+
 ## 부록 B. 옛 → 새 명령 대응 (P5)
 
 | 옛 | 새 |
