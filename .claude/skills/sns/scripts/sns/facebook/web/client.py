@@ -42,6 +42,9 @@ SNAPSHOT = json.loads((Path(__file__).with_name('queries.json')).read_text(encod
 QUERIES = SNAPSHOT['queries']
 READ_NAMES = sorted(spec['name'] for spec in QUERIES.values())
 ABOUT_SECTION = '2327158227'  # the About app section's id
+# the home feed's filters, as their pages ask for them: Facebook's feedStyle, newest first (recon 2026-11-16)
+FEED_FILTERS = {'favorites': 'FAVORITES_FEED', 'friends': 'MOST_RECENT_FRIENDS_FEED',
+                'groups': 'MOST_RECENT_GROUPS_FEED', 'pages': 'MOST_RECENT_PAGES_FEED'}
 FEED_SORTS = {'top': {'orderby': ['TOP_STORIES'], 'feedStyle': 'DEFAULT'},
               'recent': {'orderby': ['MOST_RECENT'], 'feedStyle': 'MOST_RECENT_FEED_DEFAULT'}}
 GROUP_SORTS = {'top': 'TOP_POSTS', 'recent': 'CHRONOLOGICAL', 'activity': 'RECENT_ACTIVITY'}
@@ -417,8 +420,9 @@ class Client:
                            'Check the URL in the browser; it may be private, removed or misspelled.', reason='no_id')
         return found
 
-    def feed(self, sort, cursor):
-        chunks = self.query('newsfeed', {**FEED_SORTS[sort], 'cursor': cursor}, route=HOME)
+    def feed(self, sort, cursor, tab='all'):
+        style = {'feedStyle': FEED_FILTERS[tab]} if tab != 'all' else {}
+        chunks = self.query('newsfeed', {**FEED_SORTS[sort], **style, 'cursor': cursor}, route=HOME)
         return posts_page(chunks, source='newsfeed', connection_key='news_feed', captured_at=_now())
 
     def timeline(self, profile_id, cursor, *, after_time, before_time, url):

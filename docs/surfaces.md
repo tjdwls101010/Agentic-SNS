@@ -97,7 +97,7 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Surface | Where on the site | Status |
 |---|---|---|
 | Home feed (top, recent) | Home | command: `facebook feed --sort top\|recent` |
-| Feeds filter (favorites, friends, groups, pages) | Menu "Feeds" `/?filter=…` | in recon (R17k — the feed query's filter variable was not in the capture) |
+| Feeds filter (favorites, friends, groups, pages) | Menu "Feeds" `/?filter=…` | command: `facebook feed --tab favorites\|friends\|groups\|pages` |
 | A profile's or page's timeline | Profile "All" tab | command: `facebook profile ACCOUNT` |
 | A profile's or page's About; a group's card | About tab | command: `facebook about ACCOUNT\|GROUP` |
 | A page's followers | Page "Followers" tab | command: `facebook graph ACCOUNT followers` (the first page the tab loads; a longer list ends `not_built`) |
