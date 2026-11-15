@@ -20,6 +20,13 @@ import time
 from datetime import date
 from pathlib import Path
 
+def work_dir():
+    """Where contrast runs, their records and graders' copies live: outside the repository (they hold other people's
+    posts). SNS_WORK overrides it."""
+    return Path(os.environ.get('SNS_WORK') or Path.home() / '.claude/projects/-Users-seongjin-Coding-Agentic-SNS'
+                / 'sns-unification')
+
+
 BLOCK_OUTCOMES = ('rate_limited', 'challenge', 'checkpoint', 'account_locked', 'network_blocked', 'login_required')
 
 

@@ -1,25 +1,33 @@
-"""Contrast runs for the sns skill (plan P6): one task, one SKILL.md variant, a clean Claude that may run only this
-skill's CLI, watched for the platforms' block signals.
+"""Contrast runs for the sns skill (plan P3/P8): one task, one SKILL.md body (an arm), a clean Claude that may run only
+this skill's CLI and read its own run's files, watched for the platforms' block signals.
 
-  python3 contrast.py RUN PLATFORM VARIANT TASK [--model M] [--fake SCENARIO] [--data-template DIR]
+  python3 contrast.py RUN PLATFORM TASK --body FILE --arm NAME [--model M] [--repeat N] [--fake SCENARIO]
+                      [--data-template DIR]
 
-PLATFORM: x, threads, reddit, facebook, naver-blog, or cross (a task that may use every platform). VARIANT: A (the
-frontmatter and the invocation line), B (the draft), C:<heading> (the draft without the section whose heading starts
-with <heading>). TASK is a file under tasks/<platform>/ (or a path); ${NAME} in it is filled from the environment, so
-real people, posts and URLs never live in the repository.
+PLATFORM: x, threads, reddit, facebook, naver-blog, or cross (a task that may use every platform). --body is the
+SKILL.md body the run gets (after the skill's own frontmatter, without the local-only line that turns automatic use
+off); `${CLAUDE_SKILL_DIR}/scripts/cli.py` in it becomes the run's copy of the CLI. The baseline arm A is a body file
+too: the invocation paragraph alone (arms/A.md). --arm names the body in the results; --model is any model id. TASK is
+a file under tasks/<platform>/ (or a path); ${NAME} in it is filled from the environment, so real people, posts and
+URLs never live in the repository.
+
+Each of --repeat repetitions is its own run, RUN-r<k>. A run whose child met a permission denial says nothing about
+the skill (it could not do what it tried): it is marked invalid and run again, at most twice, as RUN-r<k>-a<n>. Every
+attempt is one line in $SNS_WORK/cells.jsonl (run, task, platform, arm, model, repetition, attempt, valid) — what
+aggregate.py counts. blind.py turns runs into what graders see; grader.md is what they are asked.
 
 State per run (SNS_DATA_DIR is a new directory for every run): <platform>/<account>/protection/ and session/ are links
 to the skill's real state directory (sns.paths.data_dir(): one account, one lock, one pacing, one block record, one
 dedicated tab across every run and every ordinary invocation); handles, images and Reddit snapshots are the run's own,
 so no run continues another's. Before linking, a live run takes in the skill's old data/ (from before the state moved)
-the way any invocation would, and does not start when that fails: a contrast run may be the install's first. When a run ends — normally,
-stopped at a block signal, or by an exception — the dedicated tab is emptied (`<platform> idle --token any --after 0`),
-the links are cut before anything is copied, and summary.json is written.
+the way any invocation would, and does not start when that fails: a contrast run may be the install's first. When a
+run ends — normally, stopped at a block signal, or by an exception — the dedicated tab is emptied
+(`<platform> idle --token any --after 0`), the links are cut before anything is copied, and summary.json is written.
 
 A --fake run uses tests/sns/fakes/fake_aside.py with SCENARIO and a throwaway data directory (from --data-template when
 given, e.g. one holding a recorded block) and its shell is held by the OS sandbox; a live run only by the permission
 rules (aside cannot sign its daemon challenge inside the OS sandbox) — that is not OS isolation, and reports never call
-it that.
+it that. CONTRAST_CLAUDE names the claude executable (tests give a stand-in).
 
 Outputs go to $SNS_WORK/runs/<RUN>/ (outside the repository: they hold other people's posts): work/, settings.json,
 events.jsonl, summary.json.
@@ -50,37 +58,31 @@ def fake_launcher(directory):
 PLATFORMS = ('x', 'threads', 'reddit', 'facebook', 'naver_blog')
 TAB_PLATFORMS = ('x', 'threads', 'facebook')
 SHARED = ('protection', 'session')
-MODELS = ('claude-opus-5-5', 'claude-sonnet-5-5')
+RETRIES = 2   # a run invalidated by a permission denial is run again at most this many times
 
 sys.path.insert(0, str(HERE))
 import ledger  # noqa: E402
 
 
 def work_dir():
-    return Path(os.environ.get('SNS_WORK') or Path.home() / '.claude/projects/-Users-seongjin-Coding-Agentic-SNS'
-                / 'sns-unification')
+    """ledger.work_dir(), refused inside the repository: runs hold other people's posts."""
+    path = ledger.work_dir().resolve()
+    if path == REPO or REPO in path.parents:
+        raise SystemExit(f'SNS_WORK ({path}) is inside the repository; runs hold other people\'s posts')
+    return path
 
 
 def platforms_of(platform):
     return list(PLATFORMS) if platform == 'cross' else [platform.replace('-', '_')]
 
 
-def variant_text(variant, cli, draft):
+def body_text(body, cli, text=None):
+    """The SKILL.md a run reads: the skill's frontmatter (without the local-only line that turns automatic use off) and
+    the arm's body, with the skill's CLI path made the run's copy."""
     head = (SKILL / 'SKILL.md').read_text().split('\n---\n', 1)[0] + '\n---\n'
-    if variant == 'A':
-        return head + ('\n# Social networks through the user\'s own browser\n\n'
-                       f'Run `uv run "{cli}" <platform> <command> …` on one line. `--help` maps every platform\'s '
-                       'commands, `<platform> <command> --help` explains one, `<platform> schema` what results, files '
-                       'and fields mean, and each error\'s `fix` how to recover.\n')
-    text = Path(draft).read_text().replace('${CLAUDE_SKILL_DIR}/scripts/cli.py', cli)
-    if variant == 'B':
-        return text
-    heading = variant.split(':', 1)[1]
-    parts = re.split(r'(?m)^(?=## )', text)
-    kept = [p for p in parts if not p.startswith('## ' + heading)]
-    if len(kept) == len(parts):
-        raise SystemExit(f'no section starting with "## {heading}"')
-    return ''.join(kept)
+    head = '\n'.join(line for line in head.splitlines() if not line.startswith('disable-model-invocation:')) + '\n'
+    text = Path(body).read_text() if text is None else text
+    return head + '\n' + text.replace('${CLAUDE_SKILL_DIR}/scripts/cli.py', cli).lstrip('\n')
 
 
 def task_text(platform, name):
@@ -186,19 +188,51 @@ def resolve_account(env):
 
 
 def run(args):
-    root = work_dir() / 'runs' / args.run
+    """Every repetition of one cell (task × arm × model): each until it is valid or out of retries. Returns the
+    summaries of every attempt, in order."""
+    task = task_text(args.platform.replace('_', '-'), args.task)  # refuses before anything starts
+    summaries = []
+    for repetition in range(1, args.repeat + 1):
+        for attempt in range(RETRIES + 1):
+            name = f'{args.run}-r{repetition}' + (f'-a{attempt}' if attempt else '')
+            summary = run_once(args, name, task)
+            # evidence only from a run that finished on its own: no denial (it could not do what it tried), a final
+            # answer, and no block signal (a platform pushed back and the run was stopped)
+            summary.update(repetition=repetition, attempt=attempt,
+                           valid=not summary['permission_denials'] and summary['final'] is not None
+                           and not summary.get('block_signal'))
+            (work_dir() / 'runs' / name / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=1))
+            record(summary)
+            summaries.append(summary)
+            if summary['valid'] or summary.get('block_signal') or not summary['permission_denials']:
+                break  # only a denial is retried: a block stops everything, a run without an answer is not repeated
+        if summaries[-1].get('block_signal'):
+            break  # a platform pushed back: nothing more goes out
+    return summaries
+
+
+def record(summary):
+    """One line per attempt in the cell index aggregate.py reads."""
+    line = {k: summary.get(k) for k in ('run', 'task_name', 'platform', 'arm', 'model', 'repetition', 'attempt',
+                                         'valid', 'block_signal', 'fake')}
+    with (work_dir() / 'cells.jsonl').open('a') as stream:
+        stream.write(json.dumps(line, ensure_ascii=False) + '\n')
+
+
+def run_once(args, name, task):
+    root = work_dir() / 'runs' / name
     if root.exists():
         raise SystemExit(f'{root} exists; pick a new run name')
     platforms = platforms_of(args.platform)
-    task = task_text(args.platform.replace('_', '-'), args.task)
     root.mkdir(parents=True)
-    scratch = Path(tempfile.mkdtemp(prefix=f'sns-contrast-{args.run}-'))
+    scratch = Path(tempfile.mkdtemp(prefix=f'sns-contrast-{name}-'))
     copy = scratch / 'skill'
     shutil.copytree(SKILL / 'scripts', copy / 'scripts', ignore=shutil.ignore_patterns('__pycache__'))
     if (SKILL / 'references').exists():
         shutil.copytree(SKILL / 'references', copy / 'references')
     cli = str(copy / 'scripts/cli.py')
-    (copy / 'SKILL.md').write_text(variant_text(args.variant, cli, work_dir() / 'drafts/SKILL.md'))
+    given = Path(args.body).read_text()  # read once: what the run gets is what the summary keeps
+    (copy / 'SKILL.md').write_text(body_text(args.body, cli, given))
     env = {k: v for k, v in os.environ.items() if not k.startswith('SNS_') or k.startswith('SNS_ASIDE_ACCOUNT')}
     data_dir = scratch / 'data'
     data_dir.mkdir()
@@ -221,8 +255,9 @@ def run(args):
     prompt = (f'먼저 {copy}/SKILL.md를 읽고 따르세요. {copy}/scripts 아래 파일은 읽지 말고, 도구는 --help와 schema 명령, '
               f'그리고 출력으로 익히세요.\n\n과제: {task}')
     sandbox = ['--settings', str(settings)] if args.fake else []
-    command = ['claude', '-p', '--safe-mode', '--restricted', '--no-session-persistence', *sandbox,
-               '--tools', 'Bash,Read,Grep,Glob', '--allowedTools', f'Bash(uv run "{cli}" *)',
+    command = [os.environ.get('CONTRAST_CLAUDE') or 'claude', '-p', '--safe-mode', '--restricted',
+               '--no-session-persistence', *sandbox, '--tools', 'Bash,Read,Grep,Glob',
+               '--allowedTools', f'Bash(uv run "{cli}" *)', f'Read(/{data_dir}/**)',
                '--model', args.model, '--output-format', 'stream-json', '--verbose', prompt]
     started = time.time()
     child, watched = None, {'outcome': 'not started', 'signal': None, 'counted': 0}
@@ -242,14 +277,16 @@ def run(args):
     summary = summarize(root / 'events.jsonl')
     summary['out_files'] = sorted({m for c in summary['commands'] if c['tool'] == 'Bash'
                                    for m in re.findall(r'--out[= ](\S+)', c['input'])})
-    summary.update(run=args.run, platform=args.platform, variant=args.variant, model=args.model, task=task,
+    summary.update(run=name, platform=args.platform, arm=args.arm, body=str(args.body),
+                   body_text=given, model=args.model, task=task,
+                   task_name=args.task,
                    exit=child.returncode if child else None, fake=bool(args.fake), watch=watched['outcome'],
                    block_signal=watched['signal'], logged_requests=watched['counted'],
                    stderr=(root / 'stderr.txt').read_text()[-2000:])
     (root / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=1))
     if not args.fake:
-        ledger.add(work_dir() / 'request-record.tsv', f'P6 contrast {args.run}', watched['counted'],
-                   f'{args.platform} {args.variant} {args.model}'
+        ledger.add(work_dir() / 'request-record.tsv', f'contrast {name}', watched['counted'],
+                   f'{args.platform} {args.arm} {args.model}'
                    + (f' — stopped at {watched["signal"]}' if watched['signal'] else ''))
     return summary
 
@@ -293,15 +330,22 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('run')
     parser.add_argument('platform', choices=['x', 'threads', 'reddit', 'facebook', 'naver-blog', 'cross'])
-    parser.add_argument('variant')
     parser.add_argument('task')
-    parser.add_argument('--model', choices=MODELS, default=MODELS[0])
+    parser.add_argument('--body', required=True, type=Path, help='the SKILL.md body this arm gets')
+    parser.add_argument('--arm', required=True, help='the name this body has in the results (A, F, F-1, …)')
+    parser.add_argument('--model', default='claude-opus-5-5', help='any model id the claude CLI takes')
+    parser.add_argument('--repeat', type=int, default=3, help='repetitions of this cell (default 3)')
     parser.add_argument('--fake')
     parser.add_argument('--data-template')
-    summary = run(parser.parse_args(argv))
-    print(json.dumps({k: summary[k] for k in ('run', 'platform', 'variant', 'model', 'exit', 'watch', 'block_signal',
-                                              'turns', 'requests', 'logged_requests', 'permission_denials')},
-                     ensure_ascii=False))
+    args = parser.parse_args(argv)
+    if not args.body.is_file():
+        parser.error(f'--body {args.body} is not a file')
+    if args.repeat < 1:
+        parser.error('--repeat must be at least 1')
+    for summary in run(args):
+        print(json.dumps({k: summary.get(k) for k in ('run', 'platform', 'arm', 'model', 'repetition', 'attempt',
+                                                       'valid', 'exit', 'watch', 'block_signal', 'turns', 'requests',
+                                                       'logged_requests', 'permission_denials')}, ensure_ascii=False))
     return 0
 
 
