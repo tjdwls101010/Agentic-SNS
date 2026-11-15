@@ -1,4 +1,4 @@
-"""Pictures saved from posts under data/images/, removed 24 hours after they were saved, for every platform.
+"""Pictures saved from posts under images/ in the state directory, removed 24 hours after they were saved, for every platform.
 
 The skill chooses every file name (platform, post, picture number, a digest, the type's extension), never the URL, so
 a picture address cannot write anywhere else. Old files are removed whenever a picture is saved: nobody needs to delete
@@ -50,6 +50,6 @@ def save(data, content_type, *, platform, key, number):
             stream.write(data)
         os.replace(temporary, path)
     except OSError:
-        raise SnsError('partial', 'A picture could not be saved.', 'Make the skill\'s data/ directory writable.') \
+        raise SnsError('partial', 'A picture could not be saved.', 'Make the skill\'s state directory writable.') \
             from None
     return path

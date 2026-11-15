@@ -111,10 +111,10 @@ def test_a_nested_record_cannot_be_saved(tmp_path, data_dir):
     out.close()
 
 
-def test_a_path_inside_data_or_in_a_missing_directory_is_refused_before_any_request(tmp_path, data_dir):
+def test_a_path_inside_the_state_directory_or_in_a_missing_directory_is_refused_before_any_request(tmp_path, data_dir):
     with pytest.raises(SnsError) as caught:
         outfile.check_path(data_dir / 'x.ndjson')
-    assert 'data/' in caught.value.message
+    assert 'state directory' in caught.value.message and str(data_dir) in caught.value.message
     with pytest.raises(SnsError) as caught:
         outfile.check_path(tmp_path / 'missing' / 'x.ndjson')
     assert caught.value.kind == 'argument'

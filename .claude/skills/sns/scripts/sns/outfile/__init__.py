@@ -37,7 +37,7 @@ def resolve(path):
 
 
 def check_path(path):
-    """Refuse, before any request, a path inside the skill's data/ or one that cannot be written."""
+    """Refuse, before any request, a path inside the skill's state directory or one that cannot be written."""
     outside_data(path)
     target = resolve(path)
     if not target.parent.is_dir():

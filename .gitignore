@@ -6,3 +6,4 @@ tests/sns/captures/
 contrast/sns/triggers/evals/results/
 docs/video/node_modules/
 docs/video/out/
+.claude/skills/sns/data/

@@ -1,4 +1,4 @@
-"""Comment-tree snapshots: one file per read generation of a thread, under data/reddit/<account>/snapshots/.
+"""Comment-tree snapshots: one file per read generation of a thread, under reddit/<account>/snapshots/ in the state directory.
 
 A generation starts with a first request for a (post, anchor comment, sort) key and is named by that key and a nonce,
 so a later read of the same thread starts a new generation instead of changing what an older handle continues. A
@@ -27,7 +27,7 @@ def _key(parts):
 
 
 def _cannot_keep():
-    return SnsError('failed', 'Cannot keep the comment thread.', 'Make the skill\'s data/ directory writable and free '
+    return SnsError('failed', 'Cannot keep the comment thread.', 'Make the skill\'s state directory writable and free '
                                                                 'disk space, then retry.')
 
 

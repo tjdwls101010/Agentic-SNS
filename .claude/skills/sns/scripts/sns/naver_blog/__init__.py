@@ -152,7 +152,7 @@ COMMANDS = {
                                                                                           'post shows them ([image N])'}),
                       (('--all',), {'action': 'store_true', 'help': 'Every picture of the post (stickers, cards and '
                                                                     'maps included)'}), 'json'],
-        'epilog': ['Reads the post again (1 request) and saves each picture (1 request each) under data/images/, '
+        'epilog': ['Reads the post again (1 request) and saves each picture (1 request each) under images/ in the skill\'s state directory, '
                    'printing one line per picture with its path. A picture can say what the text does not: prices on '
                    'a menu, a disclosure drawn into a photo or a sticker. The files are other people\'s photos; the '
                    'skill removes each once it is 24 hours old (the next time it runs), so nothing needs deleting by '
