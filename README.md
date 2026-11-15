@@ -57,6 +57,8 @@ No platform name needed — a bare link is enough for the skill to pick one.
 | `facebook` | feed profile group post comments replies search about images me doctor schema |
 | `naver-blog` | search keywords post comments images resolve about profile feed graph me topic monthly doctor schema |
 
+Every surface each site shows a logged-in reader, and whether the skill reads it (or why not), is in [docs/surfaces.md](docs/surfaces.md).
+
 Feeds, a post with its replies or full comment tree, quotes and reposts, profiles and followers, search, subreddits and wikis, Facebook groups and pages, X lists, communities and trends, Naver blogs with their categories, neighbors and topics, the pictures in a post, and your own saved, liked and notification items.
 
 The CLI can be called directly too:
