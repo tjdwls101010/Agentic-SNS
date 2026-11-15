@@ -235,13 +235,15 @@ class Client:
         early = isinstance(armed, dict) and (armed.get('buffer_intact') is True or
                                              (armed.get('ready_at_install') == 'loading' and not armed.get('app_at_install')))
         deadline = self.clock.monotonic() + min(LOAD_WAIT, max(1.0, self.guard.time_left() - 5))
-        seen = [1]   # the document itself is a request too; counted up as the looks come in, charged however they end
+        # the document itself is a request too; counted up as the looks come in, charged however they end. A load no
+        # look reached was not measured, however early the kit came
+        seen = [1, False]
         slot.classify('opened')
         try:
             state = self._wait_for_app(slot, deadline, seen)
         finally:
-            self.measured_open = early
-            slot.charge(before + (seen[0] if early else OPEN_RESERVE + seen[0] - 1))
+            self.measured_open = measured = early and seen[1]
+            slot.charge(before + (seen[0] if measured else OPEN_RESERVE + seen[0] - 1))
         self._check(state)
 
     def _wait_for_app(self, slot, deadline, seen):
@@ -258,6 +260,7 @@ class Client:
                 self.clock.sleep(0.5)
                 continue
             seen[0] += _int(look.get('resources'))
+            seen[1] = True
             self._note(look)
             self._consume(look, slot)
             if ready is not None:

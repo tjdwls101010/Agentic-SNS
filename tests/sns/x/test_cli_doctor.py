@@ -126,6 +126,7 @@ def test_a_tab_that_vanishes_after_every_opening_is_replaced_once_then_reported(
     code, result, _ = doctor(browser)
     assert code == 3, result
     assert browser.ops().count('open') <= 2
+    assert result['setup_requests'] >= 21 * browser.ops().count('open')  # each load unmeasured: the reserve
 
 
 def test_a_load_that_does_not_finish_is_charged_the_reserve(browser):
@@ -135,6 +136,17 @@ def test_a_load_that_does_not_finish_is_charged_the_reserve(browser):
     code, result, _ = doctor(browser)
     # the tab was sent to x.com: its load went unmeasured (the reserve), after the placeholder's document
     assert code == 3 and result['setup_requests'] == 21
+
+
+def test_an_opening_no_look_reached_after_the_load_is_charged_the_reserve(browser):
+    """The kit was armed early, but no look at the loaded tab came back, so nothing measured what the load cost."""
+    browser.respond('open', {'tab': 'NEW1'})
+    browser.respond('load:x.arm', {'installed_at': 300, 'location': START, 'ready_at_install': 'loading',
+                                   'app_at_install': False})
+    browser.respond('x.state', {'__raw_stdout': 'aside: daemon is not reachable\n', '__exit': 1})
+    code, result, _ = doctor(browser, env={'SNS_TEST_NO_WAIT': '1'})
+    assert code == 3 and result['setup_requests'] == 21
+    assert result['results'] == [] and Session('x', ASIDE).tab == 'NEW1'
 
 
 def test_an_opening_stopped_by_a_lock_is_charged_what_it_loaded(browser):
