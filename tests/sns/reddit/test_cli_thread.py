@@ -193,5 +193,5 @@ def test_the_first_read_must_answer_with_the_post_asked_for_and_hold_the_linked_
 def test_the_comments_help_says_when_more_is_offered():
     from tests.sns.support.cli import run_cli
     done = run_cli('reddit', 'comments', '--help')
-    assert done.returncode == 0 and '--depth' in done.stdout and 'more: is offered only while' in done.stdout
+    assert done.returncode == 0 and '--depth' in done.stdout and 'more: is offered while comments within --depth remain' in done.stdout
     assert VIEWER not in done.stdout

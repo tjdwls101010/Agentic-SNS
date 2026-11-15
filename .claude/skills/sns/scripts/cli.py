@@ -141,8 +141,8 @@ def option(name, platform):
         'until': (('--until',), {'type': day, 'metavar': 'DAY', 'help': f'Last day to include, YYYY-MM-DD, in '
                                                                         f'{_zone(platform)}'}),
         'chars': (('--chars',), {'type': chars, 'help': 'Characters of each text to show (default 180; 0 = all)'}),
-        'after': (('--after',), {'type': positive, 'metavar': 'HANDLE', 'help': 'The handle a more: line printed (it '
-                                                                                'lasts 24 hours)'}),
+        'after': (('--after',), {'type': positive, 'metavar': 'HANDLE', 'help': 'The handle a more: line '
+                                                                                'printed'}),
         'out': (('--out',), {'metavar': 'FILE', 'help': 'An NDJSON file to save to; rerun to resume'}),
         'json': (('--json',), {'action': 'store_true', 'help': 'Print one JSON envelope'}),
     }[name]
@@ -209,8 +209,7 @@ def common(word, flags, spec, tab):
     if '--out' in flags:
         lines.append('--out FILE: ' + ('whole pages (a little over --limit)' if '--limit' in flags else 'the records')
                      + ', one line to stdout; keep the file out of the repository.')
-    lines += ['failure: one JSON envelope (error, message, fix) if nothing was read; records read before a failure '
-              'print as usual.',
+    lines += ['failure: one JSON envelope (error, message, fix) if nothing was read; else the records read (exit 8).',
               f'{word} schema result: fields, stop reasons, exit codes; {word} schema: record kinds.']
     return '\n'.join(lines)
 
@@ -718,13 +717,12 @@ def _reddit_surface(platform):
     WINDOW = ['since', 'until']
     TIME = (('--time',), {'choices': platform.web_TIMES, 'help': 'Reddit\'s period for top or controversial; not a date '
                                                         'window'})
-    LISTING = ('1 per page, after one account check (/api/me.json, 1) by a read that can be continued (more:, --out); a '
-               'more: that only shows the rest of the last page makes just that check.')
-    WINDOWS = ('--since/--until need sort new, the default with them (another '
-               '--sort is exit 2). The window closes at the first post more than ten minutes older than --since (Reddit\'s '
-               'new order can be a minute off); a listing that ends first is partial (8).')
-    PAGE = ('A page asks Reddit for 100 and shows 25 (--limit counts them); more: shows the rest of the page, then reads '
-            'the next.')
+    LISTING = ('1 per page of 100, 25 shown (--limit counts them; more: shows the rest, then reads the next page), plus '
+               'the account check (/api/me.json) when the read can be continued (more:, --out) — all a more: that only '
+               'shows the rest makes.')
+    WINDOWS = ('--since/--until need sort new (their default; another --sort is exit 2) and stop at the first post more '
+               'than ten minutes older than --since (Reddit\'s new order can be a minute off); a listing ending first is '
+               'partial (8).')
 
 
     def positive(value):
@@ -751,7 +749,6 @@ def _reddit_surface(platform):
                                                                             'for this account; new is newest first; top '
                                                                             'with --time'}), TIME, *WINDOW, *LIST],
             'epilog': ["The home feed is Reddit's choice for this account (its subscriptions and what it ranks), not Reddit as a whole. best and hot never end by themselves: --out needs --limit there.",
-                       PAGE,
                        WINDOWS],
             'requests': LISTING,
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
@@ -765,7 +762,6 @@ def _reddit_surface(platform):
                                                                            'controversial (with --time), rising'}),
                           TIME, *WINDOW, *LIST],
             'epilog': ["A community's listing is that community's own; r/popular and r/all are Reddit-wide rankings. Pinned posts (moderators' announcements, often old) sit at the top of hot; under new they sit at their own date. A private, quarantined or banned community is unavailable (exit 9).",
-                       PAGE,
                        WINDOWS],
             'requests': LISTING,
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
@@ -779,9 +775,8 @@ def _reddit_surface(platform):
                           (('--sort',), {'choices': platform.web_PROFILE_SORTS, 'help': 'new (default), hot, top or controversial '
                                                                                '(with --time)'}),
                           TIME, *WINDOW, *LIST],
-            'epilog': ["A public history is that account's observed activity on Reddit; an account can hide its history, or some communities, from other accounts, so what is shown may leave things out.",
-                       "An empty first page (no --after, --time, --since or --until) is checked against the account's karma for that kind (one more request): with karma it is a history that is not visible, hidden or deleted (exit 9, history_not_visible); with none it is empty as observed (7), as is a filtered empty result.",
-                       PAGE,
+            'epilog': ["An account can hide its history, or some communities, from others, so what is shown may leave things out.",
+                       "An empty first page (no --after, --time, --since or --until) is checked against the account's karma for that kind (one more request): karma means a history hidden or deleted (exit 9, history_not_visible), none an empty one (7), as is a filtered empty result.",
                        WINDOWS],
             'requests': LISTING,
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
@@ -822,9 +817,8 @@ def _reddit_surface(platform):
                           (('--nsfw',), {'action': 'store_true', 'help': 'Include posts marked over 18 (otherwise Reddit '
                                                                          'leaves most out)'}),
                           *WINDOW, *LIST],
-            'epilog': ['Reddit matches loosely: several words find posts with any of them, so results can be off-topic. These operators work inside TEXT: "exact phrase", subreddit:NAME, author:NAME, title:WORD, self:yes (text posts), site:DOMAIN, flair:NAME; url:TEXT matches loosely. Comments cannot be searched here.',
-                       "Results are Reddit's ranking, not a sample; an empty search means nothing matched in Reddit's index, not that nobody discussed it.",
-                       PAGE,
+            'epilog': ['Reddit matches loosely (several words find posts with any of them). Operators inside TEXT: "exact phrase", subreddit:NAME, author:NAME, title:WORD, self:yes (text posts), site:DOMAIN, flair:NAME; url:TEXT matches loosely. Comments cannot be searched here.',
+                       "Results are Reddit's ranking, not a sample; empty means nothing matched in Reddit's index, not that nobody discussed it.",
                        WINDOWS],
             'requests': LISTING,
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
@@ -834,8 +828,7 @@ def _reddit_surface(platform):
             'run': _command(platform.listing_related),
             'arguments': [(('target',), {'help': 'A post URL or id (a comment link reads its post)'}),
                           *LIST],
-            'epilog': ["Each other post of the same link, in other communities or the same one: one link's discussion is often split across communities that react differently. Exit 7 when there is none.",
-                       PAGE],
+            'epilog': ["Each other post of the same link, in other communities or the same one: one link's discussion is often split across communities that react differently. Exit 7 when there is none."],
             'requests': LISTING,
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
         },
@@ -847,8 +840,7 @@ def _reddit_surface(platform):
                                                                                     'your comments), post-replies (replies '
                                                                                     'to your posts) or mentions (of your '
                                                                                     'name)'}), *LIST],
-            'epilog': ['Lists of the Reddit account the Aside browser is logged in to (the account check names it). saved and upvoted hold posts and comments, newest saved or upvoted first. comment-replies, post-replies and mentions are what other accounts sent you, newest first; reading them never marks them read (unread says which are still new). Private messages are not read.',
-                       PAGE],
+            'epilog': ['Lists of the Reddit account the Aside browser is logged in to (the account check names it). saved and upvoted hold posts and comments, newest saved or upvoted first. comment-replies, post-replies and mentions are what other accounts sent you, newest first; reading them never marks them read (unread says which are still new). Private messages are not read.'],
             'requests': LISTING,
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
         },
@@ -866,8 +858,8 @@ def _reddit_surface(platform):
                           (('--context',), {'type': count, 'help': 'For a comment link: how many of its ancestors Reddit '
                                                                  'sends with it'}),
                           'chars', 'json'],
-            'epilog': ['The post is shown in full. Reddit sends up to 500 of its comments, 10 levels deep, in one answer; the rest are gaps. The comments shown are the first batch in depth-first order within --depth: each [c] line names the comment it answers (reply-to=), and the thread: line counts what Reddit reports (deleted and removed included), what arrived, what is shown, what is deeper than --depth and what is left to expand. more: continues the same reading as a comments command; it is offered only while a continuation can still show or fetch comments within --depth. The first line counts the post and the context rows with the comments.',
-                       "The sort is the order inside each batch, not across batches. A thread's suggested sort and contest mode (random order, hidden scores) are on the thread: line. Every comment carries its permalink: comments <that url> opens it in full with what hangs under it."],
+            'epilog': ['The post is shown in full. Reddit sends up to 500 of its comments, 10 levels deep, in one answer; the rest are gaps. The first batch is shown depth-first within --depth, each [c] line naming the comment it answers (reply-to=); the thread: line counts what Reddit reports (deleted and removed included), what arrived, is shown, is deeper than --depth and is left to expand. more: continues it as a comments command while comments within --depth remain. The first line counts the post and context rows with the comments.',
+                       "The sort is the order inside each batch, not across batches. A thread's suggested sort and contest mode (random order, hidden scores) are on the thread: line. comments <a comment's permalink> opens it in full with what hangs under it."],
             'requests': 'the account check (/api/me.json) + 1 (a share link adds 1 per redirect, at most 3).',
             'more': True,
             'exits': (0, 2, 3, 4, 5, 6, 8, 9, 10),
@@ -875,9 +867,7 @@ def _reddit_surface(platform):
         'comments': {
             'help': 'Read the next batch of a thread, or one comment in full with what hangs under it.',
             'run': _command(platform.thread_comments),
-            'arguments': [(('target',), {'help': 'A post URL (its next batch), or a comment\'s permalink '
-                                                                   '(that comment, always, with its ancestors as context '
-                                                                   'and what hangs under it)'}),
+            'arguments': [(('target',), {'help': 'A post URL (its next batch) or a comment\'s permalink (that comment with its ancestors and what hangs under it)'}),
                           (('--sort',), {'choices': platform.web_COMMENT_SORTS, 'help': 'Comment order (default best); a reading '
                                                                                'keeps its order'}),
                           (('--limit',), {'type': positive, 'help': 'Comments to show (default 25); with --out, comments to '
@@ -885,9 +875,9 @@ def _reddit_surface(platform):
                           (('--depth',), {'type': count, 'help': 'Reply levels to show (default 2), counted from the linked '
                                                                'comment for a comment link'}),
                           'chars', 'after', 'out', 'json'],
-            'epilog': ['A batch comes from the snapshot the last post or comments read left (for a day): no listing request while it holds comments not yet shown. When none is left within --depth, the next gaps are expanded: up to 100 comment ids across gaps in one request, and a "continue this thread" branch in one request each. A comment Reddit lists but does not send when asked is counted as asked for but never sent (deleted or removed). more: is offered only while a continuation can still show or fetch comments within --depth; comments only deeper than --depth, and branches Reddit sent nothing for, are left as coverage notes (a larger --depth shows the first kind).',
+            'epilog': ['A batch is shown from the snapshot the last post or comments read left (for a day), with no request while it holds unshown comments; then the next gaps are expanded (up to 100 comment ids in one request; a "continue this thread" branch, one request each). A comment Reddit lists but never sends when asked is counted as never sent (deleted or removed). more: is offered while comments within --depth remain; deeper ones, and branches Reddit sent nothing for, are coverage notes (a larger --depth shows the first).',
                        'A comment link is answered from the latest snapshot of its post when it holds that comment; otherwise its subtree is read (1 request).',
-                       'With --out the whole thread is written: the post once, then every comment flat (parent_id and depth), a page per expansion; rerun the same command to resume the same reading even after its snapshot expired. A tree whose last branches Reddit will not expand ends partial (8).'],
+                       '--out writes the whole thread: the post once, then every comment flat (parent_id, depth), a page per expansion; the same command resumes it even after its snapshot expired. Branches Reddit will not expand end it partial (8).'],
             'requests': 'the account check (/api/me.json) + 1 per expansion (or 1 for a new read); the time limit stops a large thread and more: continues.',
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
         },
@@ -899,7 +889,7 @@ def _reddit_surface(platform):
                           (('numbers',), {'nargs': '*', 'type': positive, 'metavar': 'N',
                                           'help': 'The pictures to save, by the numbers the post shows (media N:)'}),
                           (('--all',), {'action': 'store_true', 'help': 'Save every picture of the post'}), 'json'],
-            'epilog': ["The post is read again (preview links are signed and do not last), so N is the Nth picture as Reddit sends the post now; each saved line names its kind, size and media_id to match what the post showed. Only Reddit's own image hosts (i.redd.it, preview.redd.it) are fetched; a picture hosted elsewhere is named and skipped. A picture that could not be saved is named in coverage (exit 8); a number the post does not have is refused before any picture is fetched (exit 2). A stop between pictures (the time limit, a hold) keeps the saved ones and ends with more: naming the numbers left."],
+            'epilog': ["The post is read again (preview links expire), so N is the Nth picture as Reddit sends it now; each saved line names its kind, size and media_id to match the post. Only Reddit's image hosts (i.redd.it, preview.redd.it) are fetched; a picture elsewhere is named and skipped. One that could not be saved is named in coverage (exit 8); a number the post lacks is refused before any fetch (exit 2). A stop between pictures keeps the saved ones; more: names the numbers left."],
             'requests': "1 for the post (plus a share link's hops), then 1 per picture.",
             'more': True,
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
@@ -1358,10 +1348,11 @@ def parser(platforms, hidden=False, commands=None):
     root = Parser(prog='cli.py', usage='cli.py [--verbose] <platform> <command> [options]',
                   description='Read social networks through the logged-in Aside browser. Read-only.\nPlatforms: '
                               + ' '.join(platforms) + '.',
-                  formatter_class=argparse.RawTextHelpFormatter, add_help=True,
+                  formatter_class=argparse.RawTextHelpFormatter, add_help=False,
                   epilog=MEANINGS + '\n\nplatforms and their commands (after | each platform\'s own places):\n'
                          + '\n'.join(lines) + '\n  (every platform also has doctor and schema)\n\n' + CONVENTIONS
                          + '\n\nexit codes:\n' + exit_map())
+    root.add_argument('-h', '--help', action='help', help=argparse.SUPPRESS)  # as on every leaf: the row says nothing
     root.add_argument('--verbose', action='store_true', help='Write scrubbed request metadata to stderr')
     branches = root.add_subparsers(dest='platform', required=True, metavar='<platform>', help=argparse.SUPPRESS)
     for word, module in platforms.items():

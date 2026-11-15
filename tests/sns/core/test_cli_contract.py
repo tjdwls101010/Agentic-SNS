@@ -166,3 +166,17 @@ def test_the_tab_is_explained_by_doctor_and_record_kinds_by_schema(capsys):
     for word, label in (('x', '[t1] trend'), ('threads', '[n1] notification'), ('facebook', '[e1] person')):
         cli.main([word, 'schema', 'result'])
         assert label in json.loads(capsys.readouterr().out)['results'][0]['text']['records'], word
+
+
+CHAIN = {'x': 'replies', 'threads': 'replies', 'reddit': 'comments', 'facebook': 'replies', 'naver-blog': 'comments'}
+
+
+@pytest.mark.parametrize('word', sorted(CHAIN))
+def test_following_one_lead_reads_at_most_15000_characters_of_help(word, width):
+    """The leadchain path (a post, its branch, the author's posts, a related search, its pictures) read the way the
+    help is built to be read: the top-level map, then each leaf once — no platform-level help (the map names every
+    command). It was about 30,000 characters in nine reads."""
+    by_name = {name: leaf for w, name, leaf in REAL_LEAVES if w == word}
+    path = ['post', CHAIN[word], 'profile', 'search', 'images']
+    total = len(cli.parser(cli.load_platforms()).format_help()) + sum(len(by_name[name].format_help()) for name in path)
+    assert total <= 15_000, total
