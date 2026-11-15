@@ -19,7 +19,7 @@ ACCOUNT_IDLE_PAGES = 3
 
 def paged(listed, kinds):
     """The reading Page of one timeline page (web.list_page), keeping only `kinds` of record."""
-    kept = [r for r in listed.records if r.get('kind') in kinds]
+    kept = [r for r in listed.records if r.get('kind') in kinds or r.get('promoted')]  # an ad of any kind, marked
     foreign = sum(1 for kind in listed.unreadable_kinds if kind not in kinds)
     other = listed.other + len(listed.records) - len(kept) + foreign
     unreadable = listed.unreadable - foreign

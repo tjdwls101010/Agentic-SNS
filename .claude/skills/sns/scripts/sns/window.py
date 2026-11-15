@@ -67,8 +67,8 @@ class Window:
         return {'bounds': self.bounds, 'last': self.last, 'unordered': self.unordered, 'undated': self.undated}
 
     def keep(self, record):
-        if not self.active:
-            return True
+        if not self.active or record.get('promoted'):
+            return True  # an ad is shown marked, dated or not: it is not part of what the window asked for
         if record.get('unavailable'):
             return False
         if not record.get('created_at'):

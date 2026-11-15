@@ -100,3 +100,13 @@ def test_a_grouped_unit_with_an_undated_record_proves_no_order():
 def test_without_units_an_undated_record_is_only_left_out():
     window = Window('2026-10-10', None, order='newest_first', policy=WindowPolicy(tz=UTC, jitter=600))
     assert window.closes([{'id': 'a', 'created_at': None}, {'id': 'b', 'created_at': at('2026-10-01')}])
+
+
+def test_an_ad_passes_the_window_marked_dated_or_not():
+    """Review of P5: an ad is not what a window asked for and is shown marked either way; an undated one (Facebook's
+    usually are) is not counted among undated records left out."""
+    window = Window('2026-10-10', '2026-10-11', order='newest_first', policy=WindowPolicy(tz=KST))
+    assert window.keep({'id': 'ad1', 'promoted': True})
+    assert window.keep({'id': 'ad2', 'promoted': True, 'created_at': '2019-01-01T00:00:00Z'})
+    assert not window.keep({'id': 'p1', 'created_at': '2019-01-01T00:00:00Z'})
+    assert window.state()['undated'] == []

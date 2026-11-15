@@ -96,6 +96,19 @@ def test_ads_are_included_and_counted(browser):
     assert code == 0 and '2 shown (1 ads)' in out and '[ad] [p2]' in out and 'ads) left out' not in out
 
 
+def test_an_ad_of_another_kind_than_the_feed_reads_is_kept_marked(browser):
+    """Review of P5: a promoted account in a posts feed was dropped as 'other items X mixed in'; an ad of any kind is
+    returned marked."""
+    ad = {'entryId': 'promoted-user-1000000077', 'content': {'itemContent': {'itemType': 'TimelineUser', 'user_results': {
+        'result': {'rest_id': '1000000077', 'core': {'screen_name': 'advertiser', 'name': 'Advertiser'}}}}}}
+    known_tab(browser).respond('x.query', query_result(home([entry(post('1850000000000000001'))], extra=[ad]),
+                                                       headers=RATE))
+    code, out, _ = feed(browser, '--json')
+    envelope = json.loads(out)
+    assert code == 0 and [(r['kind'], r['promoted']) for r in envelope['results']] == [('post', False), ('account', True)]
+    assert not any('other' in line for line in envelope.get('coverage') or [])
+
+
 def test_json_envelope(browser):
     known_tab(browser).respond('x.query', query_result(home([entry(post('1850000000000000001'))]), headers=RATE))
     code, out, _ = feed(browser, '--json')
