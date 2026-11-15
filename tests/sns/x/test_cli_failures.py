@@ -300,8 +300,10 @@ def test_a_lock_in_the_same_report_is_acted_on_even_when_the_own_limit_cannot_be
 def test_an_aside_failure_near_the_deadline_is_still_an_aside_failure(browser):
     browser.tab('T1', url=START)
     Session('x', ASIDE).set_tab('T1')
-    browser.respond('x.state', {'__sleep': 1.9, '__raw_stdout': 'Error: other side closed\n', '__exit': 1})
-    code, out, _ = run(browser, 'feed', env={'SNS_DEADLINE_SECONDS': '2.5'})
+    # the call's time is clamped by the deadline (6 s, below Aside's own limit) and it fails 2.5 s before it: room
+    # for a loaded machine's start-up, which a 0.6 s margin did not leave (it then ended exit 6, the time limit)
+    browser.respond('x.state', {'__sleep': 3.5, '__raw_stdout': 'Error: other side closed\n', '__exit': 1})
+    code, out, _ = run(browser, 'feed', env={'SNS_DEADLINE_SECONDS': '6'})
     assert code == 3 and json.loads(out)['error'] == 'aside'
 
 
