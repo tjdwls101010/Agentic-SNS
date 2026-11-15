@@ -15,7 +15,7 @@ from tests.sns.support.policies import POLICIES
 
 PACKAGE = Path(facebook.__file__).resolve().parent
 WEB = PACKAGE / 'web'
-FEATURES = {'listing', 'thread', 'search', 'about', 'images', 'notifications', 'render'}
+FEATURES = {'listing', 'screens', 'thread', 'search', 'about', 'images', 'notifications', 'render'}
 
 
 def sources(root=PACKAGE):
@@ -34,8 +34,8 @@ def test_the_facebook_package_is_its_interface_its_feature_modules_and_the_syste
 def test_the_interface_is_platform_commands_and_choices():
     assert facebook.PLATFORM.key == 'facebook' and facebook.PLATFORM.word == 'facebook'
     assert facebook.PLATFORM.transport == 'tab' and facebook.PLATFORM.site == 'facebook.com'
-    assert list(COMMANDS) == ['feed', 'profile', 'group', 'post', 'comments', 'replies', 'search', 'about',
-                                       'images', 'me']
+    assert list(COMMANDS) == ['feed', 'profile', 'graph', 'group', 'post', 'comments', 'replies', 'search', 'about',
+                              'images', 'me']
     assert set(CHOICES) and all(key.split('.')[0] in COMMANDS for key in CHOICES)
 
 
@@ -44,7 +44,7 @@ def test_the_platform_adapter_says_how_this_tab_behaves():
     assert platform.idle_action == 'blank'  # window.close() does not take on Facebook's tab (measured)
     assert platform.unblock_scope is None   # an account-wide platform: the check is counted in no named scope
     assert platform.window.tz is None and platform.window.unit_key is None  # the local zone; every post is its own unit
-    assert callable(platform.locate) and platform.schemas.keys() == {'post', 'entity', 'about', 'group', 'comment', 'notification', 'doctor', 'image'}
+    assert callable(platform.locate) and platform.schemas.keys() == {'post', 'entity', 'about', 'group', 'comment', 'notification', 'saved', 'photo', 'doctor', 'image'}
 
 
 def test_the_adapters_policy_is_the_facebook_row_of_the_plans_table():

@@ -95,6 +95,21 @@ def entity(record, index):
             f'· {verified} · url: {_handle(record.get("url"))}')
 
 
+def saved(record, index, chars):
+    labels = [_line(record.get(key) or '?') for key in ('category', 'item_type')] + [_line(d) for d in record['details']]
+    return (f'[s{index}] ' + ' · '.join(labels) + '\n'
+            f'     {_shown(record.get("title"), chars, "title")}\n'
+            f'     url: {_handle(record.get("url"))}')
+
+
+def photo(record, index, chars):
+    size = f'{record["width"]}x{record["height"]}' if record.get('width') and record.get('height') else 'size=?'
+    lines = [f'[m{index}] photo id={_line(record["id"])} · {size}']
+    if record.get('alt'):
+        lines.append('     ' + _shown(record['alt'], chars, 'alt'))
+    return '\n'.join([*lines, f'     url: {_handle(record.get("url"))}'])
+
+
 def notification(record, index, chars):
     kind, seen = _line(record.get('notification_type') or 'unknown'), record.get('seen') or 'seen=?'
     return (f'[n{index}] {_time(record.get("created_at"))} · {kind} · {seen}\n'
@@ -130,6 +145,12 @@ def render(envelope, chars, command):
         elif kind == 'notification':
             counts['n'] = counts.get('n', 0) + 1
             lines.append(notification(record, counts['n'], limit))
+        elif kind == 'saved':
+            counts['s'] = counts.get('s', 0) + 1
+            lines.append(saved(record, counts['s'], limit))
+        elif kind == 'photo':
+            counts['m'] = counts.get('m', 0) + 1
+            lines.append(photo(record, counts['m'], limit))
         elif kind in ('person', 'page', 'group'):
             counts['e'] += 1
             lines.append(entity(record, counts['e']))

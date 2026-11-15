@@ -106,7 +106,7 @@ def profile(platform, invocation):
 def group(platform, invocation):
     options = invocation.options
     target = web.normalize_group(options['target'])
-    sort = options['sort']
+    sort = options['sort'] or 'top'
     order = 'newest_first' if sort == 'recent' else 'ranked'
     identity = {'sort': sort}
 

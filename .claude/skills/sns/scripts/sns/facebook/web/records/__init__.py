@@ -5,7 +5,7 @@ also says where it was read from (a post: source) or what it belongs to (a comme
 """
 from dataclasses import dataclass, field
 
-from sns.facebook.web.records import about, comments, groups, notifications, posts, search
+from sns.facebook.web.records import about, comments, groups, notifications, posts, screens, search
 from sns.facebook.web.records.parse import find_page_info, has_items
 
 
@@ -18,6 +18,7 @@ class Batch:
     has_items: bool = False
     issues: list = field(default_factory=list)
     handles: dict = field(default_factory=dict)
+    left_out: dict = field(default_factory=dict)   # rows received and not shown, by label (screen lists)
 
 
 def posts_page(chunks, *, source, connection_key, captured_at):
@@ -54,6 +55,31 @@ def notifications_page(chunks, *, captured_at):
     """One page of the viewer's notification list (notification records; layout rows are left out)."""
     records, info, has_items, issues = notifications.page(chunks, captured_at=captured_at)
     return Batch(records, info, has_items, issues)
+
+
+def saved_page(chunks, *, captured_at):
+    """The account's saved items from the /saved/ screen's payload (page_info None: the screen has no such list)."""
+    return Batch(*screens.saved(chunks, captured_at=captured_at))
+
+
+def joined_groups_page(chunks, *, captured_at):
+    """The groups the account joined (group entities) from the /groups/joins/ screen's payload."""
+    return Batch(*screens.joined_groups(chunks, captured_at=captured_at))
+
+
+def collection_page(chunks, *, captured_at):
+    """A profile tab's app collection (photos, followers) from that tab's screen payload."""
+    return Batch(*screens.app_collection(chunks, captured_at=captured_at))
+
+
+def friends_page(chunks, *, captured_at):
+    """The account's own friends (person entities) from the /friends/list screen's payload."""
+    return Batch(*screens.friends(chunks, captured_at=captured_at))
+
+
+def members_page(chunks, *, captured_at):
+    """A group's new members (person entities) from its members screen's payload."""
+    return Batch(*screens.new_members(chunks, captured_at=captured_at))
 
 
 def about_collections(chunks):
@@ -101,5 +127,7 @@ SCHEMAS = {
                      'fields': notifications.FIELDS},
     'comment': {'object': 'comment', 'description': 'A comment or reply from post, comments or replies.',
                 'fields': comments.FIELDS},
+    'saved': {'object': 'saved', 'description': 'A saved item from me saved.', 'fields': screens.SAVED_FIELDS},
+    'photo': {'object': 'photo', 'description': 'A photo from profile --tab photos.', 'fields': screens.PHOTO_FIELDS},
     'doctor': DOCTOR,
 }

@@ -92,3 +92,20 @@ def test_page_about_and_group_card():
     [group] = card['results']
     assert group['kind'] == 'group' and group['name'] and group['privacy'] and group['member_count_text']
     assert isinstance(group['rules'], list)
+
+
+def test_the_lists_read_from_a_screens_own_page():
+    """P7c: each reads one page GET of its screen. Your own lists may be empty (7); a public page's photos and
+    followers, a public group's new members and a video search are expected to have rows."""
+    for args, kinds in ((('me', 'saved'), {'saved'}), (('me', 'groups'), {'group'}), (('graph', 'friends'), {'person'})):
+        code, result = cli(*args)
+        assert code in (0, 7), result
+        assert {r['kind'] for r in result['results']} <= kinds and result['stop_reason'] in ('exhausted', 'not_built')
+    page, group = target('PAGE'), target('GROUP')
+    for args, kinds in ((('profile', page, '--tab', 'photos'), {'photo'}),
+                        (('graph', page, 'followers'), {'person', 'page'}),
+                        (('group', group, '--tab', 'members'), {'person'}),
+                        (('search', 'moon', '--type', 'videos'), {'post'})):
+        code, result = cli(*args)
+        assert code == 0 and result['results'], result
+        assert {r.get('kind', 'post') for r in result['results']} <= kinds and all(r['id'] for r in result['results'])

@@ -107,10 +107,16 @@ def direct_group_id(url):
 def about_path(url):
     """The path (and query) of a normalized profile's or group's About screen, as the tab can move to it: a numeric
     profile is /profile.php?id=N, whose About screen is /profile.php?id=N&sk=about, not a path under it."""
+    return tab_path(url, 'about')
+
+
+def tab_path(url, tab):
+    """The path (and query) of one tab of a normalized profile, page or group: /<vanity>/<tab>, or
+    /profile.php?id=N&sk=<tab> for a numeric profile."""
     parts = urlsplit(url)
     if parts.path.rstrip('/') == '/profile.php':
-        return parts.path + '?' + parts.query + '&sk=about'
-    return parts.path.rstrip('/') + '/about'
+        return parts.path + '?' + parts.query + '&sk=' + tab
+    return parts.path.rstrip('/') + '/' + tab
 
 
 def find_id(kind, page):
