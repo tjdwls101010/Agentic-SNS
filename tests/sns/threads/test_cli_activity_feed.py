@@ -167,3 +167,18 @@ def test_a_body_is_dropped_only_when_it_repeats_the_title(browser):
     code, out, _ = run(browser, 'activity', '--json')
     records = json.loads(out)['results']
     assert code == 0 and [r['text'] for r in records] == ['alice replied to your thread\nto', 'Someone replied']
+
+
+def test_a_learned_ids_own_provider_values_decide_which_providers_the_page_must_supply(browser):
+    """Live (2026-11-15): Threads dropped two providers from its feed queries; the ids learned from the live modules
+    came with the new provider values, but the client still asked the page for the bundled list's dropped ones, so the
+    page sent nothing ('no value for …') and the feed's next page failed every time."""
+    from sns.session import Session
+    favicons = '__relay_internal__pv__BarcelonaHasWebFaviconsrelayprovider'
+    Session('threads', 'u0').learn('BarcelonaActivityFeedV2StoryListContainerQuery', '999', {favicons: True})
+    known_tab(browser).respond('threads.query', query_result(inbox([row()])))
+    code, out, _ = run(browser, 'activity', '--json')
+    assert code == 0, out
+    call = queries(browser)[0]['args']
+    assert call['fallback']['doc_id'] == '999' and call['fallback']['flags'] == {favicons: True}
+    assert [p[0] for p in call['fallback']['providers']] == [favicons]

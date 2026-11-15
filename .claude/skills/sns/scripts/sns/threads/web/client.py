@@ -477,11 +477,16 @@ class Client:
             learned = self.session.query(spec['name']) or {}
             if key in self.provisional:
                 learned = {'doc_id': spec['doc_id'], 'flags': spec.get('flags')}
+            providers = [[learn.provider_variable(m), m] for m in spec.get('providers') or []]
+            if isinstance(learned.get('flags'), dict) and learned.get('doc_id'):
+                # the learned id came with its own provider values: providers the bundled list names beyond them
+                # belong to an older version of the query, and asking the page for them makes it send nothing
+                providers = [p for p in providers if p[0] in learned['flags']]
             args = {'name': spec['name'], 'allowed': self._allowed(), 'asbd_id': SNAPSHOT['asbd_id'],
                     'variables': {**spec['variables'], **variables}, 'endpoint': spec.get('endpoint'),
                     'root': spec.get('root'),
                     'fallback': {'doc_id': learned.get('doc_id') or spec.get('doc_id'), 'flags': learned.get('flags'),
-                                 'providers': [[learn.provider_variable(m), m] for m in spec.get('providers') or []]}}
+                                 'providers': providers}}
             result, verdict = self._request('query', args, lambda r: (
                 classify.Verdict('failed', reason='rejected_query') if r.get('missing')
                 else classify.response(r, mode='graphql')), key)
