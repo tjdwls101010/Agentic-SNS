@@ -149,6 +149,22 @@ def test_an_opening_no_look_reached_after_the_load_is_charged_the_reserve(browse
     assert result['results'] == [] and Session('x', ASIDE).tab == 'NEW1'
 
 
+def test_an_opening_whose_tab_vanishes_after_a_look_is_charged_the_reserve(browser):
+    """One look came back, then the tab was gone before the load settled: what the page requested after that look was
+    never read, so the load was not measured (review of P1)."""
+    gone = {'__raw_stdout': json.dumps({'kind': 'error', 'error': 'tab_missing', 'message': 'x'}) + '\n'}
+    browser.respond('open', {'tab': 'NEW1'})
+    browser.respond('load:x.arm', {'installed_at': 300, 'location': START, 'ready_at_install': 'loading',
+                                   'app_at_install': False})
+    browser.respond('x.state', state(resources=0, app=False, store=False)).respond('x.state', gone)
+    browser.respond('open', {'tab': 'NEW2'})
+    browser.respond('load:x.arm', {'__raw_stdout': json.dumps({'kind': 'error', 'error': 'load_timeout',
+                                                                'message': 'x'}) + '\n'})
+    code, result, _ = doctor(browser)
+    assert code == 3, result
+    assert result['setup_requests'] >= 21  # the reserve and the placeholder for the first opening at least
+
+
 def test_an_opening_stopped_by_a_lock_is_charged_what_it_loaded(browser):
     lock = {'path': '/i/api/graphql/abc/HomeTimeline', 'status': 200, 'codes': [326], 'html': False, 'rate': None,
             'at': 5}

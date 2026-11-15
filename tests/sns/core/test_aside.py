@@ -1,5 +1,5 @@
 """The Aside system (sns.aside) against the scripted fake: account resolution, the one output protocol, the deadline
-clamp, and both ways of opening a tab."""
+clamp, and opening a tab."""
 import json
 
 import pytest
