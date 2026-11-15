@@ -40,13 +40,15 @@ def keep(envelope):
     """Write `envelope` to a new result file after putting its path in envelope['saved'] (day-old files are pruned when
     the read starts, see reading.pipeline.run); when it cannot be written,
     envelope['saved'] is 'unavailable' and a coverage line says so (the read itself stands). Returns the envelope."""
-    path = None
+    path, created = None, False
     try:
         directory = _directory()
         with open(directory / 'counter', 'a+b') as counter:
             fcntl.flock(counter, fcntl.LOCK_EX)
             counter.seek(0)
-            number = int(counter.read().strip() or b'0') + 1
+            # above the counter and above every file there, so a lost or emptied counter never reuses a number
+            highest = max((int(p.stem) for p in directory.glob('*.json') if p.stem.isdigit()), default=0)
+            number = max(int(counter.read().strip() or b'0'), highest) + 1
             counter.seek(0)
             counter.truncate()
             counter.write(str(number).encode())
@@ -55,12 +57,14 @@ def keep(envelope):
         path = directory / f'{number}.json'
         envelope['saved'] = str(path)
         text = json.dumps(envelope, ensure_ascii=False, indent=1)
-        with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w', encoding='utf-8') as stream:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        created = True  # from here a failure leaves a file of this call's own, which goes
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as stream:
             stream.write(text)
             stream.flush()
             os.fsync(stream.fileno())
     except (OSError, ValueError, TypeError, SnsError):
-        if path is not None and envelope.get('saved') == str(path):
+        if created:
             try:
                 path.unlink()  # a file written in part is not the result it would name
             except OSError:

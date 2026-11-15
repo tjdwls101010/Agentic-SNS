@@ -186,3 +186,20 @@ def test_a_file_that_could_not_be_written_whole_is_not_left_behind(capsys, brows
     code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--json')
     assert code == 0 and json.loads(out)['saved'] == 'unavailable'
     assert not list((data_dir / 'results').glob('*.json'))
+
+
+def test_a_lost_counter_never_costs_an_earlier_file(capsys, browser, monkeypatch, data_dir):
+    """Numbers go on above the files already there, so a read never collides with, or removes, an earlier one."""
+    import json
+    import os
+    me(browser)
+    feed(browser, None, [item(1)], None)
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--json')
+    first = json.loads(out)['saved']
+    os.unlink(data_dir / 'results' / 'counter')
+    me(browser)
+    feed(browser, None, [item(2)], None)
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--json')
+    second = json.loads(out)['saved']
+    assert os.path.exists(first) and os.path.exists(second) and first != second
+    assert json.loads(open(first).read())['results'][0]['id'] != json.loads(open(second).read())['results'][0]['id']

@@ -87,13 +87,16 @@ class Connection:
         this command line without its --out file (which a rerun would find complete) and --after."""
         if self.remake:
             return self.remake
+        # the options this command was given, however abbreviated (argparse takes a unique prefix such as --ou)
+        given = [name for name in ('--out', '--after') if self.options.get(name[2:]) is not None]
         words, argv = [], list(getattr(self.invocation, 'argv', ()))
         while argv:
             word = argv.pop(0)
-            if word in ('--out', '--after') and argv:
-                argv.pop(0)
-            elif not word.startswith(('--out=', '--after=')):
+            name = word.split('=', 1)[0]
+            if not (len(name) > 2 and any(option.startswith(name) for option in given)):
                 words.append(word)
+            elif '=' not in word and argv:
+                argv.pop(0)
         return command_line(self.invocation.cli_path, words) if words else None
 
     def resume(self, number, command, target=None, identity=None):

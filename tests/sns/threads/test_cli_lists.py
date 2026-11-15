@@ -47,6 +47,15 @@ def test_followers_read_to_the_profiles_total_are_the_whole_list(browser):
     assert code == 0 and result['stop_reason'] == 'exhausted', result
 
 
+def test_the_same_follower_twice_does_not_make_the_list_look_whole(browser):
+    body = {'data': {'fetch__XDTUserDict': {'followers': {'edges': accounts(['a.one', 'a.one'])[:1] * 2}},
+                     'xdt_api__v1__text_feed__user_counts': {'follower_count': 2}}}
+    known_tab(browser).respond('threads.query', by_name()).respond('threads.query', query_result(body))
+    code, out, _ = run(browser, 'graph', '@example.author', 'followers', '--json')
+    result = json.loads(out)
+    assert code == 0 and result['stop_reason'] == 'not_built', result
+
+
 def test_the_rest_of_a_followers_page_still_ends_not_built(browser):
     """more: after --limit shows what the first page held without a request; the end it reaches is still the
     skill's, not the list's."""
