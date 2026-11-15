@@ -58,6 +58,8 @@
 | F12 | Claude `evidence` 검토자가 전체 스위트를 돌림: `3,074 passed, 31 skipped, 3 failed`(550초). 실패 3은 모두 환경 탓 — 둘은 이 세션의 작업자 샌드박스가 스킬 폴더 안에 만든 빈 `.claude/.cc-writes` 디렉터리(`.claude/skills/sns/.claude`, `…/scripts/.claude`, `…/scripts/sns/.claude`, `tests/sns/.claude`, `contrast/sns/.claude`, `contrast/sns/tasks/.claude`) 때문에 구조 테스트가 걸린 것, 하나는 샌드박스의 `ps` 거부. **구현 세션 첫 동작에서 이 빈 디렉터리들을 지운다**(계획 모드라 이 세션에서는 지우지 않음) | 검토자 보고, `find . -name .cc-writes` |
 | F13 | 대조 하네스는 지금 다시 돌릴 수 없다: 변형 B가 레포 밖 `$WORK/drafts/SKILL.md`를 읽고(`contrast.py:158`, 그 경로 없음), `MODELS`가 닫힌 쌍(`:52`), 과제 대상 `task-env.sh`·원 실행·채점표·가림 스크립트·채점 프롬프트가 모두 레포 밖(사라짐). `permission_denials`를 모으지만(`:235`) 무효 처리하지 않는다 | `evidence` 검토자, `contrast/sns/contrast.py` |
 | F14 | 지난 대조의 한계: 칸마다 1회 실행, 같은 A 98실행을 두 채점자가 3행 15 대 24·6행 16 대 4로 채점(채점자 잡음 ≥ 효과), A 실행 73/98이 권한 거부를 겪고도 채점됨(프레임: 그런 실행은 무효·재실행), A의 호출 한 줄에는 B 본문 11행의 "리터럴 경로·명령 하나씩" 사실이 없었음(교란), 절 하나만 뺀 C 실행은 한 번도 없음, 모델별 분해 기록 없음 | 개발 기록 c2:178,204–236, `contrast.py:70–73` |
+| F20 | **에이전트 없이 지속 탭을 여는 길이 새 Aside에는 없다.** `aside repl "<code>"`(코드 인자)도 출력은 스크립트가 끝난 뒤 한꺼번에 오고, REPL 호출이 연 탭은 그 호출이 끝나면 닫힌다 — 다른 호출이 붙어 있는 동안 끝나도 닫힌다. `aside <https-url>`은 브라우저 에이전트 세션이다(세션 id, 그 페이지의 `snapshot()`, 모델의 답 — 이 계정은 "signed out" 경고를 내면서도 열었다) — 그 탭은 남고 URL 조각이 `listBrowserTabs()`에 그대로 보인다. 그래서 P1은 X도 `aside <placeholder>#sns-<nonce>`로 열고 nonce로 찾은 뒤 `load`한다(10월 X 관문 ④ "에이전트·크레딧 미사용"을 뒤집음 — I3) | 이 세션 실측(2026-11-15, P1 탐침: 코드 인자 출력 6.19초에 한꺼번에, 열어 둔 탭이 붙은 채로도 사라짐, 에이전트 탭은 남음) |
+| F21 | **비운 탭(about:blank)을 Aside가 더 이상 스스로 닫지 않는다.** 에이전트가 연 탭을 `location.replace('about:blank')`로 비운 뒤 10분 넘게 목록에 남았고, `closeTab`은 붙은 탭을 떼기만 한다. 페이지 함수의 `window.close()`는 그 about:blank 탭을 닫았다. 유휴 정리(`reading.empty_tab`)는 "about:blank면 끝"으로 보므로 threads·facebook·X의 전용 탭이 비운 채 쌓일 수 있다 — X 수리와 다른 이유라 따로 PR | 이 세션 실측(2026-11-15) |
 | F9 | 나머지 넷은 정상: `doctor` 종료 0·로그인·무차단(reddit 1초, naver 1초, threads 16초·탭 열기 40요청, facebook 11초·41요청). `feed` 한 쪽: reddit 25건 119줄 14,960자(`--json` 43,087자) 5초, naver 10건 44줄 4,264자(6,846자) 1초, threads 4건 17줄 1,876자(10,897자) 2초, facebook 2건 12줄 1,780자(5,031자) 3초. 글 내용은 기록하지 않음 | 이 세션 실측(2026-11-15, 실계정 u0) |
 | F11 | **README가 안내하는 설치(`npx skills add`)로 다시 설치·업데이트하면 `data/`가 지워진다.** 설치기는 대상 폴더를 `rm -r` 한 뒤 복사한다(`vercel-labs/skills` `src/installer.ts`의 `cleanAndCreateDirectory`: `rm(path, {recursive: true, force: true})` → `copyDirectory`). 그러면 기록된 person 차단·hold·페이싱·요청 기록·핸들·학습한 쿼리가 사라져, 사람이 풀어야 하는 차단이 조용히 풀린 것처럼 된다. 프레임은 업데이트가 폴더를 바꾸는 배포에서는 상태를 폴더 밖에 두라고 한다(플러그인의 data 디렉터리) | `gh api repos/vercel-labs/skills/contents/src/installer.ts`(2026-11-15), `paths.py:16` |
 | F10 | Codex가 짚은 코드 사실을 Claude가 원문에서 확인: X 타임라인 파서가 promoted 항목을 세기만 하고 버림(`x/web/records/timeline.py:91–93`), Threads 팔로워는 커서가 와도 한 표본에서 멈춤(`threads/web/records/lists.py:122–128`, 주석 "decision T5"), 기본 미리보기 180자(`text.py:6`), `schema result`의 `detail`이 "it reads live, so what it shows can differ" (`results.py:298`) | 이 세션 |
@@ -73,7 +75,7 @@
 |---|---|---|---|
 | I1 | 추론 | 문법을 하나로 맞추면 help 읽기가 줄고 플랫폼 간 실수가 준다 | L4·L5의 측정. P5 뒤 같은 사슬로 help 글자 수·읽기 횟수를 다시 재서 확인 |
 | I2 | 추론 | 프론트매터 `allowed-tools`의 `Read(~/.local/state/agentic-sns/**)` 꼴 규칙이 상태 폴더의 사진·결과 파일 읽기를 사전 승인한다 | P2에서 Claude Code 문서와 실측으로 확인. 안 되면 대안(성진과 정함) |
-| I3 | 추론 | X 전용 탭은 threads·facebook처럼 `aside <url>`로 연 지속 탭에 붙는 방식으로 되살릴 수 있다 | P1 정찰(F8c). 옛 제약 "관찰기를 앱보다 먼저 설치"와 맞는지가 관건 |
+| I3 | 추론 → **확인(P1)** | X 전용 탭은 threads·facebook처럼 `aside <url>`로 연 지속 탭에 붙는 방식으로 되살릴 수 있다 | 앱이 돌지 않는 placeholder(`x.com/robots.txt`)를 열고 `load`로 x.com에 보내 관찰기를 앱보다 먼저 둔다. 실계정 `x doctor` 종료 0, `opening_measured: true`(F20) |
 | I4 | 추론 | 본문은 지금(약 4.6KB)보다 크게 줄어든다 | A8·A9, F4. 대조 결과가 정한다 — 줄지 않아도 증거가 있으면 그대로 |
 | G1 | 받아들인 가정 | 대조 실계정 실행은 권한 규칙만으로 가둔다(OS 샌드박스 안에서 aside가 동작하지 않음) | 옛 C12·A1 그대로 |
 | G2 | 받아들인 가정 | Fable 5.2에서의 동작은 재지 않는다 | A4 |
@@ -102,7 +104,7 @@
 | C6 캡처는 gitignore, 픽스처는 합성, 과제 대상은 환경 변수 | 유지 | — |
 | C7 `show` 명령 없음 | 유지 + 결과 파일(A10) | 새 명령 없이 파일로 |
 | C8 핸들 카운터는 재사용하지 않음, 상태를 지우라고 말하지 않음 | 유지 | — |
-| C9 전용 탭은 약 5분 뒤 정리 | 유지 | — |
+| C9 전용 탭은 약 5분 뒤 정리 | 유지, 단 비운 탭이 남는다(F21) — 따로 PR | — |
 | C10 플랫폼별 제외 | **대부분 뒤집음**: X DM만 계속 제외, reddit·threads 커스텀 피드·reddit 댓글 검색·facebook 친구·반응한 사람 목록은 정찰 대상(R13·R18). threads 트렌딩은 "계정이 보여 주지 않음"(R12) | A12 |
 | C11 명령 이름은 형제 사이 맞춤, 별칭 없음 | 유지 + 인자·옵션까지 넓힘 | '목표 문법' |
 | C12 대조 격리는 권한 규칙 | 유지 | G1 |
