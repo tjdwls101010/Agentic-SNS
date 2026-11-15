@@ -240,7 +240,7 @@ def exit_map(width=110):
 def _x_surface(platform):
     PLATFORM = platform.PLATFORM
     FEED_CHOICES = ['foryou', 'following']
-    PROFILE_TABS = ['posts', 'replies', 'media', 'highlights', 'articles', 'lists', 'memberships']
+    PROFILE_TABS = ['posts', 'replies', 'reposts', 'media', 'highlights', 'articles', 'lists', 'memberships']
     GRAPH_RELATIONS = ['following', 'followers', 'verified', 'known', 'similar']
     ME_COLLECTIONS = ['bookmarks', 'likes', 'notifications', 'mentions']
     LIST_TABS = ['posts', 'members', 'about']
@@ -331,12 +331,12 @@ def _x_surface(platform):
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
         },
         'profile': {
-            'help': 'Read a profile\'s tab: posts (with reposts), replies, media, highlights, articles, lists or memberships.',
+            'help': 'Read a profile\'s tab: posts (with reposts), replies, reposts, media, highlights, articles, lists or memberships.',
             'run': _run(platform.listing_profile),
             'arguments': [(('target',), {'help': f'{TARGET_ACCOUNT}; a tab URL such as /<handle>/with_replies reads that tab'}),
                           (('--tab',), {'choices': PROFILE_TABS, 'help': 'The tab (default: the URL\'s tab, else posts)'}),
                           'since', 'until', *LIST],
-            'epilog': ["posts holds the account's posts and reposts (X's own Posts tab now hides reposts); a repost row is dated when it was reposted. posts and replies are newest first, so a --since window reads on and closes at the first page wholly older than it (a pinned post sits first whatever its date and does not close it). media, highlights and articles are not in date order: a window only filters the page read, and covers them only when read to the end.",
+            'epilog': ["posts holds the account's posts and reposts (X's own Posts tab now hides reposts); a repost row is dated when it was reposted. reposts lists the posts this account reposted, newest first as X orders them. posts and replies are newest first, so a --since window reads on and closes at the first page wholly older than it (a pinned post sits first whatever its date and does not close it). media, highlights and articles are not in date order: a window only filters the page read, and covers them only when read to the end.",
                        'lists are the lists the account made or follows, memberships the lists others put it in; both hold lists (list <url> reads one) and take no window. A protected account this account does not follow is unavailable (exit 9).'],
             'requests': '1 to find the account, then 1 per page of about 20 posts (the lists tab: about 100 lists).',
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),

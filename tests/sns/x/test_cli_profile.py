@@ -63,6 +63,32 @@ def test_posts_find_the_account_once_then_read_its_posts_and_reposts(browser):
     assert [c['args']['name'] for c in queries(browser)][-1] == 'UserTweets'  # no second lookup
 
 
+def test_reposts_tab_reads_repost_rows(browser):
+    original = tweet('202')
+    original['core']['user_results']['result'] = user('2000000002', 'writer_b')
+    original['legacy']['full_text'] = 'synthetic original'
+    repost = tweet('201')
+    repost['legacy']['retweeted_status_result'] = {'result': original}
+    known_tab(browser).respond('x.query', by_name(user()))
+    browser.respond('x.query', timeline([repost], bottom='NEXT'))
+    code, out, _ = run(browser, 'profile', 'author_a', '--tab', 'reposts', '--json')
+    assert code == 0, out
+    record = json.loads(out)['results'][0]
+    assert record['kind'] == 'post' and record['id'] == '201' and record['author']['username'] == 'author_a'
+    assert record['text'] == '' and record['reposted_post']['id'] == '202'
+    assert record['reposted_post']['author']['username'] == 'writer_b' and record['reposted_post']['text'] == 'synthetic original'
+    calls = [c['args'] for c in queries(browser)]
+    assert [c['name'] for c in calls] == ['UserByScreenName', 'UserRepostsTimeline']
+    assert calls[1]['variables'] == {'userId': '1000000001', 'count': 20, 'includePromotedContent': True, 'withVoice': True}
+
+
+def test_reposts_tab_url_selects_reposts(browser):
+    known_tab(browser).respond('x.query', by_name(user())).respond('x.query', timeline([tweet('203')]))
+    code, out, _ = run(browser, 'profile', 'https://x.com/author_a/reposts')
+    assert code == 0 and 'tab=reposts' in out.splitlines()[0]
+    assert [c['args']['name'] for c in queries(browser)][-1] == 'UserRepostsTimeline'
+
+
 def test_a_since_window_closes_on_the_newest_first_posts_tab_and_a_pin_does_not_close_it(browser):
     since = utc_day(3)
     known_tab(browser).respond('x.query', by_name(user()))

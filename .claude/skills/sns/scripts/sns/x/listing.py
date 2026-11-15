@@ -70,10 +70,11 @@ def feed(platform, invocation):
 # tab → (operation, date order). posts is UserTweets: posts and reposts, newest first (X's own Posts tab now hides
 # reposts, X14); media is UserMedia: photos, videos and GIFs (X's own Media tab now shows videos only).
 TABS = {'posts': ('UserTweets', 'newest_first'), 'replies': ('UserRepliesTimeline', 'newest_first'),
+        'reposts': ('UserRepostsTimeline', 'finite'),
         'media': ('UserMedia', 'finite'), 'highlights': ('UserHighlightsTweets', 'finite'),
         'articles': ('UserArticlesTweets', 'finite'), 'lists': ('CombinedLists', 'finite'),
         'memberships': ('ListMemberships', 'finite')}
-DATED_TABS = ('posts', 'replies', 'media', 'highlights', 'articles')
+DATED_TABS = ('posts', 'replies', 'reposts', 'media', 'highlights', 'articles')
 
 
 def profile(platform, invocation):
