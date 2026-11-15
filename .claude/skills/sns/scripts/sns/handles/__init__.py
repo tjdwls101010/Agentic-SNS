@@ -27,7 +27,7 @@ def _directory():
         return shared('handles')
     except SnsError:
         raise SnsError('failed', 'Cannot save a handle to continue from.',
-                       'Make the skill\'s data/ directory writable, then rerun the command.') from None
+                       'Make the skill\'s state directory writable, then rerun the command.') from None
 
 
 @contextmanager
@@ -70,7 +70,30 @@ def save(context, state, viewer=None, deadline=None):
             return number
     except (OSError, ValueError, TypeError):
         raise SnsError('failed', 'Cannot save a handle to continue from.',
-                       'Make the skill\'s data/ directory writable, then rerun the command.') from None
+                       'Make the skill\'s state directory writable, then rerun the command.') from None
+
+
+def adopt_counter(legacy):
+    """Go on numbering from an install from before the state moved (`legacy`: its old data/handles/), so a number it
+    gave is never given again here (handles themselves stay where they were: they last a day)."""
+    try:
+        text = (legacy / 'counter').read_text(encoding='utf-8').strip()
+        old = int(text or '0')
+    except (OSError, ValueError, UnicodeError):
+        return
+    directory = _directory()
+    try:
+        with _counter(directory, None) as counter:
+            current = int(counter.read().strip() or b'0')
+            if old > current:
+                counter.seek(0)
+                counter.write(str(old).encode())
+                counter.truncate()
+                counter.flush()
+                os.fsync(counter.fileno())
+    except (OSError, ValueError):
+        raise SnsError('failed', 'Cannot carry the handle numbering over from the old data/.',
+                       'Make the skill\'s state directory writable, then rerun the command.') from None
 
 
 def _where(context):

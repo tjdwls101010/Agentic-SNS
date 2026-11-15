@@ -7,10 +7,15 @@ _SCRUBBED = ('SNS_', 'TWITTER_', 'THREADS_', 'REDDIT_', 'FACEBOOK_', 'NAVER_BLOG
 
 
 @pytest.fixture(autouse=True)
-def _clean_environment(monkeypatch):
+def _clean_environment(monkeypatch, request, tmp_path):
     for name in list(os.environ):
         if name.startswith(_SCRUBBED) and not name.startswith(('SNS_LIVE', 'SNS_WORK')):  # set on purpose by a run
             monkeypatch.delenv(name)
+    if request.node.get_closest_marker('live') is None:
+        # the state every install of the skill shares lives in the user's home (XDG_STATE_HOME); a test that names
+        # none of its own must neither write fake blocks there nor take in this checkout's real old data/
+        monkeypatch.setenv('SNS_DATA_DIR', str(tmp_path / 'state'))
+        monkeypatch.setenv('XDG_STATE_HOME', str(tmp_path / 'xdg-state'))
 
 
 @pytest.fixture

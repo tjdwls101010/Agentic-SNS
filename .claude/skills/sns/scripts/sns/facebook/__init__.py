@@ -171,7 +171,7 @@ COMMANDS = {
                       (('--all',), {'action': 'store_true', 'help': 'Save every picture of the post'}), 'json'],
         'epilog': ['The post is read again (its picture links are signed and do not last), so N is the Nth picture as '
                    'Facebook sends the post now; each saved line names its kind, size and media_id to match what the '
-                   'post showed. A video is saved as its poster image. Files go to the skill\'s data/images/ and are '
+                   'post showed. A video is saved as its poster image. Files go to images/ in the skill\'s state directory and are '
                    'removed a day later; they are other people\'s pictures. A picture that could not be saved is named '
                    'in coverage (exit 8); a number the post does not have is refused before any picture is fetched (exit 2). A stop between pictures (the time limit, a hold) keeps the saved ones and ends with more: naming the numbers left.',
                    'requests: 2 for the post (its page, then the post), then 1 per picture.'],

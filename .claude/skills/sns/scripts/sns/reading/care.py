@@ -36,10 +36,11 @@ def doctor(platform, invocation):
             'limits': state['scopes'], 'requests_last_hour': recent['last_hour'],
             'requests_last_day': recent['last_day'], 'idle_seconds': idle_seconds(),
             'data_dir': str(data_dir()),
-            'protection_state': f'data/{platform.key}/{connection.account}/protection/ — blocks, holds, limits, '
+            'imported_from': _imports(connection.guard),
+            'protection_state': f'{data_dir() / platform.key / connection.account / "protection"} — blocks, holds, limits, '
                                 'pacing and the request log every invocation shares; never delete it by hand',
-            'holds_personal_data': 'data/handles/ (continuation handles with other people\'s ids, removed after a '
-                                   'day) and data/images/ (saved pictures, removed after a day)',
+            'holds_personal_data': f'{data_dir() / "handles"} (continuation handles with other people\'s ids, removed '
+                                   f'after a day) and {data_dir() / "images"} (saved pictures, removed after a day)',
             **(connection.client.doctor() or {}),
         }
         reading = {'results': [result], 'stop_reason': 'ready'}
@@ -53,6 +54,15 @@ def doctor(platform, invocation):
                 pass
     return finish(reading, platform=platform.key, command='doctor',
                   report=connection.report() if connection is not None else None)
+
+
+def _imports(guard):
+    """The old data/ folders this account's protection state was taken from: the last time from each."""
+    last = {}
+    for entry in guard.snapshot()['provenance']:
+        if entry.get('kind') == 'imported' and isinstance(entry.get('path'), str):
+            last[entry['path']] = entry.get('at')
+    return [{'path': path, 'at': at} for path, at in last.items()]
 
 
 def idle(platform, invocation, account, token, after):

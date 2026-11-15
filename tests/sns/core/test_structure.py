@@ -102,10 +102,10 @@ def classify(dotted):
 
 
 def test_skill_top_level_is_fixed():
-    allowed = {'SKILL.md', 'references', 'data', 'scripts'}
+    allowed = {'SKILL.md', 'references', 'scripts'}  # state lives outside the skill folder (decision A5)
     present = set(tree.children(SKILL))
     assert present <= allowed, present - allowed
-    assert {'SKILL.md', 'data', 'scripts'} <= present
+    assert {'SKILL.md', 'scripts'} <= present
     scripts = set(tree.children(SCRIPTS))
     assert scripts == {'cli.py', 'sns'}
 
@@ -133,11 +133,15 @@ def test_platform_folders_hold_features_web_and_their_own_store_only():
             assert (root / store / '__init__.py').is_file()
 
 
-def test_only_gitignore_is_committed_in_data():
+def test_an_old_data_folder_is_never_committed():
+    """An install from before the state moved keeps data/ beside SKILL.md (handles, sessions, request logs: other people's
+    content and the account's history); the repository is public, so it is ignored and nothing in it is tracked."""
     tracked = subprocess.run(['git', 'ls-files', str(SKILL / 'data')], cwd=REPO, capture_output=True, text=True,
                              check=True).stdout.split()
-    assert tracked == ['.claude/skills/sns/data/.gitignore']
-    assert (SKILL / 'data/.gitignore').read_text().split() == ['*', '!.gitignore']
+    assert tracked == []
+    ignored = subprocess.run(['git', 'check-ignore', '-q', str(SKILL / 'data' / 'x' / 'u0' / 'protection' / 'blocks.json')],
+                             cwd=REPO)
+    assert ignored.returncode == 0
 
 
 def test_nothing_edits_sys_path():

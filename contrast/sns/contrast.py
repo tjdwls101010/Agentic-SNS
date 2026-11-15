@@ -8,9 +8,11 @@ frontmatter and the invocation line), B (the draft), C:<heading> (the draft with
 with <heading>). TASK is a file under tasks/<platform>/ (or a path); ${NAME} in it is filled from the environment, so
 real people, posts and URLs never live in the repository.
 
-State per run (SNS_DATA_DIR is a new directory for every run): data/<platform>/<account>/protection/ and session/ are
-links to the skill's real data/ (one account: one lock, one pacing, one block record, one dedicated tab across every
-run); handles, images and Reddit snapshots are the run's own, so no run continues another's. When a run ends — normally,
+State per run (SNS_DATA_DIR is a new directory for every run): <platform>/<account>/protection/ and session/ are links
+to the skill's real state directory (sns.paths.data_dir(): one account, one lock, one pacing, one block record, one
+dedicated tab across every run and every ordinary invocation); handles, images and Reddit snapshots are the run's own,
+so no run continues another's. Before linking, a live run takes in the skill's old data/ (from before the state moved)
+the way any invocation would, and does not start when that fails: a contrast run may be the install's first. When a run ends — normally,
 stopped at a block signal, or by an exception — the dedicated tab is emptied (`<platform> idle --token any --after 0`),
 the links are cut before anything is copied, and summary.json is written.
 
@@ -36,7 +38,6 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 SKILL = REPO / '.claude/skills/sns'
-DATA = SKILL / 'data'
 FAKE = REPO / 'tests/sns/fakes/fake_aside.py'
 
 
@@ -100,8 +101,50 @@ def sandbox_settings(root, data_dir):
                         'network': {'allowLocalBinding': True, 'allowAllUnixSockets': True}}}
 
 
-def link_shared(data_dir, platforms, account, real=DATA):
-    """Link each platform's protection and session state to the skill's real data/; returns the links made."""
+def skill_units():
+    """The skill's package on the path, for the unit interfaces maintenance code may use."""
+    if str(SKILL / 'scripts') not in sys.path:
+        sys.path.insert(0, str(SKILL / 'scripts'))
+
+
+def real_state():
+    """Where an ordinary invocation of the skill keeps its state in this environment."""
+    skill_units()
+    from sns.paths import data_dir
+    return data_dir()
+
+
+def take_in_old_state(platforms, account, real, legacy=None):
+    """Take the skill's old data/ in for each platform, into `real`, as the first invocation would; raises SystemExit
+    (the run does not start) when it cannot."""
+    skill_units()
+    import importlib
+    from sns.clock import Deadline
+    from sns.errors import SnsError
+    from sns.reading import adopt
+    saved = os.environ.get('SNS_DATA_DIR')
+    os.environ['SNS_DATA_DIR'] = str(real)
+    try:
+        for platform in platforms:
+            adapter = importlib.import_module(f'sns.{platform}').PLATFORM
+            try:
+                adopt(adapter, account, Deadline(60), legacy=legacy or _old_data())
+            except SnsError as error:
+                raise SystemExit(f'cannot take the old state in for {platform}: {error.message}') from None
+    finally:
+        if saved is None:
+            os.environ.pop('SNS_DATA_DIR', None)
+        else:
+            os.environ['SNS_DATA_DIR'] = saved
+
+
+def _old_data():
+    old = SKILL / 'data'
+    return old if old.is_dir() else None
+
+
+def link_shared(data_dir, platforms, account, real):
+    """Link each platform's protection and session state to the skill's real state; returns the links made."""
     links = []
     for platform in platforms:
         for kind in SHARED:
@@ -132,7 +175,7 @@ def resolve_account(env):
     named = env.get('SNS_ASIDE_ACCOUNT')
     if named:
         return named
-    sys.path.insert(0, str(SKILL / 'scripts'))
+    skill_units()
     from sns.aside import active_account  # maintenance code reads the skill through its unit interface
     done = subprocess.run([env.get('SNS_ASIDE_BIN') or 'aside', 'account', 'status'], capture_output=True, text=True,
                           env=env)
@@ -169,7 +212,9 @@ def run(args):
         account = resolve_account(env)
     else:
         account = resolve_account(env)
-        links = link_shared(data_dir, platforms, account)
+        real = real_state()
+        take_in_old_state(platforms, account, real)
+        links = link_shared(data_dir, platforms, account, real)
     env['SNS_DATA_DIR'] = str(data_dir)
     settings = root / 'settings.json'
     settings.write_text(json.dumps(sandbox_settings(scratch, data_dir), indent=1))

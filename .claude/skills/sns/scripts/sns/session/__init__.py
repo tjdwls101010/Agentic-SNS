@@ -1,5 +1,5 @@
 """What the skill knows about its browser session for one platform and Aside account, under
-data/<platform>/<account>/session/.
+<state>/<platform>/<account>/session/.
 
 The state is split by how it may be written, so nothing written inside the account-protection lock ever needs the
 session lock (the lock order everywhere is session, then protection):
@@ -244,3 +244,38 @@ class Session:
     def remember_viewer(self, viewer, **extra):
         if isinstance(viewer, str) and viewer:
             _save(self._path('viewer.json'), {'viewer': viewer, **extra, 'seen_at': time.time()})
+
+
+def adopt(platform, account, legacy):
+    """Copy what an install from before the state moved knew about its session (`legacy`: its old
+    data/<platform>/<account>/session/) into this account's session, file by file, only where this one has none — so a
+    tab the old install recorded is used and emptied by this one instead of polling unmanaged, and this install's own
+    newer record is never replaced. Locks are not copied. A file that cannot be copied is skipped: the session is a
+    cache. Before Session() reads its record."""
+    directory = scope(platform, account, 'session')
+    try:
+        names = sorted(p.name for p in legacy.iterdir() if p.is_file() and not p.is_symlink()
+                       and not p.name.endswith('.lock') and not p.name.startswith('.'))
+    except OSError:
+        return []
+    copied = []
+    for name in names:
+        if (directory / name).exists():
+            continue
+        temporary = directory / f'.{name}.adopt-{os.getpid()}-{secrets.token_hex(4)}'
+        try:
+            data = (legacy / name).read_bytes()
+            with os.fdopen(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'wb') as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.link(temporary, directory / name)  # whole or not at all; never over a record already there
+            copied.append(name)
+        except OSError:
+            pass  # FileExistsError included: another command copied it, or this one wrote its own first
+        finally:
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
+    return copied

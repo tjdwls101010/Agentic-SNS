@@ -22,7 +22,7 @@ def connect(connection):
     """The client of one invocation; doctor also reports what the comment threads take on disk."""
     return web.Client(connection, extra=lambda: {
         'snapshot_bytes': Snapshots(connection.account, connection.deadline).size(),
-        'holds_personal_data_here': 'data/reddit/<account>/snapshots/ — comment threads with other people\'s words; '
+        'holds_personal_data_here': 'reddit/<account>/snapshots/ in the state directory — comment threads with other people\'s words; '
                                     'they expire after a day on their own'})
 
 
@@ -345,7 +345,7 @@ COMMANDS = {
         'epilog': ['The post is read again (preview links are signed and do not last), so N is the Nth picture as Reddit '
                    'sends the post now; each saved line names its kind, size and media_id to match what the post '
                    'showed. Only Reddit\'s own image hosts (i.redd.it, preview.redd.it) are fetched; a picture hosted '
-                   'elsewhere is named and skipped. Files go to the skill\'s data/images/ and are removed a day later; '
+                   'elsewhere is named and skipped. Files go to images/ in the skill\'s state directory and are removed a day later; '
                    'they are other people\'s pictures. A picture that could not be saved is named in coverage (exit 8); a number the post does not have is refused before any picture is fetched (exit 2). A stop between pictures (the time limit, a hold) keeps the saved ones and ends with more: naming the numbers left.',
                    'requests: 1 for the post (plus a share link\'s hops), then 1 per picture.'],
         'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),

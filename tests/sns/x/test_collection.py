@@ -245,7 +245,7 @@ def test_a_file_inside_the_skills_data_and_out_with_after_are_refused_before_any
     """inside-skill-data-refused, out-with-after-refused."""
     known_tab(browser)
     code, out, _ = saved(browser, data_dir / 'x.ndjson')
-    assert code == 2 and 'data/' in json.loads(out)['message']
+    assert code == 2 and 'state directory' in json.loads(out)['message']
     code, out, _ = run(browser, 'profile', '@author_a', '--out', str(tmp_path / 'a.ndjson'), '--after', '1000')
     assert code == 2 and '--after and --out' in json.loads(out)['message']
     assert queries(browser) == [] and not (tmp_path / 'a.ndjson').exists()

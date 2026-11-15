@@ -17,11 +17,15 @@
 npx skills add tjdwls101010/Agentic-SNS
 ```
 
-Or copy the folder by hand — it is self-contained and writes state only to its own `data/`:
+Or copy the folder by hand — it is self-contained:
 
 ```sh
 git clone https://github.com/tjdwls101010/Agentic-SNS && mkdir -p ~/.claude/skills && cp -R Agentic-SNS/.claude/skills/sns ~/.claude/skills/
 ```
+
+The skill never writes into its own folder, so reinstalling or updating keeps your state. Blocks, holds, pacing, the request log, sessions, continuation handles and saved pictures live in `~/.local/state/agentic-sns/` (`$XDG_STATE_HOME/agentic-sns/` when that is set, or wherever `SNS_DATA_DIR` points), shared by every install on the computer. Pictures, and the handles that point at other people's posts, are removed once they are a day old, the next time the skill saves one. If you keep `SNS_DATA_DIR` elsewhere, reading a saved picture asks for permission.
+
+**Updating from a version that kept `data/` inside the skill folder:** `npx skills add` removes the folder before the new version can run, which would drop the recorded blocks. Move the folder's `data/` aside first, update, put it back as the new folder's `data/`, and run any command once; the new version takes it in (and does so again whenever that `data/` changes). Update every copy of the skill you have: an old copy keeps writing to its own `data/`. Only this one update needs it.
 
 You also need [Claude Code](https://claude.com/claude-code) and [uv](https://docs.astral.sh/uv/); the CLI is a dependency-free PEP 723 script (Python 3.11+), so `uv run` is all it takes.
 
@@ -80,7 +84,6 @@ With several Aside accounts, pick one with `SNS_ASIDE_ACCOUNT` (per platform: `S
 ```
 .claude/skills/sns/        the installed skill (complete on its own)
 ├── SKILL.md               judgment rules the model reads — scope of claims, how much to read, account ≠ person, account safety, Naver sponsorship cues
-├── data/                  runtime state (protection, sessions, continuation handles, saved pictures), not in git
 └── scripts/
     ├── cli.py             the single entry point (parser, dispatch, exit codes)
     └── sns/               shared core (protection, paging, deadlines, output) and platform packages (x, threads, reddit, facebook, naver_blog)
