@@ -5,8 +5,10 @@ covers that window whatever the order; anything else in the query is X's to inte
 one X's own quotes screen sends), so they share search's limit.
 """
 import re
+from dataclasses import replace
 
 from sns import reading
+from sns.errors import SnsError
 from sns.x import web
 from sns.x.listing import surface
 
@@ -25,9 +27,27 @@ def _server_window(text):
             'until': found.get('until') or found.get('until_time'), 'tz': "X's own days"}
 
 
+def _with_dates(text, since, until):
+    """The query with --since/--until as X's own since:/until: operators; refused beside a date operator already in it
+    (two windows, one of which X would ignore)."""
+    if not (since or until):
+        return text
+    if _DATES.search(text):
+        raise SnsError('argument', 'The query already has a date operator (since:, until:, since_time: or until_time:); '
+                                   '--since/--until would add another.',
+                       'Use either the operators in the query or --since/--until, not both.')
+    return ' '.join([text] + ([f'since:{since}'] if since else []) + ([f'until:{until}'] if until else []))
+
+
 def search(platform, invocation):
     options = invocation.options
-    text, kind, sort = options['target'], options['type'], options['sort']
+    kind, sort = options['type'], options['sort']
+    text = _with_dates(options['target'], options.get('since'), options.get('until'))
+    if text != options['target']:
+        # X filters by its own operators now in the query; the shared reader must not window the result again on this
+        # computer's days, and a more: line carries the operators in the query itself
+        options = {**options, 'target': text, 'since': None, 'until': None}
+        invocation = replace(invocation, options=options)
     if options.get('within') == 'communities':
         return _in_communities(platform, invocation, text)
     product = PRODUCTS[kind][sort]
