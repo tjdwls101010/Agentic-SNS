@@ -137,7 +137,7 @@ def test_activity_help_explains_the_read_coverage_and_seen_caveat(browser):
     assert 'one page' in out and 'not_built' in out and 'requests: 1.' in out
     assert ('Reading the list sends no seen change (the app marks notifications seen only when its activity screen '
             'opens, which this skill never does); seen state as observed on 2026-10-22.') in out
-    assert '[n1] notification' in out and 'the dedicated tab:' in out
+    assert 'threads schema: record kinds' in out and 'tab opened' in out  # labels: schema; the tab: doctor --help
     assert browser.calls() == []
 
 

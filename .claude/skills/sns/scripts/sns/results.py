@@ -274,13 +274,15 @@ ENVELOPE = {
 
 TEXT = {
     'header': '<platform> <command>[ · key=value …] · <n> shown · stopped=<stop_reason> · requests=<n>[ · tab opened '
-              '(+<n> requests)][ · unwatched=<n>][ · limit <scope> <remaining> of <limit> left resets <local time>]',
+              '(+<n> requests)][ · unwatched=<n>][ · limit <scope> <remaining> of <limit> left resets <local time>][ · '
+              'saved=<file>]',
     'window': 'dated reads add a second line: window <since>..<until> <tz> · <coverage>',
     'records': 'one record per label ([p1] post, [r1] reply, [c1] comment, [a1] account, …); each record ends with the '
                'arguments of the next command (url: <command> <url> opens it alone; replies <handle> reads more under '
                'it)',
     'text': 'text[N of M chars shown]: N characters of the M received are shown (--chars); --chars 0 shows everything',
-    'tail': 'coverage: <note> lines, then more: <command> when reading can continue. With --out the whole result is '
+    'tail': 'after the window line and before the records: coverage: <note> lines (after a failure, coverage: '
+            'incomplete — <message> fix: <fix>), then more: <command> when reading can continue. With --out the whole result is '
             'one line: <platform> <command> · <n> saved to "<path>" · stopped=… · requests=… [· resume: <command>] '
             '[· error=<kind> fix=<fix>]',
 }
