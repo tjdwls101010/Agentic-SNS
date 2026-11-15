@@ -96,6 +96,27 @@ def test_a_list_x_does_not_return_is_unavailable(browser):
 
 # --- communities -----------------------------------------------------------------------------------------------------
 
+def test_community_members_and_more_read_accounts_by_cursor(browser):
+    first = {'data': {'communityResults': {'result': {'members_slice': {
+        'items_results': [{'id': 'VXNlclJlc3VsdHM6MQ==', 'result': OWNER}],
+        'slice_info': {'next_cursor': 'MEMBERS2'}}}}}}
+    second_user = {'__typename': 'User', 'rest_id': '1000000002', 'core': {'screen_name': 'member_b', 'name': 'Member B'}}
+    second = {'data': {'communityResults': {'result': {'members_slice': {
+        'items_results': [{'id': 'VXNlclJlc3VsdHM6Mg==', 'result': second_user}],
+        'slice_info': {'next_cursor': None}}}}}}
+    known_tab(browser).respond('x.query', query_result(first, headers=RATE))
+    code, out, _ = run(browser, 'community', '1600000000000000001', '--tab', 'members')
+    assert code == 0 and '[a1] @author_a' in out, out
+    assert '--tab members' in more_line(out), out
+    call = query_args(browser)[-1]
+    assert call['name'] == 'membersSliceTimeline_Query' and call['variables']['communityId'] == '1600000000000000001'
+    browser.respond('x.state', state()).respond('x.query', query_result(second, headers=RATE))
+    code, out, _ = rerun(browser, more_line(out))
+    assert code == 0 and '[a1] @member_b' in out, out
+    assert query_args(browser)[-1]['variables']['cursor'] == 'MEMBERS2'
+    assert 'more:' not in out
+
+
 def community(ident='1600000000000000001', **extra):
     return {'__typename': 'Community', 'rest_id': ident, 'id_str': ident, 'name': 'Synthetic community',
             'description': 'For tests', 'member_count': 1200, 'moderator_count': 3, 'created_at': 1767225600000,

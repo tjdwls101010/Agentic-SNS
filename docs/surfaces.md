@@ -34,7 +34,7 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | List: posts, members, card | List page | command: `x list LIST --tab posts\|members\|about` |
 | List subscribers | List page | in recon (R17d) |
 | Community: posts (top, recent), media, card; suggested communities | Community page | command: `x community [COMMUNITY] --tab … --sort …` |
-| Community members | Community page | in recon (R17e) |
+| Community members | Community page | command: `x community COMMUNITY --tab members` |
 | Space card | Space page | command: `x about SPACE` |
 | Post pictures (a video by its poster) | Post media | command: `x images POST` |
 | Polls | Post | in recon (R16a) |

@@ -1,4 +1,4 @@
-"""What a request of the dedicated tab is allowed to be (fixtures/requests.json): the registry of the 36 wired operations
+"""What a request of the dedicated tab is allowed to be (fixtures/requests.json): the registry of the 37 wired operations
 and the variables each surface sends, and, in the Node snippet harness with the webpack page model, the read list, the
 GET method, the feature values, the header set and what is never sent."""
 import json
@@ -37,9 +37,9 @@ RATE = {'x-rate-limit-limit': '500', 'x-rate-limit-remaining': '499', 'x-rate-li
 
 # --- the registry (operations.json) ------------------------------------------------------------------------------
 
-def test_the_registry_holds_exactly_the_36_wired_operations():
+def test_the_registry_holds_exactly_the_37_wired_operations():
     assert sorted(web.OPERATIONS) == sorted(REQUESTS['read_only']['read_list']) == web.READ_OPERATIONS
-    assert len(web.OPERATIONS) == 36
+    assert len(web.OPERATIONS) == 37
     for dropped in ('UserOriginalsTimeline', 'UserVideoTimeline', 'CommunityAboutTimeline'):
         assert dropped not in web.OPERATIONS
 

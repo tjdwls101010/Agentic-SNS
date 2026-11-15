@@ -244,7 +244,7 @@ def _x_surface(platform):
     GRAPH_RELATIONS = ['following', 'followers', 'verified', 'known', 'similar']
     ME_COLLECTIONS = ['bookmarks', 'likes', 'notifications', 'mentions']
     LIST_TABS = ['posts', 'members', 'about']
-    COMMUNITY_TABS = ['posts', 'media', 'about']
+    COMMUNITY_TABS = ['posts', 'media', 'members', 'about']
     COMMUNITY_SORTS = ['top', 'recent']
     REPLY_SORTS = ['top', 'recent']
     SEARCH_TYPES = ['posts', 'accounts', 'media']
@@ -383,15 +383,15 @@ def _x_surface(platform):
             'check': check_list,
         },
         'community': {
-            'help': 'Read a community\'s posts, media or card, or without a target the communities X suggests.',
+            'help': 'Read a community\'s posts, media, members or card, or without a target the communities X suggests.',
             'run': _run(platform.listing_community),
             'arguments': [(('target',), {'nargs': '?', 'help': 'x.com/i/communities/<id> URL or the numeric id; omitted: the communities X suggests to this account'}),
-                          (('--tab',), {'choices': COMMUNITY_TABS, 'help': 'posts (default), media, or about (the card); with a target only'}),
+                          (('--tab',), {'choices': COMMUNITY_TABS, 'help': 'posts (default), media, members, or about (the card); with a target only'}),
                           (('--sort',), {'choices': COMMUNITY_SORTS, 'help': 'posts: top (default, X\'s ranking) or recent'}),
                           *LIST],
             'epilog': ["A community is a group with its own feed: its posts are what members posted there, in X's order (top is a ranking; recent was not verified as newest first), so no window closes on them. about is one record: size, moderators, how one joins, topic, rules, who made it and your role. search reads posts across all communities with its communities scope.",
                        "A suggested community is X's recommendation for this account, not a ranking of all communities."],
-            'requests': '1 per page of about 20; about: 1.',
+            'requests': '1 per page; about: 1.',
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),
             'check': check_community,
         },
