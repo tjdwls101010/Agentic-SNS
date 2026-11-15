@@ -5,7 +5,8 @@ It understands every call the skill makes:
 - `aside account status`: prints the scenario's account_status (default: u0 active), exit account_status_exit.
 - `aside --account A <url>`: Aside's agent opens a persistent tab at <url>: the id is a scripted "open" response's
   "tab", else the next of the scenario's open_ids, else TAB<n>; an "open" response may also carry "__sleep" (seconds
-  before the tab appears) or "no_tab": true (the agent answered, exit 0, and opened nothing).
+  before the tab appears), "no_tab": true (the agent answered, exit 0, and opened nothing) or "before": tabs
+  ({id, url}) listed ahead of it, "{fragment}" in their url standing for the opened url's fragment.
 - `aside --account A repl` with code on stdin: as Aside 1.26 does, the code runs only once stdin is closed, all of its
   output comes when it ends, and a tab it opened is closed when it ends, even if another call attached it meanwhile
   (measured 2026-11-15). The code is logged as op "stdin_repl"; nothing in the skill should send one.
@@ -129,6 +130,9 @@ def open_tab(url, account):
         scenario = load()
         ids = scenario.setdefault('open_ids', [])
         target = response.get('tab') or (ids.pop(0) if ids else f'TAB{len(scenario["tabs"]) + 1}')
+        fragment = url.split('#', 1)[1] if '#' in url else ''
+        scenario['tabs'] += [{'id': t['id'], 'url': t['url'].replace('{fragment}', fragment)}
+                             for t in response.get('before', [])]
         scenario['tabs'].append({'id': target, 'url': url})
         save(scenario)
     return 0

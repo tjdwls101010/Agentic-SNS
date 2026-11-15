@@ -66,6 +66,16 @@ def _host(url):
         return ''
 
 
+def _placeholder(url, nonce):
+    """Whether `url` is the placeholder this opening asked for: its page and its nonce, not a copy elsewhere."""
+    try:
+        parts, wanted = urlsplit(url or ''), urlsplit(PLACEHOLDER)
+    except ValueError:
+        return False
+    return (parts.scheme, parts.hostname, parts.path, parts.fragment) == \
+        (wanted.scheme, wanted.hostname, wanted.path, nonce)
+
+
 def _verification(error):
     """Why the check that could lift a block failed, from what stopped it."""
     if error.reason == 'verification':
@@ -185,8 +195,7 @@ class Client:
         with self.guard.request(reserve=1 + PLACEHOLDER_REQUESTS, setup=True, kind='tab_open') as slot:
             try:
                 self.aside.open(f'{PLACEHOLDER}#{nonce}')
-                target = next((t['target_id'] for t in self.aside.tabs() if urlsplit(t['url']).fragment == nonce),
-                              None)
+                target = next((t['target_id'] for t in self.aside.tabs() if _placeholder(t['url'], nonce)), None)
             except SnsError:
                 slot.classify('open_failed')
                 raise

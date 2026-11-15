@@ -65,6 +65,18 @@ def test_the_new_tab_is_told_apart_by_its_nonce_when_another_command_opens_one_m
     assert [c['tab'] for c in browser.calls() if c['op'] == 'load:x.arm'] == ['NEW1']
 
 
+def test_a_tab_elsewhere_carrying_the_same_fragment_is_not_taken_for_the_placeholder(browser):
+    """The nonce names the opening only on the placeholder's own page; a copy of the fragment on another page or host
+    is someone else's tab, even listed first (review of P1)."""
+    opening(browser, resources=13).respond('x.modules', MODULES)
+    browser.scenario['responses'][0]['response']['before'] = [
+        {'id': 'COPY1', 'url': 'https://example.org/#{fragment}'},
+        {'id': 'COPY2', 'url': 'https://x.com/home#{fragment}'}]
+    code, result, _ = doctor(browser)
+    assert code == 0, result
+    assert [c['tab'] for c in browser.calls() if c['op'] == 'load:x.arm'] == ['NEW1']
+
+
 def test_an_agent_that_opens_no_tab_is_reported_once_and_not_retried(browser):
     """`aside <url>` runs Aside's browser agent: without a model it can use it answers (exit 0) and opens nothing."""
     browser.respond('open', {'no_tab': True})
