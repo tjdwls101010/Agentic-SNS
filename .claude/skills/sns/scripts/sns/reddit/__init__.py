@@ -113,6 +113,8 @@ RECORDS = {
 }
 
 PLATFORM = reading.Platform(
+    secret_fields=('reddit_session', 'token_v2', 'loid', 'session_tracker', 'csrf_token', 'modhash', 'x-modhash', 'edgebucket',),
+    signed_image_hosts=('redd.it',),
     key='reddit', title='Reddit', site='reddit.com', transport='fetch', policy=POLICY,
     window=WindowPolicy(jitter=600), connect=connect, render=render.render,
     schemas={**RECORDS, 'image': reading.IMAGE_SCHEMA}, locate=web.locate,

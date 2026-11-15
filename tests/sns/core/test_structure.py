@@ -22,15 +22,14 @@ TESTS = REPO / 'tests/sns'
 CONTRAST = REPO / 'contrast/sns'
 
 HELPERS = {'errors', 'limits', 'redact', 'atomic', 'paths', 'clock', 'page', 'paging', 'window', 'results', 'text',
-           'render', 'cmdline'}
+           'render', 'cmdline', 'platforms'}
 STORES = {'protection', 'handles', 'session', 'outfile', 'images', 'saved'}
 SYSTEMS = {'aside'}
 FEATURES = {'reading', 'maintenance'}
+FEATURE_EDGES = set()  # reading and maintenance currently do not import one another
 SHARED = HELPERS | STORES | SYSTEMS | FEATURES
 PLATFORMS = {'x', 'threads', 'reddit', 'facebook', 'naver_blog'}
 PLATFORM_STORES = {'reddit': {'snapshots'}}  # a platform's own stores, beside its system web/
-# Platforms whose package exists so far; the last slice makes this all five (P4).
-PRESENT = {p.name for p in PACKAGE.iterdir() if p.name in PLATFORMS} if PACKAGE.exists() else set()
 
 
 def python_files(root):
@@ -117,13 +116,13 @@ def test_package_name_does_not_shadow_stdlib():
 def test_package_holds_only_known_units():
     found = {name[:-3] if name.endswith('.py') else name for name in tree.children(PACKAGE) if name != '__init__.py'}
     assert found <= SHARED | PLATFORMS, found - SHARED - PLATFORMS
-    assert SHARED <= found, SHARED - found
+    assert SHARED | PLATFORMS <= found, (SHARED | PLATFORMS) - found
     for name in STORES | SYSTEMS | FEATURES:
         assert (PACKAGE / name / '__init__.py').is_file(), name
 
 
 def test_platform_folders_hold_features_web_and_their_own_store_only():
-    for platform in PRESENT:
+    for platform in PLATFORMS:
         root = PACKAGE / platform
         assert (root / '__init__.py').is_file()
         assert (root / 'web' / '__init__.py').is_file(), platform
@@ -131,6 +130,17 @@ def test_platform_folders_hold_features_web_and_their_own_store_only():
         assert folders <= {'web'} | PLATFORM_STORES.get(platform, set()), (platform, folders)
         for store in PLATFORM_STORES.get(platform, set()) & folders:
             assert (root / store / '__init__.py').is_file()
+
+
+def test_cli_registry_matches_platform_packages():
+    parsed = ast.parse((PACKAGE / 'platforms.py').read_text(encoding='utf-8'))
+    registry = next(ast.literal_eval(node.value) for node in parsed.body if isinstance(node, ast.Assign)
+                    and any(isinstance(target, ast.Name) and target.id == 'PLATFORM_PACKAGES' for target in node.targets))
+    cli = ast.parse((SCRIPTS / 'cli.py').read_text(encoding='utf-8'))
+    assert any(isinstance(node, ast.ImportFrom) and node.module == 'sns.platforms' and any(alias.name == 'PLATFORM_PACKAGES' and alias.asname is None for alias in node.names) for node in cli.body)
+    assert any(isinstance(node, ast.For) and isinstance(node.iter, ast.Name) and node.iter.id == 'PLATFORM_PACKAGES' for node in ast.walk(cli))
+    packages = {name for name in tree.folders(PACKAGE) if name not in SHARED and (PACKAGE / name / '__init__.py').is_file()}
+    assert len(registry) == len(set(registry)) and set(registry) == packages, (registry, packages)
 
 
 def test_an_old_data_folder_is_never_committed():
@@ -170,7 +180,7 @@ def allowed(source, target):
     if s_unit == 'cli':
         return t_unit in HELPERS | FEATURES
     if s_unit in FEATURES:
-        return t_unit in HELPERS | STORES | SYSTEMS | FEATURES
+        return t_unit in HELPERS | STORES | SYSTEMS or (s_unit, t_unit) in FEATURE_EDGES
     return t_unit in HELPERS  # stores, the aside system and helpers
 
 
@@ -270,3 +280,115 @@ def test_platform_interfaces_do_not_define_command_surfaces():
         assert top_level <= {'PLATFORM', 'POLICY', 'RECORDS', 'TREE'}, (platform, top_level)
         assert {node.name for node in parsed.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))} <= {'connect'}, platform
         assert not any(isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value in ('help', 'epilog', 'arguments') for node in ast.walk(parsed)), platform
+
+
+def test_web_interfaces_are_the_only_external_access():
+    exports = {}
+    for platform in PLATFORMS:
+        root = PACKAGE / platform / 'web'
+        parsed = ast.parse((root / '__init__.py').read_text(encoding='utf-8'))
+        exports[platform] = set(next(ast.literal_eval(node.value) for node in parsed.body
+                                     if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == '__all__' for t in node.targets)))
+        modules = {alias.asname or alias.name for node in parsed.body if isinstance(node, ast.ImportFrom)
+                   and node.module == f'sns.{platform}.web' for alias in node.names}
+        assert not exports[platform] & modules, (platform, exports[platform] & modules)
+
+    problems = []
+    for root in (SCRIPTS, TESTS, CONTRAST):
+        for path in python_files(root):
+            parsed = ast.parse(path.read_text(encoding='utf-8'))
+            aliases = {}
+            dotted = set()
+            platform_aliases = {}
+            sns_aliases = set()
+            for node in ast.walk(parsed):
+                if not isinstance(node, (ast.Import, ast.ImportFrom)):
+                    continue
+                if isinstance(node, ast.ImportFrom):
+                    module = node.module or ''
+                    if node.level and path.is_relative_to(SCRIPTS):
+                        base = path.relative_to(SCRIPTS).with_suffix('').parts[:-node.level]
+                        module = '.'.join([*base, module] if module else base)
+                    if module == 'sns':
+                        for alias in node.names:
+                            if alias.name in PLATFORMS:
+                                platform_aliases[alias.asname or alias.name] = alias.name
+                    for platform in PLATFORMS:
+                        web = f'sns.{platform}.web'
+                        if path.is_relative_to(PACKAGE / platform / 'web'):
+                            continue
+                        if module.startswith(web + '.'):
+                            problems.append(f'{path}:{node.lineno}: reaches past {web}: {module}')
+                        elif module == web:
+                            for alias in node.names:
+                                if alias.name not in exports[platform]:
+                                    problems.append(f'{path}:{node.lineno}: {web}.{alias.name} is not exported')
+                        elif module == f'sns.{platform}':
+                            for alias in node.names:
+                                if alias.name == 'web':
+                                    aliases[alias.asname or alias.name] = platform
+                else:
+                    for alias in node.names:
+                        if alias.name == 'sns':
+                            sns_aliases.add(alias.asname or 'sns')
+                        for platform in PLATFORMS:
+                            if alias.name == f'sns.{platform}' and alias.asname:
+                                platform_aliases[alias.asname] = platform
+                            elif alias.name == f'sns.{platform}':
+                                sns_aliases.add('sns')
+                            web = f'sns.{platform}.web'
+                            if path.is_relative_to(PACKAGE / platform / 'web'):
+                                continue
+                            if alias.name.startswith(web + '.'):
+                                problems.append(f'{path}:{node.lineno}: reaches past {web}: {alias.name}')
+                            elif alias.name == web:
+                                if alias.asname:
+                                    aliases[alias.asname] = platform
+                                else:
+                                    dotted.add(platform)
+            for node in ast.walk(parsed):
+                if isinstance(node, ast.Attribute):
+                    parts = []
+                    value = node.value
+                    while isinstance(value, ast.Attribute):
+                        parts.append(value.attr)
+                        value = value.value
+                    if isinstance(value, ast.Name):
+                        parts.append(value.id)
+                        parts.reverse()
+                        platform = None
+                        if len(parts) == 3 and parts[0] in sns_aliases | {'sns'} and parts[1] in PLATFORMS and parts[2] == 'web' and (parts[0] in sns_aliases or parts[1] in dotted):
+                            platform = parts[1]
+                        elif len(parts) == 2 and parts[0] in platform_aliases and parts[1] == 'web':
+                            platform = platform_aliases[parts[0]]
+                        if platform and not path.is_relative_to(PACKAGE / platform / 'web') and node.attr not in exports[platform]:
+                            problems.append(f'{path}:{node.lineno}: sns.{platform}.web.{node.attr} is not exported')
+                if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id in aliases:
+                    platform = aliases[node.value.id]
+                    if node.attr not in exports[platform]:
+                        problems.append(f'{path}:{node.lineno}: sns.{platform}.web.{node.attr} is not exported')
+    assert not problems, '\n'.join(problems)
+
+
+def test_result_descriptions_do_not_list_platforms():
+    parsed = ast.parse((PACKAGE / 'results.py').read_text(encoding='utf-8'))
+    descriptions = [node.value for node in ast.walk(parsed) if isinstance(node, ast.Constant) and isinstance(node.value, str)]
+    names = '|'.join(re.escape(p).replace('_', '[-_]') for p in PLATFORMS)
+    pattern = re.compile(r'(?<![A-Za-z])(?:' + names + r')(?![A-Za-z])', re.I)
+    found = [value for value in descriptions if pattern.search(value)]
+    assert not found, found
+
+
+def test_redact_defines_only_shared_secret_fields():
+    parsed = ast.parse((PACKAGE / 'redact.py').read_text(encoding='utf-8'))
+    shared = next(ast.literal_eval(node.value) for node in parsed.body if isinstance(node, ast.Assign)
+                  and any(isinstance(t, ast.Name) and t.id == 'SENSITIVE' for t in node.targets))
+    assert shared == {'token', 'access_token', 'cookie', 'cookies', 'authorization', 'csrf', 'sessionid', 'bearer'}, shared
+    platform_values = set()
+    for platform in PLATFORMS:
+        adapter = ast.parse((PACKAGE / platform / '__init__.py').read_text(encoding='utf-8'))
+        for node in ast.walk(adapter):
+            if isinstance(node, ast.keyword) and node.arg in {'secret_fields', 'signed_image_hosts'}:
+                platform_values.update(ast.literal_eval(node.value))
+    literals = {node.value for node in ast.walk(parsed) if isinstance(node, ast.Constant) and isinstance(node.value, str)}
+    assert not literals & platform_values, literals & platform_values

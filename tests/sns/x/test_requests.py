@@ -47,7 +47,7 @@ def test_the_registry_holds_exactly_the_35_wired_operations_of_the_apps_snapshot
 def test_every_registered_operation_is_used_by_some_read_and_every_read_is_registered():
     """Wired means a feature or the client names it; an operation nobody names is dead weight in the table."""
     from pathlib import Path
-    root = Path(web.__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[3] / '.claude/skills/sns/scripts/sns/x'
     source = '\n'.join(p.read_text(encoding='utf-8') for p in root.rglob('*.py') if p.name != 'targets.py')
     unused = [name for name in web.OPERATIONS if f"'{name}'" not in source]
     assert not unused, unused

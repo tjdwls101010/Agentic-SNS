@@ -48,6 +48,8 @@ class Platform:
     locate: Callable = lambda url: None
     unblock_scope: str | None = None
     idle_action: str | None = None
+    secret_fields: tuple = ()
+    signed_image_hosts: tuple = ()
 
     @property
     def word(self):

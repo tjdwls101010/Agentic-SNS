@@ -12,7 +12,7 @@ from sns.naver_blog import web
 from tests.sns.naver_blog.scene import KIND_OF, fixture
 
 REQUESTS = fixture('requests.json')
-FETCH_JS = Path(web.__file__).with_name('fetch.js')
+FETCH_JS = Path(__file__).resolve().parents[3] / '.claude/skills/sns/scripts/sns/naver_blog/web/fetch.js'
 
 
 @pytest.mark.parametrize('case', REQUESTS['allowlist']['cases'], ids=lambda c: c['host'] + c['path'])
