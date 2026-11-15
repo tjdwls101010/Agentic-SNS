@@ -92,6 +92,9 @@ class Connection:
         words, argv = [], list(getattr(self.invocation, 'argv', ()))
         while argv:
             word = argv.pop(0)
+            if word == '--':  # what follows is positional (a target or text that looks like an option): keep it all
+                words += [word, *argv]
+                break
             name = word.split('=', 1)[0]
             if not (len(name) > 2 and any(option.startswith(name) for option in given)):
                 words.append(word)

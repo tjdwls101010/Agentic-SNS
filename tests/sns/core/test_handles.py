@@ -99,3 +99,18 @@ def test_an_expired_handle_keeps_only_its_command_for_a_week_then_goes(data_dir)
 def test_handle_files_are_private(data_dir):
     number = handles.save(CONTEXT, {'cursor': 'a'})
     assert (data_dir / 'handles' / f'{number}.json').stat().st_mode & 0o077 == 0
+
+
+@pytest.mark.parametrize('argv,options,expected', [
+    (('x', 'search', '--out', 'F', '--', '--o', 'next'), {'out': 'F'}, 'x search -- --o next'),
+    (('threads', 'search', '--after', '7', '--', '--af', 'x'), {'after': 7}, 'threads search -- --af x'),
+    (('facebook', 'comments', 'U', '--ou=F', '--limit', '5'), {'out': 'F'}, 'facebook comments U --limit 5'),
+])
+def test_the_command_that_starts_a_reading_again_keeps_every_word_after_a_double_dash(argv, options, expected):
+    """A handle's remake drops the --out file and the --after handle (however abbreviated) but nothing after `--`,
+    where a search text may itself look like an option."""
+    from types import SimpleNamespace
+    from sns.reading import Connection
+    connection = SimpleNamespace(remake=None, options=options,
+                                 invocation=SimpleNamespace(argv=argv, cli_path='/skill/scripts/cli.py'))
+    assert Connection.start_over(connection).endswith(' ' + expected)
