@@ -90,11 +90,11 @@ def test_a_tab_lost_mid_call_is_reopened_once_and_the_read_goes_on(browser):
     code, out, _ = run(browser, 'feed')
     assert code == 0, out
     head = out.splitlines()[0]
-    assert 'tab opened (+14 requests)' in head and 'requests=1' in head and 'requests=1 ' in head + ' '
+    assert 'tab opened (+15 requests)' in head and 'requests=1' in head and 'requests=1 ' in head + ' '
 
 
 def test_two_commands_starting_together_open_one_tab(browser):
-    browser.respond('opener', {'tabs': ['NEW1'], '__sleep': 1.5})
+    browser.respond('open', {'tab': 'NEW1', '__sleep': 1.5})
     browser.respond('load:x.arm', {'installed_at': 300, 'location': START, 'ready_at_install': 'loading',
                                    'app_at_install': False})
     browser.respond('x.state', state(resources=13)).respond('x.state', state()).respond('x.state', state())
@@ -107,7 +107,7 @@ def test_two_commands_starting_together_open_one_tab(browser):
     second = subprocess.Popen([sys.executable, str(CLI), 'x', 'doctor'], env=env, stdout=subprocess.PIPE, text=True)
     results = [json.loads(p.communicate(timeout=60)[0]) for p in (first, second)]
     assert all(r['ok'] for r in results), results
-    assert browser.ops().count('opener') == 1
+    assert browser.ops().count('open') == 1
     assert {r['results'][0]['tab']['target_id'] for r in results} == {'NEW1'}
 
 
@@ -262,7 +262,7 @@ def test_a_tab_lost_mid_command_is_replaced_by_the_one_another_command_already_o
     browser.respond('x.state', state()).respond('x.query', query_result(home(['1']), headers=RATE))
     code, out, _ = run(browser, 'feed')
     assert code == 0, out
-    assert 'opener' not in browser.ops()
+    assert 'open' not in browser.ops()
     assert [c['tab'] for c in queries(browser)] == ['T1', 'T2']
     assert Session('x', ASIDE).tab == 'T2'
 

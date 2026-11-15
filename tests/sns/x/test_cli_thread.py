@@ -328,10 +328,10 @@ def test_replies_out_collects_the_batches_and_resumes_after_a_time_limit_stop(br
     records = [json.loads(line) for line in saved.read_text().splitlines()]
     assert [r['id'] for r in records if 'id' in r] == ['107', '108']
     assert all(r['role'] == 'reply' and r['parent_id'] == '101' for r in records if 'id' in r)  # flat records
-    x_ops = [op for op in browser.ops() if op.startswith(('x.', 'load:x.', 'opener'))]
+    x_ops = [op for op in browser.ops() if op.startswith(('x.', 'load:x.', 'open'))]
     code, out, _ = run(browser, 'replies', number, '--out', str(saved))
     assert code == 0 and 'already complete' in out
-    assert [op for op in browser.ops() if op.startswith(('x.', 'load:x.', 'opener'))] == x_ops  # nothing read again
+    assert [op for op in browser.ops() if op.startswith(('x.', 'load:x.', 'open'))] == x_ops  # nothing read again
 
 
 def test_replies_out_stopped_by_the_operations_limit_is_resumable_but_not_before_the_reset(browser, tmp_path):

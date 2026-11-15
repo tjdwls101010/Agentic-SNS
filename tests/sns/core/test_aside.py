@@ -1,5 +1,5 @@
 """The Aside system (sns.aside) against the scripted fake: account resolution, the one output protocol, the deadline
-clamp, and both ways of opening a tab."""
+clamp, and opening a tab."""
 import json
 
 import pytest
@@ -80,15 +80,12 @@ def test_a_call_that_times_out_with_time_to_spare_is_an_aside_failure(browser, m
     assert caught.value.kind == 'aside' and caught.value.reason == 'timeout'
 
 
-def test_opening_a_tab_both_ways(browser, monkeypatch):
-    browser.flag(open_ids=['NEW1']).respond('opener', {'tabs': ['OPENED9']}).install(monkeypatch)
+def test_opening_a_tab(browser, monkeypatch):
+    browser.flag(open_ids=['NEW1']).install(monkeypatch)
     aside = Aside('threads', Deadline(30))
     aside.open('https://www.threads.com/search')
     assert {'target_id': 'NEW1', 'url': 'https://www.threads.com/search'} in aside.tabs()
-    with aside.opener() as tab:
-        assert tab == 'OPENED9'
-    opener = [c for c in browser.calls() if c['op'] == 'opener'][0]
-    assert opener['marked'] is True
+    assert [c['op'] for c in browser.calls()] == ['account_status', 'open', 'tabs']
 
 
 def test_output_that_cannot_be_read_is_an_aside_failure():
@@ -126,28 +123,6 @@ def test_the_picture_download_compiles_inside_the_program(tmp_path):
     path.write_text(program({'op': 'run'}, MEDIA, {'url': 'u', 'max': 1}))
     done = subprocess.run(['node', '--check', str(path)], capture_output=True, text=True)
     assert done.returncode == 0, done.stderr[-500:]
-
-
-@pytest.mark.skipif(not __import__('shutil').which('node'), reason='node is not installed')
-def test_the_opener_names_its_own_tab_when_another_command_opens_one_meanwhile(tmp_path):
-    """Observed live (D10, 2026-10-21): five platforms started together, and while X's opener opened its about:blank
-    tab, Threads and Facebook opened theirs; a before/after diff of the tab list then shows two new tabs and X could not
-    tell its own (exit 3). The opener runs here under node with Aside's openTab and listBrowserTabs stubbed."""
-    import subprocess
-    from sns import aside as aside_module
-    script = tmp_path / 'opener.mjs'
-    script.write_text(
-        "const tabs = [{targetId: 'USER1', url: 'https://example.org/'}];\n"
-        "const listBrowserTabs = async () => tabs.map(t => ({...t}));\n"
-        "const openTab = async (url) => {\n"
-        "  tabs.push({targetId: 'OTHER', url: 'https://www.threads.com/'});  // another command, meanwhile\n"
-        "  tabs.push({targetId: 'MINE', url});\n"
-        "  return {targetId: 'MINE'};\n"
-        "};\n"
-        "(async () => {\n" + aside_module._OPENER + "})();\n")
-    done = subprocess.run(['node', str(script)], capture_output=True, text=True, timeout=30)
-    assert done.returncode == 0, done.stderr
-    assert json.loads(done.stdout.strip().splitlines()[-1]) == {'kind': 'opened', 'tabs': ['MINE']}
 
 
 def _run_media(tmp_path, fetch_body):

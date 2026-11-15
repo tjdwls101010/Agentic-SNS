@@ -19,6 +19,7 @@ scope), every answer is classified, X's limit headers become a limits.Fact, a 42
 on that operation, a lock or challenge a person block, and the account the page shows goes to connection.seen().
 """
 import json
+import secrets
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -31,6 +32,10 @@ from sns.x.web.snippets import SNIPPETS
 OPERATIONS = json.loads(Path(__file__).with_name('operations.json').read_text(encoding='utf-8'))['operations']
 READ_OPERATIONS = sorted(OPERATIONS)
 START = 'https://x.com/i/xskill'
+# What Aside opens before the tab is sent to START: a page of x.com that runs no app, so the kit is installed before the
+# app's first script (Aside 1.26 keeps only a tab its agent opened; a REPL's own tab closes when that call ends)
+PLACEHOLDER = 'https://x.com/robots.txt'
+PLACEHOLDER_REQUESTS = 1   # its document
 # 성진: 관찰자가 앱보다 늦게 설치돼 열기를 잴 수 없을 때만 쓰는 예약값 — 실측(이른 설치) 열기는 x.com 13 + 문서 1
 OPEN_RESERVE = 20
 LOAD_WAIT = 20        # seconds a new tab may take until its app, store and login are there
@@ -59,6 +64,11 @@ def _host(url):
         return urlsplit(url or '').hostname or ''
     except ValueError:
         return ''
+
+
+def _placeholder(url, nonce):
+    """Whether `url` is the placeholder this opening asked for, exactly (Aside lists a tab's URL with its fragment)."""
+    return url == f'{PLACEHOLDER}#{nonce}'
 
 
 def _verification(error):
@@ -172,28 +182,29 @@ class Client:
         return state
 
     def _open(self):
-        """Open a new dedicated tab: about:blank first (recorded before it can poll), attached, its opener ended, then
-        sent to x.com with the kit installed as the load begins. Counted apart from the command's reads (setup)."""
-        with self.guard.request(reserve=1, setup=True, kind='tab_open') as slot:
-            with self.aside.opener() as target:
-                self.tab = target
-                self.session.set_tab(target)
-                armed = self._load(slot, target)
+        """Open a new dedicated tab: Aside opens a placeholder page that runs no app (the tab is found by the nonce in
+        its fragment, never by a before/after diff another command's tab could join), and the tab is then sent to x.com
+        with the kit installed as the load begins. Counted apart from the command's reads (setup): the placeholder's
+        document, then the load."""
+        nonce = 'sns-' + secrets.token_hex(8)
+        with self.guard.request(reserve=1 + PLACEHOLDER_REQUESTS, setup=True, kind='tab_open') as slot:
             try:
-                listed = self.aside.tabs()
+                self.aside.open(f'{PLACEHOLDER}#{nonce}')
+                target = next((t['target_id'] for t in self.aside.tabs() if _placeholder(t['url'], nonce)), None)
             except SnsError:
-                slot.charge(OPEN_RESERVE)  # the tab loaded x.com, unmeasured
-                slot.classify('opened')
+                slot.classify('open_failed')
                 raise
-            if not any(t['target_id'] == target for t in listed):
-                slot.charge(OPEN_RESERVE)  # it loaded x.com before Aside closed it, unseen
-                slot.classify('tab_closed')
-                raise SnsError('aside', 'Aside closed the new X tab when the session that opened it ended; Aside\'s '
-                                        'behaviour has changed and the skill needs an update.',
-                               'Tell the user the X reader needs an update; retrying opens a tab each time.',
-                               reason='aside_changed')
+            if target is None:
+                slot.classify('open_failed')
+                raise SnsError('aside', 'Aside did not open the X tab. Aside opens a tab through its browser agent '
+                                        '(`aside <url>`), which needs Aside signed in with a model it can use.',
+                               'Check that `aside https://example.com` opens a tab, then run x doctor.',
+                               reason='no_tab')
+            self.tab = target
+            self.session.set_tab(target)
+            armed = self._load(slot, target, before=PLACEHOLDER_REQUESTS)
             self.opened_now = True
-            self._settle_load(slot, armed)
+            self._settle_load(slot, armed, before=PLACEHOLDER_REQUESTS)
 
     def _reload(self):
         """Load the app in the known tab again (its app is older than X's servers): measured like opening, counted as
@@ -208,31 +219,40 @@ class Client:
             self.reopened = True
             self._settle_load(slot, armed)
 
-    def _load(self, slot, target):
-        """Send the tab to x.com with the kit armed; a load that fails once the tab was sent is charged the reserve."""
+    def _load(self, slot, target, before=0):
+        """Send the tab to x.com with the kit armed; a load that fails once the tab was sent is charged the reserve (on
+        top of the `before` requests the opening already made)."""
         try:
             return self.aside.load(target, START, SNIPPETS['arm'], self._args({}))
         except SnsError as error:
             if error.reason != 'tab_missing':
-                slot.charge(OPEN_RESERVE)
+                slot.charge(before + OPEN_RESERVE)
             slot.classify('load_failed')
             raise
 
-    def _settle_load(self, slot, armed):
+    def _settle_load(self, slot, armed, before=0):
         """Wait for the loaded app, its store and login, checking each look for a block; charge what the load cost:
         what the tab's observer saw plus the document, or, when the kit came too late to see it all, OPEN_RESERVE for
-        what came before it plus everything it saw (never set off against each other). Charged however the wait ends."""
+        what came before it plus everything it saw (never set off against each other), on top of the `before` requests the
+        opening made first. Charged however the wait ends."""
         # measured when the kit came before the app ran, or while X's timing buffer still held the whole load
         early = isinstance(armed, dict) and (armed.get('buffer_intact') is True or
                                              (armed.get('ready_at_install') == 'loading' and not armed.get('app_at_install')))
         deadline = self.clock.monotonic() + min(LOAD_WAIT, max(1.0, self.guard.time_left() - 5))
-        seen = [1]   # the document itself is a request too; counted up as the looks come in, charged however they end
+        # the document itself is a request too; counted up as the looks come in, charged however they end. However early
+        # the kit came, a load is measured only when its wait ended as it should: one that ended in an error (the tab
+        # gone, Aside lost, a block whose tab is then emptied) leaves what the page requested after the last look
+        # unread, and its kit's ledger goes with the tab
+        seen = [1, False]
         slot.classify('opened')
         try:
             state = self._wait_for_app(slot, deadline, seen)
+        except SnsError:
+            seen[1] = False
+            raise
         finally:
-            self.measured_open = early
-            slot.charge(seen[0] if early else OPEN_RESERVE + seen[0] - 1)
+            self.measured_open = measured = early and seen[1]
+            slot.charge(before + (seen[0] if measured else OPEN_RESERVE + seen[0] - 1))
         self._check(state)
 
     def _wait_for_app(self, slot, deadline, seen):
@@ -249,6 +269,7 @@ class Client:
                 self.clock.sleep(0.5)
                 continue
             seen[0] += _int(look.get('resources'))
+            seen[1] = True
             self._note(look)
             self._consume(look, slot)
             if ready is not None:

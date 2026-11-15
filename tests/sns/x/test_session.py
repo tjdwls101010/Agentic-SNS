@@ -16,7 +16,7 @@ def one_post():
 def test_a_recorded_tab_that_is_still_open_is_reused(browser):
     known_tab(browser).respond('x.query', one_post())
     code, out, _ = run(browser, 'feed')
-    assert code == 0 and 'opener' not in browser.ops() and 'tab opened' not in out.splitlines()[0]
+    assert code == 0 and 'open' not in browser.ops() and 'tab opened' not in out.splitlines()[0]
     assert Session('x', ASIDE).tab == 'T1'
 
 
@@ -26,7 +26,7 @@ def test_a_lost_tab_is_replaced_and_the_first_line_reports_what_opening_cost(bro
     opening(browser, target='NEW1', resources=13).respond('x.query', one_post())
     code, out, _ = run(browser, 'feed')
     assert code == 0, out
-    assert 'tab opened (+14 requests)' in out.splitlines()[0] and Session('x', ASIDE).tab == 'NEW1'
+    assert 'tab opened (+15 requests)' in out.splitlines()[0] and Session('x', ASIDE).tab == 'NEW1'
 
 
 def test_a_tab_of_the_users_is_never_adopted(browser):
@@ -44,7 +44,7 @@ def test_a_corrupt_session_opens_one_tab_rewrites_the_record_and_says_so(browser
     opening(browser, target='NEW1').respond('x.query', one_post())
     code, out, _ = run(browser, 'feed', '--json')
     envelope = json.loads(out)
-    assert code == 0 and envelope['session_reset'] is True and envelope['setup_requests'] == 14
+    assert code == 0 and envelope['session_reset'] is True and envelope['setup_requests'] == 15
     assert Session('x', ASIDE).reset is False and Session('x', ASIDE).tab == 'NEW1'
 
 

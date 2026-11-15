@@ -4,21 +4,20 @@ one JSON value through one protocol (program.js).
 Every call is clamped to the invocation's deadline. A call cut short by that clamp is the time limit (the command ends
 and can resume), not an Aside failure; a call that times out with time to spare, or loses its connection, is.
 
-Two ways to open a dedicated tab are kept because each was verified for its platform: `open(url)` (`aside <url>`,
-Threads and Facebook) and `opener()` + `load()` (X: a held session opens about:blank, the tab is recorded and attached
-by a second call before the opener ends, so Aside does not close it, and the page is loaded with the observer already
-installed). Tab-less reads (Reddit, Naver) `run` a function in the REPL itself, which fetches with the browser's
-cookies. Nothing here uses `aside exec` (the browser agent).
+A dedicated tab is opened with `open(url)` (`aside <url>`): Aside's browser agent opens the tab and it outlives the
+call. That is the only way Aside 1.26 keeps a tab: a tab a REPL call opens is closed when that call ends, even while
+another call has it attached, and piped REPL code runs only once stdin closes (measured 2026-11-15). A page that must
+see its app from the first script (X) is opened on a placeholder and sent on with `load()`, which installs the
+observer as the new document begins. Tab-less reads (Reddit, Naver) `run` a function in the REPL itself, which fetches
+with the browser's cookies.
 """
 import base64
 import json
 import os
 import re
-import selectors
 import shutil
 import subprocess
 import time
-from contextlib import contextmanager
 from pathlib import Path
 
 from sns.errors import SnsError
@@ -26,16 +25,11 @@ from sns.errors import SnsError
 PROGRAM = (Path(__file__).with_name('program.js')).read_text(encoding='utf-8')
 MEDIA = (Path(__file__).with_name('media.js')).read_text(encoding='utf-8')
 REPL_SECONDS = 120          # aside repl's own limit
-OPEN_SECONDS = 30           # opening a tab, and the opener's first answer
+OPEN_SECONDS = 30           # opening a tab (`aside <url>`: about 4 s measured)
 STATUS_SECONDS = 15         # `aside account status`
 _ANSI = re.compile(r'\x1b\[[0-9;]*m')
 _ID = re.compile(r'[A-Za-z0-9_-]{1,64}')
 _CHECK = 'Check that Aside is running, then run doctor.'
-# One line: the interactive REPL runs each line on its own. The leading string names it for the test stand-in.
-# openTab answers with the page it opened, target id included (measured 2026-10-21): a before/after diff of the tab
-# list would also catch a tab another command opened meanwhile.
-_OPENER = ("'sns-opener'; const opened = await openTab('about:blank'); "
-           "console.log(JSON.stringify({kind: 'opened', tabs: [opened && opened.targetId]}));\n")
 
 
 def active_account(stdout):
@@ -173,70 +167,6 @@ class Aside:
             raise SnsError('aside', 'Aside could not run.', _CHECK) from None
         if result.returncode:
             raise SnsError('aside', 'Aside could not open the tab.', _CHECK, reason='failed')
-
-    @contextmanager
-    def opener(self, seconds=None):
-        """Open a new about:blank tab in a held session and yield its target id; the session ends when the block does.
-        The caller records the tab and attaches it from another call before leaving the block."""
-        limit, clamped = self._limit(seconds, OPEN_SECONDS)
-        try:
-            process = subprocess.Popen(self._command('repl'), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                       stderr=subprocess.STDOUT, text=True, bufsize=1)
-        except (OSError, UnicodeError):
-            raise SnsError('aside', 'Aside could not run.', _CHECK) from None
-        try:
-            try:
-                process.stdin.write(_OPENER)
-                process.stdin.flush()
-            except OSError:
-                raise SnsError('aside', 'Aside did not accept the tab opener.', _CHECK) from None
-            found = self._opened(process, time.monotonic() + limit, clamped)
-            if not isinstance(found, list) or len(found) != 1 or not isinstance(found[0], str):
-                raise SnsError('aside', 'Aside opened no tab this skill can tell apart from the others.', _CHECK)
-            yield found[0]
-        finally:
-            try:
-                process.stdin.close()
-            except OSError:
-                pass
-            try:
-                process.wait(timeout=max(0.5, min(10, self.deadline.left())))
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=5)  # killed: it ends at once
-
-    @staticmethod
-    def _opened(process, until, clamped):
-        """The new tab ids the opener printed, read from its raw output until its answer or `until`."""
-        descriptor = process.stdout.fileno()
-        selector = selectors.DefaultSelector()
-        selector.register(descriptor, selectors.EVENT_READ)
-        pending = b''
-        try:
-            while time.monotonic() < until:
-                if not selector.select(timeout=max(0.0, until - time.monotonic())):
-                    break
-                chunk = os.read(descriptor, 65536)
-                if not chunk:
-                    break
-                pending += chunk
-                *lines, pending = pending.split(b'\n')
-                for raw in lines:
-                    line = _ANSI.sub('', raw.decode('utf-8', 'replace')).strip()
-                    start = line.find('{"kind"')
-                    if start < 0:
-                        continue
-                    try:
-                        value = json.loads(line[start:])
-                    except ValueError:
-                        continue
-                    if isinstance(value, dict) and value.get('kind') == 'opened':
-                        return value.get('tabs')
-        finally:
-            selector.close()
-        if clamped:
-            raise time_limit()
-        raise SnsError('aside', 'Aside did not open a tab in time.', _CHECK, reason='timeout')
 
     def _repl(self, header, function, args, seconds=None):
         try:

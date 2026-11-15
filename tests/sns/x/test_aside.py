@@ -1,6 +1,6 @@
 """What X needs of Aside (sns.aside, the core's system): the output cases of fixtures/aside_output.json through the real
-wrapper, the opener that opens X's tab without an agent, and a load that answers only from the new document. The
-account, the deadline clamp and the protocol itself are core/test_aside.py."""
+wrapper and a load that answers only from the new document. Opening X's tab is x/test_cli_doctor.py's; the account,
+the deadline clamp and the protocol itself are core/test_aside.py."""
 import json
 import shutil
 import stat
@@ -52,54 +52,6 @@ def test_aside_output(tmp_path, monkeypatch, case):
         assert 'lost its connection' in error.value.message
     if kind == 'timeout':
         assert error.value.reason == 'timeout'  # the request may have been made: the caller keeps the slot charged
-
-
-def opener_binary(tmp_path, answer, after=''):
-    """A fake `aside repl` that reads the opener from stdin, prints `answer`, and records when stdin closed."""
-    script = tmp_path / 'aside'
-    log = tmp_path / 'opener.log'
-    script.write_text(f"""#!{sys.executable}
-import sys, time
-line = sys.stdin.readline()
-open({str(log)!r}, 'a').write('got:' + ('opener' if 'sns-opener' in line else 'other') + '\\n')
-sys.stdout.write('\\x1b[2maccount: u0\\x1b[0m\\nrepl > ' + {answer!r} + '\\n')
-sys.stdout.flush()
-{after}
-sys.stdin.read()
-open({str(log)!r}, 'a').write('eof\\n')
-""")
-    script.chmod(script.stat().st_mode | stat.S_IEXEC)
-    return script, log
-
-
-def test_the_opener_yields_the_one_new_tab_and_ends_its_session_after_the_block(tmp_path, monkeypatch):
-    script, log = opener_binary(tmp_path, json.dumps({'kind': 'opened', 'tabs': ['NEW1']}))
-    monkeypatch.setenv('SNS_ASIDE_BIN', str(script))
-    with aside().opener() as target:
-        assert target == 'NEW1'
-        assert log.read_text() == 'got:opener\n'  # still held while the caller records and attaches the tab
-    assert log.read_text() == 'got:opener\neof\n'
-
-
-@pytest.mark.parametrize('answer', [json.dumps({'kind': 'opened', 'tabs': ['A', 'B']}),
-                                    json.dumps({'kind': 'opened', 'tabs': []})])
-def test_an_opener_that_cannot_name_one_tab_is_refused(tmp_path, monkeypatch, answer):
-    script, log = opener_binary(tmp_path, answer)
-    monkeypatch.setenv('SNS_ASIDE_BIN', str(script))
-    with pytest.raises(SnsError) as error:
-        with aside().opener():
-            pytest.fail('no tab to use')
-    assert error.value.kind == 'aside'
-    assert log.read_text().endswith('eof\n')  # the held session is ended anyway
-
-
-def test_an_opener_that_does_not_answer_in_time_is_refused(tmp_path, monkeypatch):
-    script, log = opener_binary(tmp_path, 'nothing useful', after='time.sleep(3)')
-    monkeypatch.setenv('SNS_ASIDE_BIN', str(script))
-    with pytest.raises(SnsError) as error:
-        with aside().opener(seconds=1):
-            pytest.fail('no tab to use')
-    assert error.value.kind == 'aside' and 'in time' in error.value.message
 
 
 def node_binary(tmp_path):

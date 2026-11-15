@@ -14,6 +14,7 @@ from sns.x import PLATFORM
 from tests.sns.support.cli import command_of as _command_of, run_cli
 
 START = 'https://x.com/i/xskill'
+PLACEHOLDER = 'https://x.com/robots.txt'
 ACCOUNT = '1000000099'
 ASIDE = 'u0'
 ENVIRONMENT = {'TZ': 'UTC', 'SNS_IDLE_SECONDS': 'off'}
@@ -53,9 +54,9 @@ def known_tab(browser, target='T1', **extra):
 
 
 def opening(browser, target='NEW1', resources=13, early=True, quiet=True, **extra):
-    """Aside opens a new tab; it loads x.com with the kit installed early (or late) and is logged in. quiet: the two
-    looks after the app is ready that see nothing new (the load has settled)."""
-    browser.respond('opener', {'tabs': [target]})
+    """Aside opens a new tab on the placeholder; it loads x.com with the kit installed early (or late) and is logged
+    in. quiet: the two looks after the app is ready that see nothing new (the load has settled)."""
+    browser.respond('open', {'tab': target})
     browser.respond('load:x.arm', {'installed_at': 300 if early else 4000, 'location': START,
                                    'ready_at_install': 'loading' if early else 'complete', 'app_at_install': not early})
     browser.respond('x.state', state(resources=resources, **extra))

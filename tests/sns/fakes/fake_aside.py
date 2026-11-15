@@ -3,9 +3,13 @@
 
 It understands every call the skill makes:
 - `aside account status`: prints the scenario's account_status (default: u0 active), exit account_status_exit.
-- `aside --account A <url>`: opens a persistent tab (a new id from the scenario's open_ids, else TAB<n>) at <url>.
-- `aside --account A repl` with the opener on stdin: answers {"kind": "opened", "tabs": [...]} from the scripted
-  "opener" response, then waits for stdin to close; with "opener_end_closes_tab" the tab disappears then.
+- `aside --account A <url>`: Aside's agent opens a persistent tab at <url>: the id is a scripted "open" response's
+  "tab", else the next of the scenario's open_ids, else TAB<n>; an "open" response may also carry "__sleep" (seconds
+  before the tab appears), "no_tab": true (the agent answered, exit 0, and opened nothing) or "before": tabs
+  ({id, url}) listed ahead of it, "{fragment}" in their url standing for the opened url's fragment.
+- `aside --account A repl` with code on stdin: as Aside 1.26 does, the code runs only once stdin is closed, all of its
+  output comes when it ends, and a tab it opened is closed when it ends, even if another call attached it meanwhile
+  (measured 2026-11-15). The code is logged as op "stdin_repl"; nothing in the skill should send one.
 - `aside --account A repl <program>`: the program starts with `const ASIDE = {...};` and `const ARGS = {...};`.
   ASIDE.op tabs lists the scenario's tabs; evaluate, load and run answer from the scripted responses. A function names
   itself with `// sns-snippet: <platform>.<name>` (the last such marker, after any shared library it carries); the
@@ -103,30 +107,10 @@ def ratelimit(scenario, spec):
     return {'used': str(used), 'remaining': f'{max(0, spec["limit"] - used)}.0', 'reset': str(spec.get('reset', 300))}
 
 
-def opener(account):
-    line = sys.stdin.readline()
+def stdin_repl(account):
+    code = sys.stdin.read()  # Aside runs piped code as one script, after EOF
     with locked():
-        scenario = load()
-        log({'op': 'opener', 'account': account, 'marked': 'sns-opener' in line})
-        response = take(scenario, 'opener', {}) or {'tabs': ['OPENED']}
-        save(scenario)
-    if '__sleep' in response:
-        time.sleep(response['__sleep'])
-    tabs = response.get('tabs') or []
-    with locked():
-        scenario = load()
-        scenario['tabs'] += [{'id': t, 'url': 'about:blank'} for t in tabs]
-        save(scenario)
-    sys.stdout.write('\x1b[2maccount: u0\x1b[0m\n\x1b[32mrepl\x1b[0m > ' + json.dumps({'kind': 'opened', 'tabs': tabs})
-                     + '\n')
-    sys.stdout.flush()
-    sys.stdin.read()  # held until the skill ends the session
-    log({'op': 'opener_end'})
-    with locked():
-        scenario = load()
-        if scenario.get('opener_end_closes_tab'):
-            scenario['tabs'] = [t for t in scenario['tabs'] if t['id'] not in tabs]
-            save(scenario)
+        log({'op': 'stdin_repl', 'account': account, 'code': code[:200]})
     return 0
 
 
@@ -136,8 +120,19 @@ def open_tab(url, account):
         log({'op': 'open', 'url': url, 'account': account})
         if scenario.get('open_fails'):
             return 1
+        response = take(scenario, 'open', {}) or {}
+        save(scenario)
+    if '__sleep' in response:
+        time.sleep(response['__sleep'])
+    if response.get('no_tab'):
+        return 0
+    with locked():
+        scenario = load()
         ids = scenario.setdefault('open_ids', [])
-        target = ids.pop(0) if ids else f'TAB{len(scenario["tabs"]) + 1}'
+        target = response.get('tab') or (ids.pop(0) if ids else f'TAB{len(scenario["tabs"]) + 1}')
+        fragment = url.split('#', 1)[1] if '#' in url else ''
+        scenario['tabs'] += [{'id': t['id'], 'url': t['url'].replace('{fragment}', fragment)}
+                             for t in response.get('before', [])]
         scenario['tabs'].append({'id': target, 'url': url})
         save(scenario)
     return 0
@@ -200,7 +195,7 @@ def main(argv):
         sys.stdout.write(scenario.get('account_status', '* u0  viewer@example.com  signed in  profiles: Profile 0\n'))
         return scenario.get('account_status_exit', 0)
     if argv == ['repl']:
-        return opener(account)
+        return stdin_repl(account)
     if argv[:1] != ['repl']:
         return open_tab(argv[0], account)
     with locked():

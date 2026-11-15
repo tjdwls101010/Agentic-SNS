@@ -20,6 +20,7 @@ from tests.sns.x.test_snippets import page
 pytestmark = needs_node
 CASES = fixture('accounting.json')['cases']
 R = 20
+PLACEHOLDER = 1  # an opening (not a reload) first loads the placeholder page Aside's agent opens: its document
 HOME_QUERY = {'name': 'HomeTimeline', 'allowed': ['HomeTimeline'], 'variables': {}, 'toggles': {}}
 ROTATED = '{"errors":[{"message":"Query: Unspecified"}]}'
 LOST = 'Error: other side closed\n'
@@ -96,7 +97,7 @@ def plan(case):
 def scripted(browser, mine, results):
     """Script the fake Aside with what the kit answered for one command's calls."""
     if mine['opened']:
-        browser.respond('opener', {'tabs': ['NEW1']})
+        browser.respond('open', {'tab': 'NEW1'})
         browser.respond('load:x.arm', results[mine['arm']])
     else:
         browser.tab('T1', url=START)
@@ -144,14 +145,14 @@ def test_accounting(case, browser, tmp_path):
         else:
             assert code == 0, (envelope.get('message'), envelope.get('fix'))
         total, setup = envelope['request_count'], envelope.get('setup_requests', 0)
-        opening = R if expected['charged']['opening'] == 'R' else 0
+        opening = R + PLACEHOLDER if expected['charged']['opening'] == 'R' else 0
         if opening:
             assert setup >= R, envelope  # the reservation, and the document and what the kit saw on top
         else:
             assert setup == 0, envelope
         assert envelope.get('unwatched_requests', 0) == expected['unwatched'], envelope
         if not split:
-            assert total == total_of(expected['total']), (envelope, expected)
+            assert total == total_of(expected['total']) + (PLACEHOLDER if opening else 0), (envelope, expected)
             assert total - direct - opening == expected['charged']['background'], (envelope, expected)
         charged['direct'] += direct
         charged['background'] += total - direct - opening
