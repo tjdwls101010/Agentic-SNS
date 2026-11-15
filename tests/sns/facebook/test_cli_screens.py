@@ -149,6 +149,34 @@ def test_a_saved_screen_without_the_list_is_a_changed_answer(browser):
     serve(browser, SAVED, SWITCHER)
     code, out, _ = run(browser, 'me', 'saved')
     assert code == 6 and json.loads(out)['error'] == 'failed'
+    assert 'may have changed that screen' in json.loads(out)['message']
+
+
+def test_a_list_that_does_not_say_whether_more_follow_is_a_changed_answer_not_a_retry(browser):
+    """page_info without has_next_page: the end cannot be told, and fetching the same screen again cannot help."""
+    collections, items, switcher = saved_screen([SHELF])
+    del items['data']['viewer']['saved_list_items']['page_info']['has_next_page']
+    serve(browser, SAVED, collections, items, switcher)
+    code, out, _ = run(browser, 'me', 'saved')
+    envelope = json.loads(out)
+    assert code == 6 and 'may have changed that screen' in envelope['message'] and 'more:' not in envelope['fix']
+
+
+def test_more_said_without_a_cursor_still_ends_not_built(browser):
+    collections, items, switcher = saved_screen([SHELF], has_next=True)
+    items['data']['viewer']['saved_list_items']['page_info']['end_cursor'] = None
+    serve(browser, SAVED, collections, items, switcher)
+    code, out, _ = run(browser, 'me', 'saved')
+    assert code == 0 and 'stopped=not_built' in out.splitlines()[0], out
+
+
+def test_saved_rows_of_another_kind_are_counted_as_left_out(browser):
+    broken = save('4100003', 'No savable', typename='ExternalUrl', permalink='https://example-shop.test/x')
+    broken['node']['savable'] = None
+    serve(browser, SAVED, *saved_screen([SHELF, broken]))
+    code, out, _ = run(browser, 'me', 'saved')
+    assert code == 0 and ' 1 shown ' in out.splitlines()[0]
+    assert any(line.startswith('coverage: 1 ') and 'left out' in line for line in out.splitlines()), out
 
 
 # --- me groups --------------------------------------------------------------------------------------------------------
@@ -383,6 +411,14 @@ def test_group_members_tab_reads_the_new_members_section(browser):
         '[e1] person id=61500011 · Ana Ruiz · unverified · url: "https://www.facebook.com/profile.php?id=61500011"',
         '[e2] person id=61500012 · Tomas Berg · unverified · url: "https://www.facebook.com/profile.php?id=61500012"']
     assert 'Decoy' not in out and pages(browser) == [MEMBERS]
+
+
+def test_the_new_members_section_read_to_its_end_is_still_not_the_whole_group(browser):
+    """Only the new members section is read; the group's other member sections are not, so its end is not the end."""
+    serve(browser, MEMBERS, *members_screen([member('61500011', 'Ana Ruiz', 'Joined 3 days ago')], has_next=False))
+    code, out, _ = run(browser, 'group', 'weekendhikers', '--tab', 'members')
+    assert code == 0 and 'stopped=not_built' in out.splitlines()[0], out
+    assert any(line.startswith('coverage: ') and 'new members' in line for line in out.splitlines()), out
 
 
 def test_the_members_tab_takes_no_sort_or_window(browser):

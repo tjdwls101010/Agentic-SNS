@@ -16,8 +16,13 @@ MORE = ('Facebook says more follow; the request for the page after was not obser
         'screen loads it, is read')
 
 
-def first_page(platform, invocation, *, command, target, identity, words, fetch):
-    """Read one screen list (fetch(client) → a web.Batch) as reading.read_list does, its next page not built."""
+LEFT_OUT = {'rows': 'rows of another kind or without an id'}
+
+
+def first_page(platform, invocation, *, command, target, identity, words, fetch, section=None):
+    """Read one screen list (fetch(client) → a web.Batch) as reading.read_list does, its next page not built.
+    `section`: the list is one section of a larger one (a group's new members), so even its end is not_built and a
+    coverage line names the section."""
     def read(connection, state, out):
         issues = []
 
@@ -25,14 +30,18 @@ def first_page(platform, invocation, *, command, target, identity, words, fetch)
             batch = fetch(connection.client)
             issues.extend(batch.issues)
             found = paged(batch)
-            if found.next is not None:
+            found.left_out = dict(batch.left_out)
+            # Facebook saying more follow decides it, with or without a cursor (the next page is not read anyway)
+            if (batch.page_info or {}).get('has_next_page') is True:
                 found.next, found.stop = None, 'not_built'
             return found
 
         result = reading.read_list(connection, state, out, order='server', command=command, target=target,
-                                   identity=identity, words=words, notes=NOTES, fetch=page)
+                                   identity=identity, words=words, notes={**NOTES, **LEFT_OUT}, fetch=page)
+        if section and result.get('stop_reason') == 'exhausted':
+            result['stop_reason'] = 'not_built'
         # the stop is kept with the rows a handle shows later, so the line goes with it, fetched or not
-        capped = [MORE] if result.get('stop_reason') == 'not_built' else []
+        capped = [section or MORE] if result.get('stop_reason') == 'not_built' else []
         result['coverage'] = [*result.get('coverage', []), *issue_notes(issues), *capped]
         return result
 
@@ -73,4 +82,6 @@ def group(platform, invocation):
         return group_feed(platform, invocation)
     target = web.normalize_group(invocation.options['target'])
     return first_page(platform, invocation, command='group', target=target, identity={'tab': 'members'},
-                      words=['--tab', 'members'], fetch=lambda client: client.members(target))
+                      words=['--tab', 'members'], fetch=lambda client: client.members(target),
+                      section='only the new members section is read (the group\'s other member sections are not), '
+                              'its first page as the screen loads it')

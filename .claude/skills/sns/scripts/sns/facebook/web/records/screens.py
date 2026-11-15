@@ -82,9 +82,12 @@ def _nodes(found):
 def _list(chunks, holds, record):
     found, issues = _find(chunks, holds)
     if found is None:
-        return [], None, False, issues
+        return [], None, False, issues, {}, {}
     nodes = _nodes(found)
-    return [r for r in map(record, nodes) if r is not None], found['page_info'], bool(nodes), issues
+    records = [r for r in map(record, nodes) if r is not None]
+    # rows of another kind, or without an id, are counted so the coverage says what was not shown
+    left_out = {'rows': len(nodes) - len(records)} if len(nodes) > len(records) else {}
+    return records, found['page_info'], bool(nodes), issues, {}, left_out
 
 
 def _entity(kind, identity, name, url, verified, captured_at):

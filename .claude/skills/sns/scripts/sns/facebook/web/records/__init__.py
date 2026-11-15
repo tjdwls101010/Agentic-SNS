@@ -18,6 +18,7 @@ class Batch:
     has_items: bool = False
     issues: list = field(default_factory=list)
     handles: dict = field(default_factory=dict)
+    left_out: dict = field(default_factory=dict)   # rows received and not shown, by label (screen lists)
 
 
 def posts_page(chunks, *, source, connection_key, captured_at):

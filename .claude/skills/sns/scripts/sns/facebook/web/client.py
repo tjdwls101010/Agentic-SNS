@@ -511,7 +511,10 @@ class Client:
         """The first page of a list as the screen at `url` preloads it into its own HTML (one page GET); a page that
         carries no such list is a changed answer."""
         batch = build(payload.chunks(self.page(url)), captured_at=_now(), **context)
-        if batch.page_info is None and not batch.has_items:
+        # no list, or one that does not say whether more follow: the end cannot be told, and the same screen again
+        # would not tell it either
+        if (batch.page_info is None and not batch.has_items) or (
+                isinstance(batch.page_info, dict) and type(batch.page_info.get('has_next_page')) is not bool):
             raise SnsError('failed', f'The page {url} carries no {what}; Facebook may have changed that screen.',
                            'Facebook changed this screen; the skill needs an update. Tell the user which read failed.',
                            reason='stale')

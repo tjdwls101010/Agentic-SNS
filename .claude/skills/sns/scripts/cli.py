@@ -995,7 +995,7 @@ def _facebook_surface(platform):
             'exits': (0, 2, 3, 4, 5, 6, 7, 8),
         },
         'profile': {
-            'help': 'Read a profile\'s or page\'s timeline.',
+            'help': 'Read a profile\'s or page\'s timeline or photos.',
             'run': _run(platform.screens_profile),
             'arguments': [(('target',), {'help': 'Profile or page URL, vanity name or numeric id'}),
                           (('--tab',), {'choices': PROFILE_TABS, 'default': 'posts', 'help': 'posts (the timeline) or photos'}),
@@ -1019,7 +1019,7 @@ def _facebook_surface(platform):
             'check': check_graph,
         },
         'group': {
-            'help': 'Read a group\'s posts.',
+            'help': 'Read a group\'s posts or new members.',
             'run': _run(platform.screens_group),
             'arguments': [(('target',), {'help': 'Group URL, vanity name or numeric id'}),
                           (('--tab',), {'choices': GROUP_TABS, 'default': 'posts', 'help': 'posts or members (its new members)'}),
