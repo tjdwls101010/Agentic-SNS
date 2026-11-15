@@ -108,7 +108,9 @@ def option(name, platform):
         'chars': (('--chars',), {'type': chars, 'help': 'Characters of each text to show (default 180; 0 = all '
                                                          'received); --json and --out keep all'}),
         'after': (('--after',), {'type': positive, 'metavar': 'HANDLE', 'help': 'Continue from the numbered handle a '
-                                                                                'more: or replies line printed'}),
+                                                                                'more: or replies line printed (a '
+                                                                                'handle lasts 24 hours; a post URL '
+                                                                                'does not expire)'}),
         'out': (('--out',), {'metavar': 'FILE', 'help': 'Collect into this NDJSON file one committed page at a time; '
                                                         'rerun the same command to resume; cannot be combined with '
                                                         '--after'}),
@@ -1525,7 +1527,7 @@ def main(argv=None, platforms=None, commands=None):
         exit_codes = [(code, meaning, [k for k, c in KIND_EXIT.items() if c == code])
                       for code, meaning in EXIT_CODES.items()]
         invocation = Invocation(options, deadline, {w: m.PLATFORM for w, m in platforms.items()}, cli_path(),
-                                exit_codes)
+                                exit_codes, tuple(argv))
         # another platform's link, or one of this platform of another kind: name the command that reads it
         foreign(module.PLATFORM, invocation, options.get('target'), options['command'],
                 LINKS.get(options['platform'], {}).get(options['command']))

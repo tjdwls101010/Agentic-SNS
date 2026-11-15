@@ -63,6 +63,7 @@ class Invocation:
     platforms: dict
     cli_path: str
     exit_codes: list = field(default_factory=list)
+    argv: tuple = ()          # the words after cli.py, as given: what a branch handle's expiry tells to run again
 
     @property
     def verbose(self):

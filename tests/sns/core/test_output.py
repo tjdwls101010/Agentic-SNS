@@ -56,3 +56,23 @@ def test_an_incomplete_read_says_so_before_the_records(capsys, browser, monkeypa
     lines = out.splitlines()
     assert lines[1] == 'coverage: incomplete — Alpha answered 500. fix: Retry later.'
     assert lines[-1].startswith('[p1] i1 ')
+
+
+def test_a_more_line_a_day_old_fails_with_the_command_that_starts_the_reading_again(capsys, browser, monkeypatch, data_dir):
+    """L1: the next day a more: line's handle has expired; its error gives, word for word, the command that reads the
+    same thing from the start (the more: line without --after)."""
+    import json
+    import re
+    me(browser)
+    feed(browser, None, [item(1), item(2)], 'C2')
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--limit', '1')
+    more = next(line for line in out.splitlines() if line.startswith('more: '))
+    number = re.search(r'--after (\d+)', more).group(1)
+    path = data_dir / 'handles' / f'{number}.json'
+    record = json.loads(path.read_text())
+    record['created_at'] -= 25 * 3600
+    path.write_text(json.dumps(record))
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--limit', '1', '--after', number)
+    envelope = json.loads(out)
+    assert code == 2 and 'expired' in envelope['message']
+    assert envelope['fix'].endswith(more[len('more: '):].replace(f' --after {number}', ''))

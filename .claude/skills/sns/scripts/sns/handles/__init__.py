@@ -18,6 +18,7 @@ from sns.paths import data_dir, shared
 
 FORMAT = 1
 TTL_SECONDS = 24 * 3600
+KEEP_SECONDS = 7 * 24 * 3600   # how long an expired handle keeps the command that remakes it (no cursor, no ids)
 FIRST = 1000
 _RESTART = 'Rerun the original command without --after (or the command that printed this handle).'
 
@@ -47,8 +48,9 @@ def _counter(directory, deadline):
         yield counter
 
 
-def save(context, state, viewer=None, deadline=None):
-    """Store `state` for the query `context` (and the platform account it was read with); returns the new number."""
+def save(context, state, viewer=None, deadline=None, remake=None):
+    """Store `state` for the query `context` (and the platform account it was read with); returns the new number.
+    `remake` is the command line that makes such a handle again (the reading restarted), given back once it expires."""
     directory = _directory()
     _prune(directory)
     try:
@@ -61,7 +63,7 @@ def save(context, state, viewer=None, deadline=None):
             counter.flush()
             os.fsync(counter.fileno())
             record = {'format': FORMAT, 'context': context, 'viewer': viewer, 'state': state,
-                      'created_at': time.time()}
+                      'created_at': time.time(), 'remake': remake}
             path = directory / f'{number}.json'
             with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as stream:
                 json.dump(record, stream, ensure_ascii=False, separators=(',', ':'))
@@ -121,8 +123,11 @@ def load(number, context):
                        + (' with another target, order or account.' if same_command else ', not this command.'),
                        f'Run it as {_where(saved)}: copy the whole more: or replies line that printed it.')
     created = record.get('created_at')
-    if type(created) not in (int, float) or time.time() - created > TTL_SECONDS:
-        raise SnsError('argument', f'Handle {number} has expired; cursors do not last.', _RESTART)
+    if type(created) not in (int, float) or time.time() - created > TTL_SECONDS or 'state' not in record:
+        remake = record.get('remake')
+        raise SnsError('argument', f'Handle {number} has expired: handles last 24 hours (a post\'s URL does not).',
+                       f'Run the command that made it again: {remake}' if isinstance(remake, str) and remake
+                       else _RESTART)
     state = record.get('state')
     if not isinstance(state, dict):
         raise SnsError('argument', f'Handle {number} is incomplete.', _RESTART)
@@ -131,11 +136,23 @@ def load(number, context):
 
 
 def _prune(directory):
-    """Handles hold other people's ids; one past its TTL is useless, so it is deleted when a new one is saved."""
-    cutoff = time.time() - TTL_SECONDS
+    """Handles hold other people's ids, so one past its day loses its cursor when a new one is saved; it keeps the
+    command that remakes it for KEEP_SECONDS more, so its more: line still says what to run, and then goes."""
+    now = time.time()
     for path in directory.glob('*.json'):
         try:
-            if path.stat().st_mtime < cutoff:
+            if path.stat().st_mtime >= now - TTL_SECONDS:
+                continue
+            record = json.loads(path.read_text(encoding='utf-8'))
+            created = record.get('created_at') if isinstance(record, dict) else None
+            if type(created) not in (int, float) or now - created > TTL_SECONDS + KEEP_SECONDS or not record.get('remake'):
                 path.unlink()
-        except OSError:
+            elif 'state' in record:
+                kept = {key: record[key] for key in ('format', 'context', 'created_at', 'remake') if key in record}
+                temporary = path.with_name('.' + path.name + '.tmp')
+                with os.fdopen(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w') as stream:
+                    json.dump(kept, stream, ensure_ascii=False, separators=(',', ':'))
+                os.utime(temporary, (created, created))
+                os.replace(temporary, path)
+        except (OSError, ValueError):
             pass

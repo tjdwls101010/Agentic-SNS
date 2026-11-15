@@ -78,7 +78,9 @@ class Connection:
         read with. Returns the number to print (e.g. `replies <number>`)."""
         bound = context(self.platform, command, target, identity or {}, self.account)
         viewer = self.observed or self._viewer or self.viewer()
-        return handles.save(bound, state, viewer=viewer, deadline=self.deadline)
+        argv = getattr(self.invocation, 'argv', ())
+        remake = command_line(self.invocation.cli_path, argv) if argv else None  # the read that printed it, again
+        return handles.save(bound, state, viewer=viewer, deadline=self.deadline, remake=remake)
 
     def resume(self, number, command, target=None, identity=None):
         """The state a handle saved for `command` (and target, identity); a handle of another command is an argument
@@ -324,7 +326,12 @@ def _continue(connection, reading):
     try:
         # a handle always carries the account it was read with (a fetch platform asks now if it has not yet)
         viewer = connection.observed or connection.known_viewer or connection.viewer()
-        number = handles.save(bound, continuation['state'], viewer=viewer, deadline=connection.deadline)
+        # once the handle expires, the same reading from its start is what to run
+        remake = command_line(connection.invocation.cli_path, command_words(
+            platform.key, continuation['command'], continuation['target'], window_words(continuation['words'], options),
+            options, after=None, limit=continuation.get('limit', ...)))
+        number = handles.save(bound, continuation['state'], viewer=viewer, deadline=connection.deadline,
+                              remake=remake)
     except SnsError as error:
         current = reading.get('failure')
         reading['failure'] = error if current is None else current
