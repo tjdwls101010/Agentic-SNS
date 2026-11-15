@@ -19,7 +19,7 @@ from sns.reddit.web import tree
 FETCH = Path(__file__).with_name('fetch.js').read_text(encoding='utf-8')
 REDIRECTS = (301, 302, 303, 307, 308)
 HOPS = 3
-_CHECK = 'Check that Aside is running, then run doctor.'
+_CHECK = 'Run doctor: it says whether Aside can be reached and which Aside version answered.'
 
 
 def _location(value, argument=False):

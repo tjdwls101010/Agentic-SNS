@@ -4,6 +4,11 @@ one JSON value through one protocol (program.js).
 Every call is clamped to the invocation's deadline. A call cut short by that clamp is the time limit (the command ends
 and can resume), not an Aside failure; a call that times out with time to spare, or loses its connection, is.
 
+An Aside failure names its cause, because each has a different remedy: the `aside` command is missing or does not run
+(install it), the account or the agent cannot be used (sign in, pick an account), Aside cannot be reached (start it),
+or Aside answered in a way this skill does not know (the skill may not match this Aside version, which the message
+names). The `aside` command starts a closed Aside app by itself, which takes about half a minute (measured 2026-11-15).
+
 A dedicated tab is opened with `open(url)` (`aside <url>`): Aside's browser agent opens the tab and it outlives the
 call. That is the only way Aside 1.26 keeps a tab: a tab a REPL call opens is closed when that call ends, even while
 another call has it attached, and piped REPL code runs only once stdin closes (measured 2026-11-15). A page that must
@@ -26,10 +31,16 @@ PROGRAM = (Path(__file__).with_name('program.js')).read_text(encoding='utf-8')
 MEDIA = (Path(__file__).with_name('media.js')).read_text(encoding='utf-8')
 REPL_SECONDS = 120          # aside repl's own limit
 OPEN_SECONDS = 30           # opening a tab (`aside <url>`: about 4 s measured)
-STATUS_SECONDS = 15         # `aside account status`
+# `aside account status`: answers at once, or after about 35 s when it first starts a closed Aside (measured)
+STATUS_SECONDS = 45
+VERSION_SECONDS = 5         # `aside --version` (local, no app)
 _ANSI = re.compile(r'\x1b\[[0-9;]*m')
 _ID = re.compile(r'[A-Za-z0-9_-]{1,64}')
-_CHECK = 'Check that Aside is running, then run doctor.'
+_RUNS = 'Check that the `aside` command runs in a terminal (`aside --version`), then run doctor.'
+_START = 'Start the Aside app (a closed one is started by the `aside` command, which takes about half a minute), then ' \
+         'run doctor.'
+_AGENT = 'Check that `aside https://example.com` opens a tab: Aside opens tabs through its browser agent, which needs ' \
+         'Aside signed in with a model it can use. Then run doctor.'
 
 
 def active_account(stdout):
@@ -62,8 +73,9 @@ class Aside:
         self.platform, self.deadline = platform, deadline
         self.binary = os.environ.get('SNS_ASIDE_BIN') or shutil.which('aside')
         if not self.binary:
-            raise SnsError('aside', 'Aside is unavailable: its CLI is not on PATH.',
-                           'Install or start Aside so the `aside` command works, then run doctor.')
+            raise SnsError('aside', 'Aside is unavailable: its `aside` command is not on PATH.',
+                           'Install Aside (it provides the `aside` command), then run doctor.', reason='missing')
+        self._version = None
         self.account = account if account and _ID.fullmatch(account) else self._account()
 
     def _account(self):
@@ -80,15 +92,35 @@ class Aside:
         except subprocess.TimeoutExpired:
             if clamped:
                 raise time_limit() from None
-            raise SnsError('aside', 'Aside did not say which account is active in time.', _CHECK) from None
+            raise SnsError('aside', 'Aside did not say which account is active in time: it is not running, or did not '
+                                    'finish starting.', _START, reason='unreachable') from None
         except (OSError, UnicodeError):
-            raise SnsError('aside', 'Aside could not run.', _CHECK) from None
+            raise SnsError('aside', 'The `aside` command could not run.', _RUNS, reason='missing') from None
         account = active_account(done.stdout) if done.returncode == 0 else None
         if account is None:
             raise SnsError('aside', 'Could not tell which Aside account to use.',
                            'Set SNS_ASIDE_ACCOUNT to the Aside account id (such as u0), or check '
-                           '`aside account status`.')
+                           '`aside account status`.', reason='account')
         return account
+
+    def version(self):
+        """What `aside --version` prints (asked once, without the app), or None when it does not answer."""
+        if self._version is None:
+            try:
+                done = subprocess.run([self.binary, '--version'], capture_output=True, text=True,
+                                      timeout=VERSION_SECONDS)
+                words = done.stdout.split() if done.returncode == 0 else []
+                self._version = words[-1] if words else ''
+            except (OSError, UnicodeError, subprocess.TimeoutExpired):
+                self._version = ''
+        return self._version or None
+
+    def unexpected(self, message, reason='invalid'):
+        """The failure of an Aside that answered, but not the way this skill knows: it names the Aside version."""
+        version = self.version() or '(version unknown)'
+        return SnsError('aside', f'{message} Aside {version} answered in a way this skill does not expect.',
+                        f'Run doctor; if it fails the same way, tell the user this skill may not match Aside {version} '
+                        'and needs an update.', reason=reason)
 
     def _command(self, *args):
         return [self.binary, '--account', self.account, *args]
@@ -107,7 +139,7 @@ class Aside:
         """Open browser tabs as [{target_id, url}]; listing touches no web page."""
         listed = self._repl({'op': 'tabs'}, None, {}, seconds)
         if not isinstance(listed, list):
-            raise SnsError('aside', 'Aside returned an invalid tab list.', _CHECK)
+            raise self.unexpected('Aside returned an invalid tab list.')
         return [{'target_id': t.get('targetId'), 'url': t.get('url') or ''} for t in listed
                 if isinstance(t, dict) and isinstance(t.get('targetId'), str)]
 
@@ -132,7 +164,7 @@ class Aside:
         status_<n>, not_image, redirect, network)."""
         answer = self.run(MEDIA, {'url': url, 'max': max_bytes}, seconds)
         if not isinstance(answer, dict) or type(answer.get('status')) is not int:
-            raise SnsError('aside', 'Aside returned a picture answer this skill cannot read.', _CHECK, reason='invalid')
+            raise self.unexpected('Aside returned a picture answer this skill cannot read.')
         if answer.get('redirect'):
             raise SnsError('partial', 'the image host redirected it elsewhere, so it was not fetched',
                            'Read the post again; a signed link may have expired.', reason='redirect')
@@ -151,8 +183,7 @@ class Aside:
         try:
             return base64.b64decode(answer['data'], validate=True), answer['type']
         except ValueError:
-            raise SnsError('aside', 'Aside returned picture bytes this skill cannot read.', _CHECK,
-                           reason='invalid') from None
+            raise self.unexpected('Aside returned picture bytes this skill cannot read.') from None
 
     def open(self, url, seconds=None):
         """Open `url` in a new persistent tab (`aside <url>`) and wait for Aside to finish opening it."""
@@ -162,11 +193,14 @@ class Aside:
         except subprocess.TimeoutExpired:
             if clamped:
                 raise time_limit() from None
-            raise SnsError('aside', 'Aside did not finish opening the tab in time.', _CHECK, reason='timeout') from None
+            raise SnsError('aside', 'Aside\'s browser agent did not finish opening the tab in time.', _AGENT,
+                           reason='timeout') from None
         except (OSError, UnicodeError):
-            raise SnsError('aside', 'Aside could not run.', _CHECK) from None
+            raise SnsError('aside', 'The `aside` command could not run.', _RUNS, reason='missing') from None
         if result.returncode:
-            raise SnsError('aside', 'Aside could not open the tab.', _CHECK, reason='failed')
+            if _unreachable(result.stdout + result.stderr):
+                raise SnsError('aside', 'Aside could not be reached to open the tab.', _START, reason='unreachable')
+            raise SnsError('aside', 'Aside\'s browser agent could not open the tab.', _AGENT, reason='failed')
 
     def _repl(self, header, function, args, seconds=None):
         try:
@@ -181,17 +215,29 @@ class Aside:
         except subprocess.TimeoutExpired:
             if clamped:
                 raise time_limit() from None
-            raise SnsError('aside', f'Aside did not answer within {int(limit)} seconds.',
-                           'Check Aside, then run doctor; the request may have been made.', reason='timeout') from None
+            version = self.version() or '(version unknown)'
+            raise SnsError('aside', f'Aside did not answer within {int(limit)} seconds; the request may have been made.',
+                           'Run doctor. If it passes, Aside is reachable and the page was slow: run the command again. '
+                           f'If doctor fails the same way, this skill may not match Aside {version}.',
+                           reason='timeout') from None
         except (OSError, UnicodeError):
-            raise SnsError('aside', 'Aside could not run.', _CHECK) from None
+            raise SnsError('aside', 'The `aside` command could not run.', _RUNS, reason='missing') from None
         if result.returncode:
-            text = (result.stdout + result.stderr).lower()
-            if 'other side closed' in text or 'daemon is not reachable' in text or \
-                    time.monotonic() - started > REPL_SECONDS:
-                raise SnsError('aside', 'Aside lost its connection or reached its time limit.', _CHECK, reason='lost')
-            raise SnsError('aside', 'Aside failed to run the browser call.', _CHECK, reason='failed')
-        return parse(result.stdout)
+            if _unreachable(result.stdout + result.stderr) or time.monotonic() - started > REPL_SECONDS:
+                raise SnsError('aside', 'Aside lost its connection or reached its time limit.', _START, reason='lost')
+            raise self.unexpected('Aside failed to run the browser call.', reason='failed')
+        try:
+            return parse(result.stdout)
+        except SnsError as error:
+            if error.reason == 'invalid':
+                raise self.unexpected(error.message, reason=error.reason) from None
+            raise
+
+
+def _unreachable(output):
+    """Whether the `aside` command said it could not reach the app."""
+    text = output.lower()
+    return 'other side closed' in text or 'daemon is not reachable' in text
 
 
 def program(header, function, args):
@@ -217,8 +263,9 @@ def parse(stdout):
                 raise SnsError('aside', 'The dedicated browser tab is gone.', 'Run the command again; it opens a new '
                                                                              'tab.', reason='tab_missing')
             if last['error'] == 'load_timeout':
-                raise SnsError('aside', 'The tab did not load in time.', _CHECK, reason='load_timeout')
-            raise SnsError('aside', 'The browser could not run the call.', _CHECK, reason='failed')
+                raise SnsError('aside', 'The tab did not load in time.', 'Run the command again; if the page keeps '
+                                                                         'not loading, run doctor.', reason='load_timeout')
+            raise SnsError('aside', 'The browser could not run the call.', 'Run doctor.', reason='failed')
         chunks = lines[:-1]
         if last['kind'] != 'result' or type(last.get('chunks')) is not int or last['chunks'] != len(chunks):
             raise ValueError
@@ -231,4 +278,4 @@ def parse(stdout):
     except SnsError:
         raise
     except (ValueError, TypeError, KeyError, RecursionError):
-        raise SnsError('aside', 'Aside returned output this skill cannot read.', _CHECK, reason='invalid') from None
+        raise SnsError('aside', 'Aside returned output this skill cannot read.', 'Run doctor.', reason='invalid') from None

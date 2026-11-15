@@ -43,6 +43,7 @@ def test_doctor_reports_the_account_and_protection(naver, data_dir):
     assert code == 0 and envelope['ok'] is True and envelope['stop_reason'] == 'ready'
     check, = envelope['results']
     assert check['aside_account'] == ACCOUNT and check['viewer'] == VIEWER and check['login'] == 'ready'
+    assert check['aside_version'] == '1.26.0'  # what `aside --version` printed
     assert check['blocked'] is False and check['requests_last_hour'] == 1 and check['limits'] == {}
     assert naver.paths() == ['/api/current-user'] and envelope['request_count'] == 1
     text = json.dumps(envelope, ensure_ascii=False)

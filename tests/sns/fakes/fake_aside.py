@@ -3,6 +3,7 @@
 
 It understands every call the skill makes:
 - `aside account status`: prints the scenario's account_status (default: u0 active), exit account_status_exit.
+- `aside --version`: prints the scenario's version (default 1.26.0).
 - `aside --account A <url>`: Aside's agent opens a persistent tab at <url>: the id is a scripted "open" response's
   "tab", else the next of the scenario's open_ids, else TAB<n>; an "open" response may also carry "__sleep" (seconds
   before the tab appears), "no_tab": true (the agent answered, exit 0, and opened nothing) or "before": tabs
@@ -186,6 +187,12 @@ def main(argv):
     account = None
     if argv[:1] == ['--account']:
         account, argv = argv[1], argv[2:]
+    if argv == ['--version']:
+        with locked():
+            scenario = load()
+            log({'op': 'version'})
+        sys.stdout.write(scenario.get('version', '1.26.0') + '\n')
+        return 0
     if argv[:2] == ['account', 'status']:
         with locked():
             scenario = load()

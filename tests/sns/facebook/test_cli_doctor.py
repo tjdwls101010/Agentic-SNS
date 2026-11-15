@@ -38,7 +38,7 @@ def test_opens_the_dedicated_tab_when_none_is_known(browser):
     assert check['viewer'] == ACCOUNT and check['login'] == 'ready' and check['aside_account'] == ASIDE
     assert check['tab'] == {'target_id': 'T9', 'opened_now': True}
     assert result['request_count'] == 30 and result['setup_requests'] == 30  # its document and 29 the page made
-    assert [c['op'] for c in browser.calls() if c['op'] != 'account_status'] == [
+    assert [c['op'] for c in browser.calls() if c['op'] not in ('account_status', 'version')] == [
         'tabs', 'open', 'tabs', 'facebook.state', 'facebook.modules']
     assert check['queries']['CometNewsFeedPaginationQuery'] == 'live in the tab'
     assert check['queries']['SearchCometResultsPaginatedResultsQuery'] == 'stored'
@@ -104,7 +104,7 @@ def test_a_saved_block_is_reported_without_touching_the_browser(browser):
     stand_block()
     code, result, _ = doctor(browser)
     assert code == 5 and result['error'] == 'blocked' and result['fix'].startswith('Stop requests')
-    assert [c for c in browser.calls() if c['op'] != 'account_status'] == []
+    assert [c for c in browser.calls() if c['op'] not in ('account_status', 'version')] == []
 
 
 def test_doctor_reports_what_is_specific_to_facebook(browser):
@@ -145,7 +145,7 @@ def test_the_aside_account_comes_from_the_environment_and_owns_its_state(browser
     opening(browser, 'T7')
     code, _, _ = doctor(browser, env={'SNS_ASIDE_ACCOUNT': 'u1'})
     assert code == 0
-    assert {c['account'] for c in browser.calls() if c['op'] != 'account_status'} == {'u1'}
+    assert {c['account'] for c in browser.calls() if c['op'] not in ('account_status', 'version')} == {'u1'}
     assert (data_dir / 'facebook' / 'u1' / 'session' / 'tab.json').exists()
     assert not (data_dir / 'facebook' / 'u0').exists()
 
