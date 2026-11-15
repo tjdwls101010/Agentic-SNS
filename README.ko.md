@@ -36,7 +36,7 @@ npx skills add tjdwls101010/Agentic-SNS
 cp -R .claude/skills/sns ~/.claude/skills/
 ```
 
-스킬은 자기 폴더에 쓰지 않으므로 다시 설치하거나 업데이트해도 상태가 남습니다. 차단·정지·페이싱·요청 기록·세션·이어 읽기 핸들·저장한 사진은 `~/.local/state/agentic-sns/`(`$XDG_STATE_HOME`이 있으면 `$XDG_STATE_HOME/agentic-sns/`, `SNS_DATA_DIR`가 있으면 그곳)에 있고, 이 컴퓨터의 모든 설치가 함께 씁니다. 사진과 남의 글을 가리키는 핸들은 하루가 지나면, 스킬이 다음에 사진이나 핸들을 저장할 때 지워집니다. `SNS_DATA_DIR`를 다른 곳에 두면 저장한 사진을 읽을 때 권한을 묻습니다.
+스킬은 자기 폴더에 쓰지 않으므로 다시 설치하거나 업데이트해도 상태가 남습니다. 차단·정지·페이싱·요청 기록·세션·이어 읽기 핸들·결과 파일·저장한 사진은 `~/.local/state/agentic-sns/`(`$XDG_STATE_HOME`이 있으면 `$XDG_STATE_HOME/agentic-sns/`, `SNS_DATA_DIR`가 있으면 그곳)에 있고, 이 컴퓨터의 모든 설치가 함께 씁니다. 사진, 결과 파일, 남의 글을 가리키는 핸들은 하루가 지나면, 스킬이 다음에 그것을 저장할 때 지워집니다(만료된 핸들은 자신을 다시 만드는 명령만 일주일 더 남깁니다). `SNS_DATA_DIR`를 다른 곳에 두면 저장한 사진을 읽을 때 권한을 묻습니다.
 
 **스킬 폴더 안 `data/`에 상태를 두던 버전에서 업데이트할 때:** `npx skills add`는 새 버전이 돌기 전에 폴더를 지우므로 기록된 차단이 사라집니다. 업데이트 **전에** 스킬 폴더의 `data/`를 다른 곳에 옮겨 두고, 업데이트 **뒤에** 새 폴더의 `data/` 자리에 되돌려 놓은 다음 아무 명령이나 한 번 실행하세요. 새 버전이 그것을 가져옵니다(그 `data/`가 바뀌면 다시 가져옵니다). 가진 스킬 사본은 모두 업데이트하세요 — 옛 사본은 계속 자기 `data/`에 씁니다. 이 업데이트 한 번만 필요합니다.
 
@@ -58,7 +58,7 @@ uv run .claude/skills/sns/scripts/cli.py reddit schema             # 결과 필�
 uv run .claude/skills/sns/scripts/cli.py reddit sub r/apple --sort top --time week --limit 5
 ```
 
-결과의 첫 줄은 무엇을 몇 건 보였는지, 왜 멈췄는지, 요청을 몇 번 썼는지, 남은 한도를 말합니다. 마지막 줄은 이어 읽을 명령(`more:`, `replies <handle>`, `post <url>`)입니다. `--json`은 같은 결과를 JSON으로, `--out FILE`은 긴 수집을 파일로 받습니다. 종료 코드의 뜻은 `--help` 끝에 있습니다.
+결과는 무엇을 몇 건 보였는지, 왜 멈췄는지, 요청을 몇 번 썼는지, 남은 한도, 결과 전체를 하루쯤 보관하는 파일(`saved=`)로 시작하고, 이어서 빠진 것(`coverage:`)과 이어 읽을 명령(`more:`)이 옵니다 — 출력이 잘려도 이것들은 남습니다. 레코드마다 끝에 더 열어 볼 명령(`replies <handle>`, `post <url>`)이 붙습니다. `--json`은 같은 결과를 JSON으로, `--out FILE`은 긴 수집을 파일로 받습니다. 종료 코드의 뜻은 `--help` 끝에 있습니다.
 
 ## 계정 보호
 
