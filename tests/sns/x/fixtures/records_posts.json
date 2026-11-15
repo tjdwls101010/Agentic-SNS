@@ -71,7 +71,9 @@
     "lang": "en",
     "author": {
      "id": "1000000001",
-     "username": "example_author"
+     "username": "example_author",
+     "name": "Example Author",
+     "url": "https://x.com/example_author"
     },
     "reply_count": 4,
     "repost_count": 3,
@@ -135,7 +137,7 @@
    },
    "expected": {
     "url": "https://x.com/i/web/status/1850000000000000003",
-    "author": null
+    "author": {"name": null, "id": null, "url": null}
    }
   },
   {

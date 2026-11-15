@@ -17,10 +17,10 @@ def test_post_search_shows_ten_of_a_page_and_offers_more_without_a_listing_reque
     naver.hint()
     naver.respond(M, '/api/search/v1/post', json=search_page(post_items(30)),
                   query={'keyword': '성수 카페 후기', 'sortType': 'sim', 'page': 1, 'itemCount': 30})
-    code, out, _ = naver.run('naver-blog', 'search', '성수', '카페', '후기')
+    code, out, _ = naver.run('naver-blog', 'search', '성수', '카페', '후기', '--sort', 'relevance')
     assert code == 0, out
     head = first_line(out)
-    assert head.startswith('naver-blog search · type=posts · sort=sim · 10 shown · stopped=limit_reached · requests=1')
+    assert head.startswith('naver-blog search · type=posts · sort=relevance · 10 shown · stopped=limit_reached · requests=1')
     assert 'coverage: Naver Blog reports 7749 in total' in out
     assert out.count('excerpt (Naver\'s, cut by length)') == 10 and 'url: https://blog.naver.com/blog_a1/224000000001' in out
     assert naver.paths() == ['/api/search/v1/post'], 'a warm hint stamps the handle without asking who is logged in'
@@ -63,9 +63,9 @@ def test_blog_search_uses_v2_and_takes_only_an_order(naver):
 
 @pytest.mark.parametrize('args', [['--type', 'blogs', '--since', '2026-10-01'], ['--type', 'blogs', '--own-money'],
                                   ['--type', 'tags', '--sort', 'date'], ['--type', 'tags', '--own-money'],
-                                  ['--blog', 'b', '--type', 'tags', '--sort', 'date'],
-                                  ['--blog', 'b', '--type', 'tags', '--since', '2026-10-01'],
-                                  ['--blog', 'b', '--own-money'], ['--blog', 'b', '--type', 'blogs'],
+                                  ['--in', 'b', '--type', 'tags', '--sort', 'date'],
+                                  ['--in', 'b', '--type', 'tags', '--since', '2026-10-01'],
+                                  ['--in', 'b', '--own-money'], ['--in', 'b', '--type', 'blogs'],
                                   ['--out', 'f.ndjson', '--after', '3'], ['--since', '2026-10-15', '--until', '2026-10-10']])
 def test_combinations_a_surface_cannot_honour_are_refused_before_any_request(naver, args):
     code, out, _ = naver.run('naver-blog', 'search', '카페', *args)
@@ -105,7 +105,7 @@ def test_one_blogs_own_search(naver):
     items = [{'blogId': 'own', 'logNo': 1 + i, 'title': f'안 {i}', 'contents': 'c', 'addDate': DAY0} for i in range(4)]
     naver.respond(M, '/api/blogs/own/search/post', json={'isSuccess': True, 'result': {'totalCount': 4, 'totalPage': 1, 'list': items}},
                   query={'query': '맛집', 'sortType': 'sim', 'page': 1})
-    code, out, _ = naver.run('naver-blog', 'search', '맛집', '--blog', 'https://blog.naver.com/own')
+    code, out, _ = naver.run('naver-blog', 'search', '맛집', '--in', 'https://blog.naver.com/own')
     assert code == 0, out
     assert 'blog=own' in first_line(out) and '4 shown' in first_line(out)
 
@@ -114,7 +114,7 @@ def test_one_blogs_tag_search(naver):
     items = [{'blogId': 'own', 'logNo': 9, 'title': '태그 글', 'contents': 'c', 'addDate': DAY0}]
     naver.respond(M, '/api/blogs/own/search/tag', json={'isSuccess': True, 'result': {'totalCount': 1, 'totalPage': 1, 'list': items}},
                   query={'query': '대구술집', 'page': 1})
-    code, out, _ = naver.run('naver-blog', 'search', '대구술집', '--blog', 'own', '--type', 'tags')
+    code, out, _ = naver.run('naver-blog', 'search', '대구술집', '--in', 'own', '--type', 'tags')
     assert code == 0 and '1 shown' in first_line(out)
 
 
@@ -137,7 +137,7 @@ def test_a_domain_address_is_resolved_once(naver):
     naver.respond(M, '/api/blogs/mydomain/search/post', json={'isSuccess': False, 'error': {'code': 'not_exist_blog', 'message': 'x'}})
     naver.respond('blog.naver.com', '/mydomain', body="<script>var blogId = 'real_id';</script>", content_type='text/html')
     naver.respond(M, '/api/blogs/real_id/search/post', json={'isSuccess': True, 'result': {'totalCount': 0, 'totalPage': 0, 'list': []}})
-    code, out, _ = naver.run('naver-blog', 'search', '맛집', '--blog', 'mydomain')
+    code, out, _ = naver.run('naver-blog', 'search', '맛집', '--in', 'mydomain')
     assert code == 7 and naver.paths() == ['/api/blogs/mydomain/search/post', '/mydomain', '/api/blogs/real_id/search/post']
 
 

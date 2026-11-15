@@ -7,7 +7,7 @@ Surface per scenario: a newest-first window reads `feed --sort recent`, a ranked
 - nothing reads on by itself except a window a newest-first surface can close or a server-filtered one; every scenario
   that expects a read to the end passes --limit 1000 (the file's `limit: null` means "to the natural end");
 - a pinned post is judged by its date and an undated one is left out and counted, instead of passing every window;
-- advertisements are left out before the page reaches the reader, so a continuation counts the ones it meets again;
+- advertisements are included and count toward the limit;
 - the budget stop of the file's stop_priority does not exist; the order of the stops that remain is the last test.
 """
 import json
@@ -25,8 +25,8 @@ TIMELINE = ['node', 'timeline_list_feed_units']
 PATH = {'newest_first': FEED, 'ranked': FEED, 'server': TIMELINE}
 # what changed against the file's expectation: scenario → the new `expected` keys
 CHANGED = {
-    'newest-first-window-closes-at-boundary-page': {'shown': ['P1', 'P4'], 'undated_left_out': 1},
-    'sponsored-skipped-once': {'then_sponsored_skipped': 1},
+    # P5: an ad (P3, sponsored and dated outside the window) is shown marked whatever its date
+    'newest-first-window-closes-at-boundary-page': {'shown': ['P1', 'P3', 'P4'], 'undated_left_out': 1},
 }
 
 
@@ -50,8 +50,6 @@ def arguments(options, limit=...):
     order = options['order']
     args = ['profile', '1000777'] if order == 'server' else ['feed'] + (['--sort', 'recent'] if order == 'newest_first'
                                                                          else [])
-    if order != 'server' and not options['skip_sponsored']:
-        args.append('--include-sponsored')
     for key in ('since', 'until'):
         if options[key]:
             args += ['--' + key, options[key]]
@@ -92,8 +90,7 @@ def test_the_scenario_reads_what_it_says(browser, name):
     if expected.get('undated_left_out'):
         assert f'{expected["undated_left_out"]} undated record left out: no date places it in the window' \
             in result['coverage']
-    if expected.get('sponsored_skipped'):
-        assert f'{expected["sponsored_skipped"]} sponsored posts (ads) left out' in result['coverage']
+    assert not any('sponsored posts (ads) left out' in note for note in result.get('coverage', []))
 
 
 @pytest.mark.parametrize('name', [n for n, s in SCENARIOS.items() if 'then' in s])
@@ -114,8 +111,7 @@ def test_the_continuation_shows_the_kept_tail_first_and_asks_for_no_page_it_has_
     assert ids(result) == expected['shown'] and result['stop_reason'] == expected['stop_reason']
     assert len(queries(browser)) - queried == expected['pages_fetched']
     assert ('next' in result) is expected['continues']
-    if 'then_sponsored_skipped' in expected:
-        assert f'{expected["then_sponsored_skipped"]} sponsored posts (ads) left out' in result['coverage']
+    assert not any('sponsored posts (ads) left out' in note for note in result.get('coverage', []))
 
 
 def test_an_explicitly_empty_first_page_is_an_empty_result(browser):

@@ -152,11 +152,12 @@ def post_record(raw, ancestors=()):
         return _unavailable(found, 'Post unavailable: deleted, hidden, or not visible to this account')
     if found in ancestors or len(ancestors) >= MAX_SHARE_DEPTH:
         return _unavailable(found, 'Nested share cycle or depth limit')
-    author = user_record(raw.get('user'))
+    author = user_record(raw.get('user')) or {}
+    author = {**author, 'name': author.get('full_name'), 'id': author.get('id'), 'url': author.get('url')}
     info = raw.get('text_post_app_info') if isinstance(raw.get('text_post_app_info'), dict) else {}
     share = info.get('share_info') if isinstance(info.get('share_info'), dict) else {}
     code = raw.get('code') if isinstance(raw.get('code'), str) else None
-    url = (f'{ORIGIN}/@{author["username"]}/post/{code}' if author and author['username'] and code
+    url = (f'{ORIGIN}/@{author["username"]}/post/{code}' if author.get('username') and code
            else f'{ORIGIN}/t/{code}' if code else None)
     caption = raw.get('caption') if isinstance(raw.get('caption'), dict) else {}
     pinned = info.get('pinned_post_info') if isinstance(info.get('pinned_post_info'), dict) else {}

@@ -8,6 +8,7 @@ POST = {
                    'and unavailable_reason.',
     'fields': {
         'kind': 'string — post',
+        'promoted': 'boolean — advertisement included and marked [ad] in text',
         'id': 'string — X\'s post id; post <id> opens it',
         'url': 'string|null — the post\'s own URL (a repost row: the original\'s); post <url> opens exactly that post; '
                'a tombstone with a known id has the generic /i/web/status/<id> URL',
@@ -15,7 +16,7 @@ POST = {
         'text': 'string — the whole text X sent, t.co links expanded and media links removed; a long post\'s full text; '
                 'a repost row\'s is empty (the words are the original\'s, in reposted_post)',
         'lang': 'string|null — X\'s guess of the text\'s language',
-        'author': 'object|null — who acted, as an account record: for a repost row the reposter, not the writer',
+        'author': 'object — {name, id, url} plus account fields (see schema account); unknown values are null; for a repost row the reposter, not the writer',
         'reply_count, repost_count, quote_count, like_count, bookmark_count, view_count':
             'integer|null — as X reports them, ' + NULL + '; a repost row has none of its own (see reposted_post)',
         'media': 'array<{n, kind, image_url, video_url, width, height, alt, media_id}> — n counts this post\'s '
@@ -94,6 +95,7 @@ TREND = {
     'description': 'A trend or an event on X\'s Explore tabs: what X shows this account as popular now, not a measure.',
     'fields': {
         'kind': 'string — trend or event',
+        'promoted': 'boolean — advertisement included and marked [ad] in text',
         'id': 'string — X\'s entry id for it on that tab',
         'created_at': 'null — a trend has no date',
         'name': 'string — the trend\'s words, or the event\'s title',
@@ -214,3 +216,6 @@ DOCTOR = {
 
 SCHEMAS = {'post': POST, 'account': ACCOUNT, 'trend': TREND, 'list': LIST, 'community': COMMUNITY, 'space': SPACE,
            'notification': NOTIFICATION, 'doctor': DOCTOR}
+
+for _name in ('account', 'list', 'community', 'space', 'notification'):
+    SCHEMAS[_name]['fields']['promoted'] = 'boolean — advertisement included and marked [ad] in text when present in a timeline'

@@ -23,9 +23,9 @@ def notifications(platform, invocation):
             return page
 
         # Facebook has no date filter here and lists newest first in buckets; the page size is Facebook's (15 asked for)
-        result = reading.read_list(connection, state, out, order='server', command='notifications', target=None,
-                                   identity={}, words=(), extra=None, notes=NOTES, fetch=fetch)
+        result = reading.read_list(connection, state, out, order='server', command='me', target=None,
+                                   identity={}, words=['notifications'], extra=None, notes=NOTES, fetch=fetch)
         result['coverage'] = [*result.get('coverage', []), *issue_notes(issues), *([OLDER] if capped else [])]
         return result
 
-    return reading.run(platform, invocation, command='notifications', target=None, identity={}, reader=read)
+    return reading.run(platform, invocation, command='me', target=None, identity={}, reader=read)

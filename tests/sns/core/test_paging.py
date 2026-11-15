@@ -146,3 +146,11 @@ def test_a_natural_stop_on_a_page_split_by_the_limit_survives_into_the_continuat
     rest = paginate(lambda cursor: pytest.fail('nothing more is requested'), limit=5, state=first['state'])
     assert [r['id'] for r in rest['results']] == ['b'] and rest['stop_reason'] == 'server_capped'
     assert rest['state'] is None
+
+
+def test_an_ad_and_the_same_item_shown_as_itself_do_not_hide_each_other():
+    """Review of P5: ads are records now; one keyed like the organic item it promotes would drop that item (or itself)."""
+    from sns.paging import record_key
+    organic, ad = {'id': '555', 'kind': 'post'}, {'id': '555', 'kind': 'post', 'promoted': True}
+    assert record_key(organic) != record_key(ad) and record_key(organic) == '555'
+    assert isinstance(record_key(ad), str)  # it is saved with a continuation (JSON)

@@ -3,7 +3,7 @@
 A newest-first list (feed or group --sort recent) closes a --since window at the first page that holds a dated,
 unpinned post older than --since; a ranked list (feed top, group top or activity) cannot close one; a profile's window
 is filtered by Facebook as well. Days are local days. `surface` is the one place a Facebook answer becomes a reading
-page: advertisements are left out (and counted) before the window weighs the page's order.
+page: advertisements are included before the window weighs the page's order.
 """
 from datetime import date, datetime, time
 
@@ -13,7 +13,7 @@ from sns.window import Window
 from sns.facebook import web
 
 # What a page left out, in coverage's words
-NOTES = {'sponsored': 'sponsored posts (ads)'}
+NOTES = {}
 # What a response's issues become in coverage
 ISSUES = {
     'unsupported_path_patch': 'part of a response could not be placed on any record; some records may lack fields',
@@ -23,21 +23,14 @@ ISSUES = {
 }
 
 
-def paged(batch, *, keep_sponsored=False):
-    """The reading Page of one answer (web.Batch): its cursor from page_info, ads counted and left out unless kept."""
+def paged(batch):
+    """The reading Page of one answer (web.Batch), including advertisements."""
     records = list(batch.records)
-    # 성진: 광고만 있는 쪽이 연달아 둘 오면 paginate가 "새것 없는 쪽 2번"으로 읽기를 멈춘다(광고를 어댑터에서 빼므로). 실제로 보이면 idle_limit을 올린다
-    left_out = {}
-    if not keep_sponsored:
-        ads = sum(1 for record in records if record.get('sponsored'))
-        records = [record for record in records if not record.get('sponsored')]
-        if ads:
-            left_out['sponsored'] = ads
     info = batch.page_info if isinstance(batch.page_info, dict) else {}
     cursor = info.get('end_cursor') if info.get('has_next_page') is True and isinstance(info.get('end_cursor'), str) \
         else None
     # a page of items none of which could be read is the platform having changed its answer, not an empty one
-    return Page(records, next=cursor or None, end=info.get('has_next_page') is False, left_out=left_out,
+    return Page(records, next=cursor or None, end=info.get('has_next_page') is False,
                 unreadable=1 if batch.has_items and not batch.records else 0)
 
 
@@ -52,7 +45,7 @@ def issue_notes(issues):
 
 
 def surface(connection, state, out, *, fetch, order, command, target, identity, words=(), extra=None,
-            keep_sponsored=False, end_covers_window=False):
+            end_covers_window=False):
     """Read a post list (fetch(cursor) → a web.Batch) as reading.read_list does; the issues of the answers read become
     coverage notes."""
     issues = []
@@ -60,7 +53,7 @@ def surface(connection, state, out, *, fetch, order, command, target, identity, 
     def read(cursor):
         batch = fetch(cursor)
         issues.extend(batch.issues)
-        return paged(batch, keep_sponsored=keep_sponsored)
+        return paged(batch)
 
     result = reading.read_list(connection, state, out, order=order, command=command, target=target, identity=identity,
                                words=words, extra=extra, notes=NOTES, end_covers_window=end_covers_window, fetch=read)
@@ -78,14 +71,13 @@ def window_of(platform, options, order):
 def feed(platform, invocation):
     options = invocation.options
     sort = options['sort']
-    keep = bool(options.get('include_sponsored'))
     order = 'ranked' if sort == 'top' else 'newest_first'
-    identity = {'sort': sort, 'include_sponsored': True if keep else None}
-    words = ['--sort', sort] + (['--include-sponsored'] if keep else [])
+    identity = {'sort': sort}
+    words = ['--sort', sort]
 
     def read(connection, state, out):
         return surface(connection, state, out, order=order, command='feed', target=None, identity=identity,
-                       words=words, keep_sponsored=keep, fetch=lambda cursor: connection.client.feed(sort, cursor))
+                       words=words, fetch=lambda cursor: connection.client.feed(sort, cursor))
 
     # the ranked feed never ends by itself, so --out needs --limit
     return reading.run(platform, invocation, command='feed', target=None, identity=identity, reader=read,

@@ -251,7 +251,8 @@ def post_record(node, entry_id=None, _depth=0):
         return None
     legacy = _dict(node.get('legacy'))
     author_node = _dict(_dict(node.get('core')).get('user_results')).get('result')
-    author = account_record(author_node) if isinstance(author_node, dict) else None
+    author = account_record(author_node) if isinstance(author_node, dict) else {}
+    author = {**author, 'name': author.get('full_name'), 'id': author.get('id'), 'url': author.get('url')}
     note = _dict(_dict(node.get('note_tweet')).get('note_tweet_results')).get('result') or {}
     long_text = isinstance(note, dict) and isinstance(note.get('text'), str)
     entities = _dict(note.get('entity_set')) if long_text and isinstance(note.get('entity_set'), dict) else \
@@ -270,7 +271,7 @@ def post_record(node, entry_id=None, _depth=0):
         quoted['id'] = quoted_id
     community = _dict(_dict(node.get('community_results')).get('result'))
     record = {
-        'kind': 'post', 'id': identity, 'url': f'{ORIGIN}/{handle or "i/web"}/status/{identity}',
+        'kind': 'post', 'id': identity, 'url': f'{ORIGIN}/{handle or "i/web"}/status/{identity}', 'promoted': False,
         'created_at': _time(legacy.get('created_at')), 'text': text, 'lang': _str(legacy.get('lang')),
         'author': author, 'is_reply': bool(legacy.get('in_reply_to_status_id_str')),
         'parent_id': _str(legacy.get('in_reply_to_status_id_str')),

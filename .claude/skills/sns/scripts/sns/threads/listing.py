@@ -48,7 +48,7 @@ def surface(connection, state, out, *, fetch, order, command, target, identity, 
     return result
 
 
-def flags(identity, keys=('feed', 'tab', 'sort')):
+def flags(identity, keys=('tab', 'sort')):
     """The option words that rerun a command with this identity."""
     words = []
     for key in keys:
@@ -66,9 +66,9 @@ def window_of(platform, options, order):
 
 def feed(platform, invocation):
     options = invocation.options
-    name = options.get('feed') or 'foryou'
+    name = options.get('tab') or 'foryou'
     variant, order = FEEDS[name]
-    identity = {'feed': name}
+    identity = {'tab': name}
 
     def read(connection, state, out):
         return surface(connection, state, out, order=order, command='feed', target=None, identity=identity,
@@ -156,12 +156,12 @@ def me(platform, invocation):
 def notifications(platform, invocation):
     """Your activity list: only the first page has been verified to answer without marking anything seen."""
     options = invocation.options
-    identity = {'filter': options['filter']}
+    identity = {'filter': (options.get('tab') or 'all')}
 
     def read(connection, state, out):
-        page = connection.client.notifications(options['filter'], options['limit'])
+        page = connection.client.notifications((options.get('tab') or 'all'), (options.get('limit') or 20))
         # The pagination query has not answered live, so a next-page flag is coverage rather than a continuation.
         coverage = ['Threads says older activity exists; only this page was read'] if page.stop else []
-        return {'results': page.records, 'stop_reason': page.stop or 'exhausted', 'coverage': coverage}
+        return {'results': page.records[:options.get('limit') or 20], 'stop_reason': page.stop or 'exhausted', 'coverage': coverage}
 
-    return reading.run(platform, invocation, command='activity', target=None, identity=identity, reader=read)
+    return reading.run(platform, invocation, command='me', target=None, identity=identity, reader=read)

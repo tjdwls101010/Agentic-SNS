@@ -1,5 +1,5 @@
 {
- "about": "Timeline instructions (appendix A 22, 23, 25, 26): the list X returns at an operation's ...instructions root, read into entries in X's order. {\"$post\": id} stands for a minimal tweet result {__typename: Tweet, rest_id: id, core: {user_results: {result: user A}}, legacy: {full_text: 'post <id>', created_at: 'Thu Oct 15 10:00:00 +0000 2026'}}; {\"$user\": id} for a minimal user result with that rest_id and handle user_<id>. expected: entries as [kind, id, module, index, pinned] (kind post | account | trend | event | branch; module is the module entry id or null; index the position in it), bottom (the next-page cursor or null), branches (ShowMore cursors inside a module: where more of a collapsed branch can be read), terminated, cleared, promoted (ads skipped), other (items that are none of these, counted not shown). source: code (previous timeline.py, pages.py), measured (planning session), P2 (shape not seen live).",
+ "about": "Timeline instructions (appendix A 22, 23, 25, 26): the list X returns at an operation's ...instructions root, read into entries in X's order. {\"$post\": id} stands for a minimal tweet result {__typename: Tweet, rest_id: id, core: {user_results: {result: user A}}, legacy: {full_text: 'post <id>', created_at: 'Thu Oct 15 10:00:00 +0000 2026'}}; {\"$user\": id} for a minimal user result with that rest_id and handle user_<id>. expected: entries as [kind, id, module, index, pinned, promoted] (kind post | account | trend | event | branch; module is the module entry id or null; index the position in it), bottom (the next-page cursor or null), branches (ShowMore cursors inside a module: where more of a collapsed branch can be read), terminated, cleared, other (items that are none of these, counted not shown). source: code (previous timeline.py, pages.py), measured (planning session), P2 (shape not seen live).",
  "users": {
   "A": {
    "__typename": "User",
@@ -70,26 +70,13 @@
    ],
    "expected": {
     "entries": [
-     [
-      "post",
-      "1850000000000000001",
-      null,
-      0,
-      false
-     ],
-     [
-      "post",
-      "1850000000000000002",
-      null,
-      0,
-      false
-     ]
+     ["post", "1850000000000000001", null, 0, false, false],
+     ["post", "1850000000000000002", null, 0, false, false]
     ],
     "bottom": "BOTCUR1",
     "branches": [],
     "terminated": false,
     "cleared": false,
-    "promoted": 0,
     "other": 0
    }
   },
@@ -97,7 +84,7 @@
    "name": "ads-skipped-and-counted",
    "item": "23",
    "source": "code",
-   "fact": "Ads are skipped and counted: entry ids starting promoted- or promotedTweet-, and items carrying promotedMetadata.",
+   "fact": "Ads are included: entry ids starting promoted- or promotedTweet-, and items carrying promotedMetadata.",
    "instructions": [
     {
      "type": "TimelineAddEntries",
@@ -162,16 +149,13 @@
    ],
    "expected": {
     "entries": [
-     [
-      "post",
-      "1850000000000000003",
-      null,
-      0,
-      false
-     ]
+     ["post", "1850000000000000090", null, 0, false, true],
+     ["post", "1850000000000000091", null, 0, false, true],
+     ["post", "1850000000000000092", null, 0, false, true],
+     ["post", "1850000000000000003", null, 0, false, false]
     ],
     "bottom": null,
-    "promoted": 3,
+    "record_promoted": [true, true, true, false],
     "other": 0
    }
   },
@@ -218,20 +202,8 @@
    ],
    "expected": {
     "entries": [
-     [
-      "post",
-      "1850000000000000004",
-      null,
-      0,
-      true
-     ],
-     [
-      "post",
-      "1850000000000000005",
-      null,
-      0,
-      false
-     ]
+     ["post", "1850000000000000004", null, 0, true, false],
+     ["post", "1850000000000000005", null, 0, false, false]
     ]
    }
   },
@@ -267,6 +239,7 @@
           "item": {
            "itemContent": {
             "itemType": "TimelineTweet",
+            "promotedMetadata": {"advertiser_results": {}},
             "tweet_results": {
              "result": {
               "$post": "1850000000000000011"
@@ -283,21 +256,10 @@
    ],
    "expected": {
     "entries": [
-     [
-      "post",
-      "1850000000000000010",
-      "profile-conversation-1850000000000000010",
-      0,
-      false
-     ],
-     [
-      "post",
-      "1850000000000000011",
-      "profile-conversation-1850000000000000010",
-      1,
-      false
-     ]
-    ]
+     ["post", "1850000000000000010", "profile-conversation-1850000000000000010", 0, false, false],
+     ["post", "1850000000000000011", "profile-conversation-1850000000000000010", 1, false, true]
+    ],
+    "record_promoted": [false, true]
    }
   },
   {
@@ -335,13 +297,7 @@
    ],
    "expected": {
     "entries": [
-     [
-      "post",
-      "1850000000000000006",
-      null,
-      0,
-      false
-     ]
+     ["post", "1850000000000000006", null, 0, false, false]
     ],
     "terminated": true
    }
@@ -401,13 +357,7 @@
    ],
    "expected": {
     "entries": [
-     [
-      "post",
-      "1850000000000000007",
-      null,
-      0,
-      false
-     ]
+     ["post", "1850000000000000007", null, 0, false, false]
     ],
     "bottom": "BOTCUR2"
    }
@@ -440,13 +390,7 @@
    ],
    "expected": {
     "entries": [
-     [
-      "post",
-      "1850000000000000021",
-      "conversationthread-1850000000000000020",
-      0,
-      false
-     ]
+     ["post", "1850000000000000021", "conversationthread-1850000000000000020", 0, false, false]
     ]
    }
   },
@@ -497,20 +441,8 @@
    ],
    "expected": {
     "entries": [
-     [
-      "account",
-      "1000000101",
-      null,
-      0,
-      false
-     ],
-     [
-      "account",
-      "1000000102",
-      null,
-      0,
-      false
-     ]
+     ["account", "1000000101", null, 0, false, false],
+     ["account", "1000000102", null, 0, false, false]
     ],
     "bottom": "UCUR"
    }
@@ -558,13 +490,7 @@
    ],
    "expected": {
     "entries": [
-     [
-      "post",
-      "1850000000000000008",
-      null,
-      0,
-      false
-     ]
+     ["post", "1850000000000000008", null, 0, false, false]
     ],
     "other": 2
    }
@@ -629,20 +555,8 @@
    ],
    "expected": {
     "entries": [
-     [
-      "post",
-      "1850000000000000030",
-      "conversationthread-1850000000000000030",
-      0,
-      false
-     ],
-     [
-      "branch",
-      "SHOWCUR1",
-      "conversationthread-1850000000000000030",
-      1,
-      false
-     ]
+     ["post", "1850000000000000030", "conversationthread-1850000000000000030", 0, false, false],
+     ["branch", "SHOWCUR1", "conversationthread-1850000000000000030", 1, false, false]
     ],
     "branches": [
      {
@@ -687,13 +601,7 @@
    ],
    "expected": {
     "entries": [
-     [
-      "post",
-      "1850000000000000009",
-      null,
-      0,
-      false
-     ]
+     ["post", "1850000000000000009", null, 0, false, false]
     ],
     "community_url": {
      "1850000000000000009": "https://x.com/i/communities/1600000000000000001"
@@ -753,22 +661,10 @@
    ],
    "expected": {
     "entries": [
-     [
-      "trend",
-      "trend-1",
-      null,
-      0,
-      false
-     ],
-     [
-      "event",
-      "stories-1",
-      null,
-      0,
-      false
-     ]
+     ["trend", "trend-1", null, 0, false, false],
+     ["trend", "trend-2", null, 0, false, true],
+     ["event", "stories-1", null, 0, false, false]
     ],
-    "promoted": 1,
     "trends": [
      {
       "name": "#SyntheticTopic",
@@ -777,6 +673,7 @@
       "kind": "trend",
       "query": "#SyntheticTopic"
      },
+     {"name": "Sponsored Thing", "kind": "trend", "promoted": true},
      {
       "name": "A synthetic event",
       "description": "Science · Live",
@@ -789,7 +686,7 @@
    "name": "trends-live-shape",
    "item": "26",
    "source": "P2 capture (shape), synthetic values",
-   "fact": "Live Explore trends are snake_case: trend_metadata.domain_context / meta_description, trend_url.url (twitter://search/?query=...), rank; a promoted trend carries promoted_metadata (an ad, skipped and counted); an event links with eventSummaryUrl.url.",
+   "fact": "Live Explore trends are snake_case: trend_metadata.domain_context / meta_description, trend_url.url (twitter://search/?query=...), rank; a promoted trend carries promoted_metadata and is included as an ad; an event links with eventSummaryUrl.url.",
    "instructions": [
     {
      "type": "TimelineAddEntries",
@@ -863,29 +760,11 @@
    ],
    "expected": {
     "entries": [
-     [
-      "trend",
-      "trend-1",
-      null,
-      0,
-      false
-     ],
-     [
-      "trend",
-      "trend-3",
-      null,
-      0,
-      false
-     ],
-     [
-      "event",
-      "stories-1",
-      null,
-      0,
-      false
-     ]
+     ["trend", "trend-1", null, 0, false, false],
+     ["trend", "trend-2", null, 0, false, true],
+     ["trend", "trend-3", null, 0, false, false],
+     ["event", "stories-1", null, 0, false, false]
     ],
-    "promoted": 1,
     "trends": [
      {
       "name": "#SyntheticTopic",
@@ -895,6 +774,7 @@
       "description": "12.3K posts",
       "query": "#SyntheticTopic"
      },
+     {"name": "Sponsored Thing", "kind": "trend", "promoted": true},
      {
       "name": "Plain words here",
       "kind": "trend",

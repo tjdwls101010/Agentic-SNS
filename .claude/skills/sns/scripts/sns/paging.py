@@ -14,12 +14,15 @@ _RETRY = 'Retry later with the more: command; this is not fixed by changing opti
 
 
 def record_key(record):
-    """What a record is known by when telling repeats apart: its id, else its username, else its url."""
+    """What a record is known by when telling repeats apart: its id, else its username, else its url — an ad apart from
+    the same item shown as itself, so neither hides the other."""
     if record.get('id') is not None:
-        return record['id']
-    if record.get('username'):
-        return '@' + str(record['username']).lower()
-    return record.get('url')
+        key = record['id']
+    elif record.get('username'):
+        key = '@' + str(record['username']).lower()
+    else:
+        key = record.get('url')
+    return f'ad:{key}' if record.get('promoted') and key is not None else key  # a string: it is saved in handles
 
 
 def _cursor_of(page):

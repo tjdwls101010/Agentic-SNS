@@ -26,7 +26,8 @@ RECORDS = {
                                      't1_, is a different thing); the post\'s permalink (post <url> opens it in full '
                                      'with its comments); UTC ISO-8601 or null',
         'title, text': 'string — as received (text is the body of a text post; [removed] or [deleted] when gone)',
-        'subreddit, author': 'string — the community and the account that posted it ([deleted] when unknown)',
+        'subreddit': 'string — the community',
+        'author': 'object — {name, id, url}; id and url are null when unknown, name is [deleted] when unknown',
         'edited_at': 'string|null — UTC ISO-8601',
         'score, upvote_ratio': 'number|null — as Reddit shows them; null when not sent',
         'num_comments': 'number|null — Reddit\'s total, deleted and removed comments included; not the number read',
@@ -52,7 +53,8 @@ RECORDS = {
         'kind, id, url, created_at': 'string — kind reply; the replying comment\'s fullname t1_<id>; its permalink with '
                                      'context (comments <url> opens it with what surrounds it); UTC ISO-8601 or null',
         'type': 'string — comment_reply, post_reply or username_mention, as Reddit names it',
-        'author, subreddit': 'string — who replied, where', 'post_title': 'string — the post the reply sits under',
+        'author': 'object — {name, id, url}; id and url are null when unknown, name is [deleted] when unknown',
+        'subreddit': 'string — where the reply was posted', 'post_title': 'string — the post the reply sits under',
         'parent_id': 'string — the fullname it answers', 'text': 'string — the reply as received',
         'unread': 'boolean — still unread in the account\'s inbox; reading it here does not mark it read'}},
     'comment': {'object': 'comment', 'description': 'A comment ([c] label).', 'fields': {
@@ -61,7 +63,8 @@ RECORDS = {
                                      'null',
         'parent_id': 'string — the fullname it answers (t1_ a comment, t3_ the post)', 'post_id': 'string — t3_<id>',
         'text': 'string — as received; > lines quote someone else ([removed] or [deleted] when gone)',
-        'author, subreddit': 'string', 'edited_at': 'string|null — UTC ISO-8601',
+        'author': 'object — {name, id, url}; id and url are null when unknown, name is [deleted] when unknown',
+        'subreddit': 'string', 'edited_at': 'string|null — UTC ISO-8601',
         'score': 'number|null', 'score_hidden': 'boolean — the community hides new comments\' scores for a while',
         'depth': 'integer — 0 for a comment on the post',
         'is_op': 'boolean — written by the post\'s author', 'distinguished': 'string|null — moderator or admin',

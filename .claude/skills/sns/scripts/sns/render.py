@@ -45,7 +45,8 @@ def header(envelope, shown):
     parts = [f'{envelope.get("platform", "")} {envelope.get("command", "")}'.strip()]
     parts += [f'{key}={line(value)}' for key, value in (envelope.get('query') or {}).items() if value is not None]
     if shown is not None:
-        parts.append(f'{shown} shown')
+        ads = sum(1 for record in envelope.get('results') or [] if record.get('promoted'))
+        parts.append(f'{shown} shown' + (f' ({ads} ads)' if ads else ''))
     setup = envelope.get('setup_requests') or 0
     parts += [f'stopped={line(envelope.get("stop_reason"))}', f'requests={envelope.get("request_count", 0) - setup}']
     if setup:

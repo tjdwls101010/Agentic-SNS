@@ -12,7 +12,7 @@ LINK = 'https://www.reddit.com/comments/a/_/c1/'
 
 
 def comment(text='x', depth=0, **extra):
-    return {'kind': 'comment', 'id': f't1_c{depth}', 'author': 'replier', 'text': text, 'depth': depth, 'url': LINK,
+    return {'kind': 'comment', 'id': f't1_c{depth}', 'author': {'name': 'replier', 'id': None, 'url': 'https://www.reddit.com/user/replier/'}, 'text': text, 'depth': depth, 'url': LINK,
             **extra}
 
 
@@ -51,7 +51,7 @@ def test_the_default_clips_and_zero_shows_everything_received():
 def test_a_post_carries_its_media_with_number_kind_size_and_both_urls():
     media = [{'n': 1, 'kind': 'video', 'image_url': 'https://preview.redd.it/p.jpg', 'video_url': 'https://v.redd.it/v.mp4',
               'width': 1280, 'height': 720, 'alt': 'a clip', 'media_id': None}]
-    page = '\n'.join(lines({'kind': 'post', 'id': 't3_a', 'subreddit': 's', 'author': 'u', 'title': 'T', 'text': '',
+    page = '\n'.join(lines({'kind': 'post', 'id': 't3_a', 'subreddit': 's', 'author': {'name': 'u', 'id': None, 'url': 'https://www.reddit.com/user/u/'}, 'title': 'T', 'text': '',
                             'url': 'https://www.reddit.com/comments/a/', 'media': media}, command='post'))
     assert 'media 1: video 1280x720 image: "https://preview.redd.it/p.jpg" video: "https://v.redd.it/v.mp4" ' \
            'caption: "a clip"' in page

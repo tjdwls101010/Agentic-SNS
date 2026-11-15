@@ -2,6 +2,8 @@
 import json
 import time
 
+import pytest
+
 from tests.sns.x.scenes import known_tab, queries, query_result, run
 
 RATE = {'x-rate-limit-limit': '50', 'x-rate-limit-remaining': '49', 'x-rate-limit-reset': str(int(time.time()) + 900)}
@@ -82,6 +84,12 @@ def test_empty_search_text_is_refused(browser):
     assert code == 2 and browser.calls() == []
 
 
+@pytest.mark.parametrize('flag', ['--since', '--until'])
+def test_account_search_refuses_date_filters_before_requests(browser, flag):
+    code, out, _ = run(browser, 'search', 'ai', '--type', 'accounts', flag, '2026-10-12')
+    assert code == 2 and json.loads(out)['error'] == 'argument' and browser.calls() == []
+
+
 def test_the_search_limit_after_some_results_is_a_resumable_stop(browser):
     """The window of an operation running out after records: exit 0, stopped=rate_limited, a more: line (S2)."""
     reset = int(time.time()) + 700
@@ -92,3 +100,24 @@ def test_the_search_limit_after_some_results_is_a_resumable_stop(browser):
     assert code == 0, out
     assert 'stopped=rate_limited' in out.splitlines()[0] and 'limit SearchTimeline resets' in out.splitlines()[0]
     assert out.splitlines()[-1].startswith('more: ')
+
+
+def test_since_and_until_options_are_sent_as_xs_own_operators_and_close_the_window(browser):
+    """P5: every dated read takes --since/--until; X search sends them as since:/until: (X filters, X's days)."""
+    known_tab(browser).respond('x.query', results([tweet('3')])).respond('x.query', results([], bottom=None))
+    code, out, _ = run(browser, 'search', 'topic', '--since', '2026-10-12', '--until', '2026-10-19', '--sort', 'latest',
+                       '--limit', '50')
+    assert code == 0, out
+    assert query_args(browser)[0]['variables']['rawQuery'] == 'topic since:2026-10-12 until:2026-10-19'
+    assert out.splitlines()[1] == "window 2026-10-12..2026-10-19 X's own days · closed (server-filtered)"
+    known_tab(browser).respond('x.query', results([tweet('4')], bottom=None))
+    code, out, _ = run(browser, 'search', 'topic', '--since', '2026-10-12')
+    assert code == 0 and query_args(browser)[-1]['variables']['rawQuery'] == 'topic since:2026-10-12'
+
+
+def test_a_date_option_beside_a_date_operator_in_the_query_is_refused(browser):
+    known_tab(browser)
+    for query, flag in (('topic since:2026-10-01', '--since'), ('topic until_time:1790000000', '--until')):
+        code, out, _ = run(browser, 'search', query, flag, '2026-10-12')
+        assert code == 2 and 'since:' in json.loads(out)['message'], out
+    assert queries(browser) == []

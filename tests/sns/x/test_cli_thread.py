@@ -57,6 +57,29 @@ def post(browser, *args, env=None):
     return run(browser, 'post', *args, env=env)
 
 
+def test_promoted_reply_in_a_thread_is_marked(browser):
+    promoted = module('102', tweet('102', B, '101'))
+    promoted['content']['items'][0]['item']['itemContent']['promotedMetadata'] = {'advertiser_results': {}}
+    known_tab(browser).respond('x.query', query_result(detail([single(tweet('101')), promoted]), headers=RATE))
+    code, out, _ = post(browser, '101')
+    assert code == 0 and '2 shown (1 ads)' in out.splitlines()[0]
+    assert '[ad] [r1] @replier_b' in out
+
+
+def test_an_ad_inside_a_reply_module_takes_no_depth_from_the_replies_beside_it(browser):
+    """Review of P5: an ad in a conversation module took a position, so the organic reply after it was drawn as nested
+    under the ad and counted as nested; an ad is not part of the conversation's nesting."""
+    thread = module('102', tweet('102', B, '101'))
+    ad = module('102', tweet('109', B, '101'))['content']['items'][0]
+    ad['item']['itemContent']['promotedMetadata'] = {'advertiser_results': {}}
+    thread['content']['items'].insert(0, ad)
+    known_tab(browser).respond('x.query', query_result(detail([single(tweet('101')), thread]), headers=RATE))
+    code, out, _ = post(browser, '101', '--json')
+    records = {r['id']: r for r in json.loads(out)['results']}
+    assert code == 0 and records['109']['promoted'] is True and records['102']['promoted'] is False
+    assert records['102']['depth'] == 0 and records['109']['depth'] == 0
+
+
 def test_the_post_in_full_its_parent_and_its_first_replies_with_handles(browser):
     known_tab(browser).respond('x.query', query_result(FIRST, headers=RATE))
     code, out, err = post(browser, 'https://x.com/author_a/status/101')

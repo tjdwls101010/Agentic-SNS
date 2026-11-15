@@ -200,16 +200,16 @@ def explore(initial_entries):
         headers=RATE)
 
 
-def test_trends_reads_the_trending_tab_by_its_timeline_and_leaves_ads_out(browser):
+def test_trends_reads_the_trending_tab_by_its_timeline_and_includes_ads(browser):
     trending = query_result({'data': {'timeline': {'timeline': {'instructions': entries(
         [trend('#Synthetic', 1, '%23Synthetic'), trend('Ad', 2, 'ad', promoted=True), trend('Plain words', 3, '%22Plain+words%22')])}}}},
         headers=RATE)
     known_tab(browser).respond('x.query', explore([])).respond('x.query', trending)
     code, out, _ = run(browser, 'trends')
     assert code == 0, out
-    assert out.splitlines()[0].startswith('x trends · tab=trending · 2 shown') and 'requests=2' in out.splitlines()[0]
+    assert out.splitlines()[0].startswith('x trends · tab=trending · 3 shown (1 ads)') and 'requests=2' in out.splitlines()[0]
     assert '[t1] "#Synthetic" · trend · #1 · Music · Trending' in out and 'search: "#Synthetic"' in out
-    assert 'search: "\\"Plain words\\""' in out and '"Ad"' not in out and 'promoted' in out
+    assert 'search: "\\"Plain words\\""' in out and '[ad] [t2] "Ad"' in out
     calls = query_args(browser)
     assert [c['name'] for c in calls] == ['ExplorePage', 'GenericTimelineById']
     assert calls[1]['variables']['timelineId'] == 'VFJFTkRJTkc='

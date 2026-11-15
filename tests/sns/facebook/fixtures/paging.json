@@ -92,14 +92,14 @@
     {
       "name": "sponsored-skipped-once",
       "item": "46",
-      "fact": "Sponsored posts are left out by default and counted; their ids join the seen set so a continuation does not count them again.",
+      "fact": "Sponsored posts are included and count toward the limit; their ids join the seen set so a continuation does not show them again.",
       "options": {"order": "ranked", "since": null, "until": null, "limit": 1, "skip_sponsored": true, "tz": "UTC"},
       "pages": [
         {"records": [{"id": "AD1", "sponsored": true}, {"id": "A"}, {"id": "B"}], "page_info": {"has_next_page": true, "end_cursor": "CUR1"}}
       ],
-      "expected": {"shown": ["A"], "stop_reason": "limit_reached", "pages_fetched": 1, "pending": ["B"], "sponsored_skipped": 1, "continues": true},
+      "expected": {"shown": ["AD1"], "stop_reason": "limit_reached", "pages_fetched": 1, "pending": ["A", "B"], "continues": true},
       "then": {"continue_with": {"limit": 5}, "pages": [{"records": [{"id": "AD1", "sponsored": true}, {"id": "C"}], "page_info": {"has_next_page": false, "end_cursor": null}}],
-               "expected": {"shown": ["B", "C"], "stop_reason": "exhausted", "pages_fetched": 1, "pending": [], "sponsored_skipped": 0, "continues": false}}
+               "expected": {"shown": ["A", "B", "C"], "stop_reason": "exhausted", "pages_fetched": 1, "pending": [], "continues": false}}
     },
     {
       "name": "explicit-empty-first-page",

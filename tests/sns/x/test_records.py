@@ -89,20 +89,29 @@ def fill_timeline(value):
 def test_timeline_instructions(case):
     page = x_web.walk(fill_timeline(case['instructions']))
     expected = case['expected']
-    assert [[e.kind, e.ident, e.module, e.index, e.pinned] for e in page.entries] == expected['entries']
-    for key in ('bottom', 'terminated', 'cleared', 'promoted', 'other'):
+    assert [[e.kind, e.ident, e.module, e.index, e.pinned, e.promoted] for e in page.entries] == expected['entries']
+    for key in ('bottom', 'terminated', 'cleared', 'other'):
         if key in expected:
             assert getattr(page, key) == expected[key], key
     if 'branches' in expected:
         assert [{'module': b.module, 'cursor_type': b.cursor_type, 'value': b.value} for b in page.branches] == \
             expected['branches']
     records = x_web.list_page(fill_timeline(case['instructions'])).records
+    if 'record_promoted' in expected:
+        assert [r['promoted'] for r in records] == expected['record_promoted']
     if 'community_url' in expected:
         assert {r['id']: r.get('community_url') for r in records} == expected['community_url']
     if 'roles' in expected:
         assert {r['id']: r.get('role') for r in records} == expected['roles']
     if 'trends' in expected:
         subset(expected['trends'], [r for r in records if r.get('kind') in ('trend', 'event')])
+
+
+def test_promoted_account_is_preserved_and_marked():
+    instructions = [{'type': 'TimelineAddEntries', 'entries': [{'entryId': 'promoted-user-1', 'content': {'itemContent': {
+        'itemType': 'TimelineUser', 'user_results': {'result': {'rest_id': '1', 'core': {'screen_name': 'ad', 'name': 'Ad'}}}}}}]}]
+    record = x_web.list_page(instructions).records[0]
+    assert record['promoted'] is True
 
 
 def test_a_page_after_a_bottom_termination_has_no_next_even_with_a_cursor():

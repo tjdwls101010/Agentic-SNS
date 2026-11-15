@@ -52,10 +52,10 @@ No platform name needed — a bare link is enough for the skill to pick one.
 | Platform | Commands |
 |---|---|
 | `x` | feed profile about graph me list community post replies reposts quotes search trends images doctor schema |
-| `threads` | feed profile about graph me activity search post replies quotes reposts images doctor schema |
+| `threads` | feed profile about graph me search post replies quotes reposts images doctor schema |
 | `reddit` | feed sub profile about wiki search related me post comments images doctor schema |
-| `facebook` | feed profile group post comments replies search about images notifications doctor schema |
-| `naver-blog` | search keywords post comments images resolve blog posts feed buddies topic monthly doctor schema |
+| `facebook` | feed profile group post comments replies search about images me doctor schema |
+| `naver-blog` | search keywords post comments images resolve about profile feed graph me topic monthly doctor schema |
 
 Feeds, a post with its replies or full comment tree, quotes and reposts, profiles and followers, search, subreddits and wikis, Facebook groups and pages, X lists, communities and trends, Naver blogs with their categories, neighbors and topics, the pictures in a post, and your own saved, liked and notification items.
 

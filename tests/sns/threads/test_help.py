@@ -26,9 +26,17 @@ def test_the_feeds_help_says_out_needs_a_limit():
     assert 'needs --limit' in help_of('feed')
 
 
+def test_me_help_describes_each_collection_without_duplicate_epilogs():
+    text = body(help_of('me'))
+    assert text.count('requests: 1.') == 1
+    assert text.count('records: one block per record') == 1 and text.count('the dedicated tab:') == 1
+    assert '--tab applies only to activity' in text
+    assert 'liked and saved' in text and 'activity' in text and 'no next page' in text
+
+
 def test_the_feeds_help_says_what_a_window_does_on_each_feed():
     text = body(help_of('feed'))
-    assert 'Only --feed following can close a --since window' in text and 'foryou is a sample of the window' in text
+    assert 'Only --tab following can close a --since window' in text and 'foryou is a sample of the window' in text
 
 
 def test_the_profile_help_says_the_dateless_tabs_need_the_end_to_cover_a_window():

@@ -104,7 +104,7 @@ def test_a_composite_command_exits_with_its_worst_failed_section(naver):
                   json={'isSuccess': False, 'error': {'code': 'not_blog_owner', 'message': 'x'}})
     naver.respond(M, '/api/blogs/cafe_note/notice-post-list', json=response('test_cli_blog-35'))
     naver.respond(M, '/api/blogs/cafe_note/popular-post-list', json=response('test_cli_blog-36'))
-    code, out, _ = naver.run('naver-blog', 'blog', 'cafe_note')
+    code, out, _ = naver.run('naver-blog', 'about', 'cafe_note')
     assert code == 9 and 'counts: unavailable' in out and 'categories: unavailable' in out and 'popular:' in out
 
 
@@ -119,7 +119,7 @@ def test_a_secondary_section_failing_leaves_the_rest_and_is_partial(naver, faili
             naver.respond(M, f'/api/blogs/cafe_note/{path}', json={
                 'counts': response('test_cli_blog-29'), 'categories': response('test_cli_blog-30'),
                 'notices': response('test_cli_blog-35'), 'popular': response('test_cli_blog-36')}[name])
-    got, out, _ = naver.run('naver-blog', 'blog', 'cafe_note')
+    got, out, _ = naver.run('naver-blog', 'about', 'cafe_note')
     assert got == code and '[b1] cafe_note' in out
 
 
@@ -130,13 +130,13 @@ def test_the_login_wall_in_a_section_outranks_a_failure_beside_it(naver):
                   body='')
     naver.respond(M, '/api/blogs/cafe_note/notice-post-list', json=response('test_cli_blog-35'))
     naver.respond(M, '/api/blogs/cafe_note/popular-post-list', json=response('test_cli_blog-36'))
-    code, out, _ = naver.run('naver-blog', 'blog', 'cafe_note')
+    code, out, _ = naver.run('naver-blog', 'about', 'cafe_note')
     assert code == 4
 
 
 def test_a_blogs_posts_that_end_are_exit_7_when_there_are_none(naver):
     naver.respond(M, '/api/blogs/cafe_note/post-list', json=post_list([]))
-    code, out, _ = naver.run('naver-blog', 'posts', 'cafe_note')
+    code, out, _ = naver.run('naver-blog', 'profile', 'cafe_note')
     assert code == 7
 
 

@@ -86,14 +86,14 @@ def test_the_platform_adapter_is_the_plans_row():
 
 
 def test_the_commands_are_the_plans_twelve_in_its_order_with_their_closed_sets():
-    assert list(COMMANDS) == ['search', 'keywords', 'post', 'comments', 'images', 'resolve', 'blog', 'posts', 'feed',
-                              'buddies', 'topic', 'monthly']   # doctor and schema are the shared ones after them
-    assert CHOICES == {'search.type': ['posts', 'blogs', 'tags', 'clips'], 'search.sort': ['sim', 'date']}
+    assert list(COMMANDS) == ['search', 'keywords', 'post', 'comments', 'images', 'resolve', 'about', 'profile', 'feed',
+                              'graph', 'topic', 'monthly', 'me']   # doctor and schema are the shared ones after them
+    assert CHOICES == {'search.type': ['posts', 'blogs', 'tags', 'clips'], 'search.sort': ['relevance', 'date'], 'profile.tab': ['posts', 'popular', 'notices'], 'graph.relation': ['buddies', 'followers'], 'topic.tab': ['newest', 'featured'], 'me.collection': ['groups']}
 
 
 @pytest.mark.parametrize('argv, names', [
     (['post', 'https://www.reddit.com/r/example/comments/abc123/a_title/'], 'reddit post'),
-    (['blog', 'https://www.reddit.com/r/python'], 'reddit sub'),
+    (['about', 'https://www.reddit.com/r/python'], 'reddit sub'),
     (['comments', 'https://www.reddit.com/r/example/comments/abc123/a_title/'], 'reddit post'),
 ])
 def test_another_platforms_link_is_refused_naming_its_command(naver, argv, names):
@@ -104,7 +104,7 @@ def test_another_platforms_link_is_refused_naming_its_command(naver, argv, names
 
 @pytest.mark.parametrize('argv, names', [
     (['post', 'https://blog.naver.com/sample_blog/224000000001'], 'naver-blog post'),
-    (['sub', 'https://blog.naver.com/sample_blog'], 'naver-blog blog'),
+    (['sub', 'https://blog.naver.com/sample_blog'], 'naver-blog about'),
     (['post', 'https://naver.me/AbCd12Ef'], 'naver-blog resolve'),
 ])
 def test_a_naver_link_given_to_reddit_is_refused_naming_the_naver_command(naver, argv, names):

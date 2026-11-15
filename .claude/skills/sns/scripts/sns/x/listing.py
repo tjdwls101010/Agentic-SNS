@@ -11,7 +11,7 @@ from sns.window import Window
 from sns.x import web
 
 # What a page left out, in coverage's words
-NOTES = {'promoted': 'promoted entries (ads)', 'other': 'other items X mixed in',
+NOTES = {'other': 'other items X mixed in',
          'unreadable': 'entries this skill could not read (X may have changed its answer)'}
 # 성진: X의 계정 목록은 커서를 주면서 빈 쪽을 이어 보낼 때가 있다(현행 지식) — 새것 없는 쪽 3번 연속이면 멈춘다
 ACCOUNT_IDLE_PAGES = 3
@@ -19,11 +19,11 @@ ACCOUNT_IDLE_PAGES = 3
 
 def paged(listed, kinds):
     """The reading Page of one timeline page (web.list_page), keeping only `kinds` of record."""
-    kept = [r for r in listed.records if r.get('kind') in kinds]
+    kept = [r for r in listed.records if r.get('kind') in kinds or r.get('promoted')]  # an ad of any kind, marked
     foreign = sum(1 for kind in listed.unreadable_kinds if kind not in kinds)
     other = listed.other + len(listed.records) - len(kept) + foreign
     unreadable = listed.unreadable - foreign
-    left_out = {label: count for label, count in (('promoted', listed.promoted), ('other', other),
+    left_out = {label: count for label, count in (('other', other),
                                                   ('unreadable', unreadable)) if count}
     return Page(kept, next=listed.cursor, end=not listed.has_next, left_out=left_out, unreadable=unreadable)
 
@@ -36,7 +36,7 @@ def surface(connection, state, out, *, kinds, fetch, order, command, target, ide
                              notes=NOTES, fetch=lambda cursor: paged(fetch(cursor), kinds))
 
 
-def flags(identity, keys=('feed', 'tab', 'sort')):
+def flags(identity, keys=('tab', 'sort')):
     """The option words that rerun a command with this identity."""
     words = []
     for key in keys:
@@ -54,8 +54,8 @@ def window_of(platform, options, order):
 
 def feed(platform, invocation):
     options = invocation.options
-    name = options.get('feed') or 'foryou'
-    identity = {'feed': name}
+    name = options.get('tab') or 'foryou'
+    identity = {'tab': name}
 
     def read(connection, state, out):
         return surface(connection, state, out, order='ranked', command='feed', target=None, identity=identity,

@@ -34,7 +34,7 @@ def test_one_page_skips_headers_and_keeps_seen_state_shared_head_and_post_counts
              row('follow', media=False, actors=('example.one', 'example.two')), header('EARLIER'),
              row('seen', media=False, body='Someone replied'), header('OTHER'), row('other')]
     known_tab(browser).respond('threads.query', query_result(inbox(nodes)))
-    code, out, _ = run(browser, 'activity', '--json', '--chars', '1')
+    code, out, _ = run(browser, 'me', 'activity', '--json', '--chars', '1')
     result = json.loads(out)
     assert code == 0, result
     records = result['results']
@@ -68,7 +68,7 @@ def test_one_page_skips_headers_and_keeps_seen_state_shared_head_and_post_counts
     ('requests', 'text_post_app_private_follow_requests')])
 def test_filter_words_are_the_apps_wire_values(browser, word, expected):
     known_tab(browser).respond('threads.query', query_result(inbox([row()])))
-    code, out, _ = run(browser, 'activity', '--filter', word, '--json')
+    code, out, _ = run(browser, 'me', 'activity', '--tab', word, '--json')
     assert code == 0, out
     assert queries(browser)[0]['args']['variables']['selected_filters'] == expected
 
@@ -76,7 +76,7 @@ def test_filter_words_are_the_apps_wire_values(browser, word, expected):
 @pytest.mark.parametrize('limit', [1, 50])
 def test_limit_is_the_first_variable_and_a_server_cap_is_never_paginated(browser, limit):
     known_tab(browser).respond('threads.query', query_result(inbox([header('NEW'), row()], more=True)))
-    code, out, _ = run(browser, 'activity', '--limit', str(limit), '--json')
+    code, out, _ = run(browser, 'me', 'activity', '--limit', str(limit), '--json')
     result = json.loads(out)
     assert code == 0, result
     assert len(queries(browser)) == 1 and queries(browser)[0]['args']['variables']['first'] == limit
@@ -86,7 +86,7 @@ def test_limit_is_the_first_variable_and_a_server_cap_is_never_paginated(browser
 
 @pytest.mark.parametrize('limit', ['0', '51', '-1'])
 def test_limit_outside_one_to_fifty_is_refused_before_aside(browser, limit):
-    code, out, _ = run(browser, 'activity', '--limit', limit)
+    code, out, _ = run(browser, 'me', 'activity', '--limit', limit)
     assert code == 2 and '1 to 50' in json.loads(out)['message']
     assert browser.calls() == []
 
@@ -95,7 +95,7 @@ def test_limit_outside_one_to_fifty_is_refused_before_aside(browser, limit):
                                     {**row(), 'edge_id': None}, {**row(), 'title': None, 'body': None}])
 def test_an_unreadable_row_is_a_failure_instead_of_an_empty_list(browser, broken):
     known_tab(browser).respond('threads.query', query_result(inbox([broken])))
-    code, out, _ = run(browser, 'activity', '--json')
+    code, out, _ = run(browser, 'me', 'activity', '--json')
     assert code == 6 and json.loads(out)['results'] == [], out
 
 
@@ -103,7 +103,7 @@ def test_an_unreadable_row_is_a_failure_instead_of_an_empty_list(browser, broken
 def test_a_refused_activity_query_never_learns_or_reloads_a_screen(browser, source):
     refused = {'errors': [{'message': 'Execution error', 'severity': 'CRITICAL'}]}
     known_tab(browser).respond('threads.query', query_result(refused, source=source))
-    code, out, _ = run(browser, 'activity', '--json')
+    code, out, _ = run(browser, 'me', 'activity', '--json')
     result = json.loads(out)
     assert code == 6, result
     assert 'no longer accepts the stored activity query' in result['message']
@@ -115,7 +115,7 @@ def test_a_refused_activity_query_never_learns_or_reloads_a_screen(browser, sour
 
 def test_the_query_allow_list_contains_no_mutation(browser):
     known_tab(browser).respond('threads.query', query_result(inbox([row()])))
-    code, out, _ = run(browser, 'activity')
+    code, out, _ = run(browser, 'me', 'activity')
     assert code == 0, out
     assert not any('Mutation' in name for name in queries(browser)[0]['args']['allowed'])
     assert not set(browser.ops()) & {'threads.page', 'threads.navigate', 'threads.route', 'open'}
@@ -124,7 +124,7 @@ def test_the_query_allow_list_contains_no_mutation(browser):
 def test_text_renders_notification_labels_seen_state_and_full_text(browser):
     nodes = [header('NEW'), row(), header('EARLIER'), row('n2')]
     known_tab(browser).respond('threads.query', query_result(inbox(nodes)))
-    code, out, _ = run(browser, 'activity', '--chars', '0')
+    code, out, _ = run(browser, 'me', 'activity', '--chars', '0')
     assert code == 0, out
     assert '[n1] 2026-10-08' in out and ' · reply · unseen' in out
     assert '[n2] 2026-10-08' in out and ' · reply · seen' in out
@@ -132,7 +132,7 @@ def test_text_renders_notification_labels_seen_state_and_full_text(browser):
 
 
 def test_activity_help_explains_the_read_coverage_and_seen_caveat(browser):
-    code, out, _ = run(browser, 'activity', '--help')
+    code, out, _ = run(browser, 'me', 'activity', '--help')
     assert code == 0, out
     assert 'one page' in out and 'server_capped' in out and 'requests: 1.' in out
     assert ('Reading the list sends no seen change (the app marks notifications seen only when its activity screen '
@@ -155,7 +155,7 @@ def test_the_notification_schema_describes_every_record_key(browser):
 
 def test_an_explicit_empty_activity_list_is_empty_not_failed(browser):
     known_tab(browser).respond('threads.query', query_result(inbox([header('EARLIER')])))
-    code, out, _ = run(browser, 'activity', '--json')
+    code, out, _ = run(browser, 'me', 'activity', '--json')
     result = json.loads(out)
     assert code == 7 and result['results'] == [] and result['stop_reason'] == 'exhausted', result
 
@@ -164,7 +164,7 @@ def test_a_body_is_dropped_only_when_it_repeats_the_title(browser):
     """Found in the pre-merge review: a short body that happened to occur inside the title was dropped."""
     nodes = [row('short', title='alice replied to your thread', body='to'), row('same', body='Someone replied')]
     known_tab(browser).respond('threads.query', query_result(inbox(nodes)))
-    code, out, _ = run(browser, 'activity', '--json')
+    code, out, _ = run(browser, 'me', 'activity', '--json')
     records = json.loads(out)['results']
     assert code == 0 and [r['text'] for r in records] == ['alice replied to your thread\nto', 'Someone replied']
 
@@ -177,8 +177,20 @@ def test_a_learned_ids_own_provider_values_decide_which_providers_the_page_must_
     favicons = '__relay_internal__pv__BarcelonaHasWebFaviconsrelayprovider'
     Session('threads', 'u0').learn('BarcelonaActivityFeedV2StoryListContainerQuery', '999', {favicons: True})
     known_tab(browser).respond('threads.query', query_result(inbox([row()])))
-    code, out, _ = run(browser, 'activity', '--json')
+    code, out, _ = run(browser, 'me', 'activity', '--json')
     assert code == 0, out
     call = queries(browser)[0]['args']
     assert call['fallback']['doc_id'] == '999' and call['fallback']['flags'] == {favicons: True}
     assert [p[0] for p in call['fallback']['providers']] == [favicons]
+
+
+def test_activity_limit_counts_displayed_rows(browser):
+    known_tab(browser).respond('threads.query', query_result(inbox([row('n1'), row('n2')])))
+    code, out, _ = run(browser, 'me', 'activity', '--limit', '1', '--json')
+    assert code == 0 and [r['id'] for r in json.loads(out)['results']] == ['n1']
+
+
+@pytest.mark.parametrize('flag', ['--after', '--out'])
+def test_activity_rejects_continuations_and_files(browser, flag):
+    code, out, _ = run(browser, 'me', 'activity', flag, '1')
+    assert code == 2 and browser.calls() == []

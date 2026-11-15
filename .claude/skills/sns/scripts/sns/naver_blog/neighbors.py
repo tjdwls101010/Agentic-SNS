@@ -22,7 +22,7 @@ def feed(platform, invocation):
             connection, state, out, op='feed', source=listing.pages_of(connection.client, 'feed', ids, web.post_record),
             command='feed', target=None, identity=identity, words=words, order='newest_first', show=FEED_DISPLAY,
             empty=(f'Naver reports no posts from neighbor group {group} (an unknown group answers the same way; '
-                   'buddies --groups lists them).' if group else
+                   'me groups lists them).' if group else
                    'Naver reports no neighbor posts for this account (it may follow no blog yet).'))
         result.setdefault('coverage', []).append('the neighbor feed holds only the blogs this account follows, newest '
                                                  'first')
@@ -34,26 +34,25 @@ def feed(platform, invocation):
 
 def check(options):
     """The argument rules of buddies, before any request."""
-    kinds = [flag for flag in ('followers', 'groups') if options.get(flag)] + (['group'] if options.get('group') else [])
-    if len(kinds) > 1:
-        raise SnsError('argument', 'Choose one of --followers, --group and --groups.', 'Run buddies once per list.')
-    if options.get('groups') and (options.get('out') or options.get('after')):
-        raise SnsError('argument', 'The neighbor groups are one page: no continuation, no file.',
-                       'Drop --after/--out.')
-    if options.get('target') and kinds:
-        raise SnsError('argument', f'--{kinds[0]} reads your own neighbors; another blog shows only its public list.',
-                       'Drop the blog, or drop the option.')
+    if options.get('collection') == 'groups':
+        if options.get('out') or options.get('after'):
+            raise SnsError('argument', 'The neighbor groups are one page: no continuation, no file.', 'Drop --after/--out.')
+        return
+    if options.get('group') and (options.get('target') or options['relation'] != 'buddies'):
+        raise SnsError('argument', '--group reads your own buddies.', 'Drop the blog or choose buddies without --group.')
+    if options.get('target') and options['relation'] == 'followers':
+        raise SnsError('argument', 'Followers are available only for your own blog.', 'Drop the blog.')
 
 
 def buddies(platform, invocation):
     options = invocation.options
     target = web.parse_target(options['target'], 'blog') if options.get('target') else None
-    if options.get('groups'):
+    if options.get('collection') == 'groups':
         return groups(platform, invocation)
-    kind = 'public' if target else 'followers' if options.get('followers') else 'mine'
+    kind = 'public' if target else 'followers' if options.get('relation') == 'followers' else 'mine'
     group = options.get('group')
     identity = {'blog': target and (target.blog_id or 'naver.me/' + target.short), 'kind': kind, 'group': group}
-    words = (['--followers'] if kind == 'followers' else []) + (['--group', str(group)] if group else [])
+    words = [options['relation']] + (['--group', str(group)] if group else [])
     name = target.handle if target else None
 
     def read(connection, state, out):
@@ -67,13 +66,13 @@ def buddies(platform, invocation):
             op = 'public_buddies'
         result = listing.read_numbered(
             connection, state, out, op=op, source=listing.pages_of(client, op, ids, web.buddy_record),
-            command='buddies', target=name, identity=identity, words=words, order='finite', show=BUDDY_DISPLAY,
+            command='graph', target=name, identity=identity, words=words, order='finite', show=BUDDY_DISPLAY,
             blog=ids.get('blogId'),
             empty=('This blog shows no public neighbors. A public neighbor list is private by default, so an empty '
-                   'one does not mean no neighbors: blog <id> shows the card\'s neighbor count.') if target else None)
+                   'one does not mean no neighbors: about <id> shows the card\'s neighbor count.') if target else None)
         return result
 
-    return reading.run(platform, invocation, command='buddies', target=name, identity=identity, reader=read,
+    return reading.run(platform, invocation, command='graph', target=name, identity=identity, reader=read,
                        bound=target is None or account.binds(options, BUDDY_DISPLAY))
 
 
@@ -87,4 +86,4 @@ def groups(platform, invocation):
                                                        listing.EMPTY_FIX)}
         return {'results': found, 'stop_reason': 'not_paginable'}
 
-    return reading.run(platform, invocation, command='buddies', target=None, identity={'kind': 'groups'}, reader=read)
+    return reading.run(platform, invocation, command='me', target=None, identity={'kind': 'groups'}, reader=read)

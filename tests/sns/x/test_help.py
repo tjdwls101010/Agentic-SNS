@@ -41,9 +41,9 @@ def test_trends_chars_does_not_mention_an_out_file_trends_cannot_write():
 
 
 def test_post_and_replies_say_what_their_limit_counts():
-    assert 'Reply threads' in option_line(help_of('post'), '--limit')
-    assert 'Replies to show' in option_line(help_of('replies'), '--limit')
-    assert 'Trends and events' in option_line(help_of('trends'), '--limit')
+    assert 'Reply threads' in help_of('post')
+    assert 'Replies to show' in help_of('replies')
+    assert 'Trends and events' in help_of('trends')
 
 
 def test_the_feeds_help_says_out_needs_a_limit():

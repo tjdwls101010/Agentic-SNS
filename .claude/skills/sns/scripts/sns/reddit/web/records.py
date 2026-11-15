@@ -125,13 +125,19 @@ def _content(data):
     return kind, media, poll, crosspost
 
 
+def author(data):
+    name = text(data.get('author')) or '[deleted]'
+    return {'name': name, 'id': optional(data.get('author_fullname')),
+            'url': f'{BASE}/user/{name}/' if name != '[deleted]' else None}
+
+
 def post(data):
     kind, media, poll, crosspost = _content(data)
     identity = fullname(data, 't3')
     return {
         'kind': 'post', 'id': identity, 'url': absolute(data.get('permalink')) or f'{BASE}/comments/{identity[3:]}/',
         'title': text(data.get('title')), 'text': text(data.get('selftext')), 'subreddit': text(data.get('subreddit')),
-        'author': text(data.get('author')) or '[deleted]', 'created_at': timestamp(data.get('created_utc')),
+        'author': author(data), 'created_at': timestamp(data.get('created_utc')),
         'score': number(data.get('score')), 'upvote_ratio': number(data.get('upvote_ratio')),
         'num_comments': number(data.get('num_comments')), 'post_type': kind, 'link_url': absolute(data.get('url')),
         'domain': text(data.get('domain')), 'flair': optional(data.get('link_flair_text')),
@@ -166,7 +172,7 @@ def comment(data, depth=None):
         'kind': 'comment', 'id': identity,
         'url': absolute(data.get('permalink')) or f'{BASE}/comments/{post_id[3:]}/_/{identity[3:]}/',
         'parent_id': text(data.get('parent_id')), 'post_id': post_id, 'text': text(data.get('body')),
-        'author': text(data.get('author')) or '[deleted]', 'subreddit': text(data.get('subreddit')),
+        'author': author(data), 'subreddit': text(data.get('subreddit')),
         'created_at': timestamp(data.get('created_utc')), 'score': number(data.get('score')),
         'score_hidden': data.get('score_hidden') is True,
         'depth': depth if depth is not None else int(sent_depth or 0),
@@ -184,7 +190,7 @@ def reply(data):
     a mention of its name."""
     return {'kind': 'reply', 'id': fullname(data, 't1'), 'url': absolute(data.get('context')),
             'created_at': timestamp(data.get('created_utc')), 'type': text(data.get('type')),
-            'author': text(data.get('author')) or '[deleted]', 'subreddit': text(data.get('subreddit')),
+            'author': author(data), 'subreddit': text(data.get('subreddit')),
             'post_title': text(data.get('link_title')), 'parent_id': text(data.get('parent_id')),
             'text': text(data.get('body')), 'unread': data.get('new') is True}
 

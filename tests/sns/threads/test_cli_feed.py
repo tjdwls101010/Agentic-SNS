@@ -46,9 +46,9 @@ def test_the_header_names_feed_cost_and_the_text_preview(browser):
     raw = post('A', '2026-10-08T03:00:00Z')
     raw['caption'] = {'text': text}
     known_tab(browser, resources=3).respond('threads.query', query_result(feed_body([[raw]], True, 'CUR1'), resources=2))
-    code, out, _ = run(browser, 'feed', '--feed', 'following')
+    code, out, _ = run(browser, 'feed', '--tab', 'following')
     header = out.splitlines()[0]
-    assert header.startswith('threads feed · feed=following · 1 shown · stopped=limit_reached · requests=2')
+    assert header.startswith('threads feed · tab=following · 1 shown · stopped=limit_reached · requests=2')
     assert 'requests=2/' not in header  # there is no request budget
     assert 'unwatched=3' in header
     assert 'text[180 of 300 chars shown]' in out and 'url: "https://www.threads.com/@example.author/post/CA"' in out
@@ -58,9 +58,9 @@ def test_json_keeps_whole_texts_and_variables_follow_the_feed(browser):
     raw = post('A', '2026-10-08T03:00:00Z')
     raw['caption'] = {'text': 'y' * 500}
     known_tab(browser).respond('threads.query', query_result(feed_body([[raw]], False, None)))
-    code, out, _ = run(browser, 'feed', '--feed', 'following', '--json')
+    code, out, _ = run(browser, 'feed', '--tab', 'following', '--json')
     result = json.loads(out)
-    assert code == 0 and result['results'][0]['text'] == 'y' * 500 and result['query']['feed'] == 'following'
+    assert code == 0 and result['results'][0]['text'] == 'y' * 500 and result['query']['tab'] == 'following'
     [call] = [c for c in browser.calls() if c['op'] == 'threads.query']
     assert call['args']['name'] == 'BarcelonaFeedDirectQuery'
     assert call['args']['variables']['variant'] == 'following'
@@ -80,7 +80,7 @@ def test_records_read_before_a_failure_print_as_text_and_the_help_says_so(browse
 @pytest.mark.parametrize('feed', ['foryou', 'following'])
 def test_a_collection_of_an_endless_feed_needs_a_limit(browser, feed, tmp_path):
     """Neither feed ends by itself: --out without --limit would never finish (exit 2 before any request)."""
-    code, out, _ = run(browser, 'feed', '--feed', feed, '--out', str(tmp_path / 'feed.ndjson'))
+    code, out, _ = run(browser, 'feed', '--tab', feed, '--out', str(tmp_path / 'feed.ndjson'))
     envelope = json.loads(out)
     assert code == 2 and envelope['error'] == 'argument' and '--limit' in envelope['fix']
     assert browser.calls() == [] and not (tmp_path / 'feed.ndjson').exists()
@@ -101,7 +101,7 @@ def test_the_following_feed_closes_a_window_at_the_first_page_older_than_it(brow
     old = '2026-09-01T03:00:00Z'
     known_tab(browser).respond('threads.query', query_result(feed_body([[post('A', '2026-10-08T03:00:00Z')]], True, 'CUR1')))
     browser.respond('threads.query', query_result(feed_body([[post('B', old)]], True, 'CUR2')))
-    code, out, _ = run(browser, 'feed', '--feed', 'following', '--since', '2026-10-01', '--json')
+    code, out, _ = run(browser, 'feed', '--tab', 'following', '--since', '2026-10-01', '--json')
     result = json.loads(out)
     assert code == 0 and result['stop_reason'] == 'window_reached' and len(result['results']) == 1
     assert result['window']['coverage'] == 'closed (as served)' and len(queries(browser)) == 2

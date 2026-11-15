@@ -45,6 +45,7 @@ def post_page(instructions, post_id, continuing=False):
         if record is None:
             unreadable += 1
             continue
+        record['promoted'] = entry.promoted
         if record.get('id') == post_id and not conversation:
             if record.get('unavailable'):
                 raise SnsError('unavailable', 'This post is unavailable: deleted, withheld or not visible to this account.',
@@ -53,6 +54,9 @@ def post_page(instructions, post_id, continuing=False):
             found, reported = True, record.get('reply_count')
         elif not conversation:
             record.update(role='parent' if not found and not continuing else 'reply', depth=0)
+        elif entry.promoted:
+            # an ad X placed in the module is not part of the conversation's nesting: it takes no position
+            record.update(role='reply', depth=0, unit=entry.module)
         else:
             depth = positions.get(entry.module, 0)
             positions[entry.module] = depth + 1
@@ -67,7 +71,7 @@ def post_page(instructions, post_id, continuing=False):
         in_module = [r for r in records if r.get('unit') == branch.module]
         if in_module:
             branches[in_module[-1]['id']] = branch.value
-    replies = [r for r in records if r['role'] == 'reply']
+    replies = [r for r in records if r['role'] == 'reply' and not r.get('promoted')]
     coverage = {'direct_shown': sum(1 for r in replies if r['depth'] == 0 and not r.get('unavailable')),
                 'nested_shown': sum(1 for r in replies if r['depth'] > 0 and not r.get('unavailable')),
                 'branches': len(page.branches), 'hidden': len(page.hidden),

@@ -8,9 +8,9 @@ def search(platform, invocation):
     options = invocation.options
     text, vertical = options['target'], options['type']
     recent = bool(options.get('recent'))
-    group = web.normalize_group(options['in_group']) if options.get('in_group') else None
+    group = web.normalize_group(options['within']) if options.get('within') else None
     identity = {'type': vertical, 'recent': True if recent else None, 'in_group': group}
-    words = ['--type', vertical] + (['--recent'] if recent else []) + (['--in-group', group] if group else [])
+    words = ['--type', vertical] + (['--recent'] if recent else []) + (['--in', group] if group else [])
 
     def read(connection, state, out):
         client = connection.client

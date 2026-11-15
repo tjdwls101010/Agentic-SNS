@@ -67,8 +67,8 @@ class Window:
         return {'bounds': self.bounds, 'last': self.last, 'unordered': self.unordered, 'undated': self.undated}
 
     def keep(self, record):
-        if not self.active:
-            return True
+        if not self.active or record.get('promoted'):
+            return True  # an ad is shown marked, dated or not: it is not part of what the window asked for
         if record.get('unavailable'):
             return False
         if not record.get('created_at'):
@@ -83,7 +83,7 @@ class Window:
         """Whether this newest-first page proves the window's start was passed (see the module docstring)."""
         units = {}
         for index, record in enumerate(records):
-            if record.get(self.policy.pinned_key) or record.get('unavailable'):
+            if record.get(self.policy.pinned_key) or record.get('unavailable') or record.get('promoted'):
                 continue
             key = record.get(self.policy.unit_key) if self.policy.unit_key else None
             if not record.get('created_at'):

@@ -19,7 +19,7 @@ def _clip(text, chars):
 
 
 def _who(account):
-    if not account:
+    if not account or (not account.get('unavailable') and not any(account.get(key) for key in ('name', 'id', 'url', 'username', 'full_name'))):
         return 'unavailable'
     if account.get('unavailable'):
         return 'unavailable account'
@@ -99,11 +99,12 @@ def _extras(record, chars, indent):
 def post(record, label, labels, chars):
     """One post, reply or parent; `labels` maps ids already shown on this page to their labels."""
     indent = '  ' * min(max(record.get('depth') or 0, 0), 10)
+    prefix = '[ad] ' if record.get('promoted') else ''
     if record.get('unavailable'):
-        return f'{indent}[{label}] unavailable — {_line(record.get("unavailable_reason") or "")}'
+        return f'{indent}{prefix}[{label}] unavailable — {_line(record.get("unavailable_reason") or "")}'
     original = record.get('reposted_post')
     if original:
-        lines = [f'{indent}[{label}] {_who(record.get("author"))} reposted · {_time(record.get("created_at"))}'
+        lines = [f'{indent}{prefix}[{label}] {_who(record.get("author"))} reposted · {_time(record.get("created_at"))}'
                  + (' · pinned' if record.get('pinned') else '')]
         if original.get('unavailable'):
             lines.append(f'{indent}     repost of: unavailable — {_line(original.get("unavailable_reason") or "")}')
@@ -128,7 +129,7 @@ def post(record, label, labels, chars):
         flags.append('a reply')
     if record.get('pinned'):
         flags.append('pinned')
-    lines = [f'{indent}[{label}] ' + ' · '.join(flags), f'{indent}     {_text(record, chars)}']
+    lines = [f'{indent}{prefix}[{label}] ' + ' · '.join(flags), f'{indent}     {_text(record, chars)}']
     if record.get('quoted_post'):
         lines.append(_nested('quoting', record['quoted_post'], chars, indent))
     elif record.get('quoted_post_id'):
@@ -173,7 +174,7 @@ def trend(record, label):
     parts += [_line(record[key]) for key in ('context', 'description') if record.get(key)]
     if record.get('rank') is not None:
         parts.insert(2, f'#{record["rank"]}')
-    line = f'[{label}] ' + ' · '.join(parts)
+    line = ('[ad] ' if record.get('promoted') else '') + f'[{label}] ' + ' · '.join(parts)
     if record.get('query'):
         line += '\n     search: ' + _quote(record['query'])
     elif record.get('url'):
@@ -273,27 +274,27 @@ def render(envelope, chars, command):
         kind = record.get('kind')
         if kind == 'image':
             counts['i'] = counts.get('i', 0) + 1
-            lines.append(image_line(record, f'i{counts["i"]}'))
+            lines.append(('[ad] ' if record.get('promoted') else '') + image_line(record, f'i{counts["i"]}'))
             continue
         if kind == 'notification':
             counts['n'] += 1
-            lines.append(notification(record, f'n{counts["n"]}'))
+            lines.append(('[ad] ' if record.get('promoted') else '') + notification(record, f'n{counts["n"]}'))
             continue
         if kind == 'space':
             counts['s'] += 1
-            lines.append(space(record, f's{counts["s"]}'))
+            lines.append(('[ad] ' if record.get('promoted') else '') + space(record, f's{counts["s"]}'))
             continue
         if kind == 'community':
             counts['c'] += 1
-            lines.append(community(record, f'c{counts["c"]}'))
+            lines.append(('[ad] ' if record.get('promoted') else '') + community(record, f'c{counts["c"]}'))
             continue
         if kind == 'list':
             counts['l'] += 1
-            lines.append(x_list(record, f'l{counts["l"]}'))
+            lines.append(('[ad] ' if record.get('promoted') else '') + x_list(record, f'l{counts["l"]}'))
             continue
         if kind == 'account':
             counts['a'] += 1
-            lines.append(account(record, f'a{counts["a"]}'))
+            lines.append(('[ad] ' if record.get('promoted') else '') + account(record, f'a{counts["a"]}'))
             continue
         if kind in ('trend', 'event'):
             counts['t'] += 1

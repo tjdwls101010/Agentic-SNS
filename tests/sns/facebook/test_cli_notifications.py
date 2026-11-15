@@ -48,10 +48,10 @@ def test_one_page_of_notifications_skips_layout_rows_and_is_all_there_is_to_read
     browser.respond('facebook.query', page([layout('BUCKET_HEADER'), notif('N1'), notif('N2', seen='UNSEEN',
                                             text='Sample Person tagged you', kind='tagged'),
                                             layout('SEE_PREVIOUS_BUTTON')]))
-    code, out, _ = run(browser, 'notifications')
+    code, out, _ = run(browser, 'me', 'notifications')
     assert code == 0, out
     lines = out.splitlines()
-    assert lines[0] == 'facebook notifications · 2 shown · stopped=server_capped · requests=1'
+    assert lines[0] == 'facebook me · 2 shown · stopped=server_capped · requests=1'
     assert lines[1] == '[n1] 2026-09-12T03:00+00:00 · feed_comment_reply · read'
     assert lines[2] == '     text[37 of 37 chars shown]: "Sample Person replied to your comment"'
     assert lines[3] == '     url: "https://www.facebook.com/example/posts/N1"'
@@ -68,7 +68,7 @@ def test_a_limit_above_one_page_still_reads_one_page(browser):
     rows although the first page said more follow, so the first page is all this skill reads, and it says so."""
     known_tab(browser)
     browser.respond('facebook.query', page([notif('N1'), notif('N2')], cursor='NC1'))
-    code, out, _ = run(browser, 'notifications', '--limit', '30', '--json')
+    code, out, _ = run(browser, 'me', 'notifications', '--limit', '30', '--json')
     result = json.loads(out)
     assert code == 0 and [r['id'] for r in result['results']] == ['N1', 'N2'] and result['stop_reason'] == 'server_capped'
     assert sent(browser) == [FIRST] and 'next' not in result
@@ -77,7 +77,7 @@ def test_a_limit_above_one_page_still_reads_one_page(browser):
 def test_a_last_page_is_the_end(browser):
     known_tab(browser)
     browser.respond('facebook.query', page([notif('N1')], has_next=False))
-    code, out, _ = run(browser, 'notifications', '--json')
+    code, out, _ = run(browser, 'me', 'notifications', '--json')
     result = json.loads(out)
     assert code == 0 and result['stop_reason'] == 'exhausted' and not any('older' in c for c in result.get('coverage', []))
 
@@ -87,7 +87,7 @@ def test_records_carry_the_shared_head_the_seen_words_and_nothing_opaque(browser
     browser.respond('facebook.query', page([notif('N1', seen='UNSEEN'), notif('N2', seen='SEEN_BUT_UNREAD'),
                                             notif('N3', seen='SEEN_AND_READ'), notif('N4', seen='SOMETHING_NEW')],
                                            has_next=False))
-    code, out, _ = run(browser, 'notifications', '--json')
+    code, out, _ = run(browser, 'me', 'notifications', '--json')
     result = json.loads(out)
     assert code == 0 and [r['seen'] for r in result['results']] == ['unseen', 'seen', 'read', None]
     first = result['results'][0]
@@ -103,7 +103,7 @@ def test_records_carry_the_shared_head_the_seen_words_and_nothing_opaque(browser
 def test_a_page_of_layout_rows_only_is_an_empty_list_not_a_changed_answer(browser):
     known_tab(browser)
     browser.respond('facebook.query', page([layout('BUCKET_HEADER'), layout('SEE_PREVIOUS_BUTTON')], has_next=False))
-    code, out, _ = run(browser, 'notifications', '--json')
+    code, out, _ = run(browser, 'me', 'notifications', '--json')
     result = json.loads(out)
     assert code == 7 and result['error'] == 'empty' and result['results'] == []
 
@@ -111,14 +111,14 @@ def test_a_page_of_layout_rows_only_is_an_empty_list_not_a_changed_answer(browse
 def test_a_notification_row_that_cannot_be_read_is_a_changed_answer(browser):
     known_tab(browser)
     browser.respond('facebook.query', page([{'node': {'row_type': 'NOTIFICATION'}}]))
-    code, out, _ = run(browser, 'notifications')
+    code, out, _ = run(browser, 'me', 'notifications')
     assert code == 6 and json.loads(out)['error'] == 'failed'
 
 
 def test_a_refused_first_query_ends_the_command_without_moving_the_tab(browser):
     known_tab(browser)
     browser.respond('facebook.query', query_result(REJECTED, source='stored', doc_id='999'))
-    code, out, _ = run(browser, 'notifications')
+    code, out, _ = run(browser, 'me', 'notifications')
     result = json.loads(out)
     assert code == 6 and 'no longer accepts the stored notifications query' in result['message']
     assert routes(browser) == [] and sent(browser) == [FIRST]
@@ -126,5 +126,5 @@ def test_a_refused_first_query_ends_the_command_without_moving_the_tab(browser):
 
 @pytest.mark.parametrize('flag', ['--since', '--until'])
 def test_notifications_have_no_date_window(browser, flag):
-    code, out, _ = run(browser, 'notifications', flag, '2026-09-01')
+    code, out, _ = run(browser, 'me', 'notifications', flag, '2026-09-01')
     assert code == 2 and browser.calls() == []

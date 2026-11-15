@@ -93,6 +93,7 @@ class PostDoc:
 
     def to_dict(self):
         record = {f.name: getattr(self, f.name) for f in fields(self) if f.name not in ('viewer_id', 'coverage')}
+        record['author'] = {'name': None, 'id': self.blog_id, 'url': f'https://blog.naver.com/{self.blog_id}' if self.blog_id else None, 'blog_name': None}
         return {**record, 'tags': self.tags if isinstance(self.tags, str) else list(self.tags),
                 'own_money_cards': list(self.own_money_cards), 'lines': list(self.lines),
                 'images': list(self.images), 'links': list(self.links), 'attachments': list(self.attachments),
@@ -574,6 +575,7 @@ NOTES = {
     '__doc__': 'One post read in full (post): its page, body, pictures and links.',
     'id': 'post:<blogId>/<logNo>', 'url': 'https://blog.naver.com/<blogId>/<logNo>',
     'created_at': 'KST minute',
+    'author': '{name, id, url, blog_name}: the author and their blog; unknown values are null',
     'like_count': 'the post\'s live reaction count (list surfaces can lag it); null when its section failed',
     'reactions': '{reaction type: count} (like, impressive, thanks ...); null when its section failed',
     'lines': 'the body as text lines in document order: [image N: caption], [sticker: image N], ## section titles, '

@@ -32,7 +32,7 @@ def test_the_threads_package_is_its_interface_its_feature_modules_and_the_system
 def test_the_interface_is_platform_commands_and_choices():
     assert threads.PLATFORM.key == 'threads' and threads.PLATFORM.word == 'threads' and threads.PLATFORM.transport == 'tab'
     assert threads.PLATFORM.title == 'Threads' and threads.PLATFORM.site == 'threads.com'
-    assert list(COMMANDS) == ['feed', 'profile', 'about', 'graph', 'me', 'activity', 'search', 'post',
+    assert list(COMMANDS) == ['feed', 'profile', 'about', 'graph', 'me', 'search', 'post',
                                       'replies', 'quotes', 'reposts', 'images']
     assert set(CHOICES) and all(key.split('.')[0] in COMMANDS for key in CHOICES)
 

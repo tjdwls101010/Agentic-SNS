@@ -27,7 +27,8 @@ def trends(platform, invocation):
                                    'Tell the user the X reader needs an update.', reason='shape_changed')
                 page = paged(first, KINDS)
                 coverage = [f'{count} {NOTES[label]} left out' for label, count in page.left_out.items()]
-                return {'results': page.records, 'stop_reason': 'not_paginable', 'coverage': coverage}
+                limit = invocation.options.get('limit')
+                return {'results': page.records[:limit] if limit else page.records, 'stop_reason': 'not_paginable', 'coverage': coverage}
             timeline_id = tabs.get(TABS[tab])
             if not timeline_id:
                 raise SnsError('failed', f'X\'s Explore no longer names a {tab} tab.', 'Use another --tab, or tell the '

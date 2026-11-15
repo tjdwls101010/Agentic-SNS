@@ -129,4 +129,4 @@ def locate(value):
         return None
     if target.log_no:
         return 'post', text
-    return ('posts', text) if target.category_no else ('blog', text)
+    return ('profile', text) if target.category_no else ('about', text)

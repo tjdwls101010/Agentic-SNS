@@ -20,6 +20,7 @@ RECORDS = {
         ('link', web.Resolved))},
     'image': reading.IMAGE_SCHEMA,
 }
+RECORDS['post_read']['fields']['author'] = 'object — ' + web.POST_READ_NOTES['author']
 
 
 def connect(connection):

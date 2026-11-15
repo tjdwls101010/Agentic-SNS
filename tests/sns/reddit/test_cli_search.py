@@ -119,7 +119,7 @@ def test_me_reads_what_others_sent_you_without_marking_it_read(reddit, collectio
     record = envelope['results'][0]
     assert code == 0 and reddit.paths() == ['/api/me.json', path]
     assert record['kind'] == 'reply' and record['type'] == kind_of_reply and record['unread'] is True
-    assert record['author'] == 'replier1' and record['post_title'] == 'A post title'
+    assert record['author'] == {'name': 'replier1', 'id': None, 'url': 'https://www.reddit.com/user/replier1/'} and record['post_title'] == 'A post title'
     assert record['url'] == 'https://www.reddit.com/r/example/comments/aaa1/title/m1/?context=3'
     assert record['created_at'] and record['id'] == 't1_m1'
 

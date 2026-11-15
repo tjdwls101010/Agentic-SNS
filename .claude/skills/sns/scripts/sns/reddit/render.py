@@ -99,7 +99,8 @@ def _media(item, indent=''):
 
 
 def post(record, label, chars, full=False):
-    head = [f'r/{record.get("subreddit")}', f'u/{record.get("author")}', time(record.get('created_at')),
+    name = (record.get('author') or {}).get('name')
+    head = [f'r/{record.get("subreddit")}', f'u/{name}' if name else 'unavailable', time(record.get('created_at')),
             record.get('post_type', 'link'),
             f'score={count(record.get("score"))}' + (f' ({record["upvote_ratio"]:.0%})'
                                                      if record.get('upvote_ratio') is not None else ''),
@@ -120,7 +121,8 @@ def post(record, label, chars, full=False):
                      + f' · total={count(poll.get("total_vote_count"))}')
     original = record.get('crosspost')
     if original:
-        lines.append(f'     crosspost of: r/{original.get("subreddit")} · u/{original.get("author")} · '
+        author = (original.get('author') or {}).get('name')
+        lines.append(f'     crosspost of: r/{original.get("subreddit")} · {"u/" + author if author else "unavailable"} · '
                      f'{quote(flatten(original.get("title")))} · {original.get("url")}')
     if record.get('post_type') not in ('self', 'crosspost', 'gallery', 'poll') and record.get('link_url') \
             and record.get('link_url') != record.get('url'):
@@ -132,7 +134,8 @@ def post(record, label, chars, full=False):
 def comment(record, label, chars, labels, context=False):
     indent = '  ' * min(max(record.get('depth') or 0, 0), 20)
     score = 'score hidden' if record.get('score_hidden') else f'score={count(record.get("score"))}'
-    head = [f'u/{record.get("author")}' if record.get('author') != '[deleted]' else '[deleted]',
+    name = (record.get('author') or {}).get('name')
+    head = [f'u/{name}' if name and name != '[deleted]' else name or 'unavailable',
             time(record.get('created_at')), score]
     if record.get('author_flair'):
         head.append(f'flair={quote(record["author_flair"])}')
@@ -174,8 +177,9 @@ def community(record, label, chars):
                                                                          if m.get('flair') else '') for m in mods)
                                             or 'none listed'))
     for pinned in record.get('pinned') or []:
+        author = (pinned.get('author') or {}).get('name')
         lines.append(f'     pinned: {quote(flatten(pinned.get("title")))} · {time(pinned.get("created_at"))} · '
-                     f'u/{pinned.get("author")} · {pinned.get("url")}')
+                     f'{"u/" + author if author else "unavailable"} · {pinned.get("url")}')
     lines.append(f'     url: {record.get("url")}')
     return '\n'.join(lines)
 
@@ -227,7 +231,8 @@ _LABELS = {'post': 'p', 'comment': 'c', 'subreddit': 's', 'user': 'u', 'wiki_pag
 
 
 def reply(record, label, chars):
-    head = [f'u/{record.get("author")}' if record.get('author') != '[deleted]' else '[deleted]',
+    name = (record.get('author') or {}).get('name')
+    head = [f'u/{name}' if name and name != '[deleted]' else name or 'unavailable',
             f'r/{record.get("subreddit")}', time(record.get('created_at')), (record.get('type') or '').replace('_', ' ')]
     if record.get('unread'):
         head.append('unread')

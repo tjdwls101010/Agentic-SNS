@@ -101,7 +101,7 @@ def test_search_inside_one_group(browser):
                                                  '<script>{"groupID":"700"}</script>'))
     browser.respond('facebook.query', query_result(results_body([{'node': {**story('G1'), '__typename': 'Story'}}],
                                                                 has_next=False)))
-    code, out, _ = run(browser, 'search', 'pandas', '--in-group', 'examplegroup', '--json')
+    code, out, _ = run(browser, 'search', 'pandas', '--in', 'examplegroup', '--json')
     result = json.loads(out)
     assert code == 0 and [r['id'] for r in result['results']] == ['G1'] and result['request_count'] == 2
     args = queries(browser)[0]['args']['variables']
@@ -110,7 +110,7 @@ def test_search_inside_one_group(browser):
 
 
 def test_in_group_search_is_for_posts(browser):
-    code, out, _ = run(browser, 'search', 'x', '--type', 'people', '--in-group', '700')
+    code, out, _ = run(browser, 'search', 'x', '--type', 'people', '--in', '700')
     assert code == 2 and browser.calls() == []
 
 

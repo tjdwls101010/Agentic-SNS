@@ -137,7 +137,7 @@ def test_accounting(case, browser, tmp_path):
     for mine in commands:
         expected = case['expected'][mine['index']]
         scripted(browser, mine, results)
-        code, out, err = run(browser, *(('feed', '--feed', mine['feed'], '--limit', '40', '--json') if mine['queries'] else ('doctor',)))
+        code, out, err = run(browser, *(('feed', '--tab', mine['feed'], '--limit', '40', '--json') if mine['queries'] else ('doctor',)))
         envelope = json.loads(out)
         direct = len(mine['queries'])
         if mine['lost']:  # the Aside answer is lost: the command ends there (3) with the request charged once

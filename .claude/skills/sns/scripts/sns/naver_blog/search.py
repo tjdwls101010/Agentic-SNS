@@ -26,11 +26,11 @@ _BUILD = {'blogs': web.blog_record, 'clips': web.clip_record}
 
 def check(options):
     """The argument rules of search, before any request."""
-    inside = bool(options.get('blog'))
+    inside = bool(options.get('within'))
     kind = options.get('type') or 'posts'
     if (kind, inside) not in SURFACES:
         raise SnsError('argument', f'One blog\'s own search finds posts or tags, not {kind}.',
-                       'Drop --blog, or use --type posts or tags.')
+                       'Drop --in, or use --type posts or tags.')
     _, _, sorts, dates, own_money, _ = SURFACES[(kind, inside)]
     where = _KINDS[kind] + (' inside one blog' if inside else '')
     if options.get('sort') and not sorts:
@@ -48,14 +48,14 @@ def search(platform, invocation):
     options = invocation.options
     text = ' '.join(options['text']).strip()
     kind = options.get('type') or 'posts'
-    blog_text = options.get('blog')
+    blog_text = options.get('within')
     op, key, sorts, dates, _, server_dates = SURFACES[(kind, bool(blog_text))]
-    sort = (options.get('sort') or 'sim') if sorts else None
+    sort = (options.get('sort') or 'relevance') if sorts else None
     local = web.parse_target(blog_text, 'blog') if blog_text else None
     identity = {'type': kind, 'sort': sort, 'blog': local and (local.blog_id or 'naver.me/' + local.short),
                 'own_money': True if options.get('own_money') else None}
     words = ['--type', kind] + (['--sort', sort] if options.get('sort') else []) + \
-        (['--blog', blog_text] if blog_text else []) + (['--own-money'] if options.get('own_money') else [])
+        (['--in', blog_text] if blog_text else []) + (['--own-money'] if options.get('own_money') else [])
     # A surface Naver filters by date ends by itself; tags and --sort date come newest first, so a window closes on them.
     order = 'server' if server_dates else 'newest_first' if kind == 'tags' or sort == 'date' else 'ranked'
 
@@ -63,7 +63,7 @@ def search(platform, invocation):
         client = connection.client
         ids = {key: text}
         if sort:
-            ids['sortType'] = sort
+            ids['sortType'] = 'sim' if sort == 'relevance' else sort
         if blog_text:
             ids['blogId'] = listing.resumed(state, out).get('blog_id') or client.target(blog_text, 'blog').blog_id
         if server_dates:

@@ -73,9 +73,9 @@ def test_search_then_the_post_and_its_blog():
     assert post['lines'] and post['url'] == hit['url'] and post['coverage']['label'].startswith('text[')
 
     blog = hit['blog_id']
-    code, card = cli('blog', blog, '--json')
+    code, card = cli('about', blog, '--json')
     assert code == 0 and records(card), card
-    code, listing = cli('posts', blog, '--limit', '3', '--json')
+    code, listing = cli('profile', blog, '--limit', '3', '--json')
     assert code == 0 and listing['results'], listing
 
 

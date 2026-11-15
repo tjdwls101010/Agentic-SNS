@@ -29,7 +29,7 @@ def test_a_public_read_that_goes_on_asks_first_even_with_a_warm_hint(naver):
 def test_a_window_asks_first_too(naver):
     naver.logged_in()
     naver.respond(M, '/api/blogs/cafe_note/post-list', json=post_list(blog_posts(3)))
-    code, out, _ = naver.run('naver-blog', 'posts', 'cafe_note', '--since', '2026-10-01')
+    code, out, _ = naver.run('naver-blog', 'profile', 'cafe_note', '--since', '2026-10-01')
     assert code == 0 and naver.paths()[0] == '/api/current-user'
 
 
@@ -40,7 +40,7 @@ def test_a_long_read_that_meets_the_time_limit_still_leaves_its_more_line_with_a
     for page in range(1, 31):
         naver.respond(M, '/api/blogs/cafe_note/post-list', json=post_list(blog_posts(30 if page < 30 else 5, start=30 * (page - 1))),
                       query={'page': page})
-    code, out, _ = naver.run('naver-blog', 'posts', 'cafe_note', '--limit', '5000', '--json',
+    code, out, _ = naver.run('naver-blog', 'profile', 'cafe_note', '--limit', '5000', '--json',
                              env={'SNS_DEADLINE_SECONDS': '10'})
     first = json.loads(out)
     assert code == 0 and first['stop_reason'] == 'time_limit' and 30 < len(first['results']) < 900

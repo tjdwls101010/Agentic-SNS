@@ -56,7 +56,7 @@ def test_the_next_feed_page_asks_with_the_cursor_and_the_pagination_source(brows
     case = CASES[name]
     known_tab(browser).respond('threads.query', query_result(feed_body([[post('A', '2026-10-08T03:00:00Z')]], True, cursor)))
     browser.respond('threads.query', query_result(feed_body([[post('B', '2026-10-08T02:00:00Z')]], False, None)))
-    code, out, _ = run(browser, 'feed', '--feed', feed, '--limit', '2')
+    code, out, _ = run(browser, 'feed', '--tab', feed, '--limit', '2')
     assert code == 0, out
     subset(case['expected'], sent(browser))
     # the following feed's pagination variables are not confirmed by an observation of the app (appendix C, open item):
