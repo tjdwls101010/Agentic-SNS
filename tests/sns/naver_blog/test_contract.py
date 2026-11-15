@@ -6,7 +6,11 @@ import json
 
 import pytest
 
-from sns.naver_blog import CHOICES, COMMANDS, PLATFORM, web
+from sns.naver_blog import PLATFORM, web
+import cli
+
+_COMMANDS, _CHOICES = cli.command_tables(cli.load_platforms())
+COMMANDS, CHOICES = _COMMANDS['naver-blog'], _CHOICES['naver-blog']
 from tests.sns.naver_blog.scene import FIXTURES, fixture
 from tests.sns.naver_blog.shapes import clip_items
 from tests.sns.support.policies import POLICIES

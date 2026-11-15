@@ -5,7 +5,9 @@ import sys
 
 import pytest
 
-from sns.facebook import COMMANDS
+import cli
+
+COMMANDS = cli.command_tables(cli.load_platforms())[0]['facebook']
 from tests.sns.support.cli import CLI
 
 

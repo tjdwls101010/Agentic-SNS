@@ -9,13 +9,17 @@ import pytest
 import cli
 from sns.results import KINDS
 from tests.sns.support.cli import CLI
-from tests.sns.support.stub_platform import STUBS
+from tests.sns.support.stub_platform import STUBS, STUB_COMMANDS, STUB_CHOICES
 
-PLATFORMS = {**cli.load_platforms(), **STUBS}
+REAL_PLATFORMS = cli.load_platforms()
+PLATFORMS = {**REAL_PLATFORMS, **STUBS}
+REAL_COMMANDS, REAL_CHOICES = cli.command_tables(REAL_PLATFORMS)
+COMMANDS = {**REAL_COMMANDS, **STUB_COMMANDS}
+CHOICES = {**REAL_CHOICES, **STUB_CHOICES}
 
 
 def leaves():
-    root = cli.parser(PLATFORMS)
+    root = cli.parser(PLATFORMS, commands=COMMANDS)
     found = []
     for action in root._actions:  # argparse keeps its tree here; there is no public accessor
         if isinstance(action, argparse._SubParsersAction):
@@ -27,11 +31,11 @@ def leaves():
 
 
 def test_the_top_level_map_fits_a_screen_and_names_every_command():
-    text = cli.parser(PLATFORMS).format_help()
+    text = cli.parser(PLATFORMS, commands=COMMANDS).format_help()
     assert len(text.splitlines()) <= 40, len(text.splitlines())
     for word, module in PLATFORMS.items():
         line = next(line for line in text.splitlines() if line.strip().startswith(word + ' '))
-        assert line.split()[1:] == list(cli.surface(module)), word
+        assert line.split()[1:] == list(cli.surface(module, COMMANDS[word])), word
     assert ' idle' not in text
 
 
@@ -42,7 +46,7 @@ def test_each_command_explains_every_argument_and_only_its_exit_codes(word, name
         if action.dest == 'help':
             continue
         assert action.help and action.help != argparse.SUPPRESS, (word, name, action.dest)
-    spec = cli.surface(PLATFORMS[word])[name]
+    spec = cli.surface(PLATFORMS[word], COMMANDS[word])[name]
     listed = [line.split()[0] for line in text.split('exit codes:\n')[1].splitlines() if line.strip()]
     assert [int(code) for code in listed] == list(spec['exits'])
     assert set(spec['exits']) <= set(cli.EXIT_CODES) and 0 in spec['exits'] and 2 in spec['exits']
@@ -51,9 +55,8 @@ def test_each_command_explains_every_argument_and_only_its_exit_codes(word, name
 
 @pytest.mark.parametrize('word', sorted(PLATFORMS))
 def test_closed_sets_are_choices_and_match_the_platforms_choices(word):
-    module = PLATFORMS[word]
     found = {}
-    for name, spec in module.COMMANDS.items():
+    for name, spec in COMMANDS[word].items():
         for argument in spec['arguments']:
             if isinstance(argument, str):
                 continue
@@ -61,7 +64,7 @@ def test_closed_sets_are_choices_and_match_the_platforms_choices(word):
             if 'choices' in settings:
                 dest = settings.get('dest') or flags[-1].lstrip('-').replace('-', '_')
                 found[f'{name}.{dest}'] = list(settings['choices'])
-    assert found == module.CHOICES
+    assert found == CHOICES[word]
 
 
 def test_every_result_kind_has_one_exit_code_and_every_code_a_kind():
@@ -81,7 +84,6 @@ def test_bad_arguments_are_one_json_envelope_and_exit_2():
 
 def test_every_images_help_says_how_numbers_and_stops_work():
     """reading.pictures is shared: what it does with a number the post lacks and with a stop is told the same way."""
-    import importlib
     for key in ('x', 'reddit', 'threads', 'facebook', 'naver_blog'):
-        text = ' '.join(importlib.import_module(f'sns.{key}').COMMANDS['images']['epilog'])
+        text = ' '.join(REAL_COMMANDS[key.replace('_', '-')]['images']['epilog'])
         assert 'more:' in text and 'numbers left' in text, key

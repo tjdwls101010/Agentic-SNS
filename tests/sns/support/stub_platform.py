@@ -298,3 +298,6 @@ BETA = SimpleNamespace(
                        'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10)}})
 
 STUBS = {'alpha': ALPHA, 'beta': BETA}
+
+STUB_COMMANDS = {word: module.COMMANDS for word, module in STUBS.items()}
+STUB_CHOICES = {word: module.CHOICES for word, module in STUBS.items()}

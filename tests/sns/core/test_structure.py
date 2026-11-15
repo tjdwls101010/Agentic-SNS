@@ -257,3 +257,16 @@ def test_package_interfaces_do_not_reexport_private_names():
         exported = [alias.asname or alias.name for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
                     for alias in node.names]
         assert not [e for e in exported if e.startswith('_') and e != '__all__'], init
+
+
+def test_platform_interfaces_do_not_define_command_surfaces():
+    for platform in PLATFORMS:
+        path = PACKAGE / platform / '__init__.py'
+        source = path.read_text(encoding='utf-8')
+        parsed = ast.parse(source)
+        assigned = {node.id for node in ast.walk(parsed) if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store)}
+        assert not {'COMMANDS', 'CHOICES'} & assigned, platform
+        top_level = {target.id for node in parsed.body if isinstance(node, ast.Assign) for target in node.targets if isinstance(target, ast.Name)}
+        assert top_level <= {'PLATFORM', 'POLICY', 'RECORDS', 'TREE'}, (platform, top_level)
+        assert {node.name for node in parsed.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))} <= {'connect'}, platform
+        assert not any(isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value in ('help', 'epilog', 'arguments') for node in ast.walk(parsed)), platform
