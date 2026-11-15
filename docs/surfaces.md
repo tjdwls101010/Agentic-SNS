@@ -121,7 +121,7 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Search: videos, events | Search filters | in recon (R17s) |
 | Post pictures | Post media | command: `facebook images POST` |
 | Pictures in comments | Comment media | in recon (R2b) |
-| A "sponsored" marker in posts | Feed | in recon (R17t) |
+| A "sponsored" marker in posts | Feed | command: `facebook feed` (ads come as records with `promoted: true`) |
 | Video captions | Post video | in recon (R14d) |
 | Messenger | Messenger | none — excluded (DM) |
 

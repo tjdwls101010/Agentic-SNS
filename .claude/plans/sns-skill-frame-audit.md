@@ -626,6 +626,53 @@ Codex(`gpt-6.1-terra`, high, read-only) 둘 — 실행 `20261115-155512-plan-fea
 | R18a / R18b | reddit / threads | 커스텀 피드 |
 | R18c / R18d | facebook | 친구 목록(`graph ACCOUNT friends`) / 글에 반응한 사람 목록 |
 
+**P7b 판정(2026-11-16).** 실계정에서 화면을 열어(클릭은 R18d 시도 하나, 알림 화면은 열지 않음) 페이로드와 작업 이름을 보았고, Reddit은 항목당 요청 한 번(A14)이었다. 다른 사람의 내용은 기록하지 않았다. '가능'은 읽기 경로와 데이터 모양을 보았다는 뜻이고, 구현은 P7c가 한다. '불가'·'미확정'·'계정이 보여 주지 않음'은 성진의 동의 전까지 `docs/surfaces.md`에서 `in recon`으로 남는다.
+
+| # | 플랫폼 | 항목 | 판정 | 근거 |
+|---|---|---|---|---|
+| R15 | facebook | 반응 종류별 수 | 가능 | 글 화면의 페이로드(같은 글 읽기)에 feedback.top_reactions.edges[] = {node.id(반응 종류), localized_name, reaction_count, i18n_reaction_count}. 댓글 노드에도 top_reactions(id·수). 추가 요청 없음 |
+| R8 | facebook | 내 저장 항목 | 가능 | /saved/ 화면 페이로드에 저장 목록 연결(saved_home, edges·cursor·page_info). 화면 읽기는 쓰기를 일으키지 않음. 다음 쪽 쿼리는 이 계정에서 has_next_page=false라 관찰 못 함 |
+| R17l | facebook | 페이지 팔로워 목록 | 가능 | /<page>/followers 페이로드의 연결 + 다음 쪽 ProfileCometAppCollectionListRendererPaginationQuery(has_next_page=true 관찰) |
+| R17m | facebook | 페이지 라이브 영상 | 가능 | /<page>/live_videos 페이로드의 연결(edges·page_info) |
+| R17n | facebook | 프로필의 사진·영상 탭 | 가능 | /<page>/photos 페이로드 + 다음 쪽 ProfileCometAppCollectionPhotosRendererPaginationQuery(has_next_page=true) |
+| R17o | facebook | 내 그룹 목록 | 가능 | /groups/joins/ 페이로드의 연결(total_joined_groups, has_next_page=true) |
+| R17p | facebook | 그룹 멤버 | 가능 | /groups/<g>/members 페이로드의 버킷 연결 + GroupsCometMembersPageNewMembersSectionRefetchQuery |
+| R17q | facebook | 이벤트 | 가능 | /events 페이로드에 loggedInViewer.account_user.upcoming_events 연결(이 계정은 비어 있음)과 추천 이벤트(reco_cursor) |
+| R17r | facebook | 과거의 오늘 | 미확정 | /onthisday/ 페이로드에 이야기 feedback은 있으나 목록 연결을 관찰하지 못함(오늘 이 계정의 추억이 적음) — 추억이 있는 날 다시 |
+| R17k | facebook | 피드 필터 | 가능 | /?filter=favorites&sk=h_chr이 피드와 같은 CometNewsFeedPaginationQuery(has_next_page=true) — 필터 변수만 다름 |
+| R18c | facebook | 친구 목록 | 가능 | /friends/list 페이로드의 연결(edges·cursor·page_info). 남의 친구 목록의 비공개 설정에서의 답(9와 구분)은 미관찰 |
+| R17s | facebook | 영상·이벤트 검색 | 가능(영상) / 미확정(이벤트) | /search/videos/ 가 browse_serp 연결(has_next_page=true)로 옴 — 기존 search와 같은 경로. 이벤트 검색은 관찰하지 않음 |
+| R17t | facebook | 협찬 표시 필드 | 이미 명령 | 광고 표시는 P5에서 구현: 글의 sponsored_data/is_sponsored/ad_id → promoted: true(피드 실물에서 sponsored_data 필드 확인). 유료 파트너십(브랜디드 콘텐츠) 표시는 오늘 피드에서 보지 못함 |
+| R14d | facebook | 영상 자막 | 미확정 | 영상 노드에 captions_url·video_available_captions_locales 필드가 있으나 본 영상 둘은 null·[] — 자막 있는 영상으로 확인 필요 |
+| R17a | x | 프로필 Reposts 탭 | 가능 | 사이트에 /<account>/reposts 탭, X 번들에 UserRepostsTimeline 작업 |
+| R17b | x | 북마크 폴더 | 없음 — 이 계정이 보여 주지 않음 | /i/history에 북마크·좋아요 탭만, 폴더 작업이 번들에 없음(Premium 기능). 다시 열 조건: Premium 계정. 북마크가 /i/history로 옮겨 갔어도 `me bookmarks`는 정상 — 이 계정의 북마크가 비어 7(사이트도 "북마크에 추가하세요"), `me likes`는 0 |
+| R17c | x | 알림 Verified 탭 | 미확정 | 알림 작업은 지연 로딩 번들에 있고, 알림 화면을 열면 읽음 처리가 생길 수 있어 열지 않음 — 성진이 있을 때 `me notifications`와 같은 작업의 탭 변수로 확인 |
+| R17d | x | 리스트 구독자 | 미확정 | /i/lists/<id>/followers 화면에서 작업을 관찰하지 못함(지연 로딩), 메인 번들에 이름 없음 |
+| R17e | x | 커뮤니티 멤버 | 가능 | /i/communities/<id>/members 스크롤에서 membersSliceTimeline_Query(User 노드 52) |
+| R17f | x | Creator Studio 분석 | 미확정 | 화면이 데이터 요청 없이 끝남(이 계정에서 기능이 비활성일 수 있음) |
+| R4 | threads | 팔로워 다음 쪽 | 불가로 입증됨(이 관찰에서) | 사이트 자신의 팔로워 대화창이 BarcelonaFriendshipsFollowersTabQuery 한 번으로 50명과 has_next_page=false를 받고, 끝까지 스크롤해도 더 요청하지 않음. 함의: Threads가 다음을 말하지 않을 때의 정지는 server_capped가 맞다 — P6이 무조건 not_built로 바꾼 것을 '커서를 줄 때만 not_built'로 고친다(P7c) |
+| R5 | threads | 활동 다음 쪽 | 미확정 | 다음 쪽 쿼리가 기록에 없고(queries.json에는 첫 쪽 BarcelonaActivityFeedV2StoryListContainerQuery뿐), 관찰하려면 활동 화면을 열어야 해 읽음 처리가 생길 수 있음 — 성진이 있을 때 배지 수(BarcelonaNotificationBadgeContextQueryDirectQuery)를 앞뒤로 비교하며 |
+| R6 | facebook | 알림 다음 쪽 | 미확정 | 같은 이유: '이전 알림 보기'를 관찰하려면 알림 화면을 열어야 함 — 성진이 있을 때 |
+| R12 | threads | 트렌딩 | 없음 — 이 계정이 보여 주지 않음 | 검색 화면이 추천 계정(BarcelonaSearchRecommendedUsersRefetchableQuery)만 싣고 트렌드 글자·데이터가 없음(옛 T16과 같음). 다시 열 조건: 검색 화면에 트렌드가 보일 때 |
+| R17g | threads | 인사이트 | 미확정 | /insights/ 페이로드에 데이터가 없음(이 계정의 팔로워 수 조건일 수 있음) |
+| R17h | threads | 유령 게시물 | 가능 | /ghost_posts/ 페이로드에 ghostPostsFeed 연결(이 계정은 비어 있음) |
+| R17i | threads | 보관함 | 가능 | /archive/ 페이로드에 archivedPostsFeed 연결(이 계정은 비어 있음) |
+| R10a | reddit | 홈 피드 controversial | 가능 | 같은 탭 출처의 /controversial.json?limit=2 → 200, 글 2개(after 커서) |
+| R10b | reddit | me downvoted·hidden | 가능 | /user/<me>/downvoted.json·/hidden.json → 200, Listing |
+| R13 | reddit | 댓글 검색 | 가능(HTML 경로) | /search/?q=…&type=comments → 200, 댓글 마크업 35곳(.json 검색은 403 — A14의 경로). HTML을 파싱하는 새 형식 소유 단위가 필요 |
+| R18a | reddit | 커스텀 피드 | 가능 | /api/multi/mine.json → 200(이 계정은 빈 목록). 피드 글은 /user/<u>/m/<name>.json 경로 — 이 계정에 피드가 없어 미관찰 |
+| R18d | facebook | 글에 반응한 사람 목록 | 미확정 | 글 화면에서 반응 목록을 여는 요소를 찾지 못해 쿼리를 관찰하지 못함 |
+| R18c-비공개 | facebook | (R18c의 일부) | 미확정 | 남의 친구 목록이 비공개일 때의 답을 보지 못함 |
+| R1 | facebook | 공유·reel·watch 링크 | 미확정 | 표본 링크가 없어 풀어 보지 못함 — 공유 링크 하나를 주면 확인 |
+| R2a / R2b / R2c | reddit / facebook / naver | 댓글에 달린 사진 | 미확정 | 사진이 달린 댓글 표본을 찾지 못함(Reddit은 댓글의 media_metadata, Facebook은 댓글 attachments가 후보) |
+| R7 | facebook | 깊이 2 답글의 다음 묶음 | 미확정 | 다음 묶음이 있는 깊은 가지 표본이 필요 |
+| R11 | naver | 내소식·내가 남긴 흔적·공감한 사람 | 미확정 | 알림 성격 — 읽음 처리 확인은 성진이 있을 때(O2) |
+| R14a / R14b / R14c / R14e | x / threads / reddit / naver | 영상 자막 | 미확정 | 자막 있는 영상 표본이 필요(Facebook은 R14d — 필드는 있음) |
+| R16a / R16b | x / threads | 투표 | 미확정 | 투표 글 표본이 필요. X 메인 번들에 투표 작업 이름은 없음(카드 필드로 올 가능성) |
+| R17j | reddit | 홈 For You·Following 탭 | 미확정 | 탭이 링크 없이 스크립트로 바뀌어 경로를 관찰하지 못함 |
+| R17u / R17v / R17w / R17x | naver | 안부글 / 클립 / 공식블로그 / 챌린지 | 미확정 | 화면이 프레임·스크립트로 그려져 최상위 페이로드로는 판정 불가 — 프레임 안 요청을 따로 봐야 함 |
+| R18b | threads | 커스텀 피드 | 미확정 | 이 계정의 커스텀 피드가 없어 관찰하지 못함 |
+
 ## 부록 B. 옛 → 새 명령 대응 (P5)
 
 | 옛 | 새 |
