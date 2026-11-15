@@ -105,7 +105,7 @@ def related(platform, invocation):
 
 
 def me(platform, invocation):
-    """The user's own subscriptions, saved or upvoted items, read under the logged-in name."""
+    """The user's own subscriptions, saved, upvoted, downvoted or hidden items, read under the logged-in name."""
     collection = invocation.options['collection']
     identity = {'collection': collection}
 

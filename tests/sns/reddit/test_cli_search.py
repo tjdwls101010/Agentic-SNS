@@ -128,3 +128,18 @@ def test_me_inbox_text_names_who_replied_where(reddit):
     reddit.me().json('/message/comments.json', listing([message('comment_reply', new=False)]))
     code, out, _ = reddit.run('reddit', 'me', 'comment-replies')
     assert code == 0 and 'u/replier1' in out and 'r/example' in out and 'A post title' in out
+
+
+@pytest.mark.parametrize('collection', ['downvoted', 'hidden'])
+def test_me_collections_read_posts_and_comments_across_pages(reddit, collection):
+    path = f'/user/{VIEWER}/{collection}.json'
+    reddit.me().json(path, listing([post('a')], after='t3_a'), query={'limit': 100})
+    reddit.me().json(path, listing([{'kind': 't1', 'data': {'id': 'c1', 'name': 't1_c1', 'body': 'synthetic comment', 'author': 'example_user', 'parent_id': 't3_a', 'link_id': 't3_a'}}]), query={'limit': 100, 'after': 't3_a'})
+    code, out, _ = reddit.run('reddit', 'me', collection, '--limit', '1', '--json')
+    first = json.loads(out)
+    assert code == 0 and first['results'][0]['id'] == 't3_a' and first['results'][0]['kind'] == 'post'
+    assert first['request_count'] == 2
+    code, out, _ = reddit.run(*command_of('more: ' + first['next']))
+    second = json.loads(out)
+    assert code == 0 and second['results'][0]['id'] == 't1_c1' and second['results'][0]['kind'] == 'comment'
+    assert second['request_count'] == 2 and reddit.paths() == ['/api/me.json', path, '/api/me.json', path]

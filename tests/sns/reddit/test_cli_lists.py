@@ -176,3 +176,14 @@ def test_more_is_one_line_the_permission_rule_allows(reddit):
     code, out, _ = reddit.run('reddit', 'sub', 'r/example')
     line = more_line(out)
     assert line.startswith('more: uv run "') and '/scripts/cli.py" reddit sub r/example --sort hot --after ' in line
+
+
+def test_feed_controversial_uses_the_period_and_pages(reddit):
+    reddit.me().json('/controversial.json', listing([post('a')], after='t3_a'), query={'limit': 100, 't': 'week'})
+    reddit.me().json('/controversial.json', listing([post('b')]), query={'limit': 100, 't': 'week', 'after': 't3_a'})
+    code, out, _ = reddit.run('reddit', 'feed', '--sort', 'controversial', '--time', 'week', '--limit', '1')
+    assert code == 0 and 'sort=controversial' in out and 'time=week' in out and 'title a' in out
+    assert 'requests=2' in out.splitlines()[0]
+    code, out, _ = reddit.run(*more_words(out))
+    assert code == 0 and 'title b' in out and 'stopped=exhausted' in out and 'requests=2' in out.splitlines()[0]
+    assert reddit.paths() == ['/api/me.json', '/controversial.json', '/api/me.json', '/controversial.json']
