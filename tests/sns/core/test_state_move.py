@@ -180,7 +180,8 @@ def test_two_commands_starting_together_finish_and_send_nothing_past_the_block(w
     skill = install(world.root)
     old_state(skill, person=CHALLENGE)
     world.browser.write()
-    runs = [world.start(skill, 'sub', 'r/python'), world.start(skill, 'doctor')]
+    real = {'SNS_TEST_NO_WAIT': ''}  # under the fake's virtual clock a lock wait passes the deadline at once
+    runs = [world.start(skill, 'sub', 'r/python', **real), world.start(skill, 'doctor', **real)]
     codes = [run.wait(timeout=60) for run in runs]
     assert codes == [5, 5] and world.fetches() == []
 
