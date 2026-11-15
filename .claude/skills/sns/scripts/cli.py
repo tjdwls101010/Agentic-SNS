@@ -51,7 +51,7 @@ KIND_EXIT = {'records': 0, 'resumable': 0, 'complete': 0, 'maintenance': 0, 'arg
 # other commands are its own places.
 CORE_COMMANDS = ('feed', 'profile', 'about', 'graph', 'me', 'post', 'comments', 'replies', 'search', 'images')
 MEANINGS = """these words mean the same wherever a platform has them (cli.py <platform> <command> --help explains one):
-  feed      your home feed                      profile  an account's posts (--tab picks a view)
+  feed      your home feed                      profile  an account's posts (or a --tab it has)
   about     an account's or a place's card      me       your own saved, liked, notified
   post      one post in full with its replies   search   posts, accounts or places
   images    save a post's pictures to look at   graph    who follows whom
