@@ -29,18 +29,15 @@ def test_cross_tasks_share_every_platform():
     assert contrast.platforms_of('naver-blog') == ['naver_blog']
 
 
-def test_variants(tmp_path):
-    draft = tmp_path / 'SKILL.md'
-    draft.write_text('---\nname: sns\n---\n# Title\n\nRun `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" x`.\n\n'
-                     '## Keep\n\nk\n\n## Drop me\n\nd\n')
-    a = contrast.variant_text('A', '/copy/cli.py', draft)
-    assert a.startswith('---') and 'uv run "/copy/cli.py" <platform> <command>' in a
-    b = contrast.variant_text('B', '/copy/cli.py', draft)
-    assert '"/copy/cli.py"' in b and '${CLAUDE_SKILL_DIR}' not in b
-    c = contrast.variant_text('C:Drop', '/copy/cli.py', draft)
-    assert '## Keep' in c and '## Drop me' not in c
-    with pytest.raises(SystemExit):
-        contrast.variant_text('C:Nothing', '/copy/cli.py', draft)
+def test_a_body_file_gets_the_skills_frontmatter_without_the_local_only_line(tmp_path):
+    body = tmp_path / 'F.md'
+    body.write_text('# Title\n\nRun `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" x`.\n')
+    text = contrast.body_text(body, '/copy/cli.py')
+    head, rest = text.split('\n---\n', 1)
+    assert head.startswith('---\nname: sns') and 'disable-model-invocation' not in head and 'allowed-tools' in head
+    assert '"/copy/cli.py"' in rest and '${CLAUDE_SKILL_DIR}' not in rest
+    baseline = contrast.body_text(contrast.HERE / 'arms/A.md', '/copy/cli.py')
+    assert 'Run `uv run "/copy/cli.py" <platform> <command>' in baseline
 
 
 def test_task_placeholders_come_only_from_the_environment(tmp_path, monkeypatch):
@@ -130,3 +127,153 @@ def test_an_old_state_that_cannot_be_taken_in_stops_the_run_before_it_starts(tmp
     with pytest.raises(SystemExit) as stopped:
         contrast.take_in_old_state(['reddit'], 'u0', real, legacy=tmp_path / 'old-data')
     assert 'old state' in str(stopped.value)
+
+
+STUB = r"""#!{python}
+import json, os, sys
+from pathlib import Path
+argv = sys.argv[1:]
+Path(os.environ['STUB_LOG']).open('a').write(json.dumps(argv) + '\n')
+counter = Path(os.environ['STUB_COUNTER'])
+seen = int(counter.read_text()) if counter.exists() else 0
+counter.write_text(str(seen + 1))
+deny = seen < int(os.environ.get('STUB_DENY', '0'))
+skill = argv[-1].split('먼저 ')[1].split('/SKILL.md')[0] + '/SKILL.md'
+events = [
+    {{'type': 'assistant', 'message': {{'content': [{{'type': 'tool_use', 'id': 't1', 'name': 'Read', 'input': {{'file_path': skill}}}}]}}}},
+    {{'type': 'user', 'message': {{'content': [{{'type': 'tool_result', 'tool_use_id': 't1', 'content': Path(skill).read_text()}}]}}}},
+    {{'type': 'assistant', 'message': {{'content': [{{'type': 'tool_use', 'id': 't2', 'name': 'Bash', 'input': {{'command': 'uv run cli.py x feed'}}}}]}}}},
+    {{'type': 'user', 'message': {{'content': [{{'type': 'tool_result', 'tool_use_id': 't2', 'content': 'x feed · 5 shown · requests=1'}}]}}}},
+    {{'type': 'result', 'result': 'Five posts were read. As told: only the F arm carries, long enough.',
+      'num_turns': 3, 'permission_denials': [{{'tool_name': 'Bash'}}] if deny else []}},
+]
+if os.environ.get('STUB_NO_RESULT'):
+    events = events[:-1]
+print('\n'.join(json.dumps(e) for e in events))
+"""
+
+
+@pytest.fixture
+def harness(tmp_path, monkeypatch):
+    """A fake run setup: a stand-in claude, the fake Aside's scenario, and a work directory."""
+    stub = tmp_path / 'claude'
+    stub.write_text(STUB.format(python=sys.executable))
+    stub.chmod(0o755)
+    scenario = tmp_path / 'scenario.json'
+    scenario.write_text(json.dumps({'tabs': [], 'responses': []}))
+    body = tmp_path / 'F-candidate.md'
+    body.write_text('# Social networks\n\nRun `uv run "${CLAUDE_SKILL_DIR}/scripts/cli.py" <platform>` on one line.\n\n'
+                    'A candidate fact that only the F arm carries, long enough to be recognised in a transcript.\n')
+    monkeypatch.setenv('SNS_WORK', str(tmp_path / 'work'))
+    monkeypatch.setenv('CONTRAST_CLAUDE', str(stub))
+    monkeypatch.setenv('STUB_LOG', str(tmp_path / 'stub.log'))
+    monkeypatch.setenv('STUB_COUNTER', str(tmp_path / 'stub.count'))
+    monkeypatch.setenv('SNS_ASIDE_ACCOUNT', 'u0')
+    return {'scenario': scenario, 'body': body, 'work': tmp_path / 'work', 'log': tmp_path / 'stub.log'}
+
+
+def cells(work):
+    return [json.loads(line) for line in (work / 'cells.jsonl').read_text().splitlines()]
+
+
+def test_a_fake_rehearsal_runs_any_body_with_any_model_id_and_repeats(harness):
+    contrast.main(['reh', 'x', 'rehearsal', '--body', str(harness['body']), '--arm', 'F', '--model', 'some-model-9',
+                   '--repeat', '3', '--fake', str(harness['scenario'])])
+    lines = cells(harness['work'])
+    assert [(c['run'], c['repetition'], c['valid']) for c in lines] == [('reh-r1', 1, True), ('reh-r2', 2, True),
+                                                                         ('reh-r3', 3, True)]
+    assert all(c['arm'] == 'F' and c['model'] == 'some-model-9' and c['task_name'] == 'rehearsal' for c in lines)
+    calls = [json.loads(line) for line in harness['log'].read_text().splitlines()]
+    assert all(argv[argv.index('--model') + 1] == 'some-model-9' for argv in calls)
+    assert all(any(a.startswith('Read(//') for a in argv) for argv in calls)  # the run may read its own files
+
+
+def test_a_run_with_a_permission_denial_is_invalid_and_run_again_at_most_twice(harness, monkeypatch):
+    monkeypatch.setenv('STUB_DENY', '1')
+    contrast.main(['deny', 'x', 'rehearsal', '--body', str(harness['body']), '--arm', 'F', '--repeat', '1',
+                   '--fake', str(harness['scenario'])])
+    assert [(c['run'], c['valid']) for c in cells(harness['work'])] == [('deny-r1', False), ('deny-r1-a1', True)]
+    (harness['work'] / 'cells.jsonl').unlink()
+    monkeypatch.setenv('STUB_DENY', '99')
+    contrast.main(['always', 'x', 'rehearsal', '--body', str(harness['body']), '--arm', 'F', '--repeat', '1',
+                   '--fake', str(harness['scenario'])])
+    assert [(c['run'], c['valid']) for c in cells(harness['work'])] == [
+        ('always-r1', False), ('always-r1-a1', False), ('always-r1-a2', False)]
+
+
+def test_a_blind_copy_carries_neither_run_arm_model_nor_body(harness, tmp_path):
+    from contrast.sns import blind
+    contrast.main(['blindme', 'x', 'rehearsal', '--body', str(harness['body']), '--arm', 'F-secret',
+                   '--model', 'model-xyz', '--repeat', '1', '--fake', str(harness['scenario'])])
+    harness['body'].write_text('moved and edited after the run')  # the copy uses the body the run was given
+    out, key_file = tmp_path / 'graders' / 'round1', tmp_path / 'keys' / 'round1.json'
+    with pytest.raises(SystemExit):
+        blind.main([str(out), str(out / 'key.json'), str(harness['work'] / 'runs' / 'blindme-r1')])
+    with pytest.raises(SystemExit):
+        blind.main([str(contrast.REPO / 'blind-out'), str(key_file), 'blindme-r1'])
+    blind.main([str(out), str(key_file), str(harness['work'] / 'runs' / 'blindme-r1')])
+    copies = list(out.glob('*'))
+    assert len(copies) == 1 and copies[0].suffix == '.md'
+    text = copies[0].read_text()
+    assert 'Five posts were read.' in text and 'x feed · 5 shown' in text and '# Task' in text
+    for hidden in ('blindme', 'F-secret', 'model-xyz', 'A candidate fact that only the F arm carries',
+                   'only the F arm carries, long enough', 'sns-contrast-', 'on one line'):
+        assert hidden not in text, hidden
+    assert list(json.loads(key_file.read_text()).values()) == ['blindme-r1']
+
+
+def test_a_run_without_a_final_answer_is_invalid_and_not_repeated(harness, monkeypatch):
+    monkeypatch.setenv('STUB_NO_RESULT', '1')
+    contrast.main(['cut', 'x', 'rehearsal', '--body', str(harness['body']), '--arm', 'F', '--repeat', '1',
+                   '--fake', str(harness['scenario'])])
+    assert [(c['run'], c['valid']) for c in cells(harness['work'])] == [('cut-r1', False)]
+
+
+def test_work_inside_the_repository_is_refused(monkeypatch):
+    monkeypatch.setenv('SNS_WORK', str(contrast.REPO / 'runs-here'))
+    with pytest.raises(SystemExit):
+        contrast.work_dir()
+
+
+def test_aggregation_counts_defects_over_valid_runs_per_model_arm_and_row(tmp_path, monkeypatch):
+    from contrast.sns import aggregate
+    monkeypatch.setattr(aggregate, 'HERE', tmp_path)
+    cell = lambda run, arm, model, valid=True, task='t1', signal=None: {  # noqa: E731
+        'run': run, 'arm': arm, 'model': model, 'valid': valid, 'task_name': task, 'block_signal': signal}
+    runs = [cell(f'a{i}', 'A', 'opus') for i in range(1, 5)] + [cell(f'f{i}', 'F', 'opus') for i in range(1, 4)] + [
+        cell('a9', 'A', 'opus', valid=False), cell('ab', 'A', 'opus', signal='checkpoint'),
+        cell('s1', 'A', 'sonnet', task='other'), cell('t1', 'A', 'opus', task='t2')]
+    (tmp_path / 'cells.jsonl').write_text('\n'.join(json.dumps(c) for c in runs) + '\n')
+    both = lambda run, verdict: [{'run': run, 'row': 1, 'verdict': verdict, 'grader': g}  # noqa: E731
+                                 for g in ('codex', 'claude')]
+    grades = both('a1', 'defect') + both('a2', 'ok') + both('a3', 'defect') + both('f1', 'ok') + both('f2', 'ok') \
+        + both('f3', 'defect') + both('a9', 'defect') + both('ab', 'ok') + both('s1', 'defect') + both('t1', 'defect') \
+        + [{'run': 'a4', 'row': 1, 'verdict': 'ok', 'grader': 'codex'},       # one grader only: not counted
+           {'run': 'a4', 'row': 2, 'verdict': 'ok', 'grader': 'codex'},
+           {'run': 'a4', 'row': 2, 'verdict': 'defect', 'grader': 'claude'}]  # split: not counted until settled
+    (tmp_path / 'grades.jsonl').write_text('\n'.join(json.dumps(g) for g in grades) + '\n')
+    aggregate.main(['pilot', str(tmp_path / 'grades.jsonl'), '--cells', str(tmp_path / 'cells.jsonl'),
+                    '--tasks', 't1', 't2'])
+    text = (tmp_path / 'results' / 'pilot.md').read_text()
+    assert '| 1 | opus | 2/3 | 1/3 |' in text  # the invalid and the block-stopped runs never count
+    assert 'Unsettled grader disagreements: 2.' in text and 'sonnet' not in text
+    assert 'Left out for too few valid runs: 1.' in text and 'opus, A, t2' in text and 'sonnet' not in text
+
+
+def test_a_task_whose_runs_were_all_invalid_or_not_applicable_is_handled_by_its_runs(tmp_path, monkeypatch):
+    from contrast.sns import aggregate
+    cells = [{'run': f'r{i}', 'arm': 'A', 'model': 'opus', 'valid': i < 3, 'task_name': 't', 'block_signal': None}
+             for i in range(5)] + [{'run': 'x', 'arm': 'A', 'model': 'opus', 'valid': False, 'task_name': 'dead'}]
+    decided = {('r0', '1'): 'ok', ('r1', '1'): 'ok', ('r2', '1'): 'n.a.'}
+    counts, short = aggregate.table(decided, cells)
+    assert counts == {'1': {'opus': {'A': {'defects': 0, 'valid': 2}}}}  # three valid runs; n.a. is not a run of row 1
+    assert short == [('opus', 'A', 'dead')]
+
+
+def test_blinding_keeps_what_every_arm_shares_and_sees_through_grep_prefixes():
+    from contrast.sns import blind
+    body = (contrast.HERE / 'arms/A.md').read_text() + '\nA claim only this arm makes about the reader of posts.\n'
+    shared = 'the permission rule matches the whole command line, so a'
+    assert blind.strip_body(shared, body) == shared
+    grep = 'SKILL.md:7:A claim only this arm makes about the reader of posts.'
+    assert 'only this arm makes' not in blind.strip_body(grep, body)
