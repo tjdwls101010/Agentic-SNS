@@ -198,3 +198,21 @@ def test_a_checkpointed_collection_does_not_offer_to_resume(browser, tmp_path):
     code, out, _ = run(browser, 'feed', '--sort', 'recent', '--out', str(tmp_path / 'g.ndjson'), '--json')
     result = json.loads(out)
     assert code == 5 and 'next' not in result and result['count'] == 1
+
+
+def test_a_handle_an_out_run_saved_names_the_reading_without_the_file_once_expired(browser, tmp_path, data_dir):
+    """Rerun with its --out file, the command would find that file complete and read nothing: an expired handle's fix
+    names the same reading without --out."""
+    out = tmp_path / 'comments.ndjson'
+    script_post(browser, [comment('C1', replies=1)], has_next=False)
+    code, text, _ = run(browser, 'comments', URL, '--out', str(out), '--limit', '5')
+    assert code == 0, text
+    [saved] = (data_dir / 'handles').glob('*.json')
+    record = json.loads(saved.read_text())
+    record['created_at'] -= 25 * 3600
+    saved.write_text(json.dumps(record))
+    look(browser)
+    code, text, _ = run(browser, 'replies', saved.stem)
+    error = json.loads(text)
+    assert code == 2 and 'expired' in error['message'], text
+    assert '--out' not in error['fix'] and error['fix'].endswith(f' facebook comments {URL} --limit 5'), error['fix']

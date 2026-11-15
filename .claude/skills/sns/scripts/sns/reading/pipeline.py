@@ -42,6 +42,7 @@ class Connection:
         self.started = False
         self._viewer = None
         self.observed = None   # the platform account a continued reading was read with
+        self.remake = None     # the command that starts the reading a loaded handle came from (handles.remake_of)
 
     @property
     def verbose(self):
@@ -78,15 +79,28 @@ class Connection:
         read with. Returns the number to print (e.g. `replies <number>`)."""
         bound = context(self.platform, command, target, identity or {}, self.account)
         viewer = self.observed or self._viewer or self.viewer()
-        argv = getattr(self.invocation, 'argv', ())
-        remake = command_line(self.invocation.cli_path, argv) if argv else None  # the read that printed it, again
-        return handles.save(bound, state, viewer=viewer, deadline=self.deadline, remake=remake)
+        return handles.save(bound, state, viewer=viewer, deadline=self.deadline, remake=self.start_over())
+
+    def start_over(self):
+        """The command that starts this reading from the beginning, for the handles it saves to name once they expire:
+        the one a handle it continued from named (a handle of a handle would name a handle that expired first), else
+        this command line without its --out file (which a rerun would find complete) and --after."""
+        if self.remake:
+            return self.remake
+        words, argv = [], list(getattr(self.invocation, 'argv', ()))
+        while argv:
+            word = argv.pop(0)
+            if word in ('--out', '--after') and argv:
+                argv.pop(0)
+            elif not word.startswith(('--out=', '--after=')):
+                words.append(word)
+        return command_line(self.invocation.cli_path, words) if words else None
 
     def resume(self, number, command, target=None, identity=None):
         """The state a handle saved for `command` (and target, identity); a handle of another command is an argument
         error naming where it belongs, one read as another account a changed login."""
         state, viewer = handles.load(number, context(self.platform, command, target, identity or {}, self.account))
-        self.observed = viewer
+        self.observed, self.remake = viewer, handles.remake_of(number)
         self.confirm(viewer)
         return state
 
@@ -238,6 +252,7 @@ def _read(connection, command, target, identity, reader, out_path, bound):
     state = None
     if options.get('after'):
         state, connection.observed = handles.load(options['after'], bound_context)
+        connection.remake = handles.remake_of(options['after'])
         connection.confirm(connection.observed)
     # A tab platform knows its account from the page; a fetch platform asks (one request) only for a reading that is
     # tied to the account: a collection, or one that can leave a handle (bound).
@@ -329,8 +344,9 @@ def _continue(connection, reading):
     try:
         # a handle always carries the account it was read with (a fetch platform asks now if it has not yet)
         viewer = connection.observed or connection.known_viewer or connection.viewer()
-        # once the handle expires, the same reading from its start is what to run
-        remake = command_line(connection.invocation.cli_path, command_words(
+        # once the handle expires, the same reading from its start is what to run (a replies continuation's target
+        # is a handle, so it takes the start the loaded handle named)
+        remake = connection.remake or command_line(connection.invocation.cli_path, command_words(
             platform.key, continuation['command'], continuation['target'], window_words(continuation['words'], options),
             options, after=None, limit=continuation.get('limit', ...)))
         number = handles.save(bound, continuation['state'], viewer=viewer, deadline=connection.deadline,

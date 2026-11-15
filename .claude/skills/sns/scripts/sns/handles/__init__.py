@@ -126,13 +126,23 @@ def load(number, context):
     if type(created) not in (int, float) or time.time() - created > TTL_SECONDS or 'state' not in record:
         remake = record.get('remake')
         raise SnsError('argument', f'Handle {number} has expired: handles last 24 hours (a post\'s URL does not).',
-                       f'Run the command that made it again: {remake}' if isinstance(remake, str) and remake
+                       f'Start the reading again: {remake}' if isinstance(remake, str) and remake
                        else _RESTART)
     state = record.get('state')
     if not isinstance(state, dict):
         raise SnsError('argument', f'Handle {number} is incomplete.', _RESTART)
     viewer = record.get('viewer')
     return state, viewer if isinstance(viewer, str) else None
+
+
+def remake_of(number):
+    """The command a saved handle names for starting its reading again, or None (no such handle, or none saved)."""
+    try:
+        record = json.loads((data_dir() / 'handles' / f'{int(number)}.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError, TypeError):
+        return None
+    remake = record.get('remake') if isinstance(record, dict) else None
+    return remake if isinstance(remake, str) and remake else None
 
 
 def _prune(directory):
