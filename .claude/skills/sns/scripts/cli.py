@@ -1371,6 +1371,23 @@ def _naver_blog_surface(platform):
     return COMMANDS, CHOICES
 
 
+# Which kinds of a platform's own links (what its locate() names) each command that takes a link reads; a link of
+# another kind ends before the browser with the command that reads it. A command not listed takes no link of its own
+# platform's kinds to refuse (search words, handles), and a short link whose kind shows only later (naver.me) passes.
+LINKS = {
+    'x': {'post': {'post'}, 'reposts': {'post'}, 'quotes': {'post'}, 'images': {'post'}, 'profile': {'profile'},
+          'about': {'profile', 'about'}, 'graph': {'profile'}, 'list': {'list'}, 'community': {'community'}},
+    'threads': {'post': {'post'}, 'quotes': {'post'}, 'reposts': {'post'}, 'images': {'post'},
+                'profile': {'profile'}, 'about': {'profile'}, 'graph': {'profile'}},
+    'reddit': {'post': {'post'}, 'comments': {'post'}, 'images': {'post'}, 'related': {'post'}, 'sub': {'sub'},
+               'about': {'sub', 'profile'}, 'profile': {'profile'}, 'wiki': {'wiki', 'sub'}},
+    'facebook': {'post': {'post'}, 'comments': {'post'}, 'images': {'post'}, 'profile': {'profile'},
+                 'about': {'profile', 'group'}, 'group': {'group'}},
+    'naver-blog': {'post': {'post'}, 'comments': {'post'}, 'images': {'post'}, 'about': {'about', 'profile', 'post'},
+                   'profile': {'about', 'profile'}, 'graph': {'about'}},
+}
+
+
 def command_tables(platforms):
     """Build the command and choice tables from platform interfaces."""
     factories = {'x': _x_surface, 'threads': _threads_surface, 'reddit': _reddit_surface, 'facebook': _facebook_surface, 'naver_blog': _naver_blog_surface}
@@ -1498,7 +1515,9 @@ def main(argv=None, platforms=None, commands=None):
                       for code, meaning in EXIT_CODES.items()]
         invocation = Invocation(options, deadline, {w: m.PLATFORM for w, m in platforms.items()}, cli_path(),
                                 exit_codes)
-        foreign(module.PLATFORM, invocation, options.get('target'))  # another platform's link: name its command
+        # another platform's link, or one of this platform of another kind: name the command that reads it
+        foreign(module.PLATFORM, invocation, options.get('target'), options['command'],
+                LINKS.get(options['platform'], {}).get(options['command']))
         kind, envelope = spec['run'](invocation)
     except SnsError as error:
         kind, envelope = failure_envelope(error, module.PLATFORM.key if module else None, options.get('command'))

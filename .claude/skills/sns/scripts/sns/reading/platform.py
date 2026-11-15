@@ -69,12 +69,19 @@ class Invocation:
         return bool(self.options.get('verbose'))
 
 
-def foreign(platform, invocation, target):
-    """Refuse a URL another platform reads, naming the command that reads it (before any request)."""
+def foreign(platform, invocation, target, command=None, reads=None):
+    """Refuse, before any request, a URL another platform reads, or one of this platform of a kind `command` does not
+    read (`reads`: the kinds its locate() names that the command takes; None: no check), naming the command that
+    reads it."""
     for value in target if isinstance(target, list) else [target]:
         if not isinstance(value, str) or '://' not in value and not value.split('/')[0].count('.'):
             continue
-        if platform.locate(value):
+        own = platform.locate(value)
+        if own:
+            kind, argument = own
+            if reads is not None and kind not in reads and kind != 'resolve':
+                raise SnsError('argument', f'This {platform.title} link is not one {command} reads.',
+                               f'Read it with: {platform.word} {kind} {argument}')
             continue
         for other in invocation.platforms.values():
             if other.key == platform.key:
