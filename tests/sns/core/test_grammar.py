@@ -15,7 +15,7 @@ def leaves():
 def test_core_commands_exist_on_their_platforms():
     for word, commands in leaves().items():
         assert {'feed', 'profile', 'about', 'me', 'post', 'search', 'images', 'doctor', 'schema'} <= commands.keys()
-        assert ('graph' in commands) == (word in {'x', 'threads', 'naver-blog'})
+        assert ('graph' in commands) == (word in {'x', 'threads', 'facebook', 'naver-blog'})
 
 
 def test_shared_options_mean_the_same_everywhere():

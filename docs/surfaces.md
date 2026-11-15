@@ -97,19 +97,21 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Surface | Where on the site | Status |
 |---|---|---|
 | Home feed (top, recent) | Home | command: `facebook feed --sort top\|recent` |
-| Feeds filter (favorites, friends, groups, pages) | Menu "Feeds" `/?filter=…` | in recon (R17k) |
+| Feeds filter (favorites, friends, groups, pages) | Menu "Feeds" `/?filter=…` | in recon (R17k — the feed query's filter variable was not in the capture) |
 | A profile's or page's timeline | Profile "All" tab | command: `facebook profile ACCOUNT` |
 | A profile's or page's About; a group's card | About tab | command: `facebook about ACCOUNT\|GROUP` |
-| A page's followers | Page "Followers" tab | in recon (R17l) |
-| A page's live videos | Page "Live" tab | in recon (R17m) |
-| A profile's photos and videos tabs | Profile "More" tabs | in recon (R17n) |
-| Friends list | Friends | in recon (R18c) |
+| A page's followers | Page "Followers" tab | command: `facebook graph ACCOUNT followers` (the first page the tab loads; a longer list ends `not_built`) |
+| A page's live videos | Page "Live" tab | in recon (R17m — no capture of the tab's payload yet) |
+| A profile's photos tab | Profile "Photos" tab | command: `facebook profile ACCOUNT --tab photos` (the first page the tab loads; a longer tab ends `not_built`) |
+| A profile's videos tab | Profile "More" tabs | in recon (R17n — no capture of the videos tab's payload yet) |
+| Your friends list | Friends `/friends/list` | command: `facebook graph friends` (the first page the screen loads) |
+| Another account's friends | Profile "Friends" tab | in recon (R18c — only your own list was observed; another account's tab and its private answer were not) |
 | A group's posts (top, recent, activity) | Group page | command: `facebook group GROUP --sort …` |
-| Your groups | Menu "Groups" | in recon (R17o) |
-| A group's members | Group members tab | in recon (R17p) |
-| Events | Menu "Events" | in recon (R17q) |
+| Your groups | Menu "Groups" | command: `facebook me groups` (the first page the Your groups screen loads; a longer list ends `not_built`) |
+| A group's members | Group members tab | command: `facebook group GROUP --tab members` (the tab's new members section only, its first page; a longer one ends `not_built`; the tab's other buckets are not read) |
+| Events | Menu "Events" | in recon (R17q — the upcoming events list was empty, so no event's fields were seen) |
 | Memories | Menu "Memories" `/onthisday/` | in recon (R17r) |
-| Saved | Menu "Saved" `/saved/` | in recon (R8) |
+| Saved | Menu "Saved" `/saved/` | command: `facebook me saved` (the first page the screen loads; the next-page request was not observed, so a longer list ends `not_built`) |
 | Notifications (first page) | Notifications | command: `facebook me notifications` |
 | Notifications: next pages | Notifications "see previous" | in recon (R6) |
 | A post with its comments, a comment's replies | Post page | command: `facebook post POST`, `facebook comments POST`, `facebook replies HANDLE` |
@@ -118,7 +120,8 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Who reacted to a post | Post reactions | in recon (R18d) |
 | Reaction counts by kind | Post reactions | command: `facebook post` / `feed` (reactions field) |
 | Search: top, posts, people, pages, groups | Search filters | command: `facebook search TEXT --type …` |
-| Search: videos, events | Search filters | in recon (R17s) |
+| Search: videos | Search filters | command: `facebook search TEXT --type videos` (the first page the videos search screen loads; more ends `not_built`) |
+| Search: events | Search filters | in recon (R17s — event search was not observed) |
 | Post pictures | Post media | command: `facebook images POST` |
 | Pictures in comments | Comment media | in recon (R2b) |
 | A "sponsored" marker in posts | Feed | command: `facebook feed` (ads come as records with `promoted: true`) |

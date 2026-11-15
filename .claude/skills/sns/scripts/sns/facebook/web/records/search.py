@@ -1,4 +1,5 @@
-"""Search results: posts, and people, pages and groups as entity records, in the connection's order.
+"""Search results: posts (videos are posts too), and people, pages and groups as entity records, in the connection's
+order.
 
 Only result wrappers are followed from a result root, so a post's author or a group's admin is never mistaken for a
 result. The requested vertical decides the kind of a User node (Facebook sends pages as User in the pages vertical);
@@ -142,9 +143,9 @@ def _entity(node, vertical, captured_at, module_kind=None):
 def _candidates(edge, vertical, captured_at, module, seen):
     """The records one result edge holds that are not already listed (seen is updated)."""
     candidates, found = [], []
-    if vertical in ('top', 'posts'):
+    if vertical in ('top', 'posts', 'videos'):
         candidates += posts.top_level([{'data': edge}], source='search', captured_at=captured_at)[0]
-    if vertical != 'posts':
+    if vertical not in ('posts', 'videos'):
         for node, module_kind in _result_entities(edge, module):
             if vertical == 'groups' and node.get('__typename') != 'Group':
                 continue
@@ -166,7 +167,7 @@ def results(chunks, *, vertical, captured_at):
                                          if isinstance(p, dict)) if kind), None)
         for edge in pieces:
             records += _candidates(edge, vertical, captured_at, module, seen)
-    if vertical in ('top', 'posts'):
+    if vertical in ('top', 'posts', 'videos'):
         # Posts whose pieces are spread over the response are merged across it; replace each with its merged form.
         merged = {r['id']: r for r in posts.top_level(chunks, source='search', captured_at=captured_at)[0]}
         records = [merged.get(r['id'], r) if 'kind' not in r else r for r in records]

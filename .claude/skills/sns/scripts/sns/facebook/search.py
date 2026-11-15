@@ -1,12 +1,17 @@
-"""search: posts, people, pages and groups in the server's order for this account."""
+"""search: posts, people, pages, groups and videos in the server's order for this account."""
 from sns import reading
 from sns.facebook import web
 from sns.facebook.listing import ended, surface, window_of
+from sns.facebook.screens import first_page
 
 
 def search(platform, invocation):
     options = invocation.options
     text, vertical = options['target'], options['type']
+    if vertical == 'videos':  # read from the videos search screen, its first page (screens)
+        return first_page(platform, invocation, command='search', target=text,
+                          identity={'type': vertical, 'recent': None, 'in': None}, words=['--type', vertical],
+                          fetch=lambda client: client.video_search(text))
     recent = bool(options.get('recent'))
     group = web.normalize_group(options['within']) if options.get('within') else None
     identity = {'type': vertical, 'recent': True if recent else None, 'in': group}

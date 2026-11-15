@@ -1,7 +1,7 @@
 """facebook: the platform adapter and public feature interface."""
 
 from sns import reading
-from sns.facebook import about, images, listing, notifications, search, thread, web
+from sns.facebook import about, images, listing, notifications, screens, search, thread, web
 from sns.facebook.render import render
 from sns.limits import LimitPolicy
 from sns.window import WindowPolicy
@@ -20,9 +20,10 @@ PLATFORM = reading.Platform(
 from sns.facebook.about import about as about_about
 from sns.facebook.images import images as images_images
 from sns.facebook.listing import feed as listing_feed
-from sns.facebook.listing import group as listing_group
-from sns.facebook.listing import profile as listing_profile
-from sns.facebook.notifications import notifications as notifications_notifications
+from sns.facebook.screens import graph as screens_graph
+from sns.facebook.screens import group as screens_group
+from sns.facebook.screens import me as screens_me
+from sns.facebook.screens import profile as screens_profile
 from sns.facebook.search import search as search_search
 from sns.facebook.thread import comments as thread_comments
 from sns.facebook.thread import post as thread_post

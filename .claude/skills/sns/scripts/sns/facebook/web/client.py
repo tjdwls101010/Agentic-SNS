@@ -23,9 +23,10 @@ from pathlib import Path
 from urllib.parse import quote, urlsplit
 
 from sns.errors import SnsError, diagnostic
-from sns.facebook.web import classify, targets
-from sns.facebook.web.records import (comments_page, group_about, group_card, notifications_page, permalink_post,
-                                      posts_page, replies_page, search_page)
+from sns.facebook.web import classify, payload, targets
+from sns.facebook.web.records import (collection_page, comments_page, friends_page, group_about, group_card,
+                                      joined_groups_page, members_page, notifications_page, permalink_post, posts_page, replies_page, saved_page,
+                                      search_page)
 from sns.facebook.web.records.search import VERTICALS
 from sns.facebook.web.records.search import filters as search_filters
 from sns.facebook.web.snippets import SNIPPETS
@@ -505,6 +506,39 @@ class Client:
                                              'posts_last_month', 'created_at')}, rules=[])
         record.update(details or {})
         return record, issues + more
+
+    def _screen(self, url, build, what, **context):
+        """The first page of a list as the screen at `url` preloads it into its own HTML (one page GET); a page that
+        carries no such list is a changed answer."""
+        batch = build(payload.chunks(self.page(url)), captured_at=_now(), **context)
+        if batch.page_info is None and not batch.has_items:
+            raise SnsError('failed', f'The page {url} carries no {what}; Facebook may have changed that screen.',
+                           'Facebook changed this screen; the skill needs an update. Tell the user which read failed.',
+                           reason='stale')
+        return batch
+
+    def saved(self):
+        return self._screen(HOME + 'saved/', saved_page, 'saved items')
+
+    def joined_groups(self):
+        return self._screen(HOME + 'groups/joins/', joined_groups_page, 'joined groups')
+
+    def collection(self, url, tab):
+        """The items of one tab (photos, followers) of a normalized profile or page URL."""
+        return self._screen(targets.BASE + targets.tab_path(url, tab), collection_page, tab)
+
+    def friends(self):
+        """The account's own friends list."""
+        return self._screen(HOME + 'friends/list', friends_page, 'friends list')
+
+    def video_search(self, text):
+        """Video search results as the videos search screen loads them (no query: its experience type was not
+        observed)."""
+        return self._screen(HOME + 'search/videos/?q=' + quote(text), search_page, 'search results', vertical='videos')
+
+    def members(self, url):
+        """A normalized group URL's members tab."""
+        return self._screen(targets.BASE + targets.tab_path(url, 'members'), members_page, 'member list')
 
     # --- maintenance -----------------------------------------------------------------------------------------
 

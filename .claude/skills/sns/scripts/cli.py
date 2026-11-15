@@ -93,7 +93,8 @@ LABELS = {
          'author; replies <handle>; search: <query>)',
     'threads': 'labelled [p1] post, [r1] reply, [a1] account, [n1] notification; each ends with the arguments of the '
                'next command (url: post <url> opens that one post; author; replies <handle>)',
-    'facebook': 'labelled [p1] post, [c1] comment or reply, [e1] person, page or group, [n1] notification; each ends '
+    'facebook': 'labelled [p1] post, [c1] comment or reply, [e1] person, page or group, [n1] notification, [s1] saved '
+                'item, [m1] photo; each ends '
                 'with the arguments of the next command (url: post <url> opens that one post; author: profile <url>; '
                 'replies <handle>); about prints one line per field as section: text',
 }
@@ -914,10 +915,15 @@ def _facebook_surface(platform):
     FEED_SORTS = ['top', 'recent']
     GROUP_SORTS = ['top', 'recent', 'activity']
     COMMENT_SORTS = ['all', 'relevant', 'newest']
-    SEARCH_TYPES = ['top', 'posts', 'people', 'pages', 'groups']
+    SEARCH_TYPES = ['top', 'posts', 'people', 'pages', 'groups', 'videos']
+    ME_KINDS = ['notifications', 'saved', 'groups']
+    PROFILE_TABS = ['posts', 'photos']
+    GRAPH_RELATIONS = ['followers', 'friends']
+    GROUP_TABS = ['posts', 'members']
 
-    CHOICES = {'feed.sort': FEED_SORTS, 'group.sort': GROUP_SORTS, 'post.sort': COMMENT_SORTS,
-               'comments.sort': COMMENT_SORTS, 'search.type': SEARCH_TYPES}
+    CHOICES = {'feed.sort': FEED_SORTS, 'profile.tab': PROFILE_TABS, 'graph.relation': GRAPH_RELATIONS,
+               'group.tab': GROUP_TABS, 'group.sort': GROUP_SORTS, 'post.sort': COMMENT_SORTS, 'comments.sort': COMMENT_SORTS,
+               'search.type': SEARCH_TYPES}
 
 
     LIST = ['limit', 'chars', 'after', 'out', 'json']
@@ -927,6 +933,26 @@ def _facebook_surface(platform):
         if not (options['target'].isascii() and options['target'].isdigit()):
             raise SnsError('argument', 'A replies handle is the number printed after "replies".',
                            'Copy the whole replies line.')
+
+
+    def check_graph(options):
+        if options['relation'] == 'friends' and options.get('target'):
+            raise SnsError('argument', 'Only your own friends list is read: another account\'s Friends tab was not '
+                                       'observed.', 'Drop the account: graph friends.')
+        if options['relation'] == 'followers' and not options.get('target'):
+            raise SnsError('argument', 'followers needs the profile or page whose followers to read.',
+                           'Pass it: graph ACCOUNT followers.')
+
+
+    def check_group(options):
+        if options['tab'] != 'posts' and (options.get('sort') or options.get('since') or options.get('until')):
+            raise SnsError('argument', '--sort, --since and --until are for the posts tab.',
+                           'Drop them, or read --tab posts.')
+
+
+    def check_profile(options):
+        if options['tab'] != 'posts' and (options.get('since') or options.get('until')):
+            raise SnsError('argument', '--since and --until are for the posts tab.', 'Drop them, or read --tab posts.')
 
 
     def check_search(options):
@@ -970,22 +996,40 @@ def _facebook_surface(platform):
         },
         'profile': {
             'help': 'Read a profile\'s or page\'s timeline.',
-            'run': _run(platform.listing_profile),
-            'arguments': [(('target',), {'help': 'Profile or page URL, vanity name or numeric id'}), 'since', 'until', *LIST],
-            'epilog': ["--since/--until are applied by Facebook (server-filtered) and checked against each post's date again; a window reads on until it ends, and reading to the end closes it. A post with no date cannot be placed in a window and is left out and counted; a pinned post is judged by its date like the others.",
-                       'A timeline can hold posts by other people (posts on the timeline, shares); each record names its author.'],
-            'requests': '1 to find the numeric id (none for a numeric id), then 1 per page of about 3-5 posts.',
+            'run': _run(platform.screens_profile),
+            'arguments': [(('target',), {'help': 'Profile or page URL, vanity name or numeric id'}),
+                          (('--tab',), {'choices': PROFILE_TABS, 'default': 'posts', 'help': 'posts (the timeline) or photos'}),
+                          'since', 'until', *LIST],
+            'epilog': ["--since/--until (posts only) are applied by Facebook (server-filtered) and checked against each post's date again; a window reads on until it ends, and reading to the end closes it. A post with no date cannot be placed in a window and is left out and counted; a pinned post is judged by its date like the others.",
+                       'A timeline can hold posts by other people (posts on the timeline, shares); each record names its author.',
+                       "photos: the tab's first page as its screen loads it (stopped=not_built when Facebook says more follow); post <url> opens one."],
+            'requests': '1 to find the numeric id (none for a numeric id), then 1 per page of about 3-5 posts; photos: 1.',
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
+            'check': check_profile,
+        },
+        'graph': {
+            'help': 'Read a profile\'s or page\'s followers, or your own friends.',
+            'run': _run(platform.screens_graph),
+            'arguments': [(('target',), {'nargs': '?', 'help': 'Profile or page URL, vanity name or numeric id; omitted for friends'}),
+                          (('relation',), {'choices': GRAPH_RELATIONS, 'metavar': 'RELATION', 'help': 'followers (of ACCOUNT) or friends (your own)'}),
+                          *LIST],
+            'epilog': ["The first page the Followers tab or your Friends list loads, in Facebook's order; when Facebook says more follow it ends with stopped=not_built (that request was not observed)."],
+            'requests': '1.',
+            'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
+            'check': check_graph,
         },
         'group': {
             'help': 'Read a group\'s posts.',
-            'run': _run(platform.listing_group),
+            'run': _run(platform.screens_group),
             'arguments': [(('target',), {'help': 'Group URL, vanity name or numeric id'}),
-                          (('--sort',), {'choices': GROUP_SORTS, 'default': 'top', 'help': 'top and activity are ranked; recent: newest posts first'}),
+                          (('--tab',), {'choices': GROUP_TABS, 'default': 'posts', 'help': 'posts or members (its new members)'}),
+                          (('--sort',), {'choices': GROUP_SORTS, 'help': 'posts: top (default) and activity are ranked; recent: newest posts first'}),
                           'since', 'until', *LIST],
-            'epilog': ["With --since, only --sort recent can close the window (a group's oldest post ends it), and it reads on until it does; top and activity are samples of it. A post with no date cannot be placed in a window and is left out and counted."],
-            'requests': '1 to find the numeric id (none for a numeric id), then 1 per page of about 3-5 posts.',
+            'epilog': ["With --since, only --sort recent can close the window (a group's oldest post ends it), and it reads on until it does; top and activity are samples of it. A post with no date cannot be placed in a window and is left out and counted.",
+                       "members: the new members section only (not the tab's other buckets), as its screen loads it (stopped=not_built when Facebook says more follow); --sort and the window are for posts."],
+            'requests': '1 to find the numeric id (none for a numeric id), then 1 per page of about 3-5 posts; members: 1.',
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
+            'check': check_group,
         },
         'post': {
             'help': 'Read one post in full with its first parent comments.',
@@ -1026,7 +1070,7 @@ def _facebook_surface(platform):
             'check': check_replies,
         },
         'search': {
-            'help': 'Search posts, people, pages or groups.',
+            'help': 'Search posts, people, pages, groups or videos.',
             'run': _run(platform.search_search),
             'arguments': [(('target',), {'help': 'What to search for'}),
                           (('--type',), {'choices': SEARCH_TYPES, 'default': 'top', 'help': 'top mixes posts with people, pages and groups in Facebook\'s order'}),
@@ -1035,8 +1079,9 @@ def _facebook_surface(platform):
                           (('--in',), {'dest': 'within', 'metavar': 'GROUP', 'help': 'Search the posts of one group (its URL, vanity name or numeric id), as the group\'s own search box does'}),
                           *LIST],
             'epilog': ["Results are in Facebook's order for this account; people and pages with the same name are different results (compare url and verified). One page is about 5 results.",
-                       "--recent, --since, --until and --in are for posts (--type top or posts; exit 2 otherwise). --recent, --since and --until are Facebook's post filters: Facebook applies the dates, so reaching the end closes the window as far as search returns posts; results stay in Facebook's order, not by date. A result with no date cannot be placed in a window and is left out and counted. --in searches one group's posts, as the group's own search box does."],
-            'requests': '1 per page of about 5 results; --in first finds the group id (1, none for a numeric id).',
+                       "--recent, --since, --until and --in are for posts (--type top or posts; exit 2 otherwise). --recent, --since and --until are Facebook's post filters: Facebook applies the dates, so reaching the end closes the window as far as search returns posts; results stay in Facebook's order, not by date. A result with no date cannot be placed in a window and is left out and counted. --in searches one group's posts, as the group's own search box does.",
+                       "videos: the first page of the videos search screen (video posts; stopped=not_built when Facebook says more follow)."],
+            'requests': '1 per page of about 5 results; --in first finds the group id (1, none for a numeric id); videos: 1.',
             'exits': (0, 2, 3, 4, 5, 6, 7, 8),
             'check': check_search,
         },
@@ -1064,21 +1109,22 @@ def _facebook_surface(platform):
             'exits': (0, 2, 3, 4, 5, 6, 7, 8),
         },
         'notifications': {
-            'help': 'Read your notification list (its first page) without marking anything seen.',
-            'run': _run(platform.notifications_notifications),
+            'help': 'Read your notifications (first page, none marked seen), saved items or joined groups.',
+            'run': _run(platform.screens_me),
             'arguments': [*LIST],
             'epilog': ["The notifications of the account the tab is logged in to, in Facebook's order, each with unseen, seen or read and url: what it points at (post <url> opens a post). Bucket headers and the see-previous button are layout and are left out.",
                        'Reading the list sends no seen or read change (those are separate requests this skill never sends); whether Facebook counts a read as seen by itself was not observable when this was measured (no unseen notification at the time). If Facebook stops accepting the stored notifications query the command ends with exit 6 and does not open the notifications screen to relearn it, because opening that screen is what makes the app mark notifications seen.',
-                       'It reads the first page (about 15 notifications), which is all it can: asked for the page after, Facebook answered nothing when this was measured, so when Facebook says older ones follow it ends with stopped=not_built and a coverage line instead of more:.'],
+                       'It reads the first page (about 15 notifications), which is all it can: asked for the page after, Facebook answered nothing when this was measured, so when Facebook says older ones follow it ends with stopped=not_built and a coverage line instead of more:.',
+                       "saved and groups (the groups you joined): the first page their screens load, in Facebook's order, with the same not_built end. A saved item's url is its own address."],
             'requests': '1.',
             'more': False,
             'exits': (0, 2, 3, 4, 5, 6, 7, 8),
         },
     }
 
-    CHOICES['me.collection'] = ['notifications']
+    CHOICES['me.collection'] = ME_KINDS
     COMMANDS['me'] = COMMANDS.pop('notifications')
-    COMMANDS['me']['arguments'].insert(0, (('collection',), {'choices': ['notifications'], 'metavar': 'KIND', 'help': 'notifications'}))
+    COMMANDS['me']['arguments'].insert(0, (('collection',), {'choices': ME_KINDS, 'metavar': 'KIND', 'help': 'notifications, saved or groups'}))
     return COMMANDS, CHOICES
 
 
@@ -1277,7 +1323,7 @@ LINKS = {
                 'profile': {'profile'}, 'about': {'profile'}, 'graph': {'profile'}},
     'reddit': {'post': {'post'}, 'comments': {'post'}, 'images': {'post'}, 'related': {'post'}, 'sub': {'sub'},
                'about': {'sub', 'profile'}, 'profile': {'profile'}, 'wiki': {'wiki', 'sub'}},
-    'facebook': {'post': {'post'}, 'comments': {'post'}, 'images': {'post'}, 'profile': {'profile'},
+    'facebook': {'post': {'post'}, 'comments': {'post'}, 'images': {'post'}, 'profile': {'profile'}, 'graph': {'profile'},
                  'about': {'profile', 'group'}, 'group': {'group'}},
     'naver-blog': {'post': {'post'}, 'comments': {'post'}, 'images': {'post'}, 'about': {'about', 'profile', 'post'},
                    'profile': {'about', 'profile'}, 'graph': {'about', 'profile', 'post'}},
