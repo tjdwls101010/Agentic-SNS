@@ -6,7 +6,9 @@ import sys
 
 import pytest
 
-from sns.threads import COMMANDS
+import cli
+
+COMMANDS = cli.command_tables(cli.load_platforms())[0]['threads']
 from tests.sns.support.cli import CLI
 
 

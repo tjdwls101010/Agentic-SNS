@@ -10,7 +10,7 @@ from sns import reading
 from sns.clock import Deadline
 from tests.sns.support.browser import Browser
 from tests.sns.support.cli import command_of, more_line
-from tests.sns.support.stub_platform import ALPHA, BETA, STUBS
+from tests.sns.support.stub_platform import ALPHA, BETA, STUBS, STUB_COMMANDS
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def browser(tmp_path, monkeypatch, data_dir):
 
 def run(capsys, browser, monkeypatch, *argv):
     browser.install(monkeypatch)
-    code = cli.main([str(a) for a in argv], platforms=STUBS)
+    code = cli.main([str(a) for a in argv], platforms=STUBS, commands=STUB_COMMANDS)
     return code, capsys.readouterr().out
 
 

@@ -10,6 +10,7 @@ from pathlib import Path
 
 import cli
 from tests.sns.support.browser import Browser
+from tests.sns.support.stub_platform import STUBS, STUB_COMMANDS
 
 FIXTURES = Path(__file__).resolve().parent / 'fixtures'
 VIEWER = 'example_viewer'
@@ -66,7 +67,8 @@ class Scene:
         for key, value in (env or {}).items():
             self.monkeypatch.setenv(key, value)
         time.tzset()
-        code = cli.main([str(a) for a in argv], platforms=platforms)
+        commands = None if platforms is None else {**cli.command_tables({k: v for k, v in platforms.items() if k not in STUBS})[0], **{k: STUB_COMMANDS[k] for k in platforms if k in STUBS}}
+        code = cli.main([str(a) for a in argv], platforms=platforms, commands=commands)
         captured = self.capsys.readouterr()
         return code, captured.out, captured.err
 

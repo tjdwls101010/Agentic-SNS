@@ -1,6 +1,8 @@
 """What is X's own in the skill's tree (the tree, the import directions, interface-only access and snippet ownership are
 tests/sns/core/test_structure.py's, which run over every platform package that exists): the x package's folders and
 modules, the page functions of its system, and the names of the old skill that must not come back."""
+
+import cli
 import re
 from pathlib import Path
 
@@ -17,6 +19,9 @@ def sources(root=PACKAGE):
     return [p for p in root.rglob('*.py') if '__pycache__' not in p.parts]
 
 
+COMMANDS, CHOICES = cli.command_tables(cli.load_platforms())
+COMMANDS, CHOICES = COMMANDS['x'], CHOICES['x']
+
 def test_the_x_package_is_its_interface_its_feature_modules_and_the_system_web():
     modules = {p.stem for p in PACKAGE.glob('*.py')} - {'__init__'}
     folders = tree.folders(PACKAGE)
@@ -25,9 +30,9 @@ def test_the_x_package_is_its_interface_its_feature_modules_and_the_system_web()
 
 def test_the_interface_is_platform_commands_and_choices():
     assert x.PLATFORM.key == 'x' and x.PLATFORM.word == 'x' and x.PLATFORM.transport == 'tab'
-    assert list(x.COMMANDS) == ['feed', 'profile', 'about', 'graph', 'me', 'list', 'community', 'post', 'replies',
+    assert list(COMMANDS) == ['feed', 'profile', 'about', 'graph', 'me', 'list', 'community', 'post', 'replies',
                                 'reposts', 'quotes', 'search', 'trends', 'images']
-    assert set(x.CHOICES) and all(key.split('.')[0] in x.COMMANDS for key in x.CHOICES)
+    assert set(CHOICES) and all(key.split('.')[0] in COMMANDS for key in CHOICES)
 
 
 def test_the_systems_page_functions_are_exactly_the_snippets_and_the_kit():

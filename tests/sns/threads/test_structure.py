@@ -1,6 +1,8 @@
 """What is Threads' own in the skill's tree (the tree, the import directions, interface-only access and snippet ownership
 are tests/sns/core/test_structure.py's, which run over every platform package that exists): the threads package's folders
 and modules, its adapter, the page functions of its system, and the names of the old skill that must not come back."""
+
+import cli
 import re
 from pathlib import Path
 
@@ -18,6 +20,9 @@ def sources(root=PACKAGE):
     return [p for p in root.rglob('*.py') if '__pycache__' not in p.parts]
 
 
+COMMANDS, CHOICES = cli.command_tables(cli.load_platforms())
+COMMANDS, CHOICES = COMMANDS['threads'], CHOICES['threads']
+
 def test_the_threads_package_is_its_interface_its_feature_modules_and_the_system_web():
     modules = {p.stem for p in PACKAGE.glob('*.py')} - {'__init__'}
     folders = tree.folders(PACKAGE)
@@ -27,9 +32,9 @@ def test_the_threads_package_is_its_interface_its_feature_modules_and_the_system
 def test_the_interface_is_platform_commands_and_choices():
     assert threads.PLATFORM.key == 'threads' and threads.PLATFORM.word == 'threads' and threads.PLATFORM.transport == 'tab'
     assert threads.PLATFORM.title == 'Threads' and threads.PLATFORM.site == 'threads.com'
-    assert list(threads.COMMANDS) == ['feed', 'profile', 'about', 'graph', 'me', 'activity', 'search', 'post',
+    assert list(COMMANDS) == ['feed', 'profile', 'about', 'graph', 'me', 'activity', 'search', 'post',
                                       'replies', 'quotes', 'reposts', 'images']
-    assert set(threads.CHOICES) and all(key.split('.')[0] in threads.COMMANDS for key in threads.CHOICES)
+    assert set(CHOICES) and all(key.split('.')[0] in COMMANDS for key in CHOICES)
 
 
 def test_the_adapters_policy_is_the_plans_threads_row():
