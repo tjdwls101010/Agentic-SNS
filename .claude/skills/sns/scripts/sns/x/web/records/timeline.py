@@ -22,6 +22,7 @@ class Entry:
     index: int = 0
     pinned: bool = False
     social: dict = field(default_factory=dict)
+    promoted: bool = False
 
 
 @dataclass
@@ -39,7 +40,6 @@ class Page:
     hidden: list = field(default_factory=list)     # ShowMoreThreads* cursors outside modules: replies X hid
     terminated: bool = False
     cleared: bool = False
-    promoted: int = 0
     other: int = 0
     unreadable: int = 0     # entries of a known kind this skill could not turn into a record (a shape change)
     unreadable_kinds: list = field(default_factory=list)   # the kind of each, so a surface weighs only its own
@@ -50,7 +50,6 @@ class ListPage:
     records: list
     cursor: str | None
     has_next: bool
-    promoted: int = 0
     other: int = 0
     terminated: bool = False
     unreadable: int = 0
@@ -88,11 +87,9 @@ def walk(instructions):
     """The entries of one page of instructions, in order (see the module docstring)."""
     page = Page()
 
-    def item(content, identity, module=None, index=0, pinned=False):
+    def item(content, identity, module=None, index=0, pinned=False, promoted=False):
         content = _dict(content)
-        if _promoted(identity, content):
-            page.promoted += 1
-            return
+        promoted = promoted or _promoted(identity, content)
         cursor = content.get('cursorType')
         if cursor:
             value = content.get('value')
@@ -109,28 +106,26 @@ def walk(instructions):
                           ('community_results', 'community')):
             if key in content:
                 page.entries.append(Entry(kind, _ident(kind, content, identity), content, identity, module, index,
-                                          pinned, _dict(content.get('socialContext'))))
+                                          pinned, _dict(content.get('socialContext')), promoted))
                 return
         kind = {'TimelineTrend': 'trend', 'TimelineEventSummary': 'event', 'TimelineNotification': 'notification',
                 # a post or account item without the key it carries its result in: kept so it counts as unreadable
                 'TimelineTweet': 'post', 'TimelineUser': 'account'}.get(content.get('itemType'))
         if kind:
-            page.entries.append(Entry(kind, identity, content, identity, module, index, pinned))
+            page.entries.append(Entry(kind, identity, content, identity, module, index, pinned, promoted=promoted))
         else:
             page.other += 1
 
     def entry(raw, pinned=False):
         raw = _dict(raw)
         identity, content = raw.get('entryId', ''), _dict(raw.get('content'))
-        if _promoted(identity, content):
-            page.promoted += 1
-            return
+        promoted = _promoted(identity, content)
         if isinstance(content.get('items'), list):
             for index, child in enumerate(content['items']):
                 child = _dict(child)
-                item(_dict(child.get('item')).get('itemContent'), child.get('entryId', identity), identity, index, pinned)
+                item(_dict(child.get('item')).get('itemContent'), child.get('entryId', identity), identity, index, pinned, promoted)
         else:
-            item(content.get('itemContent', content), identity, pinned=pinned)
+            item(content.get('itemContent', content), identity, pinned=pinned, promoted=promoted)
 
     for instruction in instructions if isinstance(instructions, list) else []:
         instruction = _dict(instruction)
@@ -207,6 +202,7 @@ def records_of(page):
             page.unreadable_kinds.append(entry.kind)
             continue
         record['unit'] = entry.module or entry.entry_id
+        record['promoted'] = entry.promoted
         if entry.pinned and entry.kind == 'post':
             record['pinned'] = True
         landing = entry.social.get('landingUrl')
@@ -221,5 +217,5 @@ def list_page(instructions):
     page = walk(instructions)
     records = records_of(page)
     return ListPage(records=records, cursor=page.bottom, has_next=bool(page.bottom) and not page.terminated,
-                    promoted=page.promoted, other=page.other, terminated=page.terminated, unreadable=page.unreadable,
+                    other=page.other, terminated=page.terminated, unreadable=page.unreadable,
                     unreadable_kinds=page.unreadable_kinds)

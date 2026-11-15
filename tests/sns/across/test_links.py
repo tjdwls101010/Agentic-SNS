@@ -46,6 +46,7 @@ SAME = [('x', 'post', 'https://x.com/example_user', 'profile'),
         ('facebook', 'group', 'https://www.facebook.com/example.page/posts/pfbid0abc', 'post'),
         ('facebook', 'post', 'https://www.facebook.com/groups/examplegroup/', 'group'),
         ('naver-blog', 'post', 'https://blog.naver.com/exampleid', 'about'),
+        ('naver-blog', 'profile', 'https://blog.naver.com/exampleid/223000000001', 'post'),
         ('naver-blog', 'comments', 'https://blog.naver.com/exampleid', 'about')]
 
 
@@ -72,5 +73,13 @@ ACCEPTED = [('x', 'about', 'https://x.com/example_user'), ('x', 'about', 'https:
 @pytest.mark.parametrize('platform, command, link', ACCEPTED, ids=[f'{p}:{c}' for p, c, _ in ACCEPTED])
 def test_a_link_a_command_reads_is_not_refused_for_its_kind(tmp_path, data_dir, platform, command, link):
     done = run_cli(platform, command, link, browser=Browser(tmp_path))
+    envelope = json.loads(done.stdout)
+    assert not (done.returncode == 2 and (envelope.get('fix') or '').startswith('Read it with:')), envelope
+
+
+@pytest.mark.parametrize('link', ['https://blog.naver.com/exampleid', 'https://blog.naver.com/PostList.naver?blogId=exampleid',
+                                  'https://blog.naver.com/exampleid/223000000001'])
+def test_naver_graph_accepts_any_blog_link(tmp_path, data_dir, link):
+    done = run_cli('naver-blog', 'graph', link, 'buddies', browser=Browser(tmp_path))
     envelope = json.loads(done.stdout)
     assert not (done.returncode == 2 and (envelope.get('fix') or '').startswith('Read it with:')), envelope

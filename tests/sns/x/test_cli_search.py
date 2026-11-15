@@ -2,6 +2,8 @@
 import json
 import time
 
+import pytest
+
 from tests.sns.x.scenes import known_tab, queries, query_result, run
 
 RATE = {'x-rate-limit-limit': '50', 'x-rate-limit-remaining': '49', 'x-rate-limit-reset': str(int(time.time()) + 900)}
@@ -80,6 +82,12 @@ def test_quotes_ask_the_way_the_quotes_screen_does(browser):
 def test_empty_search_text_is_refused(browser):
     code, out, _ = run(browser, 'search', '  ')
     assert code == 2 and browser.calls() == []
+
+
+@pytest.mark.parametrize('flag', ['--since', '--until'])
+def test_account_search_refuses_date_filters_before_requests(browser, flag):
+    code, out, _ = run(browser, 'search', 'ai', '--type', 'accounts', flag, '2026-10-12')
+    assert code == 2 and json.loads(out)['error'] == 'argument' and browser.calls() == []
 
 
 def test_the_search_limit_after_some_results_is_a_resumable_stop(browser):

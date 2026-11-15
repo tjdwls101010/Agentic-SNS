@@ -162,7 +162,11 @@ def epilog(spec):
     lines = list(spec.get('epilog') or [])
     names = [a for a in spec['arguments'] if isinstance(a, str)]
     if spec.get('reads', True) and 'json' in names:
-        lines += [REQUESTS, TEXT_OUTPUT, JSON_OUTPUT]
+        if spec.get('one_page'):
+            lines += ['requests: there is no request budget; every invocation of an account shares one lock and the platform\'s pacing.',
+                      TEXT_OUTPUT.replace('; last, more: <command> when reading can continue', ''), JSON_OUTPUT]
+        else:
+            lines += [REQUESTS, TEXT_OUTPUT, JSON_OUTPUT]
         if 'out' in names:
             lines.append(OUT_OUTPUT)
         lines.append(FAILURE)
@@ -227,6 +231,8 @@ def _x_surface(platform):
     def check_search(options):
         if not options['target'].strip():
             raise SnsError('argument', 'Search text must not be empty.', 'Pass the words to search for.')
+        if options['type'] == 'accounts' and any(options.get(k) for k in ('since', 'until')):
+            raise SnsError('argument', '--since and --until filter posts, not accounts.', 'Drop them, or search posts.')
         if options.get('within') and (options['type'] != 'posts' or options['sort'] != 'top'):
             raise SnsError('argument', 'search --in communities reads posts only, in X\'s order.', 'Drop --type and --sort.')
 
@@ -257,7 +263,7 @@ def _x_surface(platform):
                                          'help': 'foryou: the posts X ranks for this account; following: from the accounts it follows'}),
                           'since', 'until', *LIST],
             'epilog': ['foryou is what X chose to show this account, not everything; following holds only the accounts it follows, and X does not serve it newest first either, so neither feed can close a --since window: a window keeps the posts dated inside it among those read (a sample, not the whole day). Neither feed ends by itself, so --out needs --limit.',
-                       'A repost row is the reposter\'s act, dated when it was reposted; the words are the original\'s, shown under it with their own author. Promoted posts (ads) are left out and counted.',
+                       'A repost row is the reposter\'s act, dated when it was reposted; the words are the original\'s, shown under it with their own author. Promoted posts (ads) are included, marked [ad], and count toward --limit.',
                        'Without --limit or --out it reads one page, with a window too (the posts dated inside it among that page); more: continues.',
                        'requests: 1 per page of about 20 posts.'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
@@ -406,7 +412,7 @@ def _x_surface(platform):
                           (('--limit',), {'type': _positive, 'help': 'Trends and events to show; omitted: one page'}),
                           (('--chars',), {'type': _chars, 'help': 'Characters of each text to show (default 180; 0 = all received); --json keeps all'}),
                           'after', 'json'],
-            'epilog': ['A trend is what X shows this account as popular now, in X\'s order and for X\'s region and language settings, not a measure of opinion or a full list; its count line is X\'s rounded figure. Each trend ends with search: <query>, the words search takes to read it; an event ends with its title as that query. Promoted trends (ads) and the posts or accounts X mixes into Explore are left out and counted.',
+            'epilog': ['A trend is what X shows this account as popular now, in X\'s order and for X\'s region and language settings, not a measure of opinion or a full list; its count line is X\'s rounded figure. Each trend ends with search: <query>, the words search takes to read it; an event ends with its title as that query. Promoted trends (ads) are included, marked [ad], and count toward --limit; posts or accounts mixed into Explore are left out and counted.',
                        'requests: 1 for foryou (its first page comes with the Explore answer, and only that page is read); 2 for the other tabs (the Explore answer names their timeline), then 1 per further page.'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
         },
@@ -569,11 +575,12 @@ def _threads_surface(platform):
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9),
         },
         'me': {
-            'help': 'Read the posts you liked or saved (one batch).',
+            'help': 'Read liked or saved posts, or activity notifications.',
             'run': lambda invocation: (platform.listing_notifications if invocation.options['collection'] == 'activity' else platform.listing_me)(PLATFORM, invocation),
             'check': check_me,
             'arguments': [(('collection',), {'choices': ME_COLLECTIONS, 'metavar': 'KIND', 'help': 'liked, saved or activity'}), (('--tab',), {'choices': ACTIVITY_FILTERS, 'help': 'App activity filter (default: all); requests means follow requests'}), (('--limit',), {'type': _activity_limit, 'help': 'Rows to show (activity: default 20, 1 to 50)'}), 'chars', 'after', 'out', 'json'],
-            'epilog': ['One batch, as Threads sends it (stopped=not_paginable): not your whole history.',
+            'epilog': ['For liked and saved, one batch as Threads sends it (stopped=not_paginable): not your whole history. For activity, one page in Threads\' order; when older activity exists, stopped=server_capped and no next page is requested. --tab applies only to activity.',
+                       'Reading the list sends no seen change (the app marks notifications seen only when its activity screen opens, which this skill never does); seen state as observed on 2026-10-22.',
                        'requests: 1.'],
             'exits': (0, 2, 3, 4, 5, 6, 7, 8),
         },
@@ -684,7 +691,6 @@ def _threads_surface(platform):
         COMMANDS[_name]['epilog'] = [*COMMANDS[_name]['epilog'], RECORDS, TAB]
     COMMANDS['images']['epilog'] = [*COMMANDS['images']['epilog'], TAB]
 
-    COMMANDS['me']['epilog'] = COMMANDS['activity']['epilog'] + COMMANDS['me']['epilog']
     del COMMANDS['activity']
     return COMMANDS, CHOICES
 
@@ -988,9 +994,8 @@ def _facebook_surface(platform):
             'run': _run(platform.listing_feed),
             'arguments': [(('--sort',), {'choices': FEED_SORTS, 'default': 'top', 'help': 'top: the order Facebook ranks; recent: newest first'}),
                           'since', 'until',
-                          (('--include-sponsored',), {'action': 'store_true', 'help': 'Keep advertisements; by default they are left out and counted'}),
                           *LIST],
-            'epilog': ['The feed is what Facebook chose to show this account, not everything its friends and pages posted.',
+            'epilog': ['The feed is what Facebook chose to show this account, not everything its friends and pages posted. Advertisements are included, marked [ad], and count toward --limit.',
                        'top is Facebook\'s ranking, which cannot close a --since window: a window keeps the posts dated inside it among those read (a sample, not the whole span). recent is newest first, so a --since window closes at the first page with a dated, unpinned post older than --since; a feed that ends before --since is partial, because Facebook shows no older posts here. A post with no date cannot be placed in a window and is left out and counted. The top feed never ends by itself, so --out needs --limit.',
                        'Without --limit or --out it reads one page (about 5-10 posts), with a window too; more: continues.',
                        'requests: 1 per page of about 5-10 posts.'],
@@ -1365,7 +1370,7 @@ def _naver_blog_surface(platform):
         },
     }
 
-    COMMANDS['me'] = {**COMMANDS['graph'], 'help': 'Read your neighbor groups.', 'arguments': [(('collection',), {'choices': ['groups'], 'metavar': 'KIND', 'help': 'groups'}), 'limit', 'chars', 'after', 'out', 'json']}
+    COMMANDS['me'] = {**COMMANDS['graph'], 'help': 'Read your neighbor groups.', 'arguments': [(('collection',), {'choices': ['groups'], 'metavar': 'KIND', 'help': 'groups'}), (('--chars',), {'type': chars, 'help': 'Characters of each text to show (default 180; 0 = all); --json keeps all'}), 'json'], 'epilog': ['Your neighbor groups are read in one page.', 'requests: 1 request for groups after the account check (current-user, 1 request).'], 'one_page': True}
 
     # The closed sets the commands offer (cli.py checks its parser's choices against this).
     CHOICES = {'search.type': ['posts', 'blogs', 'tags', 'clips'], 'search.sort': ['relevance', 'date'], 'profile.tab': ['posts', 'popular', 'notices'], 'graph.relation': ['buddies', 'followers'], 'me.collection': ['groups'], 'topic.tab': ['newest', 'featured']}
@@ -1386,7 +1391,7 @@ LINKS = {
     'facebook': {'post': {'post'}, 'comments': {'post'}, 'images': {'post'}, 'profile': {'profile'},
                  'about': {'profile', 'group'}, 'group': {'group'}},
     'naver-blog': {'post': {'post'}, 'comments': {'post'}, 'images': {'post'}, 'about': {'about', 'profile', 'post'},
-                   'profile': {'about', 'profile'}, 'graph': {'about'}},
+                   'profile': {'about', 'profile'}, 'graph': {'about', 'profile', 'post'}},
 }
 
 
@@ -1526,7 +1531,10 @@ def main(argv=None, platforms=None, commands=None):
                 LINKS.get(options['platform'], {}).get(options['command']))
         kind, envelope = spec['run'](invocation)
     except SnsError as error:
-        kind, envelope = failure_envelope(error, module.PLATFORM.key if module else None, options.get('command'))
+        command = options.get('command')
+        if command is None and len(argv) >= 2 and argv[0] == 'naver-blog' and argv[1] == 'me':
+            command = 'me'
+        kind, envelope = failure_envelope(error, module.PLATFORM.key if module else None, command)
     return emit(kind, envelope, options, module)
 
 

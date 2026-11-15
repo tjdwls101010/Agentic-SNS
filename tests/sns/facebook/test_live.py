@@ -36,7 +36,7 @@ def cli(*args):
 
 
 def required_post_fields(record):
-    assert record['kind'] == 'post' and record['id'] and record['author_url'] and isinstance(record['text'], str)
+    assert record['kind'] == 'post' and record['id'] and record['author']['url'] and isinstance(record['text'], str)
     assert record['created_at'] or record['undated']
 
 

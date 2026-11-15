@@ -34,6 +34,9 @@ def test_collect_resume_and_complete(browser, tmp_path):
     assert text.startswith('facebook feed · 2 saved to "') and ' · sort=top · stopped=limit_reached' in text
     assert 'resume: ' in text
     assert [r['id'] for r in lines(out) if 'id' in r] == ['A', 'B'] and lines(out)[0]['kind'] == 'header'
+    first = next(r for r in lines(out) if r.get('id') == 'A')
+    assert first['author'] == {'name': 'Author A', 'id': '9A', 'url': 'https://www.facebook.com/author.a'}
+    assert first['promoted'] is False
     resume = text.strip().split('resume: ')[1]
     assert resume.endswith(f'facebook feed --sort top --limit 2 --out={out}')
 

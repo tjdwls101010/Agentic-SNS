@@ -70,9 +70,7 @@
           {
             "id": "F1",
             "text": "first fragment text",
-            "author_name": "Author One",
-            "author_id": "100",
-            "author_url": "https://www.facebook.com/author.one",
+            "author": {"name": "Author One", "id": "100", "url": "https://www.facebook.com/author.one"},
             "created_at": "2026-01-01T00:00:00Z",
             "incomplete": false
           }
@@ -417,11 +415,11 @@
             "id": "F1",
             "type": "shared",
             "text": "look at this",
-            "author_name": "Sharer",
+            "author": {"name": "Sharer", "id": "100", "url": "https://www.facebook.com/sharer"},
             "shared_post": {
               "id": "F2",
               "text": "original words",
-              "author_name": "Original Author",
+              "author": {"name": "Original Author", "id": "300", "url": "https://www.facebook.com/original.author"},
               "created_at": "2025-12-31T00:00:00Z",
               "url": "https://www.facebook.com/original.author/posts/pfbid0002",
               "shared_post": null
@@ -1066,20 +1064,15 @@
         "records": [
           {
             "id": "F1",
-            "author_name": "Sharer",
-            "author_id": "100",
-            "author_url": "https://www.facebook.com/sharer",
+            "author": {"name": "Sharer", "id": "100", "url": "https://www.facebook.com/sharer"},
             "shared_post": {
               "id": "F2",
-              "author_name": "Original Author",
-              "author_id": "300"
+              "author": {"name": "Original Author", "id": "300", "url": "https://www.facebook.com/original.author"}
             }
           },
           {
             "id": "F3",
-            "author_name": null,
-            "author_id": null,
-            "author_url": null
+            "author": {"name": null, "id": null, "url": null}
           }
         ],
         "issues": []
@@ -1773,7 +1766,7 @@
           {
             "id": "A1",
             "pinned": true,
-            "sponsored": false
+            "promoted": false
           },
           {
             "id": "A2",
@@ -1789,21 +1782,21 @@
           },
           {
             "id": "B1",
-            "sponsored": true,
+            "promoted": true,
             "undated": true,
             "pinned": false
           },
           {
             "id": "B2",
-            "sponsored": true
+            "promoted": true
           },
           {
             "id": "B3",
-            "sponsored": true
+            "promoted": true
           },
           {
             "id": "B4",
-            "sponsored": false
+            "promoted": false
           }
         ],
         "issues": []

@@ -102,18 +102,19 @@ def test_a_recent_feed_that_ends_before_the_window_starts_is_partial(browser):
     assert [r['id'] for r in result['results']] == ['N1']
 
 
-def test_sponsored_posts_are_left_out_and_counted_or_kept(browser):
+def test_sponsored_posts_are_included_marked_and_count_toward_limit(browser):
     known_tab(browser)
     browser.respond('facebook.query', page([story('AD', sponsored=True), story('A')], has_next=False))
     code, out, _ = run(browser, 'feed')
     lines = out.splitlines()
-    assert code == 0 and lines[0] == 'facebook feed · sort=top · 1 shown · stopped=exhausted · requests=1'
-    assert 'coverage: 1 sponsored posts (ads) left out' in lines
+    assert code == 0 and lines[0] == 'facebook feed · sort=top · 2 shown (1 ads) · stopped=exhausted · requests=1'
+    assert any(line.startswith('[ad] [p1]') for line in lines) and 'left out' not in out
     look(browser).respond('facebook.query', page([story('AD', sponsored=True), story('A')], has_next=False))
-    code, out, _ = run(browser, 'feed', '--include-sponsored')
-    assert out.splitlines()[0] == ('facebook feed · sort=top · include_sponsored=True · 2 shown · stopped=exhausted · '
-                                   'requests=1')
-    assert 'sponsored · ' in out and 'left out' not in out
+    code, out, _ = run(browser, 'feed', '--limit', '1', '--json')
+    result = json.loads(out)
+    assert code == 0 and [(r['id'], r['promoted']) for r in result['results']] == [('AD', True)]
+    code, _, _ = run(browser, 'feed', '--include-sponsored')
+    assert code == 2
 
 
 def test_explicit_empty_feed_is_exit_7(browser):

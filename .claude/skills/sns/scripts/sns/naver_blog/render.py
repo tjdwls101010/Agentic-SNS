@@ -26,7 +26,7 @@ def _join(parts):
 
 
 def post_lines(post, label, chars):
-    head = [f'[{label}] {post.get("blog_id")}/{post.get("log_no")}', post.get('nickname') or post.get('blog_name'),
+    head = [f'[{label}] {post.get("blog_id")}/{post.get("log_no")}', (post.get('author') or {}).get('name') or (post.get('author') or {}).get('blog_name'),
             post.get('created_at') or 'undated', post.get('category_name')]
     head += _counts(post, [('like_count', 'likes'), ('comment_count', 'comments'), ('view_count', 'views')])
     head += post.get('labels') or []
@@ -84,7 +84,8 @@ def comment_lines(comment, label, chars):
     if comment.get('parent_comment_no'):
         tag += f' reply-to=#{comment["parent_comment_no"]}' + ('' if comment.get('parent_shown', True)
                                                                else ' (parent not shown)')
-    head = [tag, comment.get('author'), f'blog: {comment["author_blog_id"]}' if comment.get('author_blog_id') else None,
+    author = comment.get('author') or {}
+    head = [tag, author.get('name'), f'blog: {author["id"]}' if author.get('id') else None,
             comment.get('created_at') or 'undated']
     head += _counts(comment, [('like_count', 'likes'), ('reply_count', 'replies')]) + (comment.get('labels') or [])
     lines = [indent + _join(head)]
@@ -143,7 +144,7 @@ def record_lines(record, label, chars):
     if kind == 'category':
         return category_lines(record)
     if kind == 'clip':
-        return [_join([f'[{label}] {record.get("blog_id")}/clip/{record.get("doc_no")}', record.get('nickname'),
+        return [_join([f'[{label}] {record.get("blog_id")}/clip/{record.get("doc_no")}', (record.get('author') or {}).get('name'),
                        record.get('created_at') or 'undated',
                        f'{record["play_seconds"]}s' if record.get('play_seconds') is not None else None]),
                 '     ' + quote(record.get('title')), '     url: ' + record['url']]

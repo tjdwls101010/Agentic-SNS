@@ -90,8 +90,7 @@ class Post(Record):
     log_no: str | None = None
     title: str = ''
     summary: str = ''
-    blog_name: str | None = None
-    nickname: str | None = None
+    author: dict = field(default_factory=dict)
     category_no: str | None = None
     category_name: str | None = None
     like_count: int | None = None
@@ -129,7 +128,8 @@ def post_record(raw, *, blog_id=None, blog_name=None):
                 title=clean(first(raw, 'title', 'titleWithInspectMessage')) or '',
                 summary=clean(first(raw, 'briefContents', 'contents', 'content')) or '',
                 created_at=stamp(first(raw, 'addDate', 'regDate', 'adddate')),
-                blog_name=clean(first(raw, 'blogName')) or blog_name, nickname=clean(first(raw, 'nickname', 'nickName')),
+                author={'name': clean(first(raw, 'nickname', 'nickName')), 'id': blog,
+                        'url': f'https://blog.naver.com/{blog}', 'blog_name': clean(first(raw, 'blogName')) or blog_name},
                 category_no=_id(raw.get('categoryNo')),
                 category_name=clean(first(raw, 'categoryName')),
                 like_count=number(first(raw, 'sympathyCount', 'sympathyCnt', 'likeCount')),
@@ -146,8 +146,7 @@ class Comment(Record):
     comment_no: str | None = None
     parent_comment_no: str | None = None
     reply_level: int = 1
-    author: str | None = None
-    author_blog_id: str | None = None
+    author: dict = field(default_factory=dict)
     text: str = ''
     like_count: int | None = None
     reply_count: int | None = None
@@ -179,8 +178,10 @@ def comment_record(raw, *, post_url=None):
     parent = None if _id(parent) is None or str(parent) == number_ else str(parent)
     author_blog = first(raw, 'profileUserId')
     return Comment(id=f'comment:{number_}', url=post_url, comment_no=number_, parent_comment_no=parent,
-                   reply_level=number(raw.get('replyLevel')) or 1, author=clean(first(raw, 'userName', 'maskedUserName')),
-                   author_blog_id=str(author_blog) if author_blog else None, created_at=stamp(first(raw, 'regTime')),
+                   reply_level=number(raw.get('replyLevel')) or 1,
+                   author={'name': clean(first(raw, 'userName', 'maskedUserName')), 'id': str(author_blog) if author_blog else None,
+                           'url': f'https://blog.naver.com/{author_blog}' if author_blog else None, 'blog_name': None},
+                   created_at=stamp(first(raw, 'regTime')),
                    text='' if 'deleted' in labels else clean(first(raw, 'contents')) or '',
                    like_count=number(raw.get('sympathyCount')),
                    reply_count=number(first(raw, 'replyAllCount', 'replyCount')), labels=labels)
@@ -364,7 +365,7 @@ class Clip(Record):
     doc_no: str | None = None
     title: str = ''
     play_seconds: int | None = None
-    nickname: str | None = None
+    author: dict = field(default_factory=dict)
 
 
 def clip_record(raw):
@@ -374,7 +375,8 @@ def clip_record(raw):
     blog, doc = str(raw['blogId']), str(raw['docNo'])
     return Clip(id=f'clip:{blog}/{doc}', blog_id=blog, doc_no=doc, url=f'https://m.blog.naver.com/{blog}/clip/{doc}',
                 title=clean(first(raw, 'originTitle', 'title')) or '', play_seconds=number(raw.get('playTime')),
-                created_at=stamp(raw.get('addDate')), nickname=clean(raw.get('nickname')))
+                created_at=stamp(raw.get('addDate')), author={'name': clean(raw.get('nickname')), 'id': blog,
+                                                             'url': f'https://blog.naver.com/{blog}', 'blog_name': None})
 
 
 @dataclass
@@ -433,6 +435,7 @@ NOTES = {
                         'excerpt, cut at a character count.',
              'id': 'post:<blogId>/<logNo>; what --out deduplicates and resumes on',
              'blog_id': 'the blog id in the URL (it can be digits only); not blog_no',
+             'author': '{name, id, url, blog_name}: the author and their blog; unknown values are null',
              'url': 'https://blog.naver.com/<blogId>/<logNo>; post <url> reads it in full',
              'summary': 'Naver\'s excerpt, cut at a character count: its ending is where the string stopped, not where '
                         'the writer did',
@@ -448,7 +451,7 @@ NOTES = {
                                                     'address of its own',
                 'parent_comment_no': 'the comment this replies to; null for a top-level comment',
                 'depth': '1 for a reply', 'parent_shown': 'false when the reply\'s parent is on another page',
-                'author_blog_id': 'the commenter\'s blog: about <id> is the next hop to a person',
+                'author': '{name, id, url, blog_name}: the commenter and their blog; unknown values are null',
                 'labels': 'deleted (text emptied), blinded (hidden by Naver), secret, best, status=<raw>',
                 'reply_count': 'replies Naver counts under it'},
     'blog': {'__doc__': 'A blog\'s card (blog), a blog search result, or a blogs-of-the-month profile.',
@@ -468,6 +471,7 @@ NOTES = {
     'topic': {'__doc__': 'A topic of the directory.', 'url': 'null: a topic is opened by its seq',
               'created_at': 'null', 'seq': 'what topic takes'},
     'clip': {'__doc__': 'A clip (short video) from search --type clips.', 'url': 'the clip\'s page',
+             'author': '{name, id, url, blog_name}: the author and their blog; unknown values are null',
              'play_seconds': 'its length in seconds', 'title': 'the clip\'s own title'},
     'keyword': {'__doc__': 'A keyword from keywords: Naver\'s popular blog searches of a day, or the searches related '
                            'to one keyword.', 'url': 'null', 'created_at': 'null',

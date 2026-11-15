@@ -45,6 +45,7 @@ def post_page(instructions, post_id, continuing=False):
         if record is None:
             unreadable += 1
             continue
+        record['promoted'] = entry.promoted
         if record.get('id') == post_id and not conversation:
             if record.get('unavailable'):
                 raise SnsError('unavailable', 'This post is unavailable: deleted, withheld or not visible to this account.',

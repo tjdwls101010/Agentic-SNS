@@ -13,7 +13,7 @@ POST = {
         'created_at': 'string|null — when the post was written (UTC ISO); a reposted post carries the original\'s time, '
                       'not when it was reposted; null when Threads sent no time (undated)',
         'text': 'string — the whole text Threads sent',
-        'author': 'object|null — the author as an account record (see schema account)',
+        'author': 'object — {name, id, url} plus account fields (see schema account); unknown values are null',
         'like_count': 'integer|null — null when the author hides counts or Threads sent none',
         'reply_count': 'integer|null — direct replies Threads reports',
         'repost_count, quote_count': 'integer|null — as Threads reports them',

@@ -20,28 +20,28 @@ def _media(record):
 
 
 def post(record, index, chars):
-    labels = [_line(record.get('author_name') or 'unavailable')]
-    if record.get('created_at') or not record.get('sponsored'):
+    labels = [_line((record.get('author') or {}).get('name') or 'unavailable')]
+    if record.get('created_at') or not record.get('promoted'):
         labels.append(_time(record.get('created_at')))
-    labels += [flag for flag in ('sponsored', 'pinned', 'incomplete') if record.get(flag)]
+    labels += [flag for flag in ('pinned', 'incomplete') if record.get(flag)]
     if record.get('text_truncated'):
         labels.append('text cut by Facebook')
     labels += [record.get('type', 'unknown'), f'reactions={_count(record.get("reaction_count"))} '
                                               f'comments={_count(record.get("comment_count"))} '
                                               f'shares={_count(record.get("share_count"))}']
-    lines = [f'[p{index}] ' + ' · '.join(labels), '     ' + _shown(record.get('text'), chars)]
+    lines = [('[ad] ' if record.get('promoted') else '') + f'[p{index}] ' + ' · '.join(labels), '     ' + _shown(record.get('text'), chars)]
     shared, depth, seen = record.get('shared_post'), 1, {id(record)}
     while shared is not None and id(shared) not in seen:
         seen.add(id(shared))
         label = 'shared-from' if depth == 1 else f'shared-from[{depth}]'
         state = ' · incomplete' if shared.get('incomplete') else ''
-        lines.append(f'     {label}: {_line(shared.get("author_name") or "unavailable")} · '
+        lines.append(f'     {label}: {_line((shared.get("author") or {}).get("name") or "unavailable")} · '
                      f'{_time(shared.get("created_at"))}{state} · url: {_handle(shared.get("url"))} · '
-                     f'author: {_handle(shared.get("author_url"))} · {_shown(shared.get("text"), chars)}')
+                     f'author: {_handle((shared.get("author") or {}).get("url"))} · {_shown(shared.get("text"), chars)}')
         shared, depth = shared.get('shared_post'), depth + 1
     if record.get('media'):
         lines.append('     media: ' + _media(record))
-    lines.append(f'     url: {_handle(record.get("url"))}   author: {_handle(record.get("author_url"))}')
+    lines.append(f'     url: {_handle(record.get("url"))}   author: {_handle((record.get("author") or {}).get("url"))}')
     return '\n'.join(lines)
 
 
@@ -51,11 +51,11 @@ def comment(record, index, parent_label, chars):
     parent = f' reply-to={parent_label}' if depth and parent_label else ''
     kinds = ','.join(_line(a.get('kind')) for a in record.get('attachments') or [])
     tail = f'   replies {record["replies_handle"]}' if record.get('replies_handle') else ''
-    return (f'{indent}[c{index}{parent}] {_line(record.get("author_name") or "unavailable")} · '
+    return (f'{indent}[c{index}{parent}] {_line((record.get("author") or {}).get("name") or "unavailable")} · '
             f'{_time(record.get("created_at"))} · reactions={_count(record.get("reaction_count"))} '
             f'replies={_count(record.get("reply_count"))}\n'
             f'{indent}     {_shown(record.get("text"), chars)}' + (f' · attachment={kinds}' if kinds else '') + '\n'
-            f'{indent}     author: {_handle(record.get("author_url"))}{tail}')
+            f'{indent}     author: {_handle((record.get("author") or {}).get("url"))}{tail}')
 
 
 def group_card(record, index):

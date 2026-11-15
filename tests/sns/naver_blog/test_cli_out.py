@@ -27,6 +27,7 @@ def test_search_collects_resumes_and_then_reads_nothing(naver, tmp_path):
     assert rows[0]['context']['command'] == 'search' and rows[0]['viewer'] == 'viewer_blog'
     records = [r for r in rows if r.get('kind') not in ('page', 'header')]
     assert len(records) == 60 and records[0]['kind'] == 'post' and records[0]['id'].startswith('post:')
+    assert records[0]['author'] == {'name': '닉1', 'id': 'blog_a1', 'url': 'https://blog.naver.com/blog_a1', 'blog_name': '블로그1'}
     assert (out.stat().st_mode & 0o777) == 0o600
     naver.logged_in()
     code, again, _ = naver.run('naver-blog', 'search', '카페', '--out', str(out), '--limit', '45')

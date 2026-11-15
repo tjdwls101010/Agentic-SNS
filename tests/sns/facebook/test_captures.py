@@ -38,7 +38,7 @@ def test_real_feed_pages_read_without_unexpected_issues(path):
     assert isinstance(page.page_info, dict) and page.page_info.get('has_next_page') is True
     for record in page.records:
         assert all(key in record for key in HEAD)
-        assert record['id'] and record['author_name'] and record['author_url'] and record['created_at']
+        assert record['id'] and record['author']['name'] and record['author']['url'] and record['created_at']
         assert record['type'] != 'unknown' and record['incomplete'] is False
         for number, item in enumerate(record['media'], 1):
             assert item['n'] == number and item['kind'] in ('photo', 'video') and (item['image_url'] or item['video_url'])
@@ -50,10 +50,10 @@ def test_real_feed_pages_read_without_unexpected_issues(path):
 def test_real_permalink_and_comment_pages():
     responses = observed('r3_thread')
     record, issues = web.permalink_post(decode(responses[0]['body']), captured_at=NOW)
-    assert record and record['text'] and record['author_url'] and record['created_at'] and issues == []
+    assert record and record['text'] and record['author']['url'] and record['created_at'] and issues == []
     page = web.comments_page(decode(responses[1]['body']), post_id=record['id'], captured_at=NOW)
     assert page.records and page.issues == [] and isinstance(page.page_info, dict)
-    assert all(r['kind'] == 'comment' and r['depth'] == 0 and r['author_url'] and r['created_at'] for r in page.records)
+    assert all(r['kind'] == 'comment' and r['depth'] == 0 and r['author']['url'] and r['created_at'] for r in page.records)
 
 
 @pytest.mark.skipif(observed('r3b_replies') is None, reason='no local reply captures')

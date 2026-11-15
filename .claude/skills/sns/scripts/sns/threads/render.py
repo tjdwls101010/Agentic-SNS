@@ -9,7 +9,7 @@ def _handle(value):
 
 
 def _who(account):
-    if not account:
+    if not account or not any(account.get(key) for key in ('name', 'id', 'url', 'username', 'full_name')):
         return 'unavailable'
     parts = ['@' + _line(account.get('username') or '?')]
     if account.get('full_name'):

@@ -87,13 +87,13 @@ def test_a_repost_row_is_the_reposters_act_with_the_original_underneath(browser)
     assert 'RT @' not in out
 
 
-def test_ads_are_left_out_and_counted(browser):
+def test_ads_are_included_and_counted(browser):
     ad = {'entryId': 'promoted-tweet-1850000000000000090-1', 'content': {'itemContent': {'itemType': 'TimelineTweet',
           'tweet_results': {'result': post('1850000000000000090')}}}}
     known_tab(browser).respond('x.query', query_result(home([entry(post('1850000000000000001'))], extra=[ad]),
                                                                headers=RATE))
     code, out, _ = feed(browser)
-    assert code == 0 and 'coverage: 1 promoted entries (ads) left out' in out
+    assert code == 0 and '2 shown (1 ads)' in out and '[ad] [p2]' in out and 'ads) left out' not in out
 
 
 def test_json_envelope(browser):

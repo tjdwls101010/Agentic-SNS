@@ -48,7 +48,7 @@ def surface(connection, state, out, *, fetch, order, command, target, identity, 
     return result
 
 
-def flags(identity, keys=('feed', 'tab', 'sort')):
+def flags(identity, keys=('tab', 'sort')):
     """The option words that rerun a command with this identity."""
     words = []
     for key in keys:

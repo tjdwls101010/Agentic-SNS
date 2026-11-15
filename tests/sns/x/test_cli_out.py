@@ -33,6 +33,9 @@ def test_out_commits_whole_pages_and_resumes_where_it_stopped(browser, tmp_path)
     assert text.startswith('x feed · 3 saved to') and 'stopped=time_limit' in text and 'resume: ' in text
     kinds = [r.get('kind') for r in lines(out)]
     assert kinds[:3] == ['header', 'post', 'post'] and kinds.count('post') == 3 and kinds[-1] == 'page'
+    first = next(r for r in lines(out) if r.get('kind') == 'post')
+    assert first['promoted'] is False and {k: first['author'][k] for k in ('name', 'id', 'url')} == {
+        'name': 'A', 'id': '1000000001', 'url': 'https://x.com/author_a'}
     resume = 'resume: ' + text.split('resume: ')[1].split(' · ')[0]
     browser.respond('x.state', state()).respond('x.query', page(['3', '4'], None))
     code, text, _ = rerun(browser, resume)

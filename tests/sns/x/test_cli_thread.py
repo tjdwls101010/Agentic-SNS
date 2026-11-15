@@ -57,6 +57,15 @@ def post(browser, *args, env=None):
     return run(browser, 'post', *args, env=env)
 
 
+def test_promoted_reply_in_a_thread_is_marked(browser):
+    promoted = module('102', tweet('102', B, '101'))
+    promoted['content']['items'][0]['item']['itemContent']['promotedMetadata'] = {'advertiser_results': {}}
+    known_tab(browser).respond('x.query', query_result(detail([single(tweet('101')), promoted]), headers=RATE))
+    code, out, _ = post(browser, '101')
+    assert code == 0 and '2 shown (1 ads)' in out.splitlines()[0]
+    assert '[ad] [r1] @replier_b' in out
+
+
 def test_the_post_in_full_its_parent_and_its_first_replies_with_handles(browser):
     known_tab(browser).respond('x.query', query_result(FIRST, headers=RATE))
     code, out, err = post(browser, 'https://x.com/author_a/status/101')

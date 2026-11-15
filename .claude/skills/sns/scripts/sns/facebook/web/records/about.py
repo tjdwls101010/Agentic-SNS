@@ -11,7 +11,7 @@ FIELDS = {
     'kind': 'string — about',
     'id': 'string — <profile_id>:<section>:<n>, the field\'s place among its section\'s fields in this reading',
     'created_at': 'null — an About field has no creation time',
-    'profile_id': 'string — numeric id of the profile or page; matches a post record\'s author_id',
+    'profile_id': 'string — numeric id of the profile or page; matches a post record\'s author.id',
     'section': 'string — locale-independent section such as directory_work; what --section takes',
     'collection': 'string | null — the About tab it was read from, in the viewer\'s language; null for the overview',
     'field_type': 'string | null — Facebook\'s own type of the field, when sent',

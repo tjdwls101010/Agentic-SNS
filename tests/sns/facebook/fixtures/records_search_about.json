@@ -348,7 +348,7 @@
           {
             "id": "SF1",
             "text": "a post in search",
-            "author_name": "Post Author",
+            "author": {"name": "Post Author", "id": "800", "url": "https://www.facebook.com/post.author"},
             "source": "search"
           }
         ],
