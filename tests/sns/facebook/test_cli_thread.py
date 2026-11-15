@@ -143,3 +143,30 @@ def test_another_platforms_link_names_its_command(browser):
     code, out, _ = run(browser, 'post', 'https://x.com/jack/status/20')
     result = json.loads(out)
     assert code == 2 and 'x post' in result['fix'] and browser.calls() == []
+
+
+def test_post_and_comments_show_reaction_kinds(browser):
+    root = json.loads(post_body())['data']['node_v2']
+    root['feedback'].update({'reaction_count': {'count': 9}, 'top_reactions': {'edges': [
+        {'node': {'id': '1635855486666999', 'localized_name': '좋아요'}, 'reaction_count': 5},
+        {'node': {'id': '1678524932434102', 'localized_name': '최고예요'}, 'reaction_count': 3},
+        {'node': {'id': 'synthetic-unknown', 'localized_name': '새 반응'}, 'reaction_count': 1},
+    ]}})
+    child = comment('C1', replies=0)
+    child['feedback']['top_reactions'] = {'edges': [{'node': {'id': '115940658764963'}, 'reaction_count': 2}]}
+    known_tab(browser)
+    browser.respond('facebook.page', page_result(URL, '<script>{"storyID":"UzpfSTE6Mg=="}</script>'))
+    browser.respond('facebook.query', query_result(json.dumps({'data': {'node_v2': root}})), name='CometSinglePostDialogContentQuery')
+    browser.respond('facebook.query', query_result(comments_body([child, comment('C2', replies=0)], False)), name='CommentListComponentsRootQuery')
+    code, out, _ = run(browser, 'post', URL, '--json')
+    assert code == 0, out
+    post, first, second = json.loads(out)['results']
+    assert post['reaction_count'] == 9
+    assert list(post['reactions'].items()) == [('like', 5), ('love', 3), ('새 반응', 1)]
+    assert first['reactions'] == {'haha': 2}
+    assert second['reactions'] is None
+
+
+def test_post_schema_describes_reaction_kinds(browser):
+    code, out, _ = run(browser, 'schema', 'post')
+    assert code == 0 and 'reactions' in out and 'localized_name' in out

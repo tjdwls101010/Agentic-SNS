@@ -1,5 +1,6 @@
 """Post records: every field decided here and described once in FIELDS."""
 from sns.facebook.web.records.moment import iso, timestamp
+from sns.facebook.web.records.reactions import read as read_reactions
 from sns.facebook.web.records.parse import (SHARE_EXCLUDE, Stories, find_attached_story, is_comment, is_story,
                                             iter_story_dicts)
 
@@ -32,6 +33,7 @@ FIELDS = {
     'links[].title': 'string | null — the link preview\'s title',
     'links[].description': 'string | null — the link preview\'s description',
     'reaction_count': 'integer | null — reactions; null when not sent',
+    'reactions': 'object | null — counts by reaction kind in Facebook order; known ids use English names, unknown ids use localized_name when sent or id:<id>; null when not sent',
     'comment_count': 'integer | null — comments; null when not sent',
     'share_count': 'integer | null — shares; null when not sent',
     'shared_post': 'object | null — the post this one shares, itself a post record (its author is the original '
@@ -206,6 +208,7 @@ def build(story, *, source, captured_at):
         'media': media,
         'links': links,
         'reaction_count': _count(story, 'reaction_count'),
+        'reactions': read_reactions(story.get('feedback')),
         'comment_count': _comment_count(story),
         'share_count': _count(story, 'share_count'),
         'shared_post': shared,

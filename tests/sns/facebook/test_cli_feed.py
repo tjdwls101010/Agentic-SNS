@@ -157,3 +157,35 @@ def test_the_time_limit_after_records_is_a_stop_that_more_resumes(browser):
     look(browser)
     code, out, _ = rerun(browser, 'more: ' + result['next'], env={'SNS_DEADLINE_SECONDS': '8'})
     assert code == 0 and json.loads(out)['results'][0]['id'] == f'P{len(result["results"])}'
+
+
+def test_feed_reaction_kinds_without_localized_names(browser):
+    item = story('A')
+    item['feedback'].update({'reaction_count': {'count': 13}, 'top_reactions': {'edges': [
+        {'node': {'id': '613557422527858'}, 'reaction_count': 4},
+        {'node': {'id': '478547315650144'}, 'reaction_count': 3},
+        {'node': {'id': '908563459236466'}, 'reaction_count': 2},
+        {'node': {'id': '444813342392137'}, 'reaction_count': 1},
+        {'node': {'id': 'synthetic-unknown'}, 'reaction_count': 3},
+    ]}})
+    known_tab(browser)
+    browser.respond('facebook.query', page([item, story('B')], has_next=False))
+    code, out, _ = run(browser, 'feed', '--json')
+    assert code == 0, out
+    first, second = json.loads(out)['results']
+    assert first['reaction_count'] == 13
+    assert list(first['reactions'].items()) == [('care', 4), ('wow', 3), ('sad', 2), ('angry', 1), ('id:synthetic-unknown', 3)]
+    assert second['reactions'] is None
+
+
+def test_feed_text_shows_reaction_kinds_beside_the_total(browser):
+    item = story('A')
+    item['feedback'].update({'reaction_count': {'count': 7}, 'top_reactions': {'edges': [
+        {'node': {'id': '1635855486666999'}, 'reaction_count': 5},
+        {'node': {'id': '1678524932434102'}, 'reaction_count': 2},
+    ]}})
+    known_tab(browser)
+    browser.respond('facebook.query', page([item], has_next=False))
+    code, out, _ = run(browser, 'feed')
+    assert code == 0, out
+    assert 'reactions=7 (like=5, love=2) comments=? shares=?' in out
