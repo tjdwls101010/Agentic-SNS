@@ -310,7 +310,7 @@ def _x_surface(platform):
         'list': {
             'help': 'Read an X list: its posts, its members or its card.',
             'run': _run(platform.listing_lists),
-            'arguments': [(('target',), {'metavar': 'URL', 'help': 'x.com/i/lists/<id> URL or the numeric list id'}),
+            'arguments': [(('target',), {'help': 'x.com/i/lists/<id> URL or the numeric list id'}),
                           (('--tab',), {'choices': LIST_TABS, 'default': 'posts', 'help': 'posts (from its members), members, or about (the card)'}),
                           *LIST],
             'epilog': ['A list is a set of accounts someone curated; its posts are its members\' posts in X\'s order, so they are not the members\' whole output and no window closes on them. about is one record: name, owner, members, followers, private or public.',
@@ -323,7 +323,7 @@ def _x_surface(platform):
         'community': {
             'help': 'Read a community\'s posts, media or card, or without a target the communities X suggests.',
             'run': _run(platform.listing_community),
-            'arguments': [(('target',), {'nargs': '?', 'metavar': 'URL', 'help': 'x.com/i/communities/<id> URL or the numeric id; omitted: the communities X suggests to this account'}),
+            'arguments': [(('target',), {'nargs': '?', 'help': 'x.com/i/communities/<id> URL or the numeric id; omitted: the communities X suggests to this account'}),
                           (('--tab',), {'choices': COMMUNITY_TABS, 'help': 'posts (default), media, or about (the card); with a target only'}),
                           (('--sort',), {'choices': COMMUNITY_SORTS, 'help': 'posts: top (default, X\'s ranking) or recent'}),
                           *LIST],
@@ -337,7 +337,7 @@ def _x_surface(platform):
         'post': {
             'help': 'Read one post in full with its parent chain and first batch of replies, or several posts by id.',
             'run': _run(platform.thread_post),
-            'arguments': [(('target',), {'nargs': '+', 'metavar': 'URL', 'help': 'x.com post URL or numeric id; several: those posts only, without replies'}),
+            'arguments': [(('target',), {'nargs': '+', 'help': 'x.com post URL or numeric id; several: those posts only, without replies'}),
                           (('--sort',), {'choices': REPLY_SORTS, 'default': 'top', 'help': 'Reply order: top (X\'s ranking) or recent (newest first)'}),
                           (('--limit',), {'type': _positive, 'help': 'Reply threads to show from the first batch (each reply with what hangs under it)'}),
                           (('--chars',), {'type': _chars, 'help': 'Characters of each parent and reply to show (default 180; 0 = all); the post itself is always shown in full; --json keeps all'}),
@@ -353,7 +353,7 @@ def _x_surface(platform):
         'replies': {
             'help': 'Read the next batch of a post\'s replies, the replies X hid, or the replies under one reply, by handle.',
             'run': _run(platform.thread_replies),
-            'arguments': [(('target',), {'metavar': 'HANDLE', 'help': 'The number after "replies" or in a more: line'}),
+            'arguments': [(('target',), {'help': 'The number after "replies" or in a more: line'}),
                           (('--limit',), {'type': _positive, 'help': 'Replies to show; omitted: one batch, or every batch with --out. With --out it counts replies saved'}),
                           'chars', 'out', 'json'],
             'epilog': ['A handle names a batch: the next batch of a post\'s direct replies, the replies X hid, or every reply one reply\'s own page lists (batch by batch). Running it again reads the same batch again, live; it is not a replay. more: prints the handle of the batch after.',
@@ -364,7 +364,7 @@ def _x_surface(platform):
         'reposts': {
             'help': 'Read the accounts that reposted one post.',
             'run': _run(platform.listing_reposts),
-            'arguments': [(('target',), {'metavar': 'URL', 'help': 'x.com post URL or numeric id'}), *LIST],
+            'arguments': [(('target',), {'help': 'x.com post URL or numeric id'}), *LIST],
             'epilog': ['A repost is an account sharing the post as it is, which records the act, not agreement; quotes (the posts that add words) are read with quotes. The list is what X serves, page by page; three pages in a row with no new account end the read.',
                        'Without --limit or --out it reads one page; more: continues.',
                        'requests: 1 per page of about 20 accounts.'],
@@ -373,7 +373,7 @@ def _x_surface(platform):
         'quotes': {
             'help': 'Read the posts that quote one post.',
             'run': _run(platform.search_quotes),
-            'arguments': [(('target',), {'metavar': 'URL', 'help': 'x.com post URL or numeric id'}),
+            'arguments': [(('target',), {'help': 'x.com post URL or numeric id'}),
                           (('--sort',), {'choices': REPLY_SORTS, 'default': 'top', 'help': 'top (X\'s ranking) or recent'}),
                           *LIST],
             'epilog': ['Each quote is its own post with two voices: the quoter\'s words, and the quoted post shown under it with its own author. Asked the way X\'s own quotes screen asks (a search for the post\'s id and its media links), so it shares search\'s limit (about 50 per 15 minutes).',
@@ -384,13 +384,15 @@ def _x_surface(platform):
         'search': {
             'help': 'Search posts, accounts or media, with X\'s search operators.',
             'run': _run(platform.search_search),
-            'arguments': [(('target',), {'metavar': 'QUERY', 'help': 'What to search for, as typed into X: words, "phrases", OR, -exclusions and operators (from: to: since:YYYY-MM-DD until:YYYY-MM-DD min_faves: filter:links lang: …)'}),
+            'arguments': [(('target',), {'help': 'What to search for, as typed into X: words, "phrases", OR, -exclusions and operators (from: to: since:YYYY-MM-DD until:YYYY-MM-DD min_faves: filter:links lang: …)'}),
                           (('--type',), {'choices': SEARCH_TYPES, 'default': 'posts', 'help': 'posts, accounts (people) or media'}),
                           (('--sort',), {'choices': SEARCH_SORTS, 'default': 'top', 'help': 'Posts and media: top (X\'s ranking) or latest (newest first)'}),
                           (('--in',), {'choices': ['communities'], 'dest': 'within', 'help': 'communities: search posts in communities only (X\'s community search; posts, in X\'s order)'}),
+                          (('--since',), {'type': day, 'metavar': 'DAY', 'help': 'First day to include, YYYY-MM-DD, in X\'s own days (this account\'s time zone)'}),
+                          (('--until',), {'type': day, 'metavar': 'DAY', 'help': 'Last day to include, YYYY-MM-DD, in X\'s own days (this account\'s time zone)'}),
                           *LIST],
             'epilog': ['Results are in X\'s order for this account: top is a ranking, not a sample of opinion; latest is newest first. Accounts with the same or similar names are different results (compare url and their marks).',
-                       'since: and until: in the query are filters X applies itself, so such a search read to the end (stopped=exhausted) covers its window: window ... closed (server-filtered); stopped by --limit, the time limit or X\'s limit it is still open. X decides which day boundaries those operators use (measured once: until:D ran to the end of D in this account\'s time zone), so check created_at at the edges.',
+                       '--since/--until are sent as X\'s since:/until: operators (a query that already has a date operator refuses them, exit 2). Either way the dates are filters X applies itself, so such a search read to the end (stopped=exhausted) covers its window: window ... closed (server-filtered); stopped by --limit, the time limit or X\'s limit it is still open. X decides which day boundaries those operators use (measured once: until:D ran to the end of D in this account\'s time zone), so check created_at at the edges.',
                        'X allows about 50 searches per 15 minutes for this account (quotes count too): a wide search costs that limit, and when it runs out the command stops with exit 10 (before any result) or stopped=rate_limited and a more: line (after some), naming when it resets.',
                        'Without --limit or --out it reads one page; more: continues.',
                        'requests: 1 per page of about 20.'],
@@ -411,7 +413,7 @@ def _x_surface(platform):
         'images': {
             'help': 'Save the pictures of one post (a video by its poster) so they can be looked at.',
             'run': _run(platform.images_images),
-            'arguments': [(('target',), {'metavar': 'URL', 'help': 'x.com post URL or numeric id'}),
+            'arguments': [(('target',), {'help': 'x.com post URL or numeric id'}),
                           (('numbers',), {'nargs': '*', 'type': _positive, 'metavar': 'N',
                                           'help': 'The pictures to save, by the numbers the post shows ([image N])'}),
                           (('--all',), {'action': 'store_true', 'help': 'Save every picture of the post'}), 'json'],
@@ -594,7 +596,7 @@ def _threads_surface(platform):
         'search': {
             'help': 'Search posts, tags or accounts.',
             'run': _run(platform.search_search),
-            'arguments': [(('target',), {'metavar': 'TEXT', 'help': 'What to search for (a tag without #)'}),
+            'arguments': [(('target',), {'help': 'What to search for (a tag without #)'}),
                           (('--type',), {'choices': SEARCH_TYPES, 'default': 'posts',
                                          'help': 'posts (by words), tags (posts under a tag) or accounts (one batch of profiles)'}),
                           (('--sort',), {'choices': SEARCH_SORTS, 'default': 'top',
@@ -612,7 +614,7 @@ def _threads_surface(platform):
         'post': {
             'help': 'Read one post in full with its parent chain and first batch of replies.',
             'run': _run(platform.thread_post),
-            'arguments': [(('target',), {'metavar': 'URL', 'help': 'Threads post URL (/@name/post/<code> or /t/<code>) or its shortcode'}),
+            'arguments': [(('target',), {'help': 'Threads post URL (/@name/post/<code> or /t/<code>) or its shortcode'}),
                           (('--sort',), {'choices': REPLY_SORTS, 'default': 'top', 'help': 'Reply order: top (Threads ranks them) or recent (newest first)'}),
                           (('--limit',), {'type': _positive, 'help': 'Direct replies to show from the first batch (each with what hangs under it)'}),
                           (('--chars',), {'type': _chars, 'help': 'Characters of each parent and reply to show (default 180; 0 = all); the post itself is always shown in full'}),
@@ -625,7 +627,7 @@ def _threads_surface(platform):
         'replies': {
             'help': 'Read the next batch of a post\'s replies, or the replies under one reply, by the handle post printed.',
             'run': _run(platform.thread_replies),
-            'arguments': [(('target',), {'metavar': 'HANDLE', 'help': 'The number after "replies" (a branch) or in a more: line (the next batch)'}),
+            'arguments': [(('target',), {'help': 'The number after "replies" (a branch) or in a more: line (the next batch)'}),
                           (('--limit',), {'type': _positive, 'help': 'Replies to show; omitted: one batch, or every batch with --out. With --out it counts replies saved'}),
                           'chars', 'out', 'json'],
             'epilog': ['A handle names a batch: the next batch of a post\'s direct replies, or the replies under one reply (every reply that reply\'s own page lists, batch by batch, each with what hangs under it). Running it again reads the same batch again, live; it is not a replay. more: prints the handle of the batch after.',
@@ -652,7 +654,7 @@ def _threads_surface(platform):
         'images': {
             'help': 'Save the pictures of one post (a video by its poster) so they can be looked at.',
             'run': _run(platform.images_images),
-            'arguments': [(('target',), {'metavar': 'URL', 'help': 'threads.com (or threads.net) post URL'}),
+            'arguments': [(('target',), {'help': 'threads.com (or threads.net) post URL'}),
                           (('numbers',), {'nargs': '*', 'type': _positive, 'metavar': 'N',
                                           'help': 'The pictures to save, by the numbers the post shows ([image N])'}),
                           (('--all',), {'action': 'store_true', 'help': 'Save every picture of the post'}), 'json'],
@@ -825,7 +827,7 @@ def _reddit_surface(platform):
         'related': {
             'help': 'Read the other discussions of the same link (crossposts and duplicates).',
             'run': _command(platform.listing_related),
-            'arguments': [(('target',), {'metavar': 'URL', 'help': 'A post URL or id (a comment link reads its post)'}),
+            'arguments': [(('target',), {'help': 'A post URL or id (a comment link reads its post)'}),
                           *LIST],
             'epilog': ['Each other post of the same link, in other communities or the same one: one link\'s discussion is '
                        'often split across communities that react differently. Exit 7 when there is none.', PAGE, ACCOUNT],
@@ -848,7 +850,7 @@ def _reddit_surface(platform):
         'post': {
             'help': 'Read one post in full and the first batch of its comments.',
             'run': _command(platform.thread_post),
-            'arguments': [(('target',), {'metavar': 'URL', 'help': 'A post URL, id or redd.it link; a comment link opens the '
+            'arguments': [(('target',), {'help': 'A post URL, id or redd.it link; a comment link opens the '
                                                                    'post at that comment; a share link (/r/<sub>/s/...) '
                                                                    'is resolved first'}),
                           (('--sort',), {'choices': platform.web_COMMENT_SORTS, 'help': 'Comment order: best (default), top, new, '
@@ -876,7 +878,7 @@ def _reddit_surface(platform):
         'comments': {
             'help': 'Read the next batch of a thread, or one comment in full with what hangs under it.',
             'run': _command(platform.thread_comments),
-            'arguments': [(('target',), {'metavar': 'URL', 'help': 'A post URL (its next batch), or a comment\'s permalink '
+            'arguments': [(('target',), {'help': 'A post URL (its next batch), or a comment\'s permalink '
                                                                    '(that comment, always, with its ancestors as context '
                                                                    'and what hangs under it)'}),
                           (('--sort',), {'choices': platform.web_COMMENT_SORTS, 'help': 'Comment order (default best); a reading '
@@ -905,7 +907,7 @@ def _reddit_surface(platform):
         'images': {
             'help': 'Save the pictures of one post (a gallery, an image post, a video\'s preview) so they can be looked at.',
             'run': _command(platform.images_images),
-            'arguments': [(('target',), {'metavar': 'URL', 'help': 'A post URL, id or redd.it link (a comment link or a '
+            'arguments': [(('target',), {'help': 'A post URL, id or redd.it link (a comment link or a '
                                                                    'share link opens its post)'}),
                           (('numbers',), {'nargs': '*', 'type': positive, 'metavar': 'N',
                                           'help': 'The pictures to save, by the numbers the post shows (media N:)'}),
@@ -1018,7 +1020,7 @@ def _facebook_surface(platform):
         'post': {
             'help': 'Read one post in full with its first parent comments.',
             'run': _run(platform.thread_post),
-            'arguments': [(('target',), {'metavar': 'URL', 'help': 'Facebook post permalink (posts/, permalink.php, story.php, photo, videos/, groups/…/posts/)'}),
+            'arguments': [(('target',), {'help': 'Facebook post permalink (posts/, permalink.php, story.php, photo, videos/, groups/…/posts/)'}),
                           (('--sort',), {'choices': COMMENT_SORTS, 'default': 'all', 'help': 'Comment order: all (ranked, nothing filtered out), relevant (Facebook\'s "most relevant", which can leave comments out), newest'}),
                           (('--limit',), {'type': _positive, 'help': 'Parent comments to show from the first batch'}),
                           (('--chars',), {'type': _chars, 'help': 'Characters of each comment to show (default 180; 0 = all); the post text is always shown in full; --json keeps all'}),
@@ -1030,7 +1032,7 @@ def _facebook_surface(platform):
         'comments': {
             'help': 'Read a post\'s parent comments, page by page.',
             'run': _run(platform.thread_comments),
-            'arguments': [(('target',), {'metavar': 'URL', 'help': 'Facebook post permalink'}),
+            'arguments': [(('target',), {'help': 'Facebook post permalink'}),
                           (('--sort',), {'choices': COMMENT_SORTS, 'default': 'all', 'help': 'all (ranked, nothing filtered out), relevant (can leave comments out), newest'}),
                           (('--limit',), {'type': _positive, 'help': 'Parent comments to show; omitted: one page (about 10), or every page with --out. With --out it counts parents saved'}),
                           *[option for option in LIST if option != 'limit']],
@@ -1042,7 +1044,7 @@ def _facebook_surface(platform):
         'replies': {
             'help': 'Read one batch of replies under a comment, by the handle post or comments printed.',
             'run': _run(platform.thread_replies),
-            'arguments': [(('target',), {'metavar': 'HANDLE', 'help': 'The number after "replies" on a comment or reply'}),
+            'arguments': [(('target',), {'help': 'The number after "replies" on a comment or reply'}),
                           (('--limit',), {'type': _positive, 'help': 'Replies to show; omitted: one batch (about 10), or every batch with --out. With --out it counts replies saved'}),
                           'chars', 'out', 'json'],
             'epilog': ['A handle names a batch: the first batch of a comment\'s replies, or the batch after one already shown (more: prints that one). It is not used up: running it again reads the same batch again, live.',
@@ -1055,7 +1057,7 @@ def _facebook_surface(platform):
         'search': {
             'help': 'Search posts, people, pages or groups.',
             'run': _run(platform.search_search),
-            'arguments': [(('target',), {'metavar': 'TEXT', 'help': 'What to search for'}),
+            'arguments': [(('target',), {'help': 'What to search for'}),
                           (('--type',), {'choices': SEARCH_TYPES, 'default': 'top', 'help': 'top mixes posts with people, pages and groups in Facebook\'s order'}),
                           (('--recent',), {'action': 'store_true', 'help': 'Posts only (top, posts): Facebook\'s "recent posts" filter'}),
                           'since', 'until',
@@ -1200,7 +1202,7 @@ def _naver_blog_surface(platform):
         'post': {
             'help': 'Read one post in full: body, pictures, links, tags, reactions, same-category posts.',
             'run': _command(platform.post_post),
-            'arguments': [(('target',), {'metavar': 'POST', 'help': 'Post URL (blog.naver.com or m.blog.naver.com), '
+            'arguments': [(('target',), {'help': 'Post URL (blog.naver.com or m.blog.naver.com), '
                                                                     'blogId/logNo, or a naver.me link to a post'}),
                           (('--comments',), {'action': 'store_true', 'help': 'Also read the first page of comments (10 '
                                                                              'comments with their replies; one request)'}),
@@ -1228,7 +1230,7 @@ def _naver_blog_surface(platform):
         'comments': {
             'help': 'Read a post\'s comments and replies, newest first, replies under their parent.',
             'run': _command(platform.post_comments),
-            'arguments': [(('target',), {'metavar': 'POST', 'help': 'Post URL, blogId/logNo, or a naver.me link'}),
+            'arguments': [(('target',), {'help': 'Post URL, blogId/logNo, or a naver.me link'}),
                           'limit', 'chars', 'after', 'out', 'json'],
             'epilog': ['Comments come newest first; each comment\'s replies follow it, oldest first, indented '
                        '(reply-to=#n). A reply whose parent is on another page says (parent not shown). blog: <id> on a '
@@ -1243,7 +1245,7 @@ def _naver_blog_surface(platform):
         'images': {
             'help': 'Save a post\'s pictures by their numbers so they can be looked at (Read the printed path).',
             'run': _command(platform.images_images),
-            'arguments': [(('target',), {'metavar': 'POST', 'help': 'Post URL, blogId/logNo, or a naver.me link'}),
+            'arguments': [(('target',), {'help': 'Post URL, blogId/logNo, or a naver.me link'}),
                           (('numbers',), {'nargs': '*', 'type': positive, 'metavar': 'N', 'help': 'Picture numbers as '
                                                                                               'post shows them ([image N])'}),
                           (('--all',), {'action': 'store_true', 'help': 'Every picture of the post (stickers, cards and '
@@ -1261,7 +1263,7 @@ def _naver_blog_surface(platform):
         'resolve': {
             'help': 'Show where naver.me short links lead, without following them.',
             'run': _command(platform.post_resolve),
-            'arguments': [(('target',), {'nargs': '+', 'metavar': 'LINK', 'help': 'naver.me/<code> links (as post\'s '
+            'arguments': [(('target',), {'nargs': '+', 'help': 'naver.me/<code> links (as post\'s '
                                                                                    'links: block prints them)'}),
                           'json'],
             'epilog': ['Each link is read once and its redirect reported, never followed: the destination with its host '
@@ -1275,7 +1277,7 @@ def _naver_blog_surface(platform):
         'about': {
             'help': 'Read a blog\'s card, post and clip counts, category tree, notices and popular posts.',
             'run': _command(platform.blog_blog),
-            'arguments': [(('target',), {'metavar': 'BLOG', 'help': 'Blog id, blog URL (a post URL names its blog), or a '
+            'arguments': [(('target',), {'help': 'Blog id, blog URL (a post URL names its blog), or a '
                                                                     'naver.me link'}),
                           (('--brief',), {'action': 'store_true', 'help': 'Card, counts and categories only (3 requests)'}),
                           'chars', 'json'],
@@ -1292,7 +1294,7 @@ def _naver_blog_surface(platform):
         'profile': {
             'help': 'List one blog\'s posts newest first: all, one category, its notices or its popular posts.',
             'run': _command(platform.blog_posts), 'check': platform.blog_check,
-            'arguments': [(('target',), {'metavar': 'BLOG', 'help': 'Blog id, blog URL (a PostList URL\'s categoryNo counts '
+            'arguments': [(('target',), {'help': 'Blog id, blog URL (a PostList URL\'s categoryNo counts '
                                                                     'as --category), or a naver.me link'}),
                           (('--category',), {'metavar': 'N|NAME', 'help': 'A category number (free) or name (one request: '
                                                                           'exact match first, then part of a name)'}),
@@ -1322,7 +1324,7 @@ def _naver_blog_surface(platform):
         'graph': {
             'help': 'Read the logged-in account\'s neighbor list, or a blog\'s public one.',
             'run': _command(platform.neighbors_buddies), 'check': platform.neighbors_check,
-            'arguments': [(('target',), {'nargs': '?', 'metavar': 'BLOG', 'help': 'A blog id or URL for its public neighbor '
+            'arguments': [(('target',), {'nargs': '?', 'help': 'A blog id or URL for its public neighbor '
                                                                                   'list; omitted: your own neighbors'}),
                           (('relation',), {'choices': ['buddies', 'followers'], 'metavar': 'RELATION', 'help': 'buddies or followers'}),
                           (('--group',), {'type': positive, 'metavar': 'N', 'help': 'Only your neighbors in one group'}),
@@ -1338,7 +1340,7 @@ def _naver_blog_surface(platform):
         'topic': {
             'help': 'Browse the topic directory, or one topic\'s newest or featured posts.',
             'run': _command(platform.directory_topic), 'check': platform.directory_check,
-            'arguments': [(('target',), {'nargs': '?', 'metavar': 'TOPIC', 'help': 'Topic number (free) or name (one '
+            'arguments': [(('target',), {'nargs': '?', 'help': 'Topic number (free) or name (one '
                                                                                    'request); omitted: the directory'}),
                           (('--tab',), {'choices': ['newest', 'featured'], 'default': 'newest', 'help': 'The topic\'s newest or featured posts (one page)'}),
                           'since', 'until', 'limit', 'chars', 'after', 'out', 'json'],
@@ -1411,6 +1413,26 @@ def surface(module, commands):
     return {**commands, **shared_commands(module.PLATFORM)}
 
 
+# What a positional argument is called in help, one word per kind of thing across platforms (plan '목표 문법': ACCOUNT,
+# POST, the place's own name, HANDLE for numbered handles): the one owner of these labels; the tables leave them out.
+POSITIONAL_LABELS = {'target': {'profile': 'ACCOUNT', 'about': 'ACCOUNT', 'graph': 'ACCOUNT', 'sub': 'SUB', 'wiki': 'SUB',
+                                'group': 'GROUP', 'list': 'LIST', 'community': 'COMMUNITY', 'post': 'POST',
+                                'comments': 'POST', 'related': 'POST', 'images': 'POST', 'reposts': 'POST',
+                                'quotes': 'POST', 'replies': 'HANDLE', 'search': 'TEXT', 'topic': 'TEXT',
+                                'resolve': 'TEXT'},
+                     'page': 'PAGE', 'collection': 'KIND', 'relation': 'RELATION'}
+
+
+def label(word, command, dest):
+    """The help label of a positional argument."""
+    found = POSITIONAL_LABELS[dest]
+    if not isinstance(found, dict):
+        return found
+    if word == 'naver-blog' and command in ('profile', 'about', 'graph'):
+        return 'BLOG'
+    return found.get(command, 'TEXT')
+
+
 def parser(platforms, hidden=False, commands=None):
     commands = command_tables(platforms)[0] if commands is None else commands
     lines = [f'  {word:<11} {" ".join(surface(module, commands[word]))}' for word, module in platforms.items()]
@@ -1423,7 +1445,6 @@ def parser(platforms, hidden=False, commands=None):
                          + '\n'.join(f'  {code:<2} {meaning}' for code, meaning in EXIT_SUMMARY.items()))
     root.add_argument('--verbose', action='store_true', help='Write scrubbed request metadata to stderr')
     branches = root.add_subparsers(dest='platform', required=True, metavar='<platform>', help=argparse.SUPPRESS)
-    templates = {'--tab': 'Choose the view.', '--sort': 'Choose the order.', '--type': 'Choose the result type.', '--in': 'Choose the search scope.', '--limit': 'How many to show; the description explains what is counted.', '--chars': 'Characters of each text to show; the description explains the default.'}
     for word, module in platforms.items():
         platform = module.PLATFORM
         platform_commands = surface(module, commands[word])
@@ -1434,26 +1455,11 @@ def parser(platforms, hidden=False, commands=None):
         for name, spec in platform_commands.items():
             leaf = leaves.add_parser(name, help=spec['help'], description=spec['help'], epilog=epilog(spec),
                                      formatter_class=argparse.RawTextHelpFormatter, prog=f'cli.py {word} {name}')
-            details = []
             for argument in spec['arguments']:
                 flags, settings = option(argument, platform) if isinstance(argument, str) else argument
-                settings = dict(settings)
-                if flags[0] == 'target':
-                    labels = {'profile': 'ACCOUNT', 'about': 'ACCOUNT', 'graph': 'ACCOUNT', 'sub': 'SUB', 'wiki': 'SUB', 'group': 'GROUP', 'list': 'LIST', 'community': 'COMMUNITY', 'post': 'POST', 'comments': 'POST', 'related': 'POST', 'images': 'POST', 'reposts': 'POST', 'quotes': 'POST', 'replies': 'HANDLE', 'search': 'TEXT', 'topic': 'TEXT', 'resolve': 'TEXT'}
-                    settings['metavar'] = 'BLOG' if word == 'naver-blog' and name in ('profile', 'about', 'graph') else labels.get(name, settings.get('metavar', 'TEXT'))
-                elif flags[0] == 'page':
-                    settings['metavar'] = 'PAGE'
-                elif flags[0] in ('collection', 'relation'):
-                    settings['metavar'] = 'KIND' if flags[0] == 'collection' else 'RELATION'
-                if flags[0] in templates or flags[0] in ('--limit', '--chars', '--after', '--out', '--json'):
-                    old_help = settings.get('help')
-                    generic = templates.get(flags[0]) or option(flags[0][2:], platform)[1]['help']
-                    if old_help and old_help != generic:
-                        details.append(f'{flags[0]}: {old_help}')
-                    settings['help'] = generic
+                if flags[0] in POSITIONAL_LABELS:
+                    settings = {**settings, 'metavar': label(word, name, flags[0])}
                 leaf.add_argument(*flags, **settings)
-            if details:
-                leaf.epilog = leaf.epilog.replace('exit codes:\n', '\n'.join(details) + '\n\nexit codes:\n')
         if hidden:  # the idle cleanup the skill starts itself; not part of the help
             leaf = leaves.add_parser('idle', prog=f'cli.py {word} idle')
             leaf.add_argument('--account', required=True)

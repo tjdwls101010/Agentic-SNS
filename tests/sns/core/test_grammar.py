@@ -18,17 +18,30 @@ def test_core_commands_exist_on_their_platforms():
         assert ('graph' in commands) == (word in {'x', 'threads', 'naver-blog'})
 
 
-def test_shared_options_have_one_help_template():
-    shared = {'--tab', '--sort', '--type', '--in', '--since', '--until', '--limit', '--chars', '--after', '--out', '--json'}
+def test_shared_options_mean_the_same_everywhere():
+    """The options every reading command shares read the same on every platform (only the time zone differs); the
+    closed-set options keep one name and offer their platform's own words as choices, with their own wording."""
+    zones = ('Korea time (KST)', "this computer's time zone", "X's own days (this account's time zone)")
+    shared, closed = {'--since', '--until', '--limit', '--chars', '--after', '--out', '--json'}, {'--tab', '--sort',
+                                                                                                    '--type'}
     helps = {}
-    for commands in leaves().values():
-        for parser in commands.values():
+    for word, commands in leaves().items():
+        for name, parser in commands.items():
             for action in parser._actions:
-                for flag in shared.intersection(action.option_strings):
-                    template = action.help.replace('Korea time (KST)', 'ZONE').replace("this computer's time zone", 'ZONE')
-                    helps.setdefault(flag, set()).add(template)
-    assert helps.keys() == shared
-    assert all(len(templates) == 1 for templates in helps.values()), helps
+                flag = next((f for f in action.option_strings if f in shared | closed | {'--in'}), None)
+                if flag is None:
+                    continue
+                assert action.help and action.help.strip(), (word, name, flag)
+                if flag in closed:
+                    assert action.choices, (word, name, flag)
+                # a composite read's --out saves the whole read at once, not page by page: its own wording
+                if flag in shared and (word, name, flag) != ('naver-blog', 'post', '--out'):
+                    text = action.help
+                    for zone in zones:
+                        text = text.replace(zone, 'ZONE')
+                    helps.setdefault(flag, set()).add(text)
+    assert set(helps) == shared
+    assert all(len(texts) == 1 for flag, texts in helps.items() if flag not in ('--limit', '--chars')), helps
 
 
 def test_no_old_view_flags_and_positional_labels():
