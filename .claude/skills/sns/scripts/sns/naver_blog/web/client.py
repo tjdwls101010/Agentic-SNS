@@ -22,7 +22,7 @@ from sns.naver_blog.web.pages import Fetched, Policy
 from sns.naver_blog.web.routes import allowed, build, frame_blog_id, image_host, operation
 
 FETCH = Path(__file__).with_name('fetch.js').read_text(encoding='utf-8')
-_CHECK = 'Check that Aside is running, then run doctor.'
+_CHECK = 'Run doctor: it says whether Aside can be reached and which Aside version answered.'
 _LOGIN = 'Log in to Naver in the Aside browser, then run doctor.'
 
 

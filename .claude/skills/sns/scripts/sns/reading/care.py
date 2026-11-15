@@ -29,7 +29,8 @@ def doctor(platform, invocation):
             connection.start()
         state, recent = connection.guard.state(), connection.guard.recent()
         result = {
-            'aside': 'available', 'aside_account': connection.account, 'login': 'ready',
+            'aside': 'available', 'aside_version': connection.aside.version(), 'aside_account': connection.account,
+            'login': 'ready',
             'viewer': connection.known_viewer, 'blocked': state['blocked'], 'block_reason': state['block_reason'],
             'hold_until': state['hold']['until'] if state['hold'] else None, 'unblocked': unblocked,
             'limits': state['scopes'], 'requests_last_hour': recent['last_hour'],

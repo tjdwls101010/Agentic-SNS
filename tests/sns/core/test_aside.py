@@ -1,9 +1,10 @@
 """The Aside system (sns.aside) against the scripted fake: account resolution, the one output protocol, the deadline
-clamp, and opening a tab."""
+clamp, opening a tab, and the cause each Aside failure names."""
 import json
 
 import pytest
 
+import sns.aside
 from sns.aside import Aside, active_account, parse
 from sns.clock import Deadline
 from sns.errors import SnsError
@@ -168,3 +169,43 @@ def test_a_picture_whose_body_breaks_off_is_that_pictures_failure(tmp_path):
     out = _run_media(tmp_path, "  return {status: 200, type: 'basic', headers: new Headers({'content-type': 'image/jpeg'}), "
                                "arrayBuffer: async () => { throw new TypeError('terminated'); }};")
     assert out['answer']['status'] == 0 and 'terminated' in out['answer']['network']
+
+
+def test_each_cause_of_an_aside_failure_names_its_own_remedy(browser, monkeypatch, tmp_path):
+    """Every Aside failure used to say 'Check that Aside is running', also when Aside was running and had changed how
+    it answers (live, 2026-11-15: x doctor after an Aside update). Each cause now has its own fix."""
+    causes = {}
+    with monkeypatch.context() as patched:  # no `aside` command at all
+        patched.setenv('SNS_ASIDE_BIN', '')
+        patched.setenv('PATH', str(tmp_path / 'empty'))
+        with pytest.raises(SnsError) as caught:
+            Aside('reddit', Deadline(30))
+        causes['missing'] = caught.value
+    with monkeypatch.context() as patched:  # the account cannot be told
+        browser.flag(account_status_exit=1).install(patched)
+        with pytest.raises(SnsError) as caught:
+            Aside('reddit', Deadline(30))
+        causes['account'] = caught.value
+    with monkeypatch.context() as patched:  # Aside is closed: the `aside` command starts it, slower than the wait
+        patched.setattr(sns.aside, 'STATUS_SECONDS', 0.5)
+        browser.flag(account_status_exit=0, account_status_sleep=2).install(patched)
+        with pytest.raises(SnsError) as caught:
+            Aside('reddit', Deadline(30))
+        causes['starting'] = caught.value
+    browser.flag(account_status_sleep=0, version='9.9.9').install(monkeypatch)
+    browser.respond('reddit.fetch', {'__raw_stdout': 'aside: daemon is not reachable\n', '__exit': 1})
+    browser.respond('reddit.fetch', {'__raw_stdout': 'nothing this skill can read\n'}).install(monkeypatch)
+    aside = Aside('reddit', Deadline(30))
+    for name in ('unreachable', 'unexpected'):
+        with pytest.raises(SnsError) as caught:
+            aside.run('async (args) => { // sns-snippet: reddit.fetch\n }', {})
+        causes[name] = caught.value
+    assert {name: error.reason for name, error in causes.items()} == {
+        'missing': 'missing', 'account': 'account', 'starting': 'unreachable', 'unreachable': 'lost',
+        'unexpected': 'invalid'}
+    assert all(error.kind == 'aside' for error in causes.values())
+    assert 'Install Aside' in causes['missing'].fix and 'SNS_ASIDE_ACCOUNT' in causes['account'].fix
+    assert causes['starting'].fix == causes['unreachable'].fix and 'Start the Aside app' in causes['unreachable'].fix
+    assert 'Aside 9.9.9' in causes['unexpected'].message and 'may not match Aside 9.9.9' in causes['unexpected'].fix
+    assert len({causes[name].fix for name in ('missing', 'account', 'unreachable', 'unexpected')}) == 4
+    assert not any('Check that Aside is running' in error.fix for error in causes.values())

@@ -188,7 +188,10 @@ class Client:
                 raise
             if not new:
                 slot.classify('open_failed')
-                raise SnsError('aside', 'Aside did not open the Threads tab.', 'Check Aside, then run threads doctor.')
+                raise SnsError('aside', 'Aside did not open the Threads tab. Aside opens a tab through its browser '
+                                        'agent (`aside <url>`), which needs Aside signed in with a model it can use.',
+                               'Check that `aside https://example.com` opens a tab, then run threads doctor.',
+                               reason='no_tab')
             self.tab = new[-1]['target_id']
             self.session.set_tab(self.tab)
             self.opened_now = True

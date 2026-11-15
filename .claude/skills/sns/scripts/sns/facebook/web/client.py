@@ -180,7 +180,10 @@ class Client:
             slot.classify('opened')
             new = [t for t in self.aside.tabs() if t['target_id'] not in before and _facebook(t['url'])]
             if not new:
-                raise SnsError('aside', 'Aside did not open the Facebook tab.', 'Check Aside, then run facebook doctor.')
+                raise SnsError('aside', 'Aside did not open the Facebook tab. Aside opens a tab through its browser '
+                                        'agent (`aside <url>`), which needs Aside signed in with a model it can use.',
+                               'Check that `aside https://example.com` opens a tab, then run facebook doctor.',
+                               reason='no_tab')
             self.tab = new[-1]['target_id']
             self.session.set_tab(self.tab)
             self.opened_now = True
