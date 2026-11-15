@@ -4,6 +4,7 @@ import json
 import time
 
 from tests.sns.x.scenes import known_tab, queries, query_result, rerun, run, state
+from tests.sns.support.cli import more_line
 
 RATE = {'x-rate-limit-limit': '150', 'x-rate-limit-remaining': '149', 'x-rate-limit-reset': str(int(time.time()) + 900)}
 
@@ -57,7 +58,7 @@ def test_posts_find_the_account_once_then_read_its_posts_and_reposts(browser):
     assert [c['name'] for c in calls] == ['UserByScreenName', 'UserTweets']
     assert calls[0]['variables']['screen_name'] == 'author_a' and calls[1]['variables']['userId'] == '1000000001'
     browser.respond('x.state', state()).respond('x.query', timeline([tweet('13')]))
-    code, out, _ = rerun(browser, out.splitlines()[-1])
+    code, out, _ = rerun(browser, more_line(out))
     assert code == 0 and 'post 13' in out
     assert [c['args']['name'] for c in queries(browser)][-1] == 'UserTweets'  # no second lookup
 

@@ -74,7 +74,7 @@ def test_records_read_before_a_failure_print_as_text_and_the_help_says_so(browse
     assert code == 8
     assert out.startswith('threads feed · ') and '[p1]' in out and 'coverage: incomplete — ' in out
     _, help_text, _ = run(browser, 'feed', '--help')
-    assert 'records read before a failure print as usual' in ' '.join(help_text.split())
+    assert 'if nothing was read; else the records read (exit 8)' in ' '.join(help_text.split())
 
 
 @pytest.mark.parametrize('feed', ['foryou', 'following'])

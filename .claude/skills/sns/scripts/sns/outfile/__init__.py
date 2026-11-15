@@ -22,7 +22,7 @@ from sns.errors import SnsError
 from sns.paths import outside_data
 
 FORMAT = 1
-COMPLETE = ('exhausted', 'window_reached', 'not_paginable', 'server_capped')
+COMPLETE = ('exhausted', 'window_reached', 'not_paginable', 'server_capped', 'not_built')
 VERDICT_KINDS = ('empty', 'partial', 'unavailable')
 
 

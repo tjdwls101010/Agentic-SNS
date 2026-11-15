@@ -5,6 +5,7 @@ import time
 import pytest
 
 from tests.sns.x.scenes import known_tab, queries, query_result, run
+from tests.sns.support.cli import more_line
 
 RATE = {'x-rate-limit-limit': '50', 'x-rate-limit-remaining': '49', 'x-rate-limit-reset': str(int(time.time()) + 900)}
 A = {'__typename': 'User', 'rest_id': '1000000001', 'core': {'screen_name': 'author_a', 'name': 'A'}}
@@ -99,7 +100,7 @@ def test_the_search_limit_after_some_results_is_a_resumable_stop(browser):
     code, out, _ = run(browser, 'search', 'ai', '--limit', '40')
     assert code == 0, out
     assert 'stopped=rate_limited' in out.splitlines()[0] and 'limit SearchTimeline resets' in out.splitlines()[0]
-    assert out.splitlines()[-1].startswith('more: ')
+    assert more_line(out).startswith('more: ')
 
 
 def test_since_and_until_options_are_sent_as_xs_own_operators_and_close_the_window(browser):

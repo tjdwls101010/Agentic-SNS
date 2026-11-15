@@ -3,6 +3,7 @@ import json
 import time
 
 from tests.sns.x.scenes import ACCOUNT, known_tab, queries, query_result, run
+from tests.sns.support.cli import more_line
 
 RATE = {'x-rate-limit-limit': '500', 'x-rate-limit-remaining': '499', 'x-rate-limit-reset': str(int(time.time()) + 900)}
 
@@ -30,7 +31,7 @@ def test_following_reads_one_page_of_accounts(browser):
     code, out, _ = run(browser, 'graph', 'author_a', 'following')
     assert code == 0, out
     assert 'x graph · relation=following · 2 shown' in out.splitlines()[0]
-    assert '[a1] @friend_one (Friend_One)' in out and out.splitlines()[-1].startswith('more: ')
+    assert '[a1] @friend_one (Friend_One)' in out and more_line(out).startswith('more: ')
     calls = [c['args'] for c in queries(browser)]
     assert [c['name'] for c in calls] == ['UserByScreenName', 'Following']
     assert calls[1]['variables']['userId'] == '1000000001' and calls[1]['variables']['withGrokTranslatedBio'] is True

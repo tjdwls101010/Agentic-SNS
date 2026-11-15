@@ -12,7 +12,7 @@ import time
 import pytest
 
 from sns.session import Session
-from tests.sns.support.cli import CLI
+from tests.sns.support.cli import CLI, more_line
 from tests.sns.x.scenes import (ASIDE, ENVIRONMENT, MODULES, START, known_tab, limits, opening, query_result,
                                 queries, rerun, run, stand_block, state, state_of)
 
@@ -70,7 +70,7 @@ def test_this_operations_limit_seen_after_records_is_a_resumable_stop(browser, o
     known_tab(browser).respond('x.query', result)
     code, out, _ = run(browser, 'feed', '--limit', '40')
     assert code == 0, out
-    assert 'stopped=rate_limited' in out.splitlines()[0] and out.splitlines()[-1].startswith('more: ')
+    assert 'stopped=rate_limited' in out.splitlines()[0] and more_line(out).startswith('more: ')
     assert len(queries(browser)) == 1  # the second page is not asked for
 
 
@@ -173,7 +173,7 @@ def test_a_continued_reading_under_another_x_account_is_exit_4_not_2(browser):
     """The handle remembers the X account it was read with; the account is compared outside the handle's context."""
     known_tab(browser).respond('x.query', query_result(home(['1']), headers=RATE))
     code, out, _ = run(browser, 'feed')
-    more = out.splitlines()[-1]
+    more = more_line(out)
     known_tab(browser, user_id=OTHER)
     code, out, _ = rerun(browser, more)
     envelope = json.loads(out)
@@ -241,7 +241,7 @@ def test_a_browser_call_cut_by_the_deadline_after_results_is_a_resumable_stop(br
     browser.respond('x.query', {**query_result(home(['2'], bottom='C2'), headers=RATE), '__sleep': 12})
     code, out, _ = run(browser, 'feed', '--limit', '40', env={'SNS_DEADLINE_SECONDS': '8'})
     assert code == 0, out
-    assert 'stopped=time_limit' in out.splitlines()[0] and out.splitlines()[-1].startswith('more: ')
+    assert 'stopped=time_limit' in out.splitlines()[0] and more_line(out).startswith('more: ')
 
 
 def test_the_own_responses_limit_is_recorded_even_when_a_lock_stops_the_command(browser):

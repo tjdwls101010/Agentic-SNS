@@ -5,6 +5,7 @@ import re
 
 from tests.sns.facebook.scenes import graphql_body, known_tab, look, queries, query_result, rerun, run, story
 from tests.sns.facebook.test_cli_thread import URL, comment, script_post
+from tests.sns.support.cli import head, regrouped
 
 
 def replies_body(parent, nodes, has_next=True, cursor='R1'):
@@ -31,8 +32,8 @@ def test_a_comments_replies_batch_by_batch_and_deeper(browser):
     serve(browser, 'C1', batch, cursor='RC1')
     code, out, _ = run(browser, 'replies', first)
     assert code == 0, out
-    lines = out.splitlines()
-    assert lines[0] == 'facebook replies · 10 shown · stopped=limit_reached · requests=1'
+    lines = regrouped(out)
+    assert head(lines[0]) == 'facebook replies · 10 shown · stopped=limit_reached · requests=1'
     assert lines[1] == f'thread: post "{URL}" · replies to comment C1'
     assert lines[2].startswith('  [c1] Person R1')
     deeper = handle_of(out, 'r1')
@@ -154,12 +155,12 @@ def test_the_replies_under_a_reply_are_one_batch_because_facebook_repeats_it_whe
           name='Depth2CommentsListPaginationQuery', has_next=True, cursor='DC1')
     code, out, _ = run(browser, 'replies', handle_of(out, 'r1'))
     assert code == 0, out
-    assert out.splitlines()[0] == 'facebook replies · 10 shown · stopped=server_capped · requests=1'
+    assert head(out.splitlines()[0]) == 'facebook replies · 10 shown · stopped=not_built · requests=1'
     assert 'coverage: Facebook reports 30 replies under this comment (deeper ones included); 10 were sent' in out
     assert 'more:' not in out
 
 
-def test_a_deeper_branch_read_in_parts_still_ends_server_capped(browser):
+def test_a_deeper_branch_read_in_parts_still_ends_not_built(browser):
     """Found by review: --limit split the capped batch, and the continuation served the rest and called it exhausted."""
     script_post(browser, [comment('C1', replies=50)], has_next=False)
     code, out, _ = run(browser, 'post', URL)
@@ -173,5 +174,5 @@ def test_a_deeper_branch_read_in_parts_still_ends_server_capped(browser):
     look(browser)
     code, out, _ = rerun(browser, 'more: ' + first['next'])
     last = json.loads(out)
-    assert code == 0 and [r['id'] for r in last['results']] == ['D2'] and last['stop_reason'] == 'server_capped'
+    assert code == 0 and [r['id'] for r in last['results']] == ['D2'] and last['stop_reason'] == 'not_built'
     assert not last.get('next') and len(queries(browser)) == 4  # the rest came from the handle: no request

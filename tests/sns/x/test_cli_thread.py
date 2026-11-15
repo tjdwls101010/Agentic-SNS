@@ -8,6 +8,7 @@ import time
 import pytest
 
 from tests.sns.x.scenes import ACCOUNT, known_tab, queries, query_result, rerun, run, state
+from tests.sns.support.cli import more_line
 
 A = {'__typename': 'User', 'rest_id': '1000000001', 'core': {'screen_name': 'author_a', 'name': 'A'}}
 B = {'__typename': 'User', 'rest_id': '1000000002', 'core': {'screen_name': 'replier_b', 'name': 'B'}}
@@ -92,7 +93,7 @@ def test_the_post_in_full_its_parent_and_its_first_replies_with_handles(browser)
     assert 'reply to a post not shown' in out  # 106 answers 105, which X skipped
     assert re.search(r'url: "https://x.com/replier_b/status/102"   author: "replier_b"   replies \d+', out)
     assert re.search(r'coverage: X hid some replies as probable spam or low quality; replies \d+ reads them', out)
-    assert out.splitlines()[-1].startswith('more: ') and ' replies ' in out.splitlines()[-1]
+    assert more_line(out).startswith('more: ') and ' replies ' in more_line(out)
     [query] = queries(browser)
     assert query['args']['name'] == 'TweetDetail'
     assert query['args']['variables']['focalTweetId'] == '101' and query['args']['variables']['rankingMode'] == 'Relevance'
@@ -106,7 +107,7 @@ def test_more_reads_the_next_batch_of_direct_replies(browser):
     nxt = {'data': {'threaded_conversation_with_injections_v2': {'instructions': [
         {'type': 'TimelineAddToModule', 'moduleEntryId': 'conversationthread-107', 'moduleItems': [item(tweet('107', B, '101'), 'conversationthread-107')]}]}}}
     browser.respond('x.query', query_result(nxt, headers=RATE))
-    code, out, _ = rerun(browser, out.splitlines()[-1])
+    code, out, _ = rerun(browser, more_line(out))
     assert code == 0, out
     assert '[r1] @replier_b' in out and 'post 107' in out
     last = queries(browser)[-1]
@@ -212,7 +213,7 @@ def test_a_handle_read_as_another_x_account_is_a_changed_login_not_a_wrong_argum
     known_tab(browser).respond('x.query', query_result(FIRST, headers=RATE))
     _, out, _ = post(browser, '101')
     browser.respond('x.state', state(user_id='1000000098'))
-    code, out, _ = rerun(browser, out.splitlines()[-1])
+    code, out, _ = rerun(browser, more_line(out))
     envelope = json.loads(out)
     assert code == 4 and envelope['error'] == 'login' and ACCOUNT in envelope['message'], out
     assert '1000000098' in envelope['message'] and 'without --after' in envelope['fix']
@@ -276,7 +277,7 @@ def test_a_further_batch_of_replies_reports_the_replies_it_could_not_read(browse
         {'entryId': f'{name}-tweet-140', 'item': {'itemContent': {'itemType': 'TimelineTweet', 'tweet_results': {
             'result': {'__typename': 'Tweet', 'renamed': '140'}}}}}]}}])
     browser.respond('x.state', state()).respond('x.query', query_result(nxt, headers=RATE))
-    code, out, _ = rerun(browser, out.splitlines()[-1])
+    code, out, _ = rerun(browser, more_line(out))
     assert code == 0 and 'post 141' in out and 'could not read' in out, out
 
 
@@ -295,7 +296,7 @@ def test_a_replies_handle_belongs_to_the_replies_command_and_names_it_elsewhere(
     handle of another command is refused by `replies` the same way."""
     known_tab(browser).respond('x.query', query_result(FIRST, headers=RATE))
     _, out, _ = post(browser, '101')
-    number = handle_of(out.splitlines()[-1])
+    number = handle_of(more_line(out))
     browser.respond('x.state', state())
     code, text, _ = run(browser, 'feed', '--after', number)
     assert code == 2 and 'x replies' in json.loads(text)['message'], text
@@ -303,7 +304,7 @@ def test_a_replies_handle_belongs_to_the_replies_command_and_names_it_elsewhere(
         single(tweet('300')), cursor('Bottom', 'FEEDCUR')]}]}}}}
     browser.respond('x.state', state()).respond('x.query', query_result(feed_page, headers=RATE))
     code, text, _ = run(browser, 'feed')
-    feed_handle = re.search(r'--after (\d+)', text.splitlines()[-1]).group(1)
+    feed_handle = re.search(r'--after (\d+)', more_line(text)).group(1)
     browser.respond('x.state', state())
     code, text, _ = run(browser, 'replies', feed_handle)
     assert code == 2 and 'x feed' in json.loads(text)['message'], text
@@ -317,14 +318,14 @@ def test_a_replies_handle_of_the_other_command_word_is_a_number_checked_before_t
 def test_replies_stopped_by_the_time_limit_after_records_resumes_from_its_own_handle(browser):
     known_tab(browser).respond('x.query', query_result(FIRST, headers=RATE))
     _, out, _ = post(browser, '101')
-    number = handle_of(out.splitlines()[-1])
+    number = handle_of(more_line(out))
     browser.respond('x.state', state())
     # the batch takes 3 of the 6 seconds: the next request no longer fits (pacing and a call's least time) -> time limit
     browser.respond('x.query', {'__sleep': 3, **query_result(batch(tweet('107', B, '101'), bottom='CUR3'), headers=RATE)})
     code, out, _ = run(browser, 'replies', number, '--limit', '40', env={'SNS_DEADLINE_SECONDS': '6'})
     assert code == 0, out
     assert 'stopped=time_limit' in out.splitlines()[0] and 'post 107' in out
-    last = out.splitlines()[-1]
+    last = more_line(out)
     assert last.startswith('more: ') and ' replies ' in last and handle_of(last) != number  # its own, newer handle
     browser.respond('x.state', state())
     browser.respond('x.query', query_result(batch(tweet('109', B, '101'), ident='109'), headers=RATE))
@@ -336,7 +337,7 @@ def test_replies_stopped_by_the_time_limit_after_records_resumes_from_its_own_ha
 def test_replies_out_collects_the_batches_and_resumes_after_a_time_limit_stop(browser, tmp_path):
     known_tab(browser).respond('x.query', query_result(FIRST, headers=RATE))
     _, out, _ = post(browser, '101')
-    number = handle_of(out.splitlines()[-1])
+    number = handle_of(more_line(out))
     saved = tmp_path / 'replies.ndjson'
     browser.respond('x.state', state())
     # the batch takes 3 of the 6 seconds: the next request no longer fits (pacing and a call's least time) -> time limit
@@ -360,7 +361,7 @@ def test_replies_out_collects_the_batches_and_resumes_after_a_time_limit_stop(br
 def test_replies_out_stopped_by_the_operations_limit_is_resumable_but_not_before_the_reset(browser, tmp_path):
     known_tab(browser).respond('x.query', query_result(FIRST, headers=RATE))
     _, out, _ = post(browser, '101')
-    number = handle_of(out.splitlines()[-1])
+    number = handle_of(more_line(out))
     saved = tmp_path / 'replies.ndjson'
     browser.respond('x.state', state())
     browser.respond('x.query', query_result(batch(tweet('107', B, '101'), bottom='CUR3'), headers=RATE))
@@ -414,10 +415,10 @@ def test_a_branch_read_in_several_batches_continues_from_the_cursor_the_last_one
                     module('130', tweet('130', A, '102', text='first batch')), cursor('Bottom', 'BRANCHCUR')])
     browser.respond('x.state', state()).respond('x.query', query_result(first, headers=RATE))
     code, out, _ = run(browser, 'replies', number)
-    assert code == 0 and 'first batch' in out and out.splitlines()[-1].startswith('more: '), out
+    assert code == 0 and 'first batch' in out and more_line(out).startswith('more: '), out
     second = detail([module('131', tweet('131', A, '102', text='second batch'))])
     browser.respond('x.state', state()).respond('x.query', query_result(second, headers=RATE))
-    code, out, _ = rerun(browser, out.splitlines()[-1])
+    code, out, _ = rerun(browser, more_line(out))
     assert code == 0 and 'second batch' in out, out
     last = queries(browser)[-1]['args']['variables']
     assert last['focalTweetId'] == '102' and last['cursor'] == 'BRANCHCUR'

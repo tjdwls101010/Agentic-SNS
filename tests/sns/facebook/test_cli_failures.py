@@ -5,6 +5,7 @@ import time
 
 from tests.sns.facebook.scenes import (ACCOUNT, GRAPHQL, graphql_body, known_tab, look, queries, query_result, run,
                                        stand_block, stand_hold, state_of, story)
+from tests.sns.support.cli import more_line, regrouped
 
 FEED = ['viewer', 'news_feed']
 
@@ -24,7 +25,7 @@ def test_a_failure_after_records_is_partial_and_keeps_them(browser):
     browser.respond('facebook.query', failure())
     code, out, _ = run(browser, 'feed', '--limit', '5')
     assert code == 8
-    lines = out.splitlines()
+    lines = regrouped(out)
     assert lines[0].startswith('facebook feed · sort=top · 1 shown · stopped=query_failure')
     assert any(line.startswith('coverage: incomplete — Facebook answered with HTTP 500') for line in lines)
     assert lines[-1].startswith('more: ')  # a failed page can be retried later from its cursor
@@ -58,7 +59,7 @@ def test_a_login_wall_after_records_keeps_them_and_offers_no_continuation(browse
     browser.respond('facebook.query', page(['B'], cursor='C2'))
     browser.respond('facebook.query', query_result('', status=429))
     code, out, _ = run(browser, 'feed', '--limit', '5')
-    assert code == 0 and 'stopped=rate_limited' in out.splitlines()[0] and out.splitlines()[-1].startswith('more: ')
+    assert code == 0 and 'stopped=rate_limited' in out.splitlines()[0] and more_line(out).startswith('more: ')
     assert 'limit account resets' in out.splitlines()[0]
 
 

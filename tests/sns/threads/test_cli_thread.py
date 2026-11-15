@@ -4,6 +4,7 @@ import json
 
 from tests.sns.threads.data import fixture
 from tests.sns.threads.scenes import known_tab, query_result, rerun, run, state
+from tests.sns.support.cli import regrouped
 
 THREAD = fixture('records_thread.json')
 CASE = next(c for c in THREAD['cases'] if c['name'] == 'post-parents-replies-coverage')
@@ -54,7 +55,7 @@ def test_post_text_shows_the_post_in_full_and_the_reply_tree(browser):
     scripted_post(browser)
     code, out, _ = run(browser, 'post', URL, '--chars', '3')
     assert code == 0
-    lines = out.splitlines()
+    lines = regrouped(out)
     assert lines[0].startswith('threads post · sort=top · 8 shown · stopped=limit_reached · requests=3')
     assert lines[1].startswith('replies: 2 of 5 direct received · ≈1 never received (estimate)')
     assert 'text[8 of 8 chars shown]: "The post"' in out  # the opened post is never clipped

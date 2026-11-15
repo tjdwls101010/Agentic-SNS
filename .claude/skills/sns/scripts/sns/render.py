@@ -1,5 +1,6 @@
-"""The text page's frame, the same for every platform: a header naming scope and cost, the window, the platform's
-record lines, coverage, an incomplete-read line, more:. The records themselves are drawn by the platform."""
+"""The text page's frame, the same for every platform: a header naming scope and cost, the window, coverage, an
+incomplete-read line, more:, then the platform's record lines — so output cut off by a tool limit keeps what was read,
+what is missing and the next command. The records themselves are drawn by the platform."""
 import json
 
 from sns.clock import local
@@ -53,7 +54,10 @@ def header(envelope, shown):
         parts.append(f'tab opened (+{setup} requests)')
     if envelope.get('unwatched_requests'):
         parts.append(f'unwatched={envelope["unwatched_requests"]}')
-    return parts + _limits(envelope)
+    parts += _limits(envelope)
+    if envelope.get('saved'):
+        parts.append(f'saved={envelope["saved"]}')  # last on the line: the file to Read for the whole result
+    return parts
 
 
 def _window(window):
@@ -69,12 +73,13 @@ def page(envelope, records, shown=None):
     lines = [' · '.join(header(envelope, shown))]
     if envelope.get('window'):
         lines.append(_window(envelope['window']))
-    lines += records
+    # what was read, what is missing and the next command come before the records, so output a tool cuts off keeps them
     lines += ['coverage: ' + line(note) for note in envelope.get('coverage') or []]
     if envelope.get('error'):
         lines.append(f'coverage: incomplete — {line(envelope.get("message"))} fix: {line(envelope.get("fix"))}')
     if envelope.get('next'):
         lines.append('more: ' + envelope['next'])
+    lines += records
     return '\n'.join(lines)
 
 

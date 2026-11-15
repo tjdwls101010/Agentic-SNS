@@ -10,7 +10,7 @@ from sns.window import Window
 FEEDS = {'foryou': ('for_you', 'ranked'), 'following': ('following', 'newest_first')}
 TABS = {'threads': 'newest_first', 'replies': 'newest_first', 'reposts': 'finite', 'media': 'finite'}
 # A surface's own end, which a continuation that reads only the tail it already holds must still report
-NATURAL_STOPS = ('server_capped', 'not_paginable')
+NATURAL_STOPS = ('server_capped', 'not_paginable', 'not_built')
 
 
 def paged(listed):

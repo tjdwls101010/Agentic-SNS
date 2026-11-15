@@ -3,9 +3,12 @@ from sns import outfile
 from sns.results import describe, finish
 
 
-def schema(platform, invocation):
-    """One object's schema, or the list of objects."""
-    documents = {'result': describe(invocation.exit_codes), 'out': outfile.describe(), **platform.schemas}
+def schema(platform, invocation, labels=None):
+    """One object's schema, or the list of objects; `labels` names the platform's record labels in the text page."""
+    result = describe(invocation.exit_codes)
+    if labels:
+        result['text'] = {**result['text'], 'records': f'one block per record, {labels}'}
+    documents = {'result': result, 'out': outfile.describe(), **platform.schemas}
     name = invocation.options.get('object')
     results = [documents[name]] if name else [{'object': key, 'description': doc['description']}
                                                for key, doc in documents.items()]

@@ -109,7 +109,8 @@ def connection_page(data, surface):
             raise
     if not isinstance(connection, dict) or not isinstance(connection.get('edges'), list):
         raise _changed('A list response has no explicit edges.')
-    page = Page(stop={CAPPED: 'server_capped', SINGLE: 'not_paginable'}.get(policy))
+    # followers: the skill reads the first page Threads sends and no next one (decision T5): not built, not a cap
+    page = Page(stop={CAPPED: 'not_built', SINGLE: 'not_paginable'}.get(policy))
     if policy in (RELAY, OFFSET):
         info = connection.get('page_info')
         if not isinstance(info, dict) or type(info.get('has_next_page')) is not bool:
@@ -151,6 +152,11 @@ def connection_page(data, surface):
                 record['unit'] = unit
         page.groups.append(group)
         page.records.extend(group)
+    offered = (connection.get('page_info') or {}).get('has_next_page') is True  # Threads itself says more follow
+    accounts = {r.get('id') for r in page.records}  # an account sent twice is still one
+    if policy == CAPPED and page.reported_total is not None and len(accounts) >= page.reported_total \
+            and not offered:
+        page.stop = None  # the whole list arrived: nothing is left that the skill did not read
     return page
 
 

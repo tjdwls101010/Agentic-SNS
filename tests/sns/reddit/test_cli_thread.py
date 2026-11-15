@@ -7,7 +7,7 @@ import pytest
 
 from tests.sns.reddit.scene import VIEWER, fixture
 from tests.sns.reddit.shapes import PERMALINK, more, pair, t1, things
-from tests.sns.support.cli import command_of, more_line
+from tests.sns.support.cli import command_of, head, more_line, regrouped
 
 
 def more_words(out):
@@ -23,7 +23,7 @@ def test_post_shows_the_post_in_full_and_the_first_batch(reddit):
     reddit.me().json('/comments/aaa1.json', pair(TREE), query={'limit': 500, 'depth': 10, 'sort': 'confidence'})
     code, out, _ = reddit.run('reddit', 'post', PERMALINK, '--limit', '3')
     assert code == 0
-    lines = out.splitlines()
+    lines = regrouped(out)
     # the post record and the three comments are what the first line counts as shown
     assert lines[0].startswith('reddit post · sort=best · 4 shown · stopped=limit_reached · requests=2')
     assert lines[1].startswith('thread: 9 comments reported (deleted and removed included) · 5 received · 3 shown now')
@@ -122,7 +122,7 @@ def test_a_share_link_resolves_hop_by_hop(reddit):
     code, out, _ = reddit.run('reddit', 'post', share)
     first = out.splitlines()[0]
     assert code == 0 and reddit.paths() == ['/api/me.json', share, '/comments/aaa1.json']
-    assert 'requests=3 ' in first and 'share' not in first.split('requests=')[1], 'a share link is never measured'
+    assert 'requests=3 ' in first and 'share' not in head(first).split('requests=')[1], 'a share link is never measured'
 
 
 def test_quotes_are_kept_apart_from_the_reply(reddit):
@@ -193,5 +193,5 @@ def test_the_first_read_must_answer_with_the_post_asked_for_and_hold_the_linked_
 def test_the_comments_help_says_when_more_is_offered():
     from tests.sns.support.cli import run_cli
     done = run_cli('reddit', 'comments', '--help')
-    assert done.returncode == 0 and '--depth' in done.stdout and 'more: is offered only while' in done.stdout
+    assert done.returncode == 0 and '--depth' in done.stdout and 'more: is offered while comments within --depth remain' in done.stdout
     assert VIEWER not in done.stdout

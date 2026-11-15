@@ -33,8 +33,7 @@ def test_no_help_speaks_of_a_request_budget():
     for name in (*COMMANDS, 'doctor', 'schema'):
         text = help_of(name)
         assert 'max-requests' not in text and 'budget is spent' not in text, name
-        if name in COMMANDS:
-            assert 'there is no request budget' in text, name
+    assert 'there is no request budget' in help_of('doctor')  # its one owner, beside the shared lock and pacing
 
 
 def test_the_default_read_is_one_page_and_the_help_says_so():
@@ -56,8 +55,10 @@ def test_post_and_replies_say_what_their_limit_counts():
 
 
 def test_the_tab_cost_is_explained_without_a_budget():
-    text = help_of('feed')
+    """doctor --help owns the dedicated tab (plan 'help 구조'); a reading command's first line only names its cost."""
+    text = help_of('doctor')
     assert 'costs about 30 requests' in text and 'about 10 more' in text and 'not charged' in text
+    assert 'tab opened' in help_of('feed') and 'doctor --help' in help_of('feed')
 
 
 def test_the_windows_are_explained_with_the_core_wording():
@@ -77,24 +78,23 @@ def test_a_share_link_is_refused_by_the_help_before_the_command():
     assert 'Share links' in help_of('post') and 'fb.watch' in help_of('post')
 
 
-@pytest.mark.parametrize('name', [name for name in COMMANDS if name != 'images'])
-def test_every_command_names_its_records_and_its_tab(name):
+@pytest.mark.parametrize('name', sorted(COMMANDS))
+def test_every_command_points_to_its_record_kinds_and_its_tab(name):
+    """Record kinds are schema's and the tab is doctor's (plan 'help 구조'): each command names where they are."""
     text = help_of(name)
-    assert 'records: one block per record' in text and 'the dedicated tab' in text
+    assert 'facebook schema: record kinds' in text and 'tab opened' in text and 'doctor --help' in text
 
 
-def test_images_names_the_tab_and_how_its_numbers_match_the_post():
-    text = help_of('images')
-    assert 'the dedicated tab' in text and '[image N]' in text
+def test_images_says_how_its_numbers_match_the_post():
+    assert '[image N]' in help_of('images')
 
 
 def test_replies_says_a_deeper_branch_is_one_batch():
-    assert 'stopped=server_capped' in help_of('replies')
+    assert 'stopped=not_built' in help_of('replies')
 
 
 def test_notifications_say_that_reading_marks_nothing_and_what_was_not_observed():
     text = ' '.join(help_of('me').split())
     assert 'Reading the list sends no seen or read change' in text
     assert 'whether Facebook counts a read as seen by itself was not observable when this was measured' in text
-    assert 'stopped=server_capped' in text and 'instead of more:' in text and 'requests: 1.' in text
-    assert '[n1] notification' in text
+    assert 'stopped=not_built' in text and 'instead of more:' in text and 'requests: 1.' in text

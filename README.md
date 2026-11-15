@@ -23,7 +23,7 @@ Or copy the folder by hand — it is self-contained:
 git clone https://github.com/tjdwls101010/Agentic-SNS && mkdir -p ~/.claude/skills && cp -R Agentic-SNS/.claude/skills/sns ~/.claude/skills/
 ```
 
-The skill never writes into its own folder, so reinstalling or updating keeps your state. Blocks, holds, pacing, the request log, sessions, continuation handles and saved pictures live in `~/.local/state/agentic-sns/` (`$XDG_STATE_HOME/agentic-sns/` when that is set, or wherever `SNS_DATA_DIR` points), shared by every install on the computer. Pictures, and the handles that point at other people's posts, are removed once they are a day old, the next time the skill saves one. If you keep `SNS_DATA_DIR` elsewhere, reading a saved picture asks for permission.
+The skill never writes into its own folder, so reinstalling or updating keeps your state. Blocks, holds, pacing, the request log, sessions, continuation handles, result files and saved pictures live in `~/.local/state/agentic-sns/` (`$XDG_STATE_HOME/agentic-sns/` when that is set, or wherever `SNS_DATA_DIR` points), shared by every install on the computer. Pictures, result files and the handles that point at other people's posts are removed once they are a day old, the next time the skill saves one (an expired handle keeps only the command that remakes it, for a week). If you keep `SNS_DATA_DIR` elsewhere, reading a saved picture asks for permission.
 
 **Updating from a version that kept `data/` inside the skill folder:** `npx skills add` removes the folder before the new version can run, which would drop the recorded blocks. Move the folder's `data/` aside first, update, put it back as the new folder's `data/`, and run any command once; the new version takes it in (and does so again whenever that `data/` changes). Update every copy of the skill you have: an old copy keeps writing to its own `data/`. Only this one update needs it.
 
@@ -68,7 +68,7 @@ uv run .claude/skills/sns/scripts/cli.py reddit schema             # what result
 uv run .claude/skills/sns/scripts/cli.py reddit sub r/apple --sort top --time week --limit 5
 ```
 
-The first line of every result says what was shown, why it stopped, how many requests it used and what limit is left; the last line is the command that continues (`more:`, `replies <handle>`, `post <url>`). `--json` gives the same result as JSON and `--out FILE` collects a long read into a file. Exit codes are listed at the end of `--help`.
+A result starts with what was shown, why it stopped, how many requests it used, what limit is left and the file that keeps the whole result for about a day (`saved=`), then what is missing (`coverage:`) and the command that continues (`more:`) — so output cut short still keeps them; each record ends with the commands that open it further (`replies <handle>`, `post <url>`). `--json` gives the same result as JSON and `--out FILE` collects a long read into a file. Exit codes are listed at the end of `--help`.
 
 ## Account protection
 

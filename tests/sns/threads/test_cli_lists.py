@@ -21,7 +21,7 @@ def test_followers_report_the_profiles_total_and_stop_at_threads_sample(browser)
     code, out, _ = run(browser, 'graph', '@example.author', 'followers', '--json')
     result = json.loads(out)
     assert code == 0, result
-    assert result['stop_reason'] == 'server_capped' and result['reported_total'] == 5000
+    assert result['stop_reason'] == 'not_built' and result['reported_total'] == 5000
     assert [r['username'] for r in result['results']] == ['a.one', 'b.two']
     call = [c['args'] for c in browser.calls() if c['op'] == 'threads.query'][1]
     assert call['name'] == 'BarcelonaFriendshipsFollowersTabQuery' and call['variables']['userID'] == '1000000001'
@@ -33,8 +33,42 @@ def test_followers_stay_one_sample_even_when_threads_offers_a_cursor(browser):
     known_tab(browser).respond('threads.query', by_name()).respond('threads.query', query_result(first))
     code, out, _ = run(browser, 'graph', '@example.author', 'followers', '--limit', '5', '--json')
     result = json.loads(out)
-    assert code == 0 and result['stop_reason'] == 'server_capped' and 'next' not in result
+    assert code == 0 and result['stop_reason'] == 'not_built' and 'next' not in result
     assert browser.ops().count('threads.query') == 2
+
+
+def test_followers_read_to_the_profiles_total_are_the_whole_list(browser):
+    """not_built says Threads may have more; when what was read reaches the count the profile reports, it has not."""
+    body = {'data': {'fetch__XDTUserDict': {'followers': {'edges': accounts(['a.one', 'b.two'])}},
+                     'xdt_api__v1__text_feed__user_counts': {'follower_count': 2}}}
+    known_tab(browser).respond('threads.query', by_name()).respond('threads.query', query_result(body))
+    code, out, _ = run(browser, 'graph', '@example.author', 'followers', '--json')
+    result = json.loads(out)
+    assert code == 0 and result['stop_reason'] == 'exhausted', result
+
+
+def test_the_same_follower_twice_does_not_make_the_list_look_whole(browser):
+    body = {'data': {'fetch__XDTUserDict': {'followers': {'edges': accounts(['a.one', 'a.one'])[:1] * 2}},
+                     'xdt_api__v1__text_feed__user_counts': {'follower_count': 2}}}
+    known_tab(browser).respond('threads.query', by_name()).respond('threads.query', query_result(body))
+    code, out, _ = run(browser, 'graph', '@example.author', 'followers', '--json')
+    result = json.loads(out)
+    assert code == 0 and result['stop_reason'] == 'not_built', result
+
+
+def test_the_rest_of_a_followers_page_still_ends_not_built(browser):
+    """more: after --limit shows what the first page held without a request; the end it reaches is still the
+    skill's, not the list's."""
+    body = {'data': {'fetch__XDTUserDict': {'followers': {'edges': accounts(['a.one', 'b.two'])}},
+                     'xdt_api__v1__text_feed__user_counts': {'follower_count': 5000}}}
+    known_tab(browser).respond('threads.query', by_name()).respond('threads.query', query_result(body))
+    code, out, _ = run(browser, 'graph', '@example.author', 'followers', '--limit', '1', '--json')
+    first = json.loads(out)
+    assert code == 0 and first['stop_reason'] == 'limit_reached' and first['next'], first
+    known_tab(browser)
+    code, out, _ = rerun(browser, 'more: ' + first['next'])
+    rest = json.loads(out)
+    assert code == 0 and [r['username'] for r in rest['results']] == ['b.two'] and rest['stop_reason'] == 'not_built'
 
 
 def test_following_pages_by_offset_and_more_continues_with_the_profiles_id(browser):

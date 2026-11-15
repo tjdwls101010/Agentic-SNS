@@ -29,7 +29,7 @@ def test_the_feeds_help_says_out_needs_a_limit():
 def test_me_help_describes_each_collection_without_duplicate_epilogs():
     text = body(help_of('me'))
     assert text.count('requests: 1.') == 1
-    assert text.count('records: one block per record') == 1 and text.count('the dedicated tab:') == 1
+    assert text.count('threads schema: record kinds') == 1 and text.count('tab opened') == 1
     assert '--tab applies only to activity' in text
     assert 'liked and saved' in text and 'activity' in text and 'no next page' in text
 
@@ -57,8 +57,14 @@ def test_post_and_replies_say_what_their_limit_counts():
 
 
 @pytest.mark.parametrize('name', sorted(COMMANDS))
-def test_every_reading_command_says_how_the_tab_is_counted(name):
-    assert 'the dedicated tab:' in help_of(name)
+def test_every_reading_command_says_where_the_tab_is_explained(name):
+    """doctor --help owns the dedicated tab (plan 'help 구조'); each command says what "tab opened" means."""
+    assert 'tab opened' in help_of(name) and 'doctor --help' in help_of(name)
+
+
+def test_doctor_says_how_the_tab_is_counted():
+    text = body(help_of('doctor'))
+    assert 'the dedicated tab:' in text and 'about 34-40 requests' in text and 'unwatched=' in text
 
 
 def test_search_help_names_the_filters_threads_applies_itself():

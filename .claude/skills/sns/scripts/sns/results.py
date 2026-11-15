@@ -21,6 +21,8 @@ STOP_REASONS = {
     'not_paginable': ('This surface is one batch.', 'Nothing.'),
     'server_capped': ('The platform serves no more than this (its own cap or sample), though it may report a larger '
                       'total; what lies beyond cannot be asked for.', 'Narrow the query to reach other records.'),
+    'not_built': ('This skill does not read this surface past what it read: the platform may have more (a later '
+                  'version may read it).', 'Use another surface, or narrow the read; nothing to retry.'),
     'pagination_stalled': ('The platform kept serving the same records, so reading stopped there.',
                            'Retry later with more:.'),
     'time_limit': ('The command reached its time limit (it must end within about two minutes).',
@@ -261,6 +263,7 @@ ENVELOPE = {
     'fix': 'string — what to do next; a resumable stop carries one too',
     'coverage': 'array<string> — what this result does not cover: unread parts, left-out entries, response issues',
     'next': 'string — the command that continues this reading; run it as it is (text prints it as more:)',
+    'saved': 'string — the file that keeps this whole result (this same envelope, saved field included) for about a day: open it with Read or Grep instead of asking the platform again; removed by a later read once a day old (unused, it stays); unavailable when it could not be written; absent for doctor, schema, an --out run and a failure before any record',
     'out': 'string — the --out file',
     'count': 'integer — records saved in the --out file so far',
     'already_complete': 'boolean — the --out file was final before this run; nothing was read',
@@ -271,13 +274,15 @@ ENVELOPE = {
 
 TEXT = {
     'header': '<platform> <command>[ · key=value …] · <n> shown · stopped=<stop_reason> · requests=<n>[ · tab opened '
-              '(+<n> requests)][ · unwatched=<n>][ · limit <scope> <remaining> of <limit> left resets <local time>]',
+              '(+<n> requests)][ · unwatched=<n>][ · limit <scope> <remaining> of <limit> left resets <local time>][ · '
+              'saved=<file>]',
     'window': 'dated reads add a second line: window <since>..<until> <tz> · <coverage>',
     'records': 'one record per label ([p1] post, [r1] reply, [c1] comment, [a1] account, …); each record ends with the '
                'arguments of the next command (url: <command> <url> opens it alone; replies <handle> reads more under '
                'it)',
     'text': 'text[N of M chars shown]: N characters of the M received are shown (--chars); --chars 0 shows everything',
-    'tail': 'coverage: <note> lines, then more: <command> when reading can continue. With --out the whole result is '
+    'tail': 'after the window line and before the records: coverage: <note> lines (after a failure, coverage: '
+            'incomplete — <message> fix: <fix>), then more: <command> when reading can continue. With --out the whole result is '
             'one line: <platform> <command> · <n> saved to "<path>" · stopped=… · requests=… [· resume: <command>] '
             '[· error=<kind> fix=<fix>]',
 }

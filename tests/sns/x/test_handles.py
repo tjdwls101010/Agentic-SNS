@@ -13,6 +13,7 @@ import time
 import pytest
 
 from tests.sns.x.scenes import ACCOUNT, known_tab, opening, queries, query_result, rerun, run, state
+from tests.sns.support.cli import more_line
 
 RATE = {'x-rate-limit-limit': '500', 'x-rate-limit-remaining': '499', 'x-rate-limit-reset': str(int(time.time()) + 900)}
 AUTHOR = {'__typename': 'User', 'rest_id': '1000000001', 'core': {'screen_name': 'author_a', 'name': 'A'}}
@@ -55,7 +56,7 @@ def feed_handle(browser, *args):
     browser.respond('x.query', feed_page('1850000000000000001'))
     code, out, _ = run(browser, 'feed', '--limit', '1', *args)
     assert code == 0, out
-    return re.search(r'--after (\d+)', out.splitlines()[-1]).group(1), out
+    return re.search(r'--after (\d+)', more_line(out)).group(1), out
 
 
 def test_one_post_read_saves_a_handle_for_each_batch_and_branch_and_the_numbers_only_grow(browser):
@@ -66,7 +67,7 @@ def test_one_post_read_saves_a_handle_for_each_batch_and_branch_and_the_numbers_
     assert code == 0, out
     branch = int(re.search(r'status/102"   author: "author_a"   replies (\d+)', out).group(1))
     hidden = int(re.search(r'replies (\d+) reads them', out).group(1))
-    following = int(re.search(r' replies (\d+)', out.splitlines()[-1]).group(1))
+    following = int(re.search(r' replies (\d+)', more_line(out)).group(1))
     assert len({branch, hidden, following}) == 3 and min(branch, hidden, following) >= 1000
     assert sorted([branch, hidden, following]) == [branch, hidden, following]  # saved in the order they were found
 
@@ -81,7 +82,7 @@ def test_a_handle_that_is_not_a_number_is_exit_2_before_the_browser_is_touched(b
 def test_a_handle_is_bound_to_the_command_the_feed_the_target_and_the_window_it_continues(browser):
     known_tab(browser)
     number, out = feed_handle(browser, '--since', '2026-10-01')
-    assert '--since 2026-10-01' in out.splitlines()[-1]  # the window travels in the more: line
+    assert '--since 2026-10-01' in more_line(out)  # the window travels in the more: line
     for args in (('feed', '--tab', 'following', '--since', '2026-10-01'),   # another feed
                  ('feed', '--since', '2026-10-02'),                          # another window
                  ('feed',),                                                  # no window
@@ -99,7 +100,7 @@ def test_a_handle_read_as_one_x_account_is_a_changed_login_under_another_and_sur
     deleted, and the same number works again once the browser shows the account it was read as."""
     known_tab(browser)
     number, out = feed_handle(browser)
-    more = out.splitlines()[-1]
+    more = more_line(out)
     browser.respond('x.state', state(user_id='1000000098'))
     code, text, _ = rerun(browser, more)
     envelope = json.loads(text)
@@ -122,3 +123,28 @@ def test_a_number_nobody_saved_is_exit_2_naming_what_to_rerun(browser):
     code, out, _ = run(browser, 'feed', '--after', '99999')
     envelope = json.loads(out)
     assert code == 2 and envelope['error'] == 'argument' and 'without --after' in envelope['fix'], out
+
+
+def test_an_expired_handle_names_the_reading_to_start_again_however_deep_it_came_from(browser, data_dir):
+    """A handle read from a handle (post, then replies N, then its more:) names the reading the chain started from —
+    not the handle it came from, which expired first — and never the --out file of the command that printed it."""
+    known_tab(browser).respond('x.query', conversation())
+    code, out, _ = run(browser, 'post', '101')
+    first = re.search(r' replies (\d+)', more_line(out)).group(1)
+    later = [{'type': 'TimelineAddEntries', 'entries': [entry(tweet('103', '101')), entry(tweet('104', '101')),
+                                                        cursor('Bottom', 'NEXTCUR2')]}]
+    known_tab(browser).respond('x.query', query_result(
+        {'data': {'threaded_conversation_with_injections_v2': {'instructions': later}}}, headers=RATE))
+    code, out, _ = run(browser, 'replies', first, '--limit', '1')
+    assert code == 0, out
+    second = re.search(r' replies (\d+)', more_line(out)).group(1)
+    for path in (data_dir / 'handles').glob('*.json'):
+        record = json.loads(path.read_text())
+        record['created_at'] -= 25 * 3600
+        path.write_text(json.dumps(record))
+    for number in (first, second):
+        known_tab(browser)
+        code, out, _ = run(browser, 'replies', number)
+        error = json.loads(out)
+        assert code == 2 and 'expired' in error['message'], out
+        assert error['fix'].endswith(' x post 101'), error['fix']

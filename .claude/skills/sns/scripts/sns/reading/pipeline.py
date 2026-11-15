@@ -11,7 +11,7 @@ import os
 import subprocess
 import sys
 
-from sns import handles, images, outfile, protection
+from sns import handles, images, outfile, protection, saved
 from sns.aside import Aside
 from sns.cmdline import command_line, words as command_words
 from sns.errors import SnsError
@@ -42,6 +42,7 @@ class Connection:
         self.started = False
         self._viewer = None
         self.observed = None   # the platform account a continued reading was read with
+        self.remake = None     # the command that starts the reading a loaded handle came from (handles.remake_of)
 
     @property
     def verbose(self):
@@ -78,13 +79,34 @@ class Connection:
         read with. Returns the number to print (e.g. `replies <number>`)."""
         bound = context(self.platform, command, target, identity or {}, self.account)
         viewer = self.observed or self._viewer or self.viewer()
-        return handles.save(bound, state, viewer=viewer, deadline=self.deadline)
+        return handles.save(bound, state, viewer=viewer, deadline=self.deadline, remake=self.start_over())
+
+    def start_over(self):
+        """The command that starts this reading from the beginning, for the handles it saves to name once they expire:
+        the one a handle it continued from named (a handle of a handle would name a handle that expired first), else
+        this command line without its --out file (which a rerun would find complete) and --after."""
+        if self.remake:
+            return self.remake
+        # the options this command was given, however abbreviated (argparse takes a unique prefix such as --ou)
+        given = [name for name in ('--out', '--after') if self.options.get(name[2:]) is not None]
+        words, argv = [], list(getattr(self.invocation, 'argv', ()))
+        while argv:
+            word = argv.pop(0)
+            if word == '--':  # what follows is positional (a target or text that looks like an option): keep it all
+                words += [word, *argv]
+                break
+            name = word.split('=', 1)[0]
+            if not (len(name) > 2 and any(option.startswith(name) for option in given)):
+                words.append(word)
+            elif '=' not in word and argv:
+                argv.pop(0)
+        return command_line(self.invocation.cli_path, words) if words else None
 
     def resume(self, number, command, target=None, identity=None):
         """The state a handle saved for `command` (and target, identity); a handle of another command is an argument
         error naming where it belongs, one read as another account a changed login."""
         state, viewer = handles.load(number, context(self.platform, command, target, identity or {}, self.account))
-        self.observed = viewer
+        self.observed, self.remake = viewer, handles.remake_of(number)
         self.confirm(viewer)
         return state
 
@@ -150,6 +172,7 @@ def run(platform, invocation, *, command, target, identity, reader, window=None,
     options = invocation.options
     out_path = options.get('out')
     public = identity
+    saved.prune()  # the first read after a day removes day-old result files, whatever this read finds
     identity = with_window(identity, options)  # a different window is a different query for handles and files
     connection, reading = None, None
     try:
@@ -178,8 +201,11 @@ def run(platform, invocation, *, command, target, identity, reader, window=None,
     if window is not None and 'window' not in reading:
         reading['window'] = window
     report = connection.report() if connection is not None else None
-    return finish(reading, platform=platform.key, command=command, report=report, identity=_public(public),
-                  out=str(outfile.resolve(out_path)) if out_path else None)
+    kind, envelope = finish(reading, platform=platform.key, command=command, report=report, identity=_public(public),
+                            out=str(outfile.resolve(out_path)) if out_path else None)
+    if not out_path and (envelope.get('results') or envelope.get('sections')):
+        saved.keep(envelope)  # the whole result, for about a day: read it again from disk, not from the platform
+    return kind, envelope
 
 
 def with_window(identity, options):
@@ -233,6 +259,7 @@ def _read(connection, command, target, identity, reader, out_path, bound):
     state = None
     if options.get('after'):
         state, connection.observed = handles.load(options['after'], bound_context)
+        connection.remake = handles.remake_of(options['after'])
         connection.confirm(connection.observed)
     # A tab platform knows its account from the page; a fetch platform asks (one request) only for a reading that is
     # tied to the account: a collection, or one that can leave a handle (bound).
@@ -324,7 +351,13 @@ def _continue(connection, reading):
     try:
         # a handle always carries the account it was read with (a fetch platform asks now if it has not yet)
         viewer = connection.observed or connection.known_viewer or connection.viewer()
-        number = handles.save(bound, continuation['state'], viewer=viewer, deadline=connection.deadline)
+        # once the handle expires, the same reading from its start is what to run (a replies continuation's target
+        # is a handle, so it takes the start the loaded handle named)
+        remake = connection.remake or command_line(connection.invocation.cli_path, command_words(
+            platform.key, continuation['command'], continuation['target'], window_words(continuation['words'], options),
+            options, after=None, limit=continuation.get('limit', ...)))
+        number = handles.save(bound, continuation['state'], viewer=viewer, deadline=connection.deadline,
+                              remake=remake)
     except SnsError as error:
         current = reading.get('failure')
         reading['failure'] = error if current is None else current
