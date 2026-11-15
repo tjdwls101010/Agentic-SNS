@@ -5,6 +5,7 @@ import re
 
 from tests.sns.facebook.scenes import graphql_body, known_tab, look, queries, query_result, rerun, run, story
 from tests.sns.facebook.test_cli_thread import URL, comment, script_post
+from tests.sns.support.cli import regrouped
 
 
 def replies_body(parent, nodes, has_next=True, cursor='R1'):
@@ -31,7 +32,7 @@ def test_a_comments_replies_batch_by_batch_and_deeper(browser):
     serve(browser, 'C1', batch, cursor='RC1')
     code, out, _ = run(browser, 'replies', first)
     assert code == 0, out
-    lines = out.splitlines()
+    lines = regrouped(out)
     assert lines[0] == 'facebook replies · 10 shown · stopped=limit_reached · requests=1'
     assert lines[1] == f'thread: post "{URL}" · replies to comment C1'
     assert lines[2].startswith('  [c1] Person R1')

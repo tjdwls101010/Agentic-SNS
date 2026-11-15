@@ -3,6 +3,7 @@ import json
 import re
 
 from tests.sns.facebook.scenes import known_tab, look, page_result, queries, query_result, rerun, run, story
+from tests.sns.support.cli import more_line, regrouped
 
 URL = 'https://www.facebook.com/some.page/posts/pfbid0abc'
 
@@ -47,7 +48,7 @@ def test_post_shows_full_text_parents_and_reply_handles(browser):
     script_post(browser, [comment('C1', replies=2), comment('C2', replies=0), comment('C3')], text=long_text)
     code, out, _ = run(browser, 'post', URL)
     assert code == 0, out
-    lines = out.splitlines()
+    lines = regrouped(out)
     assert lines[0] == 'facebook post · sort=all · 4 shown · stopped=limit_reached · requests=3'
     assert lines[2] == f'     text[500 of 500 chars shown]: "{long_text}"'
     handles = dict(re.findall(r'author: "https://www.facebook.com/person.(c\d)"   replies (\d+)', out))
@@ -76,7 +77,7 @@ def test_limit_keeps_the_unshown_parents_for_comments(browser):
     script_post(browser, [comment('C1', replies=0), comment('C2', replies=0), comment('C3', replies=0)])
     code, out, _ = run(browser, 'post', URL, '--limit', '1')
     assert code == 0 and '2 shown' in out.splitlines()[0]
-    more = out.splitlines()[-1]
+    more = more_line(out)
     assert re.search(rf'facebook comments {re.escape(URL)} --sort all --after \d+$', more)
     look(browser)
     browser.respond('facebook.query', query_result(comments_body([comment('C4', replies=0)], has_next=False, cursor=None)),
@@ -86,7 +87,7 @@ def test_limit_keeps_the_unshown_parents_for_comments(browser):
     assert out.splitlines()[0] == 'facebook comments · sort=all · 2 shown · stopped=limit_reached · requests=0'
     assert 'Person C2' in out and 'Person C3' in out
     look(browser)
-    code, out, _ = rerun(browser, out.splitlines()[-1])
+    code, out, _ = rerun(browser, more_line(out))
     assert 'Person C4' in out and 'stopped=exhausted' in out
     page = queries(browser)[-1]['args']['variables']
     assert page['commentsAfterCursor'] == 'CC1' and page['id'] == 'P1'
@@ -116,7 +117,7 @@ def test_comments_command_finds_the_post_first(browser):
 def test_comments_without_a_limit_read_one_page(browser):
     script_post(browser, [comment('C1', replies=0)], has_next=True)
     code, out, _ = run(browser, 'comments', URL)
-    assert code == 0 and len(queries(browser)) == 2 and out.splitlines()[-1].startswith('more: ')
+    assert code == 0 and len(queries(browser)) == 2 and more_line(out).startswith('more: ')
 
 
 def test_a_post_url_is_required(browser):

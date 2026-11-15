@@ -10,6 +10,7 @@ import pytest
 
 from sns.facebook import web
 from tests.sns.facebook.scenes import known_tab, queries, query_result, run, sent
+from tests.sns.support.cli import regrouped
 
 FIRST = 'CometNotificationsRootQuery'
 REJECTED = json.dumps({'errors': [{'message': 'PersistedQueryNotFound', 'code': 1675002}]})
@@ -50,7 +51,7 @@ def test_one_page_of_notifications_skips_layout_rows_and_is_all_there_is_to_read
                                             layout('SEE_PREVIOUS_BUTTON')]))
     code, out, _ = run(browser, 'me', 'notifications')
     assert code == 0, out
-    lines = out.splitlines()
+    lines = regrouped(out)
     assert lines[0] == 'facebook me · 2 shown · stopped=server_capped · requests=1'
     assert lines[1] == '[n1] 2026-09-12T03:00+00:00 · feed_comment_reply · read'
     assert lines[2] == '     text[37 of 37 chars shown]: "Sample Person replied to your comment"'

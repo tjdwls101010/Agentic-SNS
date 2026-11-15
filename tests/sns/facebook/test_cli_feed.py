@@ -4,6 +4,7 @@ import json
 import re
 
 from tests.sns.facebook.scenes import graphql_body, known_tab, look, queries, query_result, rerun, run, story
+from tests.sns.support.cli import regrouped
 
 FEED = ['viewer', 'news_feed']
 
@@ -21,7 +22,7 @@ def test_text_page_contract_and_continuation(browser):
     browser.respond('facebook.query', page([story('A'), story('B'), story('C')], cursor='CUR1'))
     code, out, _ = run(browser, 'feed', '--limit', '2')
     assert code == 0, out
-    lines = out.splitlines()
+    lines = regrouped(out)
     assert lines[0] == 'facebook feed · sort=top · 2 shown · stopped=limit_reached · requests=1'
     assert lines[1].startswith('[p1] Author A · 2026-09-12T03:00+00:00 · status · reactions=? comments=? shares=?')
     assert lines[2] == '     text[6 of 6 chars shown]: "post A"'

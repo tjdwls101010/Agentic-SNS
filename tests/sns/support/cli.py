@@ -35,3 +35,14 @@ def command_of(line):
     words = shlex.split(line.split(': ', 1)[1])
     assert words[:2] == ['uv', 'run'] and words[2].endswith('cli.py'), words
     return words[3:]
+
+
+def regrouped(text):
+    """A text page's lines as header, records, then its notes (window, coverage, more:) — for tests that check records
+    by position. The page itself prints the notes before the records (tests/sns/core/test_output.py pins that)."""
+    lines = text.splitlines()
+    head, rest = lines[:1], lines[1:]
+    notes = []
+    while rest and rest[0].startswith(('window ', 'coverage: ', 'more: ')):
+        notes.append(rest.pop(0))
+    return head + rest + notes

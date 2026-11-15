@@ -2,6 +2,7 @@
 import json
 
 from tests.sns.facebook.scenes import (known_tab, look, page_result, queries, query_result, rerun, run, story)
+from tests.sns.support.cli import more_line, regrouped
 
 
 def results_body(edges, has_next=True, cursor='S1'):
@@ -22,7 +23,7 @@ def test_people_search_lists_entities_with_their_next_argument(browser):
     browser.respond('facebook.query', query_result(results_body([person('500', verified=True), person('501')])))
     code, out, _ = run(browser, 'search', 'Sample Person', '--type', 'people', '--limit', '2')
     assert code == 0, out
-    lines = out.splitlines()
+    lines = regrouped(out)
     assert lines[0] == 'facebook search · type=people · 2 shown · stopped=limit_reached · requests=1'
     assert lines[1] == '[e1] person id=500 · Sample Person · verified · url: "https://www.facebook.com/p.500"'
     assert lines[2] == '[e2] person id=501 · Sample Person · verified=? · url: "https://www.facebook.com/p.501"'
@@ -48,7 +49,7 @@ def test_search_continues_from_its_cursor(browser):
     browser.respond('facebook.query', query_result(results_body([person('1')], cursor='S1')))
     code, out, _ = run(browser, 'search', 'x', '--type', 'people', '--limit', '1')
     look(browser).respond('facebook.query', query_result(results_body([person('2')], has_next=False)))
-    code, out, _ = rerun(browser, out.splitlines()[-1])
+    code, out, _ = rerun(browser, more_line(out))
     assert code == 0 and 'id=2' in out
     assert queries(browser)[1]['args']['variables']['cursor'] == 'S1'
 
@@ -57,7 +58,7 @@ def test_option_like_search_text_goes_after_a_double_dash(browser):
     known_tab(browser)
     browser.respond('facebook.query', query_result(results_body([person('1')], cursor='S1')))
     code, out, _ = run(browser, 'search', '--type', 'people', '--limit', '1', '--', '-dash')
-    assert code == 0 and out.splitlines()[-1].endswith(' -- -dash')
+    assert code == 0 and more_line(out).endswith(' -- -dash')
 
 
 def test_empty_search_text_is_refused(browser):
@@ -85,7 +86,7 @@ def test_filters_continue_with_the_same_filters(browser):
     known_tab(browser)
     browser.respond('facebook.query', query_result(results_body([{'node': {**story('SF1'), '__typename': 'Story'}}])))
     code, out, _ = run(browser, 'search', 'ai', '--type', 'posts', '--recent', '--limit', '1')
-    assert out.splitlines()[-1].split('facebook search ', 1)[1].startswith('ai --type posts --recent --limit 1 --after ')
+    assert more_line(out).split('facebook search ', 1)[1].startswith('ai --type posts --recent --limit 1 --after ')
 
 
 def test_post_filters_need_a_post_vertical(browser):

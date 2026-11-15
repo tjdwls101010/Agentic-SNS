@@ -4,6 +4,7 @@ import json
 import time
 
 from tests.sns.x.scenes import known_tab, limits, query_result, queries, rerun, run, stand_limit, state, state_of
+from tests.sns.support.cli import more_line, regrouped
 
 USER = {'__typename': 'User', 'rest_id': '1000000001', 'core': {'screen_name': 'example_author', 'name': 'Example'}}
 
@@ -38,7 +39,7 @@ def test_one_page_by_default_with_a_more_line(browser):
                                                                      entry(post('1850000000000000002'))]), headers=RATE))
     code, out, err = feed(browser)
     assert code == 0, (out, err)
-    lines = out.splitlines()
+    lines = regrouped(out)
     assert lines[0].startswith('x feed · tab=foryou · 2 shown · stopped=limit_reached · requests=1')
     assert '[p1] @example_author (Example)' in out and 'url: "https://x.com/example_author/status/1850000000000000001"' in out
     assert lines[-1].startswith('more: uv run "')
@@ -55,7 +56,7 @@ def test_more_continues_from_the_cursor_without_repeats(browser):
     browser.respond('x.state', state())
     browser.respond('x.query', query_result(home([entry(post('1850000000000000001')), entry(post('1850000000000000003'))],
                                                bottom='CUR2'), headers=RATE), name='HomeTimeline')
-    code, out, _ = rerun(browser, out.splitlines()[-1])
+    code, out, _ = rerun(browser, more_line(out))
     assert code == 0, out
     assert '1 shown' in out.splitlines()[0] and '1850000000000000003' in out and '1850000000000000001' not in out
     second = queries(browser)[-1]
@@ -147,7 +148,7 @@ def test_the_operations_limit_after_records_is_a_resumable_stop(browser):
     assert code == 0, out
     head = out.splitlines()[0]
     assert 'stopped=rate_limited' in head and 'limit HomeTimeline resets' in head
-    assert out.splitlines()[-1].startswith('more: ')
+    assert more_line(out).startswith('more: ')
 
 
 def test_a_known_empty_bucket_is_refused_without_a_request(browser):
@@ -163,7 +164,7 @@ def test_the_time_limit_after_records_is_a_resumable_stop(browser):
                                                            headers=RATE)})
     code, out, _ = feed(browser, '--limit', '40', env={'SNS_DEADLINE_SECONDS': '8'})
     assert code == 0, out
-    assert 'stopped=time_limit' in out.splitlines()[0] and out.splitlines()[-1].startswith('more: ')
+    assert 'stopped=time_limit' in out.splitlines()[0] and more_line(out).startswith('more: ')
 
 
 def test_the_time_limit_before_any_record_is_exit_6(browser):

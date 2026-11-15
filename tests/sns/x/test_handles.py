@@ -13,6 +13,7 @@ import time
 import pytest
 
 from tests.sns.x.scenes import ACCOUNT, known_tab, opening, queries, query_result, rerun, run, state
+from tests.sns.support.cli import more_line
 
 RATE = {'x-rate-limit-limit': '500', 'x-rate-limit-remaining': '499', 'x-rate-limit-reset': str(int(time.time()) + 900)}
 AUTHOR = {'__typename': 'User', 'rest_id': '1000000001', 'core': {'screen_name': 'author_a', 'name': 'A'}}
@@ -55,7 +56,7 @@ def feed_handle(browser, *args):
     browser.respond('x.query', feed_page('1850000000000000001'))
     code, out, _ = run(browser, 'feed', '--limit', '1', *args)
     assert code == 0, out
-    return re.search(r'--after (\d+)', out.splitlines()[-1]).group(1), out
+    return re.search(r'--after (\d+)', more_line(out)).group(1), out
 
 
 def test_one_post_read_saves_a_handle_for_each_batch_and_branch_and_the_numbers_only_grow(browser):
@@ -66,7 +67,7 @@ def test_one_post_read_saves_a_handle_for_each_batch_and_branch_and_the_numbers_
     assert code == 0, out
     branch = int(re.search(r'status/102"   author: "author_a"   replies (\d+)', out).group(1))
     hidden = int(re.search(r'replies (\d+) reads them', out).group(1))
-    following = int(re.search(r' replies (\d+)', out.splitlines()[-1]).group(1))
+    following = int(re.search(r' replies (\d+)', more_line(out)).group(1))
     assert len({branch, hidden, following}) == 3 and min(branch, hidden, following) >= 1000
     assert sorted([branch, hidden, following]) == [branch, hidden, following]  # saved in the order they were found
 
@@ -81,7 +82,7 @@ def test_a_handle_that_is_not_a_number_is_exit_2_before_the_browser_is_touched(b
 def test_a_handle_is_bound_to_the_command_the_feed_the_target_and_the_window_it_continues(browser):
     known_tab(browser)
     number, out = feed_handle(browser, '--since', '2026-10-01')
-    assert '--since 2026-10-01' in out.splitlines()[-1]  # the window travels in the more: line
+    assert '--since 2026-10-01' in more_line(out)  # the window travels in the more: line
     for args in (('feed', '--tab', 'following', '--since', '2026-10-01'),   # another feed
                  ('feed', '--since', '2026-10-02'),                          # another window
                  ('feed',),                                                  # no window
@@ -99,7 +100,7 @@ def test_a_handle_read_as_one_x_account_is_a_changed_login_under_another_and_sur
     deleted, and the same number works again once the browser shows the account it was read as."""
     known_tab(browser)
     number, out = feed_handle(browser)
-    more = out.splitlines()[-1]
+    more = more_line(out)
     browser.respond('x.state', state(user_id='1000000098'))
     code, text, _ = rerun(browser, more)
     envelope = json.loads(text)

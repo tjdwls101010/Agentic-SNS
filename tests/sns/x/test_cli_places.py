@@ -4,6 +4,7 @@ import json
 import time
 
 from tests.sns.x.scenes import known_tab, queries, query_result, rerun, run, state
+from tests.sns.support.cli import more_line
 
 RATE = {'x-rate-limit-limit': '500', 'x-rate-limit-remaining': '499', 'x-rate-limit-reset': str(int(time.time()) + 900)}
 OWNER = {'__typename': 'User', 'rest_id': '1000000001', 'core': {'screen_name': 'author_a', 'name': 'Author A'}}
@@ -175,9 +176,9 @@ def test_suggested_communities_and_community_search_continue_from_their_more_lin
     for args, body, cursor in ((['community'], discovery, 'DISC2'), (['search', 'rust', '--in', 'communities'], search, 'SRCH2')):
         known_tab(browser).respond('x.query', query_result(body, headers=RATE))
         code, out, _ = run(browser, *args)
-        assert code == 0 and out.splitlines()[-1].startswith('more: '), out
+        assert code == 0 and more_line(out).startswith('more: '), out
         browser.respond('x.state', state()).respond('x.query', query_result(body, headers=RATE))
-        code, out, _ = rerun(browser, out.splitlines()[-1])
+        code, out, _ = rerun(browser, more_line(out))
         assert code == 0, out
         assert query_args(browser)[-1]['variables']['cursor'] == cursor and query_args(browser)[-1]['name'] == query_args(browser)[-2]['name']
 
@@ -503,11 +504,11 @@ def test_a_trends_more_line_keeps_the_tab_it_continues(browser):
         [trend('#Goal', 1, '%23Goal')], 'SPORTS2')}}}}, headers=RATE)
     known_tab(browser).respond('x.query', answer).respond('x.query', page)
     code, out, _ = run(browser, 'trends', '--tab', 'sports')
-    assert code == 0 and out.splitlines()[-1].startswith('more: ') and '--tab sports' in out.splitlines()[-1], out
+    assert code == 0 and more_line(out).startswith('more: ') and '--tab sports' in more_line(out), out
     last = entries([trend('#Save', 2, '%23Save')])
     browser.respond('x.state', state()).respond('x.query', query_result(
         {'data': {'timeline': {'timeline': {'instructions': last}}}}, headers=RATE))
-    code, out, _ = rerun(browser, out.splitlines()[-1])
+    code, out, _ = rerun(browser, more_line(out))
     assert code == 0 and '#Save' in out, out
     assert query_args(browser)[-1]['variables'] == {'timelineId': 'U1BPUlRT', 'cursor': 'SPORTS2'} or \
         query_args(browser)[-1]['variables']['cursor'] == 'SPORTS2'

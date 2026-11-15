@@ -7,7 +7,7 @@ import pytest
 
 from tests.sns.reddit.scene import VIEWER, fixture
 from tests.sns.reddit.shapes import PERMALINK, more, pair, t1, things
-from tests.sns.support.cli import command_of, more_line
+from tests.sns.support.cli import command_of, more_line, regrouped
 
 
 def more_words(out):
@@ -23,7 +23,7 @@ def test_post_shows_the_post_in_full_and_the_first_batch(reddit):
     reddit.me().json('/comments/aaa1.json', pair(TREE), query={'limit': 500, 'depth': 10, 'sort': 'confidence'})
     code, out, _ = reddit.run('reddit', 'post', PERMALINK, '--limit', '3')
     assert code == 0
-    lines = out.splitlines()
+    lines = regrouped(out)
     # the post record and the three comments are what the first line counts as shown
     assert lines[0].startswith('reddit post · sort=best · 4 shown · stopped=limit_reached · requests=2')
     assert lines[1].startswith('thread: 9 comments reported (deleted and removed included) · 5 received · 3 shown now')
