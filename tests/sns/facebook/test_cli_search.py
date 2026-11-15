@@ -2,7 +2,7 @@
 import json
 
 from tests.sns.facebook.scenes import (known_tab, look, page_result, queries, query_result, rerun, run, story)
-from tests.sns.support.cli import more_line, regrouped
+from tests.sns.support.cli import head, more_line, regrouped
 
 
 def results_body(edges, has_next=True, cursor='S1'):
@@ -24,7 +24,7 @@ def test_people_search_lists_entities_with_their_next_argument(browser):
     code, out, _ = run(browser, 'search', 'Sample Person', '--type', 'people', '--limit', '2')
     assert code == 0, out
     lines = regrouped(out)
-    assert lines[0] == 'facebook search · type=people · 2 shown · stopped=limit_reached · requests=1'
+    assert head(lines[0]) == 'facebook search · type=people · 2 shown · stopped=limit_reached · requests=1'
     assert lines[1] == '[e1] person id=500 · Sample Person · verified · url: "https://www.facebook.com/p.500"'
     assert lines[2] == '[e2] person id=501 · Sample Person · verified=? · url: "https://www.facebook.com/p.501"'
     sent = queries(browser)[0]['args']

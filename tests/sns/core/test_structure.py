@@ -23,7 +23,7 @@ CONTRAST = REPO / 'contrast/sns'
 
 HELPERS = {'errors', 'limits', 'redact', 'atomic', 'paths', 'clock', 'page', 'paging', 'window', 'results', 'text',
            'render', 'cmdline'}
-STORES = {'protection', 'handles', 'session', 'outfile', 'images'}
+STORES = {'protection', 'handles', 'session', 'outfile', 'images', 'saved'}
 SYSTEMS = {'aside'}
 FEATURES = {'reading', 'maintenance'}
 SHARED = HELPERS | STORES | SYSTEMS | FEATURES

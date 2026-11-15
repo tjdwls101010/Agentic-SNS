@@ -263,6 +263,7 @@ ENVELOPE = {
     'fix': 'string — what to do next; a resumable stop carries one too',
     'coverage': 'array<string> — what this result does not cover: unread parts, left-out entries, response issues',
     'next': 'string — the command that continues this reading; run it as it is (text prints it as more:)',
+    'saved': 'string — the file that keeps this whole result (this same envelope, saved field included) for about a day: open it with Read or Grep instead of asking the platform again; removed by a later read once a day old (unused, it stays); unavailable when it could not be written; absent for doctor, schema, an --out run and a failure before any record',
     'out': 'string — the --out file',
     'count': 'integer — records saved in the --out file so far',
     'already_complete': 'boolean — the --out file was final before this run; nothing was read',

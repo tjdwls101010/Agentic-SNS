@@ -5,7 +5,7 @@ import json
 from tests.sns.facebook.data import fixture
 from tests.sns.facebook.scenes import (graphql_body, known_tab, look, page_result, queries, query_result,
                                        rerun, run, story)
-from tests.sns.support.cli import more_line
+from tests.sns.support.cli import head, more_line
 
 TIMELINE = ['node', 'timeline_list_feed_units']
 GROUP = ['node', 'group_feed']
@@ -52,7 +52,7 @@ def test_without_a_limit_a_profile_reads_one_page(browser):
     browser.respond('facebook.query', query_result(graphql_body(TIMELINE, [story('A'), story('B')], True, 'T1')))
     code, out, _ = run(browser, 'profile', '1000777')
     assert code == 0 and len(queries(browser)) == 1
-    assert out.splitlines()[0] == 'facebook profile · 2 shown · stopped=limit_reached · requests=1'
+    assert head(out.splitlines()[0]) == 'facebook profile · 2 shown · stopped=limit_reached · requests=1'
     assert more_line(out).startswith('more: ')
 
 

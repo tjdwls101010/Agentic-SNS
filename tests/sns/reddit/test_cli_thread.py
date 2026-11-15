@@ -7,7 +7,7 @@ import pytest
 
 from tests.sns.reddit.scene import VIEWER, fixture
 from tests.sns.reddit.shapes import PERMALINK, more, pair, t1, things
-from tests.sns.support.cli import command_of, more_line, regrouped
+from tests.sns.support.cli import command_of, head, more_line, regrouped
 
 
 def more_words(out):
@@ -122,7 +122,7 @@ def test_a_share_link_resolves_hop_by_hop(reddit):
     code, out, _ = reddit.run('reddit', 'post', share)
     first = out.splitlines()[0]
     assert code == 0 and reddit.paths() == ['/api/me.json', share, '/comments/aaa1.json']
-    assert 'requests=3 ' in first and 'share' not in first.split('requests=')[1], 'a share link is never measured'
+    assert 'requests=3 ' in first and 'share' not in head(first).split('requests=')[1], 'a share link is never measured'
 
 
 def test_quotes_are_kept_apart_from_the_reply(reddit):

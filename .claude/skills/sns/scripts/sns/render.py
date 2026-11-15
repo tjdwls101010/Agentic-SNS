@@ -54,7 +54,10 @@ def header(envelope, shown):
         parts.append(f'tab opened (+{setup} requests)')
     if envelope.get('unwatched_requests'):
         parts.append(f'unwatched={envelope["unwatched_requests"]}')
-    return parts + _limits(envelope)
+    parts += _limits(envelope)
+    if envelope.get('saved'):
+        parts.append(f'saved={envelope["saved"]}')  # last on the line: the file to Read for the whole result
+    return parts
 
 
 def _window(window):

@@ -76,3 +76,63 @@ def test_a_more_line_a_day_old_fails_with_the_command_that_starts_the_reading_ag
     envelope = json.loads(out)
     assert code == 2 and 'expired' in envelope['message']
     assert envelope['fix'].endswith(more[len('more: '):].replace(f' --after {number}', ''))
+
+
+# --- the whole result kept as a file (A10) ---------------------------------------------------------------------------
+
+def test_a_read_keeps_its_whole_result_in_a_private_file_the_first_line_names(capsys, browser, monkeypatch, data_dir):
+    import json
+    import os
+    me(browser)
+    feed(browser, None, [item(1), item(2)], 'C2')
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--limit', '1', '--json')
+    envelope = json.loads(out)
+    path = envelope['saved']
+    assert code == 0 and os.path.isabs(path) and path.startswith(str(data_dir / 'results'))
+    assert json.loads(open(path).read()) == envelope  # the file is the --json envelope, saved field included
+    assert os.stat(path).st_mode & 0o077 == 0
+    me(browser)
+    feed(browser, None, [item(1), item(2)], 'C2')
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--limit', '1')
+    first = out.splitlines()[0]
+    assert first.endswith(' · saved=' + first.rsplit('saved=', 1)[1]) and first.rsplit('saved=', 1)[1] != path
+
+
+def test_no_file_for_a_read_without_records_or_one_collected_into_out(capsys, browser, monkeypatch, data_dir, tmp_path):
+    import json
+    browser.respond('alpha.get', {'status': 500, 'body': {}}, path='/me')
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--limit', '1', '--json')
+    assert code != 0 and 'saved' not in json.loads(out)
+    me(browser)
+    feed(browser, None, [item(1)], None)
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--out', str(tmp_path / 'f.ndjson'), '--json')
+    assert code == 0 and 'saved' not in json.loads(out)
+    assert not (data_dir / 'results').exists() or not list((data_dir / 'results').glob('*.json'))
+
+
+def test_files_a_day_old_go_at_the_next_read(capsys, browser, monkeypatch, data_dir):
+    import json
+    import os
+    import time
+    me(browser)
+    feed(browser, None, [item(1)], None)
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--json')
+    old = json.loads(out)['saved']
+    past = time.time() - 25 * 3600
+    os.utime(old, (past, past))
+    me(browser)
+    feed(browser, None, [item(2)], None)
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--json')
+    assert not os.path.exists(old) and os.path.exists(json.loads(out)['saved'])
+
+
+def test_a_file_that_cannot_be_written_does_not_fail_the_read(capsys, browser, monkeypatch, data_dir):
+    import json
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / 'results').write_text('a file where the directory goes')
+    me(browser)
+    feed(browser, None, [item(1)], None)
+    code, out = run(capsys, browser, monkeypatch, 'alpha', 'feed', '--json')
+    envelope = json.loads(out)
+    assert code == 0 and envelope['saved'] == 'unavailable'
+    assert any('saved' in line or 'file' in line for line in envelope['coverage'])

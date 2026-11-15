@@ -3,6 +3,7 @@ import base64
 import json
 
 from tests.sns.facebook.scenes import (GRAPHQL, HOME, known_tab, page_result, queries, query_result, run, state_of)
+from tests.sns.support.cli import head
 
 
 def section(name, *texts):
@@ -34,7 +35,7 @@ def test_overview_then_every_collection(browser):
     code, out, _ = run(browser, 'about', 'some.person')
     assert code == 0, out
     lines = out.splitlines()
-    assert lines[0] == 'facebook about · 4 shown · stopped=exhausted · requests=4'
+    assert head(lines[0]) == 'facebook about · 4 shown · stopped=exhausted · requests=4'
     assert lines[1:] == ['overview: Works at Example Co', 'directory_work: Works at Example Co',
                          'directory_work: Studied at X', 'directory_places: Lives in Example City']
     variables = [q['args']['variables'] for q in queries(browser)]
@@ -132,7 +133,7 @@ def test_a_group_url_gets_the_group_card(browser):
     code, out, _ = run(browser, 'about', 'https://www.facebook.com/groups/examplegroup/')
     assert code == 0, out
     lines = out.splitlines()
-    assert lines[0] == 'facebook about · 1 shown · stopped=exhausted · requests=3'
+    assert head(lines[0]) == 'facebook about · 1 shown · stopped=exhausted · requests=3'
     assert lines[1] == ('[e1] group id=700 · Example Group · Public group · 90,355 total members · you: CAN_JOIN · '
                         'url: "https://www.facebook.com/groups/examplegroup/"')
     assert lines[2] == '     description: "All about examples."'

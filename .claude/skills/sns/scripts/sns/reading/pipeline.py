@@ -11,7 +11,7 @@ import os
 import subprocess
 import sys
 
-from sns import handles, images, outfile, protection
+from sns import handles, images, outfile, protection, saved
 from sns.aside import Aside
 from sns.cmdline import command_line, words as command_words
 from sns.errors import SnsError
@@ -180,8 +180,11 @@ def run(platform, invocation, *, command, target, identity, reader, window=None,
     if window is not None and 'window' not in reading:
         reading['window'] = window
     report = connection.report() if connection is not None else None
-    return finish(reading, platform=platform.key, command=command, report=report, identity=_public(public),
-                  out=str(outfile.resolve(out_path)) if out_path else None)
+    kind, envelope = finish(reading, platform=platform.key, command=command, report=report, identity=_public(public),
+                            out=str(outfile.resolve(out_path)) if out_path else None)
+    if not out_path and (envelope.get('results') or envelope.get('sections')):
+        saved.keep(envelope)  # the whole result, for about a day: read it again from disk, not from the platform
+    return kind, envelope
 
 
 def with_window(identity, options):

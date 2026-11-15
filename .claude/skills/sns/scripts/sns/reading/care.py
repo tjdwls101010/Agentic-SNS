@@ -1,5 +1,6 @@
 """doctor and the idle cleanup: the same for every platform, with the platform's own part behind its client."""
 from sns.clock import Deadline
+from sns import saved
 from sns.errors import SnsError
 from sns.paths import data_dir
 from sns.results import finish
@@ -71,6 +72,7 @@ def idle(platform, invocation, account, token, after):
     runs it waits and looks again, so a command that dies without releasing does not leave the tab polling. The waits
     are outside any deadline; each attempt gets its own short one."""
     sleep = invocation.deadline.clock.sleep
+    saved.prune()  # result files a day old go with the idle cleanup too
     for attempt in range(BUSY_CHECKS):
         sleep(after if attempt == 0 else max(after, 1))
         try:

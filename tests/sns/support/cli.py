@@ -46,3 +46,8 @@ def regrouped(text):
     while rest and rest[0].startswith(('window ', 'coverage: ', 'more: ')):
         notes.append(rest.pop(0))
     return head + rest + notes
+
+
+def head(line):
+    """A first line without its trailing ' · saved=<file>' (the file's number differs from run to run)."""
+    return line.split(' · saved=', 1)[0]

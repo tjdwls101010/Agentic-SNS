@@ -3,7 +3,7 @@ import json
 import re
 
 from tests.sns.facebook.scenes import known_tab, look, page_result, queries, query_result, rerun, run, story
-from tests.sns.support.cli import more_line, regrouped
+from tests.sns.support.cli import head, more_line, regrouped
 
 URL = 'https://www.facebook.com/some.page/posts/pfbid0abc'
 
@@ -49,7 +49,7 @@ def test_post_shows_full_text_parents_and_reply_handles(browser):
     code, out, _ = run(browser, 'post', URL)
     assert code == 0, out
     lines = regrouped(out)
-    assert lines[0] == 'facebook post · sort=all · 4 shown · stopped=limit_reached · requests=3'
+    assert head(lines[0]) == 'facebook post · sort=all · 4 shown · stopped=limit_reached · requests=3'
     assert lines[2] == f'     text[500 of 500 chars shown]: "{long_text}"'
     handles = dict(re.findall(r'author: "https://www.facebook.com/person.(c\d)"   replies (\d+)', out))
     assert set(handles) == {'c1', 'c3'}
@@ -84,7 +84,7 @@ def test_limit_keeps_the_unshown_parents_for_comments(browser):
                     name='CommentsListComponentsPaginationQuery')
     code, out, _ = rerun(browser, more)
     assert code == 0, out
-    assert out.splitlines()[0] == 'facebook comments · sort=all · 2 shown · stopped=limit_reached · requests=0'
+    assert head(out.splitlines()[0]) == 'facebook comments · sort=all · 2 shown · stopped=limit_reached · requests=0'
     assert 'Person C2' in out and 'Person C3' in out
     look(browser)
     code, out, _ = rerun(browser, more_line(out))
@@ -110,7 +110,7 @@ def test_comments_command_finds_the_post_first(browser):
     script_post(browser, [comment('C1', replies=0)], has_next=False)
     code, out, _ = run(browser, 'comments', URL, '--sort', 'newest')
     assert code == 0
-    assert out.splitlines()[0] == 'facebook comments · sort=newest · 1 shown · stopped=exhausted · requests=3'
+    assert head(out.splitlines()[0]) == 'facebook comments · sort=newest · 1 shown · stopped=exhausted · requests=3'
     assert '[p1]' not in out
 
 

@@ -4,7 +4,7 @@ import json
 import re
 
 from tests.sns.facebook.scenes import graphql_body, known_tab, look, queries, query_result, rerun, run, story
-from tests.sns.support.cli import regrouped
+from tests.sns.support.cli import head, regrouped
 
 FEED = ['viewer', 'news_feed']
 
@@ -23,7 +23,7 @@ def test_text_page_contract_and_continuation(browser):
     code, out, _ = run(browser, 'feed', '--limit', '2')
     assert code == 0, out
     lines = regrouped(out)
-    assert lines[0] == 'facebook feed · sort=top · 2 shown · stopped=limit_reached · requests=1'
+    assert head(lines[0]) == 'facebook feed · sort=top · 2 shown · stopped=limit_reached · requests=1'
     assert lines[1].startswith('[p1] Author A · 2026-09-12T03:00+00:00 · status · reactions=? comments=? shares=?')
     assert lines[2] == '     text[6 of 6 chars shown]: "post A"'
     assert lines[3] == '     url: "https://www.facebook.com/author.a/posts/A"   author: "https://www.facebook.com/author.a"'
@@ -37,7 +37,7 @@ def test_text_page_contract_and_continuation(browser):
     look(browser).respond('facebook.query', page([story('D'), story('E')], has_next=False))
     code, out, _ = rerun(browser, more)
     assert code == 0, out
-    assert out.splitlines()[0] == 'facebook feed · sort=top · 2 shown · stopped=limit_reached · requests=1'
+    assert head(out.splitlines()[0]) == 'facebook feed · sort=top · 2 shown · stopped=limit_reached · requests=1'
     assert 'Author C' in out and 'Author D' in out and 'Author E' not in out
     assert queries(browser)[1]['args']['variables']['cursor'] == 'CUR1'
 
@@ -49,7 +49,7 @@ def test_without_a_limit_the_feed_reads_one_page_and_says_how_to_go_on(browser):
     browser.respond('facebook.query', page([story('A'), story('B'), story('C')], cursor='CUR1'))
     code, out, _ = run(browser, 'feed')
     assert code == 0 and len(queries(browser)) == 1
-    assert out.splitlines()[0] == 'facebook feed · sort=top · 3 shown · stopped=limit_reached · requests=1'
+    assert head(out.splitlines()[0]) == 'facebook feed · sort=top · 3 shown · stopped=limit_reached · requests=1'
     assert more_of(out).endswith(re.search(r'facebook feed .*', more_of(out)).group(0))
     assert re.search(r'--after \d+$', more_of(out))
 
@@ -108,7 +108,7 @@ def test_sponsored_posts_are_included_marked_and_count_toward_limit(browser):
     browser.respond('facebook.query', page([story('AD', sponsored=True), story('A')], has_next=False))
     code, out, _ = run(browser, 'feed')
     lines = out.splitlines()
-    assert code == 0 and lines[0] == 'facebook feed · sort=top · 2 shown (1 ads) · stopped=exhausted · requests=1'
+    assert code == 0 and head(lines[0]) == 'facebook feed · sort=top · 2 shown (1 ads) · stopped=exhausted · requests=1'
     assert any(line.startswith('[ad] [p1]') for line in lines) and 'left out' not in out
     look(browser).respond('facebook.query', page([story('AD', sponsored=True), story('A')], has_next=False))
     code, out, _ = run(browser, 'feed', '--limit', '1', '--json')

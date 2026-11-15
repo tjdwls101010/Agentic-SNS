@@ -6,6 +6,7 @@ import json
 from sns.session import Session
 from tests.sns.facebook.scenes import (ACCOUNT, ASIDE, HOME, graphql_body, known_tab, look, opening, queries,
                                        query_result, run, sent, state_of, story)
+from tests.sns.support.cli import head
 
 FEED = ['viewer', 'news_feed']
 NAME = 'CometNewsFeedPaginationQuery'
@@ -138,7 +139,7 @@ def test_a_vanished_tab_is_reopened_once_and_the_opening_is_counted(browser):
     browser.respond('facebook.query', page(['A']))
     code, out, _ = run(browser, 'feed')
     assert code == 0, out
-    assert out.splitlines()[0] == 'facebook feed · sort=top · 1 shown · stopped=exhausted · requests=1 · tab opened (+30 requests)'
+    assert head(out.splitlines()[0]) == 'facebook feed · sort=top · 1 shown · stopped=exhausted · requests=1 · tab opened (+30 requests)'
     assert Session('facebook', ASIDE).tab == 'NEW'
 
 
