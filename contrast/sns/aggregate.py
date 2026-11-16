@@ -1,7 +1,7 @@
 """Counts of graded contrast runs (plan P8): per rubric row, per model and arm, defects over valid runs — the numbers
 results/<round>.md keeps (numbers only: no names, posts or answers).
 
-  python3 aggregate.py ROUND GRADES.jsonl [--cells CELLS.jsonl] [--key KEY.json …] [--tasks TASK …]
+  python3 aggregate.py ROUND GRADES.jsonl [--cells CELLS.jsonl] [--key KEY.json …] [--tasks PLATFORM/TASK …]
 
 GRADES.jsonl: one line per graded copy and row, {"id": <blind id>, "row": <rubric row>, "verdict": "defect" | "ok" |
 "n.a.", "grader": <name>} — or {"run": <run name>, …} when a grade was made without blinding. --key maps blind ids back
@@ -49,23 +49,29 @@ def verdicts(grades, keys, graders):
     return decided, open_cells
 
 
+def task_of(cell):
+    """A run's task as probes.md names it: platform/task (task files are per platform, so t3 alone is ambiguous); a
+    cell recorded without a platform keeps its bare name."""
+    return f"{cell['platform']}/{cell['task_name']}" if cell.get('platform') else cell.get('task_name')
+
+
 def table(decided, cells, tasks=None, minimum=3):
     """({row: {model: {arm: {"defects": d, "valid": v}}}}, the (model, arm, task) left out) over the valid runs of the
     chosen tasks. A task counts in a cell (model, arm) only with at least `minimum` valid runs there, counted from the
     run index whatever the grades say; a row's denominator is then the runs whose verdict for it was decided and
     applicable (n.a. is not a run of that row)."""
     info = {c['run']: c for c in cells if c.get('valid') and not c.get('block_signal')}
-    chosen = [c for c in cells if not tasks or c.get('task_name') in tasks]
+    chosen = [c for c in cells if not tasks or task_of(c) in tasks]
     valid_runs = defaultdict(int)
     for c in chosen:
-        valid_runs[(c['model'], c['arm'], c['task_name'])] += c['run'] in info
+        valid_runs[(c['model'], c['arm'], task_of(c))] += c['run'] in info
     short = sorted(cell for cell, count in valid_runs.items() if count < minimum)
     counts = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {'defects': 0, 'valid': 0})))
     for (run, row), verdict in decided.items():
         cell = info.get(run)
-        if cell is None or verdict == 'n.a.' or (tasks and cell['task_name'] not in tasks):
+        if cell is None or verdict == 'n.a.' or (tasks and task_of(cell) not in tasks):
             continue
-        if (cell['model'], cell['arm'], cell['task_name']) in short:
+        if (cell['model'], cell['arm'], task_of(cell)) in short:
             continue
         slot = counts[row][cell['model']][cell['arm']]
         slot['valid'] += 1

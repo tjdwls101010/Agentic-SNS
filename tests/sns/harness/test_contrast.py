@@ -286,6 +286,22 @@ def test_a_task_whose_runs_were_all_invalid_or_not_applicable_is_handled_by_its_
     assert short == [('opus', 'A', 'dead')]
 
 
+def test_a_probe_set_names_tasks_with_their_platform(tmp_path, monkeypatch):
+    """Task files are named per platform (x/t3 and facebook/t3 are different tasks): probes.md lists them as
+    platform/task, and only that task counts."""
+    from contrast.sns import aggregate
+    monkeypatch.setattr(aggregate, 'HERE', tmp_path)
+    cells = [{'run': f'{p}{i}', 'arm': 'A', 'model': 'sonnet', 'valid': True, 'task_name': 't3', 'platform': p,
+              'block_signal': None} for p in ('x', 'facebook') for i in range(3)]
+    (tmp_path / 'cells.jsonl').write_text('\n'.join(json.dumps(c) for c in cells) + '\n')
+    grades = [{'run': c['run'], 'row': 1, 'verdict': 'defect' if c['platform'] == 'facebook' else 'ok',
+               'grader': 'sonnet'} for c in cells]
+    (tmp_path / 'grades.jsonl').write_text('\n'.join(json.dumps(g) for g in grades) + '\n')
+    aggregate.main(['probe', str(tmp_path / 'grades.jsonl'), '--cells', str(tmp_path / 'cells.jsonl'),
+                    '--graders', 'sonnet', '--tasks', 'x/t3'])
+    assert '| 1 | sonnet | 0/3 |' in (tmp_path / 'results' / 'probe.md').read_text()
+
+
 def test_blinding_keeps_what_every_arm_shares_and_sees_through_grep_prefixes():
     from contrast.sns import blind
     body = (contrast.HERE / 'arms/A.md').read_text() + '\nA claim only this arm makes about the reader of posts.\n'
