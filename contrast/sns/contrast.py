@@ -11,8 +11,9 @@ too: the invocation paragraph alone (arms/A.md). --arm names the body in the res
 a file under tasks/<platform>/ (or a path); ${NAME} in it is filled from the environment, so real people, posts and
 URLs never live in the repository.
 
-Each of --repeat repetitions is its own run, RUN-r<k>. A run whose child met a permission denial says nothing about
-the skill (it could not do what it tried): it is marked invalid and run again, at most twice, as RUN-r<k>-a<n>. Every
+Each of --repeat repetitions is its own run, RUN-r<k>. A run whose child was denied the skill's CLI says nothing about
+the skill (it could not do what it tried): it is marked invalid and run again, at most twice, as RUN-r<k>-a<n>; a denied
+tool outside the skill (python3 or mkdir on an --out file) is counted (outside_denials) and the run stays valid. Every
 attempt is one line in $SNS_WORK/cells.jsonl (run, task, platform, arm, model, repetition, attempt, valid) — what
 aggregate.py counts. blind.py turns runs into what graders see; grader.md is what they are asked.
 
@@ -198,17 +199,30 @@ def run(args):
             summary = run_once(args, name, task)
             # evidence only from a run that finished on its own: no denial (it could not do what it tried), a final
             # answer, and no block signal (a platform pushed back and the run was stopped)
+            against = skill_denials(summary['permission_denials'])
             summary.update(repetition=repetition, attempt=attempt,
-                           valid=not summary['permission_denials'] and summary['final'] is not None
-                           and not summary.get('block_signal'))
+                           outside_denials=len(summary['permission_denials']) - len(against),
+                           valid=not against and summary['final'] is not None and not summary.get('block_signal'))
             (work_dir() / 'runs' / name / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=1))
             record(summary)
             summaries.append(summary)
-            if summary['valid'] or summary.get('block_signal') or not summary['permission_denials']:
-                break  # only a denial is retried: a block stops everything, a run without an answer is not repeated
+            if summary['valid'] or summary.get('block_signal') or not against:
+                break  # only a denial of the skill is retried; a block stops everything; no answer is not repeated
         if summaries[-1].get('block_signal') or summaries[-1].get('error'):
             break  # a platform pushed back, or the model's side failed (a usage limit): the next would meet it too
     return summaries
+
+
+def skill_denials(denials):
+    """The denials that say the run could not use the skill (A19): a call of its CLI, or a shell call whose command the
+    denial does not give. A denied tool outside the skill (python3 or mkdir on an --out file, a Read outside the state
+    folder) is what a session without that approval meets; the run goes on and still shows how the skill was used."""
+    against = []
+    for denial in denials:
+        command = (denial.get('tool_input') or {}).get('command') if isinstance(denial, dict) else None
+        if denial.get('tool_name') == 'Bash' and (not isinstance(command, str) or 'scripts/cli.py' in command):
+            against.append(denial)
+    return against
 
 
 def record(summary):
