@@ -648,13 +648,13 @@ Codex(`gpt-6.1-terra`, high, read-only) 둘 — 실행 `20261115-155512-plan-fea
 | R14d | facebook | 영상 자막 | 미확정 | 영상 노드에 captions_url·video_available_captions_locales 필드가 있으나 본 영상 둘은 null·[] — 자막 있는 영상으로 확인 필요 |
 | R17a | x | 프로필 Reposts 탭 | 가능 | 사이트에 /<account>/reposts 탭, X 번들에 UserRepostsTimeline 작업 |
 | R17b | x | 북마크 폴더 | 없음 — 이 계정이 보여 주지 않음 | /i/history에 북마크·좋아요 탭만, 폴더 작업이 번들에 없음(Premium 기능). 다시 열 조건: Premium 계정. 북마크가 /i/history로 옮겨 갔어도 `me bookmarks`는 정상 — 이 계정의 북마크가 비어 7(사이트도 "북마크에 추가하세요"), `me likes`는 0 |
-| R17c | x | 알림 Verified 탭 | 미확정 | 알림 작업은 지연 로딩 번들에 있고, 알림 화면을 열면 읽음 처리가 생길 수 있어 열지 않음 — 성진이 있을 때 `me notifications`와 같은 작업의 탭 변수로 확인 |
+| R17c | x | 알림 Verified 탭 | 가능 → #40 | (A16, 성진이 있을 때) 알림 화면을 열자 배지 16 → 0(읽음 처리). 스킬은 화면 없이 `NotificationsTimeline`의 `timeline_type=Verified`로 읽는다. 이 질의가 읽음 처리를 하지 않는지는 배지가 이미 0이라 미측정 |
 | R17d | x | 리스트 구독자 | 미확정 | /i/lists/<id>/followers 화면에서 작업을 관찰하지 못함(지연 로딩), 메인 번들에 이름 없음 |
 | R17e | x | 커뮤니티 멤버 | 가능 | /i/communities/<id>/members 스크롤에서 membersSliceTimeline_Query(User 노드 52) |
 | R17f | x | Creator Studio 분석 | 미확정 | 화면이 데이터 요청 없이 끝남(이 계정에서 기능이 비활성일 수 있음) |
 | R4 | threads | 팔로워 다음 쪽 | 불가로 입증됨(이 관찰에서) | 사이트 자신의 팔로워 대화창이 BarcelonaFriendshipsFollowersTabQuery 한 번으로 50명과 has_next_page=false를 받고, 끝까지 스크롤해도 더 요청하지 않음. 함의: Threads가 다음을 말하지 않을 때의 정지는 server_capped가 맞다 — P6이 무조건 not_built로 바꾼 것을 '커서를 줄 때만 not_built'로 고친다(P7c) |
-| R5 | threads | 활동 다음 쪽 | 미확정 | 다음 쪽 쿼리가 기록에 없고(queries.json에는 첫 쪽 BarcelonaActivityFeedV2StoryListContainerQuery뿐), 관찰하려면 활동 화면을 열어야 해 읽음 처리가 생길 수 있음 — 성진이 있을 때 배지 수(BarcelonaNotificationBadgeContextQueryDirectQuery)를 앞뒤로 비교하며 |
-| R6 | facebook | 알림 다음 쪽 | 미확정 | 같은 이유: '이전 알림 보기'를 관찰하려면 알림 화면을 열어야 함 — 성진이 있을 때 |
+| R5 | threads | 활동 다음 쪽 | 미확정(다시 열 조건: 활동이 20개를 넘는 계정) | (A16, 성진이 있을 때) 활동 화면을 열면 읽음 처리 요청 `BarcelonaActivityFeedMarkInboxAsSeenMutation`이 목록 쿼리와 따로 나간다 — 스킬은 목록 쿼리만 보내므로 읽음 처리를 하지 않는다. 이 계정의 목록 쿼리(first 20)가 has_next_page=false라 다음 쪽 쿼리를 관찰할 수 없었다 |
+| R6 | facebook | 알림 다음 쪽 | 가능 | (A16, 성진이 있을 때) '이전 알림 보기'가 `CometNotificationsListPaginationQuery` {count: 10, cursor}를 보내고 다음 묶음이 온다. 배지가 앞뒤 모두 0이라 이 쿼리의 읽음 처리 여부는 미측정 |
 | R12 | threads | 트렌딩 | 없음 — 이 계정이 보여 주지 않음 | 검색 화면이 추천 계정(BarcelonaSearchRecommendedUsersRefetchableQuery)만 싣고 트렌드 글자·데이터가 없음(옛 T16과 같음). 다시 열 조건: 검색 화면에 트렌드가 보일 때 |
 | R17g | threads | 인사이트 | 미확정 | /insights/ 페이로드에 데이터가 없음(이 계정의 팔로워 수 조건일 수 있음) |
 | R17h | threads | 유령 게시물 | 가능 | /ghost_posts/ 페이로드에 ghostPostsFeed 연결(이 계정은 비어 있음) |
@@ -668,7 +668,7 @@ Codex(`gpt-6.1-terra`, high, read-only) 둘 — 실행 `20261115-155512-plan-fea
 | R1 | facebook | 공유·reel·watch 링크 | 미확정 | 표본 링크가 없어 풀어 보지 못함 — 공유 링크 하나를 주면 확인 |
 | R2a / R2b / R2c | reddit / facebook / naver | 댓글에 달린 사진 | 미확정 | 사진이 달린 댓글 표본을 찾지 못함(Reddit은 댓글의 media_metadata, Facebook은 댓글 attachments가 후보) |
 | R7 | facebook | 깊이 2 답글의 다음 묶음 | 미확정 | 다음 묶음이 있는 깊은 가지 표본이 필요 |
-| R11 | naver | 내소식·내가 남긴 흔적·공감한 사람 | 미확정 | 알림 성격 — 읽음 처리 확인은 성진이 있을 때(O2) |
+| R11 | naver | 내소식 / 내가 남긴 흔적·공감한 사람 | 가능(내소식) / 미확정(나머지 둘 — 다시 열 조건: 그 화면의 요청 관찰) | (A16, 성진이 있을 때) 블로그 홈을 열 때마다 `/ajax/NewsList.naver`와 `/ajax/BlogNotificationList.naver`를 받아 온다 — 홈을 여는 것이 이미 하는 요청이다. '내 소식' 클릭은 로그만 보낸다. 앞뒤 수 표시가 없어 읽음 처리는 미측정 |
 | R14a / R14b / R14c / R14e | x / threads / reddit / naver | 영상 자막 | 미확정 | 자막 있는 영상 표본이 필요(Facebook은 R14d — 필드는 있음) |
 | R16a / R16b | x / threads | 투표 | 미확정 | 투표 글 표본이 필요. X 메인 번들에 투표 작업 이름은 없음(카드 필드로 올 가능성) |
 | R17j | reddit | 홈 For You·Following 탭 | 미확정 | 탭이 링크 없이 스크립트로 바뀌어 경로를 관찰하지 못함 |
