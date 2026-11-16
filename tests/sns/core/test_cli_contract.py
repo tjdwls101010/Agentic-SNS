@@ -32,6 +32,17 @@ def leaves():
     return found
 
 
+def test_the_top_level_map_names_the_folder_whose_files_open_without_asking(tmp_path):
+    """The skill pre-approves Read only under its state folder (SKILL.md allowed-tools): the map says where that is, as
+    this install resolves it, so an --out file meant to be read goes there (P8 shakedown: runs that put it in /tmp met a
+    denial on every read)."""
+    state = tmp_path / 'state-here'
+    done = subprocess.run([sys.executable, CLI, '--help'], capture_output=True, text=True,
+                          env={**__import__('os').environ, 'SNS_DATA_DIR': str(state)})
+    text = ' '.join(done.stdout.split())
+    assert done.returncode == 0 and str(state) in text and '--out' in text and 'Read' in text
+
+
 def test_the_top_level_map_fits_a_screen_and_names_every_command():
     """The map (plan 'help 구조'): each core word's meaning once, then one line per platform with every command it has,
     the platform's own places after |, doctor and schema named once for all; at most 40 lines."""
@@ -112,8 +123,11 @@ TAB_PLATFORMS = {word for word, module in REAL_PLATFORMS.items() if module.PLATF
 
 @pytest.fixture
 def width(monkeypatch):
-    """argparse wraps the usage to the terminal; measure at one width."""
+    """argparse wraps the usage to the terminal; measure at one width, and as a default install (the map prints the
+    state folder, which a test's temporary SNS_DATA_DIR would lengthen)."""
     monkeypatch.setenv('COLUMNS', '80')
+    monkeypatch.delenv('SNS_DATA_DIR', raising=False)
+    monkeypatch.delenv('XDG_STATE_HOME', raising=False)
 
 
 def parts(text):

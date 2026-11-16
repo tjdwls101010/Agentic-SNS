@@ -10,10 +10,12 @@ import importlib.util
 import json
 import sys
 from datetime import date, datetime, time, timedelta
+from pathlib import Path
 
 from sns.clock import Deadline
 from sns.errors import SnsError
 from sns.maintenance import objects, schema
+from sns.paths import data_dir
 from sns.platforms import PLATFORM_PACKAGES
 from sns.reading import Invocation, adopt_all, doctor, foreign, idle
 from sns.render import page, summary
@@ -57,9 +59,18 @@ MEANINGS = """these words mean the same wherever a platform has them (cli.py <pl
   images    save a post's pictures to look at   graph    who follows whom
   replies, comments   the rest of a thread; a result prints the exact next command
   doctor    Aside, login, blocks and limits     schema   what results and fields mean (no request)"""
-CONVENTIONS = """--sort, --tab and --type take each platform's own words. A URL of another platform or another kind is
-refused with the command that reads it. A read starts with what was read, why it stopped and the next
-command when there is one, and names a file that keeps the whole result for about a day."""
+CONVENTIONS = """--sort, --tab and --type take each platform's own words. Another platform's or kind's URL is refused
+with the command that reads it. A read's first lines give what was read, why it stopped, the next command
+and a file with the whole result in {folder}; Read opens files there unasked: put --out files there."""
+
+def state_folder():
+    """The state folder as this install resolves it, for the map: SKILL.md allowed-tools pre-approves Read there only."""
+    folder = str(data_dir())
+    home = str(Path.home())
+    if folder == home or folder.startswith(home + '/'):
+        folder = '~' + folder[len(home):]
+    return folder
+
 
 # The dedicated tab of the platforms that read through one: doctor --help is its one owner (each reading command's
 # first line only says what "tab opened" there means).
@@ -1397,7 +1408,8 @@ def parser(platforms, hidden=False, commands=None):
                               + ' '.join(platforms) + '.',
                   formatter_class=argparse.RawTextHelpFormatter, add_help=False,
                   epilog=MEANINGS + '\n\nplatforms and their commands (after | each platform\'s own places):\n'
-                         + '\n'.join(lines) + '\n  (every platform also has doctor and schema)\n\n' + CONVENTIONS
+                         + '\n'.join(lines) + '\n  (every platform also has doctor and schema)\n\n'
+                         + CONVENTIONS.format(folder=state_folder())
                          + '\n\nexit codes:\n' + exit_map())
     root.add_argument('-h', '--help', action='help', help=argparse.SUPPRESS)  # as on every leaf: the row says nothing
     root.add_argument('--verbose', action='store_true', help='Write scrubbed request metadata to stderr')
