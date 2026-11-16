@@ -86,11 +86,13 @@ def test_a_last_page_is_the_end(browser):
 def test_records_carry_the_shared_head_the_seen_words_and_nothing_opaque(browser):
     known_tab(browser)
     browser.respond('facebook.query', page([notif('N1', seen='UNSEEN'), notif('N2', seen='SEEN_BUT_UNREAD'),
-                                            notif('N3', seen='SEEN_AND_READ'), notif('N4', seen='SOMETHING_NEW')],
+                                            notif('N3', seen='SEEN_AND_READ'), notif('N4', seen='SOMETHING_NEW'),
+                                            notif('N5', seen='UNSEEN_AND_UNREAD')],
                                            has_next=False))
     code, out, _ = run(browser, 'me', 'notifications', '--json')
     result = json.loads(out)
-    assert code == 0 and [r['seen'] for r in result['results']] == ['unseen', 'seen', 'read', None]
+    # UNSEEN_AND_UNREAD: what Facebook sends for an unseen notification (live 2026-11-16; UNSEEN in 2026-10)
+    assert code == 0 and [r['seen'] for r in result['results']] == ['unseen', 'seen', 'read', None, 'unseen']
     first = result['results'][0]
     assert list(first)[:4] == ['kind', 'id', 'url', 'created_at']
     assert first['kind'] == 'notification' and first['id'] == 'N1' and first['url'].endswith('/posts/N1')
