@@ -145,7 +145,7 @@ events = [
     {{'type': 'assistant', 'message': {{'content': [{{'type': 'tool_use', 'id': 't2', 'name': 'Bash', 'input': {{'command': 'uv run cli.py x feed'}}}}]}}}},
     {{'type': 'user', 'message': {{'content': [{{'type': 'tool_result', 'tool_use_id': 't2', 'content': 'x feed · 5 shown · requests=1'}}]}}}},
     {{'type': 'result', 'result': 'Five posts were read. As told: only the F arm carries, long enough.',
-      'num_turns': 3, 'permission_denials': [{{'tool_name': 'Bash'}}] if deny else []}},
+      'num_turns': 3, 'permission_denials': [json.loads(os.environ.get('STUB_DENIAL', '{{"tool_name": "Bash"}}'))] if deny else []}},
 ]
 if os.environ.get('STUB_NO_RESULT'):
     events = events[:-1]
@@ -202,6 +202,27 @@ def test_a_run_with_a_permission_denial_is_invalid_and_run_again_at_most_twice(h
                    '--fake', str(harness['scenario'])])
     assert [(c['run'], c['valid']) for c in cells(harness['work'])] == [
         ('always-r1', False), ('always-r1-a1', False), ('always-r1-a2', False)]
+
+
+def test_a_denied_tool_outside_the_skill_leaves_the_run_valid_and_is_counted(harness, monkeypatch):
+    """A19: a model that tries python3 or mkdir on its --out file meets a denial (the skill pre-approves only its CLI and
+    Read of its state folder) and goes on; that run still says how the skill was used. Only a denied call of the skill's
+    CLI itself (or a denial that does not say what it was) makes a run invalid and runs it again."""
+    monkeypatch.setenv('STUB_DENY', '1')
+    monkeypatch.setenv('STUB_DENIAL', json.dumps({'tool_name': 'Bash', 'tool_input': {'command': 'python3 -I -c "x"'}}))
+    contrast.main(['outside', 'x', 'rehearsal', '--body', str(harness['body']), '--arm', 'F', '--repeat', '1',
+                   '--fake', str(harness['scenario'])])
+    assert [(c['run'], c['valid']) for c in cells(harness['work'])] == [('outside-r1', True)]
+    summary = json.loads((harness['work'] / 'runs' / 'outside-r1' / 'summary.json').read_text())
+    assert summary['outside_denials'] == 1
+    (harness['work'] / 'cells.jsonl').unlink()
+    (harness['work'] / 'stub.count').unlink(missing_ok=True)
+    monkeypatch.setenv('STUB_COUNTER', str(harness['work'] / 'stub2.count'))
+    monkeypatch.setenv('STUB_DENIAL', json.dumps({'tool_name': 'Bash', 'tool_input': {
+        'command': 'uv run "/somewhere/skill/scripts/cli.py" x feed; touch marker'}}))
+    contrast.main(['inside', 'x', 'rehearsal', '--body', str(harness['body']), '--arm', 'F', '--repeat', '1',
+                   '--fake', str(harness['scenario'])])
+    assert [(c['run'], c['valid']) for c in cells(harness['work'])] == [('inside-r1', False), ('inside-r1-a1', True)]
 
 
 def test_a_blind_copy_carries_neither_run_arm_model_nor_body(harness, tmp_path):
