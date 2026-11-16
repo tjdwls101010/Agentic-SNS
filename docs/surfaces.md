@@ -76,7 +76,7 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Home feed: best, hot, new, top, rising | Home sort | command: `reddit feed --sort …` |
 | Home feed: controversial | Home sort | command: `reddit feed --sort controversial` |
 | Home feed: For You, Following tabs | Home tabs | none — undetermined (reopen with the home tabs' request observed; R17j) |
-| Custom feeds | Left menu | in recon (R18a) |
+| Custom feeds | Left menu | command: `reddit sub m/NAME` (yours), `reddit sub u/USER/m/NAME` (another account's public feed) |
 | A community's listing (hot, new, top, rising, controversial), r/a+b, r/popular, r/all | Community page | command: `reddit sub SUB --sort …` |
 | Community card, rules, moderators, pinned posts; a user's card | Community sidebar, profile header | command: `reddit about SUB\|USER` |
 | Community wiki | Community wiki | command: `reddit wiki SUB [PAGE]` |

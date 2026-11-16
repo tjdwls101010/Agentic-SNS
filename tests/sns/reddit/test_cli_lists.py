@@ -187,3 +187,52 @@ def test_feed_controversial_uses_the_period_and_pages(reddit):
     code, out, _ = reddit.run(*more_words(out))
     assert code == 0 and 'title b' in out and 'stopped=exhausted' in out and 'requests=2' in out.splitlines()[0]
     assert reddit.paths() == ['/api/me.json', '/controversial.json', '/api/me.json', '/controversial.json']
+
+
+# Custom feeds (R18a, A16): a feed's posts come as a listing at /user/<owner>/m/<name>/<sort>.json, read like a community's.
+
+def test_a_custom_feed_is_read_like_a_community(reddit):
+    reddit.me().json('/user/someone/m/news/hot.json', listing([post('a'), post('b')], after='t3_b'), query={'limit': 100})
+    code, out, _ = reddit.run('reddit', 'sub', 'u/someone/m/news', '--limit', '1')
+    assert code == 0 and out.splitlines()[0].startswith('reddit sub · sort=hot · 1 shown · stopped=limit_reached')
+    assert 'title a' in out and 'title b' not in out
+    assert '/scripts/cli.py" reddit sub u/someone/m/news --sort hot --limit 1 --after ' in more_line(out)
+    assert reddit.paths() == ['/api/me.json', '/user/someone/m/news/hot.json']
+
+
+def test_your_own_custom_feed_is_m_name_under_the_logged_in_account(reddit):
+    reddit.me().json(f'/user/{VIEWER}/m/news/new.json', listing([post('a')]), query={'limit': 100})
+    code, out, _ = reddit.run('reddit', 'sub', 'm/news', '--sort', 'new', '--json')
+    result = json.loads(out)
+    assert code == 0 and [r['id'] for r in result['results']] == ['t3_a'] and result['stop_reason'] == 'exhausted'
+    assert reddit.paths() == ['/api/me.json', f'/user/{VIEWER}/m/news/new.json']
+
+
+def test_a_custom_feed_url_names_the_same_feed(reddit):
+    reddit.me().json('/user/someone/m/news/top.json', listing([post('a')]), query={'limit': 100, 't': 'week'})
+    code, out, _ = reddit.run('reddit', 'sub', 'https://www.reddit.com/user/someone/m/news/', '--sort', 'top', '--time',
+                              'week')
+    assert code == 0 and 'title a' in out
+    assert reddit.paths() == ['/api/me.json', '/user/someone/m/news/top.json']
+
+
+def test_a_custom_feed_continues_with_the_next_page(reddit):
+    reddit.me().json('/user/someone/m/news/new.json', listing([post('a'), post('b')], after='t3_b'))
+    reddit.me().json('/user/someone/m/news/new.json', listing([post('c')]), query={'after': 't3_b'})
+    code, out, _ = reddit.run('reddit', 'sub', 'u/someone/m/news', '--sort', 'new', '--limit', '2')
+    code, out, _ = reddit.run(*more_words(out))
+    assert code == 0 and 'title c' in out and 'stopped=exhausted' in out
+
+
+def test_a_private_custom_feed_is_unavailable(reddit):
+    reddit.me().respond({'status': 403, 'body': {'reason': 'private'}}, path='/user/someone/m/news/hot.json')
+    code, out, _ = reddit.run('reddit', 'sub', 'u/someone/m/news')
+    assert code == 9 and json.loads(out)['error'] == 'unavailable'
+
+
+def test_custom_feed_targets_that_are_not_one(reddit):
+    for target in ('m/', 'm/a/b', 'u/someone/m', 'u/someone/m/news/extra/more', 'r/example/m/news'):
+        code, out, _ = reddit.run('reddit', 'sub', target)
+        assert code == 2, target
+    code, out, _ = reddit.run('reddit', 'profile', 'u/someone/m/news')
+    assert code == 2 and 'u/<name>' in json.loads(out)['message']

@@ -1,5 +1,5 @@
 """What a user-typed Reddit target names, with no request: a post, a comment, a community (or an a+b combination), a
-user, the logged-in user, a wiki, or a share link that only a request can resolve."""
+user, the logged-in user, a wiki, a custom feed, or a share link that only a request can resolve."""
 import re
 from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
@@ -13,10 +13,11 @@ _COMMENT_ID = r'[A-Za-z0-9]{1,16}'  # comment ids reached 13 characters in 2026 
 _SUB = r'[A-Za-z0-9_]{1,21}'
 _USER = r'[A-Za-z0-9_-]{3,20}'
 _PAGE = r'[A-Za-z0-9_-]{1,64}(?:/[A-Za-z0-9_-]{1,64})?'
+_FEED = r'[A-Za-z0-9_]{1,50}'
 
 # Which target kinds each command takes: the one table the commands check their target against.
 ACCEPTS = {
-    'sub': ('subreddit', 'subreddits'),
+    'sub': ('subreddit', 'subreddits', 'custom_feed'),
     'post': ('post', 'comment', 'share'),
     'comments': ('post', 'comment', 'share'),
     'images': ('post', 'comment', 'share'),
@@ -28,22 +29,25 @@ ACCEPTS = {
 }
 # Which command opens a target of each kind (for a Reddit link given to another platform's command).
 OPENED_BY = {'post': 'post', 'comment': 'post', 'share': 'post', 'subreddit': 'sub', 'subreddits': 'sub',
-             'user': 'profile', 'wiki': 'wiki'}
+             'user': 'profile', 'wiki': 'wiki', 'custom_feed': 'sub'}
 
 
 @dataclass(frozen=True)
 class Target:
-    kind: str                   # post | comment | subreddit | subreddits | user | me | share | wiki
+    kind: str                   # post | comment | subreddit | subreddits | user | me | share | wiki | custom_feed
     sub: str | None = None
     post_id: str | None = None
     comment_id: str | None = None
     user: str | None = None
     url: str | None = None      # a share link's canonical URL
     page: str | None = None     # a wiki page name (None: the wiki's page list)
+    feed: str | None = None     # a custom feed's name (its owner in user; None there: the logged-in account)
 
     @property
     def name(self):
-        """How a result names it: r/<sub>, u/<user>, or the permalink of a post or comment."""
+        """How a result names it: r/<sub>, u/<user>, m/<feed> (u/<user>/m/<feed>), or the permalink of a post or comment."""
+        if self.kind == 'custom_feed':
+            return (f'u/{self.user}/' if self.user else '') + f'm/{self.feed}'
         if self.kind in ('subreddit', 'subreddits'):
             return f'r/{self.sub}'
         if self.kind in ('user', 'me'):
@@ -61,7 +65,7 @@ def permalink(post_id, comment_id=None):
 
 def _invalid():
     return SnsError('argument', 'Invalid or unsupported Reddit target.',
-                    'Use r/name, u/name, a post id, or a Reddit post, comment or share URL.')
+                    'Use r/name, u/name, m/name (a custom feed), a post id, or a Reddit post, comment or share URL.')
 
 
 def _checked(value, pattern):
@@ -101,6 +105,10 @@ def parse_target(value):
         if value == 'me':
             return Target('me', user='me')
         return Target('post', post_id=_checked(value.removeprefix('t3_'), _POST_ID).lower())
+    if segments[0] == 'm' and len(segments) == 2 and host is None:
+        return Target('custom_feed', feed=_checked(segments[1], _FEED))
+    if segments[0] in ('u', 'user') and len(segments) == 4 and segments[2] == 'm':
+        return Target('custom_feed', user=_checked(segments[1], _USER), feed=_checked(segments[3], _FEED))
     if segments[0] in ('u', 'user') and len(segments) == 2:
         if segments[1] == 'me':
             return Target('me', user='me')
@@ -152,7 +160,8 @@ def require(target, command):
     kinds = ACCEPTS[command]
     if target.kind not in kinds:
         names = {'post': 'a post', 'comment': 'a comment link', 'share': 'a share link', 'subreddit': 'r/<name>',
-                 'subreddits': 'r/<a+b>', 'user': 'u/<name>', 'me': 'u/me', 'wiki': 'a wiki URL'}
+                 'subreddits': 'r/<a+b>', 'user': 'u/<name>', 'me': 'u/me', 'wiki': 'a wiki URL',
+                 'custom_feed': 'm/<name>'}
         raise SnsError('argument', f'{command} takes ' + ', '.join(names[k] for k in kinds) + f', not {names[target.kind]}.',
                        f'Run {command.split()[0]} --help for its targets.')
     return target

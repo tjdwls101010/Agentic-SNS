@@ -76,7 +76,7 @@ def feed(platform, invocation):
 
 
 def sub(platform, invocation):
-    """A community's listing."""
+    """A community's listing, or a custom feed's (the posts of the communities it gathers, sorted the same ways)."""
     options = invocation.options
     target = web.require(web.parse_target(options['target']), 'sub')
     shown, sort, sort_words = resolve_sort(options, 'hot')
@@ -85,9 +85,13 @@ def sub(platform, invocation):
     order = 'newest_first' if sort == 'new' else 'ranked'
 
     def read(connection, state, out):
-        return read_pages(connection, state, out, request=lambda after: web.route_listing(
-            target.sub, sort, options.get('time'), after), command='sub', target=target.name, identity=identity,
-            words=words, order=order)[0]
+        if target.kind == 'custom_feed':
+            owner = target.user or connection.viewer()  # m/<name> is the logged-in account's own feed
+            request = lambda after: web.route_custom_feed(owner, target.feed, sort, options.get('time'), after)
+        else:
+            request = lambda after: web.route_listing(target.sub, sort, options.get('time'), after)
+        return read_pages(connection, state, out, request=request, command='sub', target=target.name,
+                          identity=identity, words=words, order=order)[0]
 
     return reading.run(platform, invocation, command='sub', target=target.name, identity=identity, reader=read,
                        window=window_of(options, order))

@@ -34,6 +34,7 @@ _ROUTES = (
     (r'/(best|hot|new|top|rising|controversial)\.json', GENERAL),
     (rf'/r/{_SUB}(\+{_SUB})*/(hot|new|top|rising|controversial|search)\.json', GENERAL),
     (rf'/r/{_SUB}/about(/rules|/moderators)?\.json', GENERAL),
+    (rf'/user/[A-Za-z0-9_-]+/m/{_SUB}/(hot|new|top|rising|controversial)\.json', GENERAL),
     (rf'/r/{_SUB}/wiki/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)?\.json', WIKI),
     (rf'/(r/{_SUB}/)?comments/{_ID}(/[^/]+/{_ID})?\.json', GENERAL),
     (rf'/duplicates/{_ID}\.json', GENERAL),
@@ -87,6 +88,11 @@ def feed(sort, time=None, after=None):
 
 def listing(sub, sort, time=None, after=None):
     return Request(f'/r/{sub}/{sort}.json', _query(limit=PAGE_SIZE, t=time, after=after))
+
+
+def custom_feed(owner, feed, sort, time=None, after=None):
+    """A custom feed's posts: a listing under its owner's account, sorted like a community's."""
+    return Request(f'/user/{owner}/m/{feed}/{sort}.json', _query(limit=PAGE_SIZE, t=time, after=after))
 
 
 def post_alone(post_id):
