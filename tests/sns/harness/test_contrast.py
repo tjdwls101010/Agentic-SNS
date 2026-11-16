@@ -293,3 +293,32 @@ def test_blinding_keeps_what_every_arm_shares_and_sees_through_grep_prefixes():
     assert blind.strip_body(shared, body) == shared
     grep = 'SKILL.md:7:A claim only this arm makes about the reader of posts.'
     assert 'only this arm makes' not in blind.strip_body(grep, body)
+
+
+def test_grading_tasks_and_collected_verdicts_feed_aggregate(tmp_path):
+    """grade.py (A18): one Sonnet worker task per blinded copy, labelled with its id; the workers' JSON answers become
+    the {id, row, verdict, grader} lines aggregate.py counts; an answer that is not grader.md's object is named, never
+    guessed."""
+    from contrast.sns import grade
+    copies = tmp_path / 'copies'
+    copies.mkdir()
+    for name in ('aaaa1111', 'bbbb2222'):
+        (copies / f'{name}.md').write_text('# Task\n')
+    lines = [json.loads(line) for line in grade.tasks(copies)]
+    assert [line['label'] for line in lines] == ['g-aaaa1111', 'g-bbbb2222']
+    assert str(copies / 'aaaa1111.md') in lines[0]['prompt'] and 'grader.md' in lines[0]['prompt']
+    answer = {'rows': {str(n): {'verdict': 'defect' if n == 6 else 'n.a.' if n in (7, 8) else 'ok', 'evidence': 'e'}
+                       for n in range(1, 9)}, 'misread': [], 'tool': []}
+    printed = ('{"group": "g", "members": []}\n'
+               '--- [1:g-aaaa1111] run=r1 state=completed bytes=10\n' + json.dumps(answer) + '\n'
+               '--- [2:g-bbbb2222] run=r2 state=completed bytes=10\n' + 'I could not finish.\n')
+    found, missing = grade.collect(printed, 'sonnet')
+    assert missing == ['bbbb2222'] and len(found) == 8
+    # the print saved by a background shell ends with its own trailer after the last answer
+    found, missing = grade.collect('--- [1:g-aaaa1111] run=r1\n' + json.dumps(answer) + '\n\n[exited with code 0]\n',
+                                   'sonnet')
+    assert missing == [] and len(found) == 8
+    assert {'id': 'aaaa1111', 'row': '6', 'verdict': 'defect', 'grader': 'sonnet'} in found
+    assert {line['verdict'] for line in found if line['row'] in ('7', '8')} == {'n.a.'}
+    schema = json.loads((grade.HERE / 'grader.schema.json').read_text())
+    assert set(schema['properties']['rows']['required']) == set(answer['rows'])
