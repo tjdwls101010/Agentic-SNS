@@ -9,7 +9,7 @@ from sns.text import limit_of, line, quote
 
 # The label of each kind: [p1] posts, [c1] comments, [b1] blogs and neighbors, [k1] keywords ...
 PREFIX = {'post': 'p', 'comment': 'c', 'blog': 'b', 'buddy': 'b', 'topic': 't', 'clip': 'v', 'keyword': 'k',
-          'group': 'g', 'image': 'i', 'link': 'l'}
+          'news': 'n', 'group': 'g', 'image': 'i', 'link': 'l'}
 
 
 def _clip(value, chars):
@@ -150,6 +150,8 @@ def record_lines(record, label, chars):
                 '     ' + quote(record.get('title')), '     url: ' + record['url']]
     if kind == 'keyword':
         return [f'[{label}] {record.get("keyword")}']
+    if kind == 'news':
+        return [_join([f'[{label}] {record.get("category")}', (record.get('author') or {}).get('name'), record.get('created_at'), 'read' if record.get('read') else 'unread' if record.get('read') is False else None]), '     ' + quote(_clip(record.get('title'), chars)), '     url: ' + (record.get('url') or '')]
     if kind == 'group':
         return [_join([f'[{label}] group {record.get("group_id")}', record.get('name')])]
     if kind == 'link':

@@ -55,5 +55,6 @@ def test_naver_me_help_describes_groups_and_only_supported_options():
     assert result.returncode == 0
     body = ' '.join(result.stdout.split('exit codes:')[0].split())
     assert 'neighbor groups' in body and 'one page' in body
-    assert '--group' not in body and 'followers' not in body and '--limit' not in body
-    assert '--after' not in body and '--out' not in body
+    assert '--group' not in body and 'followers' not in body
+    # --limit, --after and --out are news's (me groups refuses them before any request: test_cli_neighbors).
+    assert all(flag in body for flag in ('--limit', '--after', '--out')) and 'news' in body

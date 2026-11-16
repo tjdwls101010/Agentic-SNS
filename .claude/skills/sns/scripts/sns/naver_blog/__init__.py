@@ -17,7 +17,7 @@ RECORDS = {
     **{name: web.record_schema(name, cls, web.RECORD_NOTES[name]) for name, cls in (
         ('comment', web.Comment), ('blog', web.Blog), ('category', web.Category), ('buddy', web.Buddy),
         ('topic', web.Topic), ('clip', web.Clip), ('keyword', web.Keyword), ('group', web.Group),
-        ('link', web.Resolved))},
+        ('link', web.Resolved), ('news', web.News))},
     'image': reading.IMAGE_SCHEMA,
 }
 RECORDS['post_read']['fields']['author'] = 'object — ' + web.POST_READ_NOTES['author']

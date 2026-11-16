@@ -15,9 +15,10 @@ from pathlib import Path
 from urllib.parse import parse_qsl, urlsplit
 
 from sns.errors import SnsError, diagnostic
+from sns.page import Page
 
 from sns.naver_blog.web import targets
-from sns.naver_blog.web.classify import at, classify
+from sns.naver_blog.web.classify import at, classify, drift
 from sns.naver_blog.web.pages import Fetched, Policy
 from sns.naver_blog.web.routes import allowed, build, frame_blog_id, image_host, operation
 
@@ -207,6 +208,19 @@ class Client:
         return Fetched(items=records, raw_count=len(items), last_page=last if last is not None else (
             number if row.marker else None), next_page=following,
             reported_total=None if total == 0 and items else total), payload
+
+    def after(self, name, cursor, build_record, **ids):
+        """One page of a cursor surface as a sns.page.Page (cursor None or '' for the first): the answer says whether more
+        follow and names their cursor; more with no new cursor is a changed answer."""
+        row = operation(name)
+        payload = self.get(name, page=cursor or '', **ids)
+        items = at(payload, row.leaf)   # classify has checked it is a list
+        more, following = at(payload, row.marker), at(payload, row.cursor)
+        if not isinstance(more, bool) or (more and (not isinstance(following, str) or not following
+                                                    or following == cursor)):
+            raise drift(f'A page did not say where the next one starts ({row.marker}, {row.cursor}).')
+        records = _records(build_record, items)
+        return Page(records, next=following if more else None, end=not more, unreadable=0 if records else len(items))
 
     def target(self, text, kind):
         """A typed target, with a naver.me link resolved by one counted hop."""

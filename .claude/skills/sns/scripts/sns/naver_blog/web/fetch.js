@@ -40,6 +40,7 @@ async (args) => {
       "^/commentBox/cbox/web_naver_list_json\\.json$"
     ],
     "section.blog.naver.com": [
+      "^/ajax/NewsList\\.naver$",
       "^/ajax/DirectoryList\\.naver$",
       "^/ajax/DirectoryPostList\\.naver$",
       "^/ajax/DirectoryTopPostList\\.naver$"

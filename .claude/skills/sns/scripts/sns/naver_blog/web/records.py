@@ -428,9 +428,36 @@ class Resolved(Record):
     post: str | None = None
 
 
+@dataclass
+class News(Record):
+    kind: str = 'news'
+    id: str | None = None
+    url: str | None = None
+    created_at: str | None = None
+    category: str | None = None
+    read: bool | None = None
+    author: dict = field(default_factory=dict)
+    title: str = ''
+
+
+def news_record(raw):
+    """One item of the account's 내소식 (NewsList): what a neighbor did on the account's posts or comments."""
+    if not isinstance(raw, dict) or first(raw, 'createKeyString') is None:
+        return None
+    blog = first(raw, 'writerBlogId')
+    blog = str(blog) if blog is not None else None
+    return News(id=f'news:{raw["createKeyString"]}', url=first(raw, 'url'), created_at=stamp(raw.get('createTime')),
+                category=first(raw, 'commcastCategoryType'),
+                read=raw['isRead'] if isinstance(raw.get('isRead'), bool) else None,
+                author={'name': clean(first(raw, 'writerNickName')), 'id': blog,
+                        'url': f'https://blog.naver.com/{blog}' if blog else None, 'blog_name': None},
+                title=clean(first(raw, 'title')) or '')
+
+
 # What each field means to a reader, beside its type; schema prints these.
 _HEAD = {'kind': 'the record type', 'created_at': 'an ISO time with its offset (KST), or null when there is none'}
 NOTES = {
+    'news': {'__doc__': 'One item of the logged-in account\'s 내소식 (me news): a reply to its comment, a comment on its post and the like, newest first.', 'id': 'news:<createKeyString>, Naver\'s key of the item', 'url': 'what the item points at, as Naver sends it (a post with the comment in focus; post <url> reads the post)', 'created_at': 'KST minute', 'category': 'Naver\'s own word for what happened (BLOG_COMMENT_REPLY, ...), an open set', 'read': 'Naver\'s isRead; listing news left it unchanged (2026-11-16, one item; opening the item may change it)', 'author': '{name, id, url, blog_name}: the neighbor who did it and their blog; unknown values are null', 'title': 'the title of the post it is about'},
     'post': {'__doc__': 'A post from a list surface (search, a blog\'s lists, the feed, topics). Its summary is Naver\'s '
                         'excerpt, cut at a character count.',
              'id': 'post:<blogId>/<logNo>; what --out deduplicates and resumes on',

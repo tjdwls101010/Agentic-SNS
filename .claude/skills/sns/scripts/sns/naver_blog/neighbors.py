@@ -1,13 +1,13 @@
-"""feed (the logged-in account's neighbor feed) and buddies (neighbor lists).
+"""feed (the logged-in account's neighbor feed), buddies (neighbor lists) and news (내소식).
 
-Both read the account's own surfaces, so they ask who is logged in first (their address is that account's blog id); a
+All three read the account's own surfaces, so they ask who is logged in first (their address is that account's blog id); a
 public neighbor list is a blog's and asks no one."""
 from sns import reading
 from sns.errors import SnsError
 
 from sns.naver_blog import account, listing, web
 
-FEED_DISPLAY, BUDDY_DISPLAY = 10, 20
+FEED_DISPLAY, BUDDY_DISPLAY, NEWS_DISPLAY = 10, 20, 5
 
 
 def feed(platform, invocation):
@@ -35,8 +35,9 @@ def feed(platform, invocation):
 def check(options):
     """The argument rules of buddies, before any request."""
     if options.get('collection') == 'groups':
-        if options.get('out') or options.get('after'):
-            raise SnsError('argument', 'The neighbor groups are one page: no continuation, no file.', 'Drop --after/--out.')
+        if options.get('out') or options.get('after') or options.get('limit'):
+            raise SnsError('argument', 'The neighbor groups are one page: no continuation, no file, no limit.',
+                           'Drop --after/--out/--limit.')
         return
     if options.get('group') and (options.get('target') or options['relation'] != 'buddies'):
         raise SnsError('argument', '--group reads your own buddies.', 'Drop the blog or choose buddies without --group.')
@@ -49,6 +50,8 @@ def buddies(platform, invocation):
     target = web.parse_target(options['target'], 'blog') if options.get('target') else None
     if options.get('collection') == 'groups':
         return groups(platform, invocation)
+    if options.get('collection') == 'news':
+        return news(platform, invocation)
     kind = 'public' if target else 'followers' if options.get('relation') == 'followers' else 'mine'
     group = options.get('group')
     identity = {'blog': target and (target.blog_id or 'naver.me/' + target.short), 'kind': kind, 'group': group}
@@ -87,3 +90,14 @@ def groups(platform, invocation):
         return {'results': found, 'stop_reason': 'not_paginable'}
 
     return reading.run(platform, invocation, command='me', target=None, identity={'kind': 'groups'}, reader=read)
+
+
+def news(platform, invocation):
+    """Your 내소식 (replies to your comments, comments on your posts ...), newest first, a page at a time. Reading marks
+    nothing read; the account check (bound) comes first."""
+    def read(connection, state, out):
+        return reading.read_list(connection, state, out, order='newest_first', command='me', target=None,
+                                 fetch=lambda cursor: connection.client.after('news', cursor, web.news_record),
+                                 identity={'kind': 'news'}, words=['news'], show=NEWS_DISPLAY)
+
+    return reading.run(platform, invocation, command='me', target=None, identity={'kind': 'news'}, reader=read)

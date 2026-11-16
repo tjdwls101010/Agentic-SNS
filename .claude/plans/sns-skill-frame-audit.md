@@ -668,7 +668,7 @@ Codex(`gpt-6.1-terra`, high, read-only) 둘 — 실행 `20261115-155512-plan-fea
 | R1 | facebook | 공유·reel·watch 링크 | 미확정 | 표본 링크가 없어 풀어 보지 못함 — 공유 링크 하나를 주면 확인 |
 | R2a / R2b / R2c | reddit / facebook / naver | 댓글에 달린 사진 | 미확정 | 사진이 달린 댓글 표본을 찾지 못함(Reddit은 댓글의 media_metadata, Facebook은 댓글 attachments가 후보) |
 | R7 | facebook | 깊이 2 답글의 다음 묶음 | 미확정 | 다음 묶음이 있는 깊은 가지 표본이 필요 |
-| R11 | naver | 내소식 / 내가 남긴 흔적·공감한 사람 | 가능(내소식) / 미확정(나머지 둘 — 다시 열 조건: 그 화면의 요청 관찰) | (A16, 성진이 있을 때) 블로그 홈을 열 때마다 `/ajax/NewsList.naver`와 `/ajax/BlogNotificationList.naver`를 받아 온다 — 홈을 여는 것이 이미 하는 요청이다. '내 소식' 클릭은 로그만 보낸다. 앞뒤 수 표시가 없어 읽음 처리는 미측정 |
+| R11 | naver | 내소식 / 내가 남긴 흔적·공감한 사람 | 가능(내소식) / 미확정(나머지 둘 — 다시 열 조건: 그 화면의 요청 관찰) | (A16, 성진이 있을 때) 블로그 홈을 열 때마다 `/ajax/NewsList.naver`와 `/ajax/BlogNotificationList.naver`를 받아 온다 — 홈을 여는 것이 이미 하는 요청이다. '내 소식' 클릭은 로그만 보낸다. `naver-blog me news`로 내소식을 구현했다. 두 번 읽은 뒤에도 isRead는 false였으며 다음 페이지의 데이터는 관찰하지 못했다 |
 | R14a / R14b / R14c / R14e | x / threads / reddit / naver | 영상 자막 | 미확정 | 자막 있는 영상 표본이 필요(Facebook은 R14d — 필드는 있음) |
 | R16a / R16b | x / threads | 투표 | 미확정 | 투표 글 표본이 필요. X 메인 번들에 투표 작업 이름은 없음(카드 필드로 올 가능성) |
 | R17j | reddit | 홈 For You·Following 탭 | 미확정 | 탭이 링크 없이 스크립트로 바뀌어 경로를 관찰하지 못함 |
