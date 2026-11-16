@@ -196,8 +196,8 @@ def shared_commands(platform):
 def common(word, flags, spec, tab):
     """⑤ of a command's --help: what every read's output holds, said only with the options this command has (when a
     read stops, and the time limit, are schema result's stop reasons)."""
-    lines = ['output: first line "… N shown · stopped=<reason> · requests=<n> · saved=<file>" (the whole result'
-             + (' as --json prints it, texts in full' if '--json' in flags else '') + ', for about a day)'
+    lines = ['output: first line "… N shown · stopped=<reason> · requests=<n> · saved=<file>" (the whole '
+             + ('--json result, texts uncut' if '--json' in flags else 'result') + ', kept a day)'
              + ('; tab opened (+n) is the skill\'s tab loading (doctor --help)' if tab else '') + '.']
     more = []
     if '--after' in flags:
