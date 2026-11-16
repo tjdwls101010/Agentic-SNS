@@ -15,11 +15,11 @@ FIELDS = {
     'created_at': 'string | null — ISO-8601 UTC time Facebook gives the notification; null when it gave none',
     'notification_type': 'string | null — Facebook\'s own type word, e.g. feed_comment_reply; the set is open',
     'text': 'string | null — the notification as Facebook words it, e.g. "A replied to your comment"',
-    'seen': 'string | null — unseen (Facebook\'s UNSEEN) | seen (SEEN_BUT_UNREAD) | read (SEEN_AND_READ); null when '
+    'seen': 'string | null — unseen (Facebook\'s UNSEEN or UNSEEN_AND_UNREAD) | seen (SEEN_BUT_UNREAD) | read (SEEN_AND_READ); null when '
             'Facebook sent none or one this skill does not know (a coverage note says so)',
     'captured_at': 'string — ISO-8601 UTC time this tool received it; changes every run',
 }
-SEEN = {'UNSEEN': 'unseen', 'SEEN_BUT_UNREAD': 'seen', 'SEEN_AND_READ': 'read'}
+SEEN = {'UNSEEN': 'unseen', 'UNSEEN_AND_UNREAD': 'unseen', 'SEEN_BUT_UNREAD': 'seen', 'SEEN_AND_READ': 'read'}
 LAYOUT = frozenset({'BUCKET_HEADER', 'SEE_PREVIOUS_BUTTON'})
 
 
