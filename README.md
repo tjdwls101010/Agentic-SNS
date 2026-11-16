@@ -85,7 +85,7 @@ With several Aside accounts, pick one with `SNS_ASIDE_ACCOUNT` (per platform: `S
 
 ```
 .claude/skills/sns/        the installed skill (complete on its own)
-├── SKILL.md               judgment rules the model reads — scope of claims, how much to read, account ≠ person, account safety, Naver sponsorship cues
+├── SKILL.md               how to call the CLI, and that every request is the user's real account
 └── scripts/
     ├── cli.py             the single entry point (parser, dispatch, exit codes)
     └── sns/               shared core (protection, paging, deadlines, output) and platform packages (x, threads, reddit, facebook, naver_blog)
@@ -103,7 +103,7 @@ uv run --with 'pytest>=9,<10' pytest -c tests/sns/pytest.ini tests/sns
 
 Tests run against `tests/sns/fakes/fake_aside.py` instead of a real browser, with synthetic fixtures only. Live smoke tests against a real account run only with `SNS_LIVE=<platform>` (or `all`) and `-m live`.
 
-`contrast/sns/` measures whether each section of SKILL.md actually improves the model's answers: the same tasks run on Opus and Sonnet with a bodyless skill (A) and the draft (B), graded blind against `rubric.md`. `contrast/sns/triggers/` measures when the skill is invoked, with `claude plugin eval`.
+`contrast/sns/` runs the skill on development tasks with nobody there and grades the runs blind against `rubric.md`; its stage-1 counts are in `contrast/sns/results/`. The body was then cut to what every session needs (decision A22 in the plan): runs with nobody to ask reward reading on without asking, which is not how the skill is used. `contrast/sns/triggers/` measures when the skill is invoked, with `claude plugin eval`.
 
 When a platform's site changes, only that platform's `scripts/sns/<platform>/web/` should need fixing: site formats live there alone.
 

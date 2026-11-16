@@ -75,7 +75,7 @@ Aside 계정이 여럿이면 `SNS_ASIDE_ACCOUNT`(플랫폼별로는 `SNS_ASIDE_A
 
 ```
 .claude/skills/sns/        설치되는 스킬 (이것만으로 완결)
-├── SKILL.md               모델이 읽는 판단 원칙 — 읽은 범위, 읽는 분량, 계정 ≠ 사람, 계정 안전, 네이버 협찬 단서
+├── SKILL.md               CLI를 부르는 법, 모든 요청이 사용자의 실계정이라는 사실
 └── scripts/
     ├── cli.py             유일한 진입점(파서·디스패치·종료 코드)
     └── sns/               공용 코어(보호·쪽 넘김·기한·출력)와 플랫폼 패키지(x, threads, reddit, facebook, naver_blog)
@@ -93,6 +93,6 @@ uv run --with 'pytest>=9,<10' pytest -c tests/sns/pytest.ini tests/sns
 
 테스트는 실제 브라우저 대신 `tests/sns/fakes/fake_aside.py`로 돌고, 픽스처는 모두 합성 데이터입니다. 실제 계정으로 도는 스모크는 `SNS_LIVE=<platform>`(또는 `all`)과 `-m live`로만 돕니다.
 
-`contrast/sns/`는 SKILL.md의 각 절이 실제로 모델의 답을 낫게 하는지 재는 하네스입니다. 같은 과제를 본문 없는 스킬(A)과 초안(B)으로 Opus·Sonnet에 돌리고, 채점자가 어느 쪽인지 모르게 `rubric.md` 기준으로 채점합니다. 과제의 실제 대상은 환경 변수(`SNS_TASK_*`)로만 받고 실행 산출물은 레포 밖에 둡니다. `contrast/sns/triggers/`는 `claude plugin eval`로 스킬이 언제 불리는지 잽니다.
+`contrast/sns/`는 개발 과제를 사람 없이 스킬로 돌리고 `rubric.md` 기준으로 가려 채점하는 하네스입니다. 1단계 수치는 `contrast/sns/results/`에 있습니다. 본문은 그 뒤 모든 세션에 필요한 것만 남겼습니다(계획의 결정 A22): 물을 사람이 없는 실행은 묻지 않고 더 읽는 쪽을 높게 치는데, 이 스킬은 그렇게 쓰이지 않습니다. 과제의 실제 대상은 환경 변수(`SNS_TASK_*`)로만 받고 실행 산출물은 레포 밖에 둡니다. `contrast/sns/triggers/`는 `claude plugin eval`로 스킬이 언제 불리는지 잽니다.
 
 플랫폼 사이트가 바뀌면 그 플랫폼의 `scripts/sns/<platform>/web/`만 고치면 되도록, 사이트 형식은 그 안에만 둡니다.
