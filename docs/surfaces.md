@@ -56,7 +56,7 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Following | Profile following | command: `threads graph ACCOUNT following` |
 | Liked, saved | Menu `/liked/`, `/saved/` | command: `threads me liked\|saved` |
 | Activity, first page (all, mentions, replies, quotes, reposts, follows, conversations, following, requests) | Activity `/activity` | command: `threads me activity --tab …` |
-| Activity: next pages | Activity, scrolled | in recon (R5) |
+| Activity: next pages | Activity, scrolled | none — undetermined (this account's activity fits one page of 20; reopen with an account whose activity has more; R5) |
 | A post with its replies, a reply's branch | Post page | command: `threads post POST`, `threads replies HANDLE` |
 | Quotes and reposts of a post | Post activity | command: `threads quotes POST`, `threads reposts POST` |
 | Search: posts (top, recent), tags, accounts | Search | command: `threads search TEXT --type …` |
@@ -136,7 +136,8 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Neighbor feed (이웃새글) | Blog home | command: `naver-blog feed` |
 | Your neighbor list, a blog's public neighbor list, followers | 이웃 목록 | command: `naver-blog graph [BLOG] buddies\|followers` |
 | Your neighbor groups | 이웃 목록 | command: `naver-blog me groups` |
-| 내 소식, 내 활동 (traces you left), who liked your posts | Blog home | in recon (R11) |
+| 내 소식 (news from your neighbors' blogs) | Blog home | in recon (R11) |
+| 내 활동 (traces you left), who liked your posts | Blog home | none — undetermined (reopen with the request those screens send observed; R11) |
 | A blog's card, category tree, notices, popular posts | Blog | command: `naver-blog about BLOG` |
 | A blog's posts: all, one category, notices, popular | Blog | command: `naver-blog profile BLOG --tab … --category …` |
 | A post in full; its comments | Post | command: `naver-blog post POST`, `naver-blog comments POST` |
