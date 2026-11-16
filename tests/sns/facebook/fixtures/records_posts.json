@@ -2372,6 +2372,96 @@
         "records": [],
         "issues": []
       }
+    },
+    {
+      "name": "ufi-renderer-for-another-target-is-not-a-post",
+      "item": "follow-up",
+      "fact": "A story's reaction and comment bar (comet_sections.feedback \u2026 story_ufi_container \u2026 feedback_context) can point at another feedback target than the story's own; its renderer dicts (\u2026UFISummaryAndActionsRenderer, \u2026ActionRenderer) carry that target's feedback.id and are not stories (live 2026-11-16: an empty, undated record with no url beside the real post).",
+      "parser": "posts",
+      "args": {
+        "source": "newsfeed",
+        "connection_key": "news_feed"
+      },
+      "body_lines": [
+        {
+          "data": {
+            "viewer": {
+              "news_feed": {
+                "edges": [
+                  {
+                    "node": {
+                      "__typename": "Story",
+                      "id": "S1",
+                      "feedback": {
+                        "id": "F1"
+                      },
+                      "creation_time": 1767225600,
+                      "permalink_url": "https://www.facebook.com/example/posts/1",
+                      "message": {
+                        "text": "the post"
+                      },
+                      "comet_sections": {
+                        "feedback": {
+                          "story": {
+                            "feedback": {
+                              "id": "F1"
+                            },
+                            "story_ufi_container": {
+                              "story": {
+                                "id": "S1",
+                                "feedback_context": {
+                                  "feedback_target_with_context": {
+                                    "id": "F2",
+                                    "comet_ufi_summary_and_actions_renderer": {
+                                      "__typename": "DefaultModernCometUFISummaryAndActionsRenderer",
+                                      "feedback": {
+                                        "id": "F2",
+                                        "adaptive_ufi_action_renderers": [
+                                          {
+                                            "__typename": "UFIStoryReactActionRenderer",
+                                            "feedback": {
+                                              "id": "F2"
+                                            }
+                                          },
+                                          {
+                                            "__typename": "UFICommentActionRenderer",
+                                            "feedback": {
+                                              "id": "F2"
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "cursor": "e1"
+                  }
+                ],
+                "page_info": {
+                  "has_next_page": false,
+                  "end_cursor": null
+                }
+              }
+            }
+          }
+        }
+      ],
+      "expected": {
+        "records": [
+          {
+            "id": "F1",
+            "url": "https://www.facebook.com/example/posts/1",
+            "text": "the post"
+          }
+        ],
+        "issues": []
+      }
     }
   ]
 }

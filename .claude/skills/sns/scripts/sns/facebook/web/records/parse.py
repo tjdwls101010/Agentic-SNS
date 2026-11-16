@@ -68,7 +68,13 @@ def is_comment(obj):
 
 
 def is_story(obj):
-    return isinstance(obj, dict) and isinstance(obj.get('feedback'), dict) and obj['feedback'].get('id') is not None
+    """A dict with a feedback id, except a renderer: a story's reaction and comment bar is drawn by renderer dicts
+    (…UFISummaryAndActionsRenderer, …ActionRenderer) that carry the feedback id of whatever that bar targets, which can
+    be another target than the story's own — counted as a story, it became an empty post with no url or date."""
+    if not (isinstance(obj, dict) and isinstance(obj.get('feedback'), dict) and obj['feedback'].get('id') is not None):
+        return False
+    typename = obj.get('__typename')
+    return not (isinstance(typename, str) and typename.endswith('Renderer'))
 
 
 def _read_field(name):
