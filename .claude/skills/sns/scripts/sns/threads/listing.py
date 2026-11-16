@@ -9,8 +9,6 @@ from sns.window import Window
 
 FEEDS = {'foryou': ('for_you', 'ranked'), 'following': ('following', 'newest_first')}
 TABS = {'threads': 'newest_first', 'replies': 'newest_first', 'reposts': 'finite', 'media': 'finite'}
-# A surface's own end, which a continuation that reads only the tail it already holds must still report
-NATURAL_STOPS = ('server_capped', 'not_paginable', 'not_built')
 
 
 def paged(listed):
@@ -21,15 +19,14 @@ def paged(listed):
 
 def surface(connection, state, out, *, fetch, order, command, target, identity, words=(), extra=None, idle_limit=2,
             end_covers_window=False):
-    """Read a Threads surface (fetch(cursor) → a web.Page) as reading.read_list does. What the surface itself said (it
-    is a sample, it is one batch, the total it reports) travels in the continuation and the --out file's state."""
+    """Read a Threads surface (fetch(cursor) → a web.Page) as reading.read_list does. The total the surface reports
+    travels in the continuation and the --out file's state; its own stop (a sample, one batch) travels in the shared
+    pager's state (paging.paginate's ended), so a continuation that only shows the tail it holds still ends with it."""
     saved = (out.state if out is not None else state) or {}
     natural = dict(saved.get('natural') or {})
 
     def fetch_page(cursor):
         page = fetch(cursor)
-        if page.stop:
-            natural['stop'] = page.stop
         if page.reported_total is not None:
             natural['reported'] = page.reported_total
         return paged(page)
@@ -37,8 +34,6 @@ def surface(connection, state, out, *, fetch, order, command, target, identity, 
     result = reading.read_list(connection, state, out, order=order, command=command, target=target, identity=identity,
                                words=words, extra={**(extra or {}), 'natural': natural}, idle_limit=idle_limit,
                                end_covers_window=end_covers_window, fetch=fetch_page)
-    if result['stop_reason'] == 'exhausted' and natural.get('stop') in NATURAL_STOPS and not result.get('failure'):
-        result['stop_reason'] = natural['stop']
     reported = natural.get('reported')
     if reported is not None:
         result['details'] = {'reported_total': reported}
