@@ -39,6 +39,21 @@ def test_followers_stay_one_sample_even_when_threads_offers_a_cursor(browser):
     assert browser.ops().count('threads.query') == 2
 
 
+def test_the_rest_of_a_followers_page_that_offered_more_still_ends_not_built(browser):
+    """more: after --limit shows what the first page held without a request; the end it reaches is still the page
+    the skill does not read, not the list's end."""
+    first = {'data': {'fetch__XDTUserDict': {'followers': {'edges': accounts(['a.one', 'b.two']),
+                                                           'page_info': {'has_next_page': True, 'end_cursor': 'F2'}}}}}
+    known_tab(browser).respond('threads.query', by_name()).respond('threads.query', query_result(first))
+    code, out, _ = run(browser, 'graph', '@example.author', 'followers', '--limit', '1', '--json')
+    held = json.loads(out)
+    assert code == 0 and held['stop_reason'] == 'limit_reached' and held['next'], held
+    known_tab(browser)
+    code, out, _ = rerun(browser, 'more: ' + held['next'])
+    rest = json.loads(out)
+    assert code == 0 and [r['username'] for r in rest['results']] == ['b.two'] and rest['stop_reason'] == 'not_built'
+
+
 def test_followers_read_to_the_profiles_total_are_the_whole_list(browser):
     """When what was read reaches the count the profile reports, nothing is left: exhausted, not a cap."""
     body = {'data': {'fetch__XDTUserDict': {'followers': {'edges': accounts(['a.one', 'b.two'])}},
