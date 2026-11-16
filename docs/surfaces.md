@@ -114,7 +114,7 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Memories | Menu "Memories" `/onthisday/` | none — undetermined (reopen with a day with memories; R17r) |
 | Saved | Menu "Saved" `/saved/` | command: `facebook me saved` (the first page the screen loads; the next-page request was not observed, so a longer list ends `not_built`) |
 | Notifications (first page) | Notifications | command: `facebook me notifications` |
-| Notifications: next pages | Notifications "see previous" | in recon (R6) |
+| Notifications: next pages | Notifications "see previous" | command: `facebook me notifications --limit N` (more: continues) |
 | A post with its comments, a comment's replies | Post page | command: `facebook post POST`, `facebook comments POST`, `facebook replies HANDLE` |
 | Replies under a reply: next batches | Post page, depth 2 | none — undetermined (reopen with a reply branch two levels deep that has more; R7) |
 | Share, reel and watch links | Shared links | none — undetermined (reopen with a share, reel or watch link to try; R1) |

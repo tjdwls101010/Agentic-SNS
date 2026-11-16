@@ -476,12 +476,14 @@ class Client:
         chunks = self.query('search', {'args': args, **variables}, route=route)
         return search_page(chunks, vertical=vertical, captured_at=_now())
 
-    def notifications(self):
-        """The first page of the viewer's notification list. route=None: a refused id is never relearned, because the
-        screen that loads this query is the notifications screen, and rendering it makes the app send the seen-state
-        mutations; the command ends instead."""
+    def notifications(self, cursor=None):
+        """One page of the viewer's notification list: the first, or the older ones after `cursor` with the query the
+        screen's see-previous button sends (the first page's end cursor is that button's own). route=None: a refused id
+        is never relearned, because the screen that loads these queries is the notifications screen, and rendering it
+        makes the app send the seen-state mutations; the command ends instead."""
         try:
-            chunks = self.query('notifications', {}, route=None)
+            chunks = self.query('notifications_older', {'cursor': cursor}, route=None) if cursor else \
+                self.query('notifications', {}, route=None)
         except SnsError as error:
             if error.reason != 'stale':
                 raise

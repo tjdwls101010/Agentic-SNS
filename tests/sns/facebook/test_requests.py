@@ -13,7 +13,7 @@ REQUESTS = fixture('requests.json')
 DEEP = 'Depth2CommentsListPaginationQuery'
 
 
-def test_the_thirteen_read_queries_are_the_bundled_snapshot_the_fixture_describes():
+def test_the_fourteen_read_queries_are_the_bundled_snapshot_the_fixture_describes():
     described = REQUESTS['query_names']['queries']
     assert set(web.QUERIES) == set(described)
     for key, spec in described.items():
