@@ -7,6 +7,10 @@
     "cases": [
       {"path": "/best.json", "allowed": true},
       {"path": "/hot.json", "allowed": true},
+      {"path": "/user/someone/m/news/hot.json", "allowed": true},
+      {"path": "/user/someone/m/news/top.json", "allowed": true},
+      {"path": "/user/someone/m/news.json", "allowed": false},
+      {"path": "/user/someone/m/news/search.json", "allowed": false},
       {"path": "/new.json", "allowed": true},
       {"path": "/top.json", "allowed": true},
       {"path": "/rising.json", "allowed": true},

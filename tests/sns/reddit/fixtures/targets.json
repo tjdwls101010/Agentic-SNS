@@ -61,12 +61,20 @@
     {"input": "https://www.reddit.com/r/example/wiki/401k/after-tax", "item": "R4", "target": {"kind": "wiki", "sub": "example", "page": "401k/after-tax"}},
     {"input": "https://www.reddit.com/r/example/wiki/", "item": "R4", "target": {"kind": "wiki", "sub": "example", "page": null}, "fact": "the wiki itself: its page list"},
     {"input": "r/example/wiki/a/b/c", "item": "R4", "refused": true, "why": "a wiki page name has at most one / level here"},
-    {"input": "", "item": "10", "refused": true, "why": "empty"}
+    {"input": "", "item": "10", "refused": true, "why": "empty"},
+    {"input": "m/news", "item": "R18a", "target": {"kind": "custom_feed", "user": null, "feed": "news"}, "why": "your own custom feed: the owner is the logged-in account, named at read time"},
+    {"input": "u/someone/m/news", "item": "R18a", "target": {"kind": "custom_feed", "user": "someone", "feed": "news"}},
+    {"input": "user/someone/m/news", "item": "R18a", "target": {"kind": "custom_feed", "user": "someone", "feed": "news"}},
+    {"input": "https://www.reddit.com/user/someone/m/news/", "item": "R18a", "target": {"kind": "custom_feed", "user": "someone", "feed": "news"}},
+    {"input": "https://old.reddit.com/user/someone/m/news", "item": "R18a", "target": {"kind": "custom_feed", "user": "someone", "feed": "news"}},
+    {"input": "m/a/b", "item": "R18a", "refused": true, "why": "a feed name is one segment"},
+    {"input": "u/someone/m", "item": "R18a", "refused": true, "why": "no feed name"},
+    {"input": "r/example/m/news", "item": "R18a", "refused": true, "why": "custom feeds belong to accounts, not communities"}
   ],
   "commands": {
     "about": "Which target kinds each command accepts (the old TARGETS table, moved from the entry point into the features). A target of another kind is an argument error naming the kinds it takes.",
     "accepts": {
-      "sub": ["subreddit", "subreddits"],
+      "sub": ["subreddit", "subreddits", "custom_feed"],
       "post": ["post", "comment", "share"],
       "comments": ["post", "comment", "share"],
       "images": ["post", "comment", "share"],

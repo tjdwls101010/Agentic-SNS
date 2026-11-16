@@ -61,7 +61,8 @@ def test_targets(case):
         return
     target = web.parse_target(case['input'])
     subset(case['target'], {'kind': target.kind, 'sub': target.sub, 'post_id': target.post_id,
-                            'comment_id': target.comment_id, 'user': target.user, 'url': target.url, 'page': target.page})
+                            'comment_id': target.comment_id, 'user': target.user, 'url': target.url, 'page': target.page,
+                            'feed': target.feed})
 
 
 def test_each_command_takes_the_target_kinds_the_fixture_lists():

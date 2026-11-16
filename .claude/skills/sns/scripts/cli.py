@@ -755,14 +755,14 @@ def _reddit_surface(platform):
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 10),
         },
         'sub': {
-            'help': 'Read a community\'s listing (r/name, r/a+b, r/popular, r/all).',
+            'help': 'Read a community\'s or custom feed\'s listing (r/name, r/a+b, r/popular, r/all, m/name).',
             'run': _command(platform.listing_sub), 'check': platform.listing_window_check,
-            'arguments': [(('target',), {'help': 'r/<name>, a community URL, or r/<a+b> for several at once (r/popular and '
-                                                 'r/all are Reddit-wide)'}),
+            'arguments': [(('target',), {'help': 'r/<name>, a community URL, r/<a+b> for several, m/<name> (your custom '
+                                                 'feed) or u/<user>/m/<name>'}),
                           (('--sort',), {'choices': platform.web_SUB_SORTS, 'help': 'hot (default), new (newest first), top or '
                                                                            'controversial (with --time), rising'}),
                           TIME, *WINDOW, *LIST],
-            'epilog': ["A community's listing is that community's own; r/popular and r/all are Reddit-wide rankings. Pinned posts (moderators' announcements, often old) sit at the top of hot; under new they sit at their own date. A private, quarantined or banned community is unavailable (exit 9).",
+            'epilog': ["r/popular and r/all are Reddit-wide rankings; a custom feed gathers its communities. Pinned posts (often old) top hot; under new they sit at their own date. A private, quarantined or banned community, or another's private feed: unavailable (exit 9).",
                        WINDOWS],
             'requests': LISTING,
             'exits': (0, 2, 3, 4, 5, 6, 7, 8, 9, 10),

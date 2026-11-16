@@ -662,7 +662,7 @@ Codex(`gpt-6.1-terra`, high, read-only) 둘 — 실행 `20261115-155512-plan-fea
 | R10a | reddit | 홈 피드 controversial | 가능 | 같은 탭 출처의 /controversial.json?limit=2 → 200, 글 2개(after 커서) |
 | R10b | reddit | me downvoted·hidden | 가능 | /user/<me>/downvoted.json·/hidden.json → 200, Listing |
 | R13 | reddit | 댓글 검색 | 가능(HTML 경로) | /search/?q=…&type=comments → 200, 댓글 마크업 35곳(.json 검색은 403 — A14의 경로). HTML을 파싱하는 새 형식 소유 단위가 필요 |
-| R18a | reddit | 커스텀 피드 | 가능 | /api/multi/mine.json → 200(이 계정은 빈 목록). 피드 글은 /user/<u>/m/<name>.json 경로 — 이 계정에 피드가 없어 미관찰 |
+| R18a | reddit | 커스텀 피드 | 가능 → 구현(`reddit sub m/<name>`·`u/<user>/m/<name>`, A16) | /api/multi/mine.json → 200(이 계정은 빈 목록). 피드 글은 /user/<u>/m/<name>/<sort>.json 경로 — 이 계정과 정찰용 공개 계정에 피드가 없어 실물 응답은 미관찰(공동체 목록과 같은 Listing으로 가정) |
 | R18d | facebook | 글에 반응한 사람 목록 | 미확정 | 글 화면에서 반응 목록을 여는 요소를 찾지 못해 쿼리를 관찰하지 못함 |
 | R18c-비공개 | facebook | (R18c의 일부) | 미확정 | 남의 친구 목록이 비공개일 때의 답을 보지 못함 |
 | R1 | facebook | 공유·reel·watch 링크 | 미확정 | 표본 링크가 없어 풀어 보지 못함 — 공유 링크 하나를 주면 확인 |
