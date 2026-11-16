@@ -1,0 +1,9 @@
+{"type": "object", "additionalProperties": false, "required": ["rows", "misread", "tool"],
+ "properties": {
+  "rows": {"type": "object", "additionalProperties": false, "required": ["1","2","3","4","5","6","7","8"],
+   "properties": {"1": {"$ref": "#/$defs/row"}, "2": {"$ref": "#/$defs/row"}, "3": {"$ref": "#/$defs/row"}, "4": {"$ref": "#/$defs/row"},
+                  "5": {"$ref": "#/$defs/row"}, "6": {"$ref": "#/$defs/row"}, "7": {"$ref": "#/$defs/row"}, "8": {"$ref": "#/$defs/row"}}},
+  "misread": {"type": "array", "items": {"type": "string"}},
+  "tool": {"type": "array", "items": {"type": "string"}}},
+ "$defs": {"row": {"type": "object", "additionalProperties": false, "required": ["verdict", "evidence"],
+   "properties": {"verdict": {"enum": ["defect", "ok", "n.a."]}, "evidence": {"type": "string"}}}}}
