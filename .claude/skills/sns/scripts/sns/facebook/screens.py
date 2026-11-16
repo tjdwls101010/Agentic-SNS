@@ -1,8 +1,9 @@
 """Lists read from a screen's own page: the first page Facebook preloads into the screen's HTML, in Facebook's order.
 
 No request for the page after was observed for any of them (recon 2026-11-16), so a list Facebook says goes on ends
-with stopped=not_built and a coverage line instead of more:. The commands whose views include one of these (me KIND,
-profile --tab, group --tab, graph RELATION) choose here between them and the views read elsewhere.
+with stopped=not_built and a coverage line instead of more:. The commands whose views include one of these (me saved and
+groups — me notifications pages, in notifications.py —, profile --tab, group --tab, graph RELATION) choose here between
+them and the views read elsewhere.
 """
 from sns import reading
 from sns.facebook import web

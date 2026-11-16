@@ -336,6 +336,19 @@
    "expected_key": "notifications_page",
    "kind": "connection",
    "cursor_var": null
+  },
+  "notifications_older": {
+   "name": "CometNotificationsListPaginationQuery",
+   "doc_id": "28637046332633815",
+   "variables": {
+    "count": 10,
+    "environment": "MAIN_SURFACE",
+    "filter_tokens": [],
+    "scale": 2
+   },
+   "expected_key": "notifications_page",
+   "kind": "connection",
+   "cursor_var": "cursor"
   }
  }
 }

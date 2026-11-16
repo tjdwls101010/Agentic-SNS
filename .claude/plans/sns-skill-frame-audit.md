@@ -654,7 +654,7 @@ Codex(`gpt-6.1-terra`, high, read-only) 둘 — 실행 `20261115-155512-plan-fea
 | R17f | x | Creator Studio 분석 | 미확정 | 화면이 데이터 요청 없이 끝남(이 계정에서 기능이 비활성일 수 있음) |
 | R4 | threads | 팔로워 다음 쪽 | 불가로 입증됨(이 관찰에서) | 사이트 자신의 팔로워 대화창이 BarcelonaFriendshipsFollowersTabQuery 한 번으로 50명과 has_next_page=false를 받고, 끝까지 스크롤해도 더 요청하지 않음. 함의: Threads가 다음을 말하지 않을 때의 정지는 server_capped가 맞다 — P6이 무조건 not_built로 바꾼 것을 '커서를 줄 때만 not_built'로 고친다(P7c) |
 | R5 | threads | 활동 다음 쪽 | 미확정(다시 열 조건: 활동이 20개를 넘는 계정) | (A16, 성진이 있을 때) 활동 화면을 열면 읽음 처리 요청 `BarcelonaActivityFeedMarkInboxAsSeenMutation`이 목록 쿼리와 따로 나간다 — 스킬은 목록 쿼리만 보내므로 읽음 처리를 하지 않는다. 이 계정의 목록 쿼리(first 20)가 has_next_page=false라 다음 쪽 쿼리를 관찰할 수 없었다 |
-| R6 | facebook | 알림 다음 쪽 | 가능 | (A16, 성진이 있을 때) '이전 알림 보기'가 `CometNotificationsListPaginationQuery` {count: 10, cursor}를 보내고 다음 묶음이 온다. 배지가 앞뒤 모두 0이라 이 쿼리의 읽음 처리 여부는 미측정 |
+| R6 | facebook | 알림 다음 쪽 | 가능 → 구현(`me notifications`가 다음 쪽을 읽음) | (A16, 성진이 있을 때) '이전 알림 보기'가 `CometNotificationsListPaginationQuery` {count: 10, cursor}를 보내고 다음 묶음이 온다. 첫 쪽의 end_cursor가 곧 그 버튼 행의 커서다(rt=see_previous_button) — 2026-10-21의 '빈 답'과 달리 화면의 변수로 보내면 겹치지 않는 더 오래된 10개가 왔다. 읽음 처리: 둘째 쪽을 읽은 뒤 다시 읽은 첫 쪽의 notifications_unseen_count가 1 그대로(2026-11-16) |
 | R12 | threads | 트렌딩 | 없음 — 이 계정이 보여 주지 않음 | 검색 화면이 추천 계정(BarcelonaSearchRecommendedUsersRefetchableQuery)만 싣고 트렌드 글자·데이터가 없음(옛 T16과 같음). 다시 열 조건: 검색 화면에 트렌드가 보일 때 |
 | R17g | threads | 인사이트 | 미확정 | /insights/ 페이로드에 데이터가 없음(이 계정의 팔로워 수 조건일 수 있음) |
 | R17h | threads | 유령 게시물 | 가능 | /ghost_posts/ 페이로드에 ghostPostsFeed 연결(이 계정은 비어 있음) |

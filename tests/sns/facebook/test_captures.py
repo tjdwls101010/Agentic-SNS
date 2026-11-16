@@ -111,3 +111,16 @@ def test_real_notifications_page():
         assert all(key in record for key in HEAD) and record['kind'] == 'notification'
         assert record['id'] and record['created_at'] and record['seen'] in ('unseen', 'seen', 'read')
     assert any(r['text'] and r['url'] and r['notification_type'] for r in page.records)
+
+
+OLDER_NOTIFICATIONS = CAPTURES / 'd4_notifications_second.json'
+
+
+@pytest.mark.skipif(not OLDER_NOTIFICATIONS.exists(), reason='no local older-notifications capture')
+def test_real_older_notifications_page():
+    """The answer of the see-previous query (CometNotificationsListPaginationQuery) has the first page's shape: the
+    same connection under viewer, notification rows only, and a page_info that goes on."""
+    page = web.notifications_page(json.loads(OLDER_NOTIFICATIONS.read_text()), captured_at=NOW)
+    assert page.records and page.issues == [] and isinstance(page.page_info.get('has_next_page'), bool)
+    assert all(r['kind'] == 'notification' and r['id'] and r['created_at'] for r in page.records)
+    assert all(r['seen'] in ('unseen', 'seen', 'read') for r in page.records)

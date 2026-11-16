@@ -1,7 +1,6 @@
-"""notifications through the real cli.py and a fake Aside: the record lines, what layout rows do, the seen mapping, one
-page as all there is to read (the next-page query answered nothing live), and the one failure that must not move the tab
-(a refused stored query id is never relearned by opening the notifications screen, which makes the app mark notifications
-seen)."""
+"""notifications through the real cli.py and a fake Aside: the record lines, what layout rows do, the seen mapping, the
+older pages read with the see-previous button's query, and the one failure that must not move the tab (a refused stored
+query id is never relearned by opening the notifications screen, which makes the app mark notifications seen)."""
 import json
 import re
 from datetime import datetime
@@ -9,10 +8,11 @@ from datetime import datetime
 import pytest
 
 from sns.facebook import web
-from tests.sns.facebook.scenes import known_tab, queries, query_result, run, sent
+from tests.sns.facebook.scenes import known_tab, look, queries, query_result, run, sent
 from tests.sns.support.cli import head, regrouped
 
 FIRST = 'CometNotificationsRootQuery'
+OLDER = 'CometNotificationsListPaginationQuery'  # what the screen's see-previous button sends
 REJECTED = json.dumps({'errors': [{'message': 'PersistedQueryNotFound', 'code': 1675002}]})
 TRACKING = 'TRACKING-SENTINEL-DO-NOT-OUTPUT'
 
@@ -44,7 +44,7 @@ def routes(browser):
     return [c for c in browser.calls() if c['op'] == 'facebook.route']
 
 
-def test_one_page_of_notifications_skips_layout_rows_and_is_all_there_is_to_read(browser):
+def test_one_page_of_notifications_skips_layout_rows_and_says_how_to_go_on(browser):
     known_tab(browser)
     browser.respond('facebook.query', page([layout('BUCKET_HEADER'), notif('N1'), notif('N2', seen='UNSEEN',
                                             text='Sample Person tagged you', kind='tagged'),
@@ -52,27 +52,45 @@ def test_one_page_of_notifications_skips_layout_rows_and_is_all_there_is_to_read
     code, out, _ = run(browser, 'me', 'notifications')
     assert code == 0, out
     lines = regrouped(out)
-    assert head(lines[0]) == 'facebook me · 2 shown · stopped=not_built · requests=1'
+    assert head(lines[0]) == 'facebook me · 2 shown · stopped=limit_reached · requests=1'
     assert lines[1] == '[n1] 2026-09-12T03:00+00:00 · feed_comment_reply · read'
     assert lines[2] == '     text[37 of 37 chars shown]: "Sample Person replied to your comment"'
     assert lines[3] == '     url: "https://www.facebook.com/example/posts/N1"'
     assert lines[4] == '[n2] 2026-09-12T03:00+00:00 · tagged · unseen'
-    assert 'more:' not in out and any(line.startswith('coverage: Facebook says older notifications follow') for line in lines)
+    assert re.search(r'^more: uv run ".*cli\.py" facebook me notifications --after \d+$', out, re.M)
+    assert not any('older notifications' in line for line in lines)
     assert TRACKING not in out
     first = queries(browser)[0]['args']
     assert first['name'] == FIRST and first['variables'] == {'count': 15, 'environment': 'MAIN_SURFACE',
                                                              'filter_tokens': [], 'scale': 2}
 
 
-def test_a_limit_above_one_page_still_reads_one_page(browser):
-    """Observed 2026-10-21: the next-page query (CometNotificationsListPaginationQuery with the end cursor) answered no
-    rows although the first page said more follow, so the first page is all this skill reads, and it says so."""
+def test_a_limit_above_one_page_reads_the_older_pages_with_the_see_previous_query(browser):
+    """Observed 2026-11-16: the first page's end cursor is the see-previous button's own cursor, and the button's query
+    with it answers the next notifications (no repeats, older times) while the unseen count stays as it was."""
     known_tab(browser)
     browser.respond('facebook.query', page([notif('N1'), notif('N2')], cursor='NC1'))
+    browser.respond('facebook.query', page([notif('N3', created='2026-09-11T03:00:00Z')], has_next=False))
     code, out, _ = run(browser, 'me', 'notifications', '--limit', '30', '--json')
     result = json.loads(out)
-    assert code == 0 and [r['id'] for r in result['results']] == ['N1', 'N2'] and result['stop_reason'] == 'not_built'
-    assert sent(browser) == [FIRST] and 'next' not in result
+    assert code == 0 and [r['id'] for r in result['results']] == ['N1', 'N2', 'N3']
+    assert result['stop_reason'] == 'exhausted' and 'next' not in result
+    assert sent(browser) == [FIRST, OLDER]
+    assert queries(browser)[1]['args']['variables'] == {'count': 10, 'cursor': 'NC1', 'environment': 'MAIN_SURFACE',
+                                                        'filter_tokens': [], 'scale': 2}
+
+
+def test_more_continues_with_the_see_previous_query(browser):
+    known_tab(browser)
+    browser.respond('facebook.query', page([notif('N1'), notif('N2')], cursor='NC1'))
+    code, out, _ = run(browser, 'me', 'notifications')
+    number = re.search(r'--after (\d+)', out).group(1)
+    look(browser)
+    browser.respond('facebook.query', page([notif('N3')], has_next=False))
+    code, out, _ = run(browser, 'me', 'notifications', '--after', number, '--json')
+    result = json.loads(out)
+    assert code == 0 and [r['id'] for r in result['results']] == ['N3'] and result['stop_reason'] == 'exhausted'
+    assert sent(browser) == [FIRST, OLDER] and queries(browser)[1]['args']['variables']['cursor'] == 'NC1'
 
 
 def test_a_last_page_is_the_end(browser):
