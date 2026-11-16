@@ -206,8 +206,8 @@ def run(args):
             summaries.append(summary)
             if summary['valid'] or summary.get('block_signal') or not summary['permission_denials']:
                 break  # only a denial is retried: a block stops everything, a run without an answer is not repeated
-        if summaries[-1].get('block_signal'):
-            break  # a platform pushed back: nothing more goes out
+        if summaries[-1].get('block_signal') or summaries[-1].get('error'):
+            break  # a platform pushed back, or the model's side failed (a usage limit): the next would meet it too
     return summaries
 
 
@@ -294,7 +294,7 @@ def run_once(args, name, task):
 def summarize(path):
     """Commands the child ran with the head of each output, its final answer, denials, and the requests its outputs
     reported (requests=N)."""
-    commands, outputs, denials, final, turns, requests = [], {}, [], None, 0, 0
+    commands, outputs, denials, final, turns, requests, error = [], {}, [], None, 0, 0, None
     for line in path.read_text().splitlines():
         try:
             event = json.loads(line)
@@ -314,7 +314,12 @@ def summarize(path):
                         c.get('text', '') for c in content or [] if isinstance(c, dict))
                     outputs[block.get('tool_use_id')] = text
         elif event.get('type') == 'result':
-            final, turns, denials = event.get('result'), event.get('num_turns', 0), event.get('permission_denials', [])
+            turns, denials = event.get('num_turns', 0), event.get('permission_denials', [])
+            # an error result (a usage limit, an API failure) carries a message, not an answer
+            if event.get('is_error'):
+                error = event.get('result') or event.get('subtype') or 'error'
+            else:
+                final = event.get('result')
     for command in commands:
         text = outputs.get(command['id'], '')
         command['output_head'] = text[:400]
@@ -323,7 +328,8 @@ def summarize(path):
         match = re.search(r'requests=(\d+)', text) or re.search(r'"request_count":\s*(\d+)', text)
         if match:
             requests += int(match.group(1))
-    return {'commands': commands, 'final': final, 'turns': turns, 'permission_denials': denials, 'requests': requests}
+    return {'commands': commands, 'final': final, 'turns': turns, 'permission_denials': denials, 'requests': requests,
+            'error': error}
 
 
 def main(argv=None):
@@ -344,8 +350,9 @@ def main(argv=None):
         parser.error('--repeat must be at least 1')
     for summary in run(args):
         print(json.dumps({k: summary.get(k) for k in ('run', 'platform', 'arm', 'model', 'repetition', 'attempt',
-                                                       'valid', 'exit', 'watch', 'block_signal', 'turns', 'requests',
-                                                       'logged_requests', 'permission_denials')}, ensure_ascii=False))
+                                                       'valid', 'exit', 'watch', 'block_signal', 'error', 'turns',
+                                                       'requests', 'logged_requests', 'permission_denials')},
+                         ensure_ascii=False))
     return 0
 
 

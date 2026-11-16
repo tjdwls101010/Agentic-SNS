@@ -149,6 +149,9 @@ events = [
 ]
 if os.environ.get('STUB_NO_RESULT'):
     events = events[:-1]
+if os.environ.get('STUB_ERROR'):  # what claude -p ends with when the subscription's usage limit is reached
+    events[-1] = {{'type': 'result', 'subtype': 'success', 'is_error': True, 'num_turns': 1, 'permission_denials': [],
+                  'result': os.environ['STUB_ERROR']}}
 print('\n'.join(json.dumps(e) for e in events))
 """
 
@@ -227,6 +230,19 @@ def test_a_run_without_a_final_answer_is_invalid_and_not_repeated(harness, monke
     contrast.main(['cut', 'x', 'rehearsal', '--body', str(harness['body']), '--arm', 'F', '--repeat', '1',
                    '--fake', str(harness['scenario'])])
     assert [(c['run'], c['valid']) for c in cells(harness['work'])] == [('cut-r1', False)]
+
+
+def test_a_run_that_ended_in_an_error_is_invalid_and_stops_its_cell(harness, monkeypatch, capsys):
+    """A usage limit (or any API error) ends claude -p with an error result: its text is not an answer, and the
+    repetitions after it would meet the same limit, so the cell stops and says why (A13: discard and wait)."""
+    monkeypatch.setenv('STUB_ERROR', "You've hit your limit · resets 8pm")
+    contrast.main(['lim', 'x', 'rehearsal', '--body', str(harness['body']), '--arm', 'F', '--repeat', '3',
+                   '--fake', str(harness['scenario'])])
+    assert [(c['run'], c['valid']) for c in cells(harness['work'])] == [('lim-r1', False)]
+    printed = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert printed[-1]['error'] == "You've hit your limit · resets 8pm" and printed[-1]['valid'] is False
+    summary = json.loads((harness['work'] / 'runs' / 'lim-r1' / 'summary.json').read_text())
+    assert summary['final'] is None
 
 
 def test_work_inside_the_repository_is_refused(monkeypatch):
