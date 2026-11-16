@@ -32,10 +32,11 @@ class Operation:
     envelope: str = 'mblog'          # mblog (isSuccess/result/error), cbox (success/code), section (XSSI), html, hop, image
     leaf: str | None = None
     leaf_type: str | None = None     # list | dict | int
-    pagination: str | None = None    # plain (page+1, a short page ends it) | marked (the answer names the last page)
+    pagination: str | None = None    # plain (page+1, a short page ends it) | marked (the answer names the last page) | cursor (the answer says at marker whether more follow and names their cursor at cursor)
     page_size: int | None = None
     page_param: str = 'page'
-    marker: str | None = None        # where a marked surface names its last page
+    marker: str | None = None        # where a marked surface names its last page (a cursor surface: whether more follow)
+    cursor: str | None = None        # where a cursor surface names the cursor of the page after
     ceiling: int | None = None
     total: str | None = None         # where Naver reports a total (a drifting figure, shown, never decided on)
     empty_when_missing: bool = False  # a page past the end comes without its leaf (feed/v1): that is an empty page
@@ -114,6 +115,11 @@ OPERATIONS = _rows(
     Operation('public_buddies', M, '/api/blogs/{blogId}/public-buddies', leaf='result.buddyList', leaf_type='list',
               pagination='marked', page_size=50, page_param='pageNo', marker='result.totalPageCount',
               total='result.totalPublicBuddyCount'),
+    # The blog home's own request, as it sends it (countPerPage 5); the first page's cursor is empty. Only the first page
+    # was observed (one item): the next page is built from these fields.
+    Operation('news', SECTION, '/ajax/NewsList.naver', params={'countPerPage': 5, 'lastMessageTimeKey': '', 'pagingModeType': 'next'},
+              envelope='section', leaf='result.list', leaf_type='list', pagination='cursor', page_size=5,
+              page_param='lastMessageTimeKey', marker='result.hasNext', cursor='result.lastMessageTimeKey', login=True),
     Operation('directories', SECTION, '/ajax/DirectoryList.naver', envelope='section', leaf='result', leaf_type='list'),
     Operation('directory_posts', SECTION, '/ajax/DirectoryPostList.naver', required=('directorySeq',),
               envelope='section', leaf='result.postList', leaf_type='list', pagination='plain', page_size=10,

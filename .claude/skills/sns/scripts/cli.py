@@ -1306,10 +1306,10 @@ def _naver_blog_surface(platform):
         },
     }
 
-    COMMANDS['me'] = {**COMMANDS['graph'], 'help': 'Read your neighbor groups.', 'arguments': [(('collection',), {'choices': ['groups'], 'metavar': 'KIND', 'help': 'groups'}), (('--chars',), {'type': chars, 'help': 'Characters of each text to show (default 180; 0 = all); --json keeps all'}), 'json'], 'epilog': ['Your neighbor groups are read in one page.'], 'requests': '1 for groups after the account check (current-user, 1).', 'more': False}
+    COMMANDS['me'] = {**COMMANDS['graph'], 'help': 'Read your neighbor groups or your 내소식 (news from neighbors).', 'arguments': [(('collection',), {'choices': ['groups', 'news'], 'metavar': 'KIND', 'help': 'groups or news'}), 'limit', 'chars', 'after', 'out', 'json'], 'epilog': ['groups reads your neighbor groups in one page; it takes no --limit, --after or --out.', 'news reads your 내소식: replies to your comments, comments on your posts and other news from neighbors, newest first, 5 a page. Reading marks nothing read: isRead was unchanged after reads on 2026-11-16. The next page is built from the first page\'s fields (lastMessageTimeKey, hasNext) and was not observed with data.'], 'requests': '1 per page after the account check (current-user, 1).', 'more': True}
 
     # The closed sets the commands offer (cli.py checks its parser's choices against this).
-    CHOICES = {'search.type': ['posts', 'blogs', 'tags', 'clips'], 'search.sort': ['relevance', 'date'], 'profile.tab': ['posts', 'popular', 'notices'], 'graph.relation': ['buddies', 'followers'], 'me.collection': ['groups'], 'topic.tab': ['newest', 'featured']}
+    CHOICES = {'search.type': ['posts', 'blogs', 'tags', 'clips'], 'search.sort': ['relevance', 'date'], 'profile.tab': ['posts', 'popular', 'notices'], 'graph.relation': ['buddies', 'followers'], 'me.collection': ['groups', 'news'], 'topic.tab': ['newest', 'featured']}
 
     return COMMANDS, CHOICES
 

@@ -138,7 +138,7 @@ def test_groups_list_and_one_group(naver):
     assert code == 0 and 'group=3' in first_line(out)
 
 
-@pytest.mark.parametrize('command,args', [('graph', ['other', 'followers']), ('graph', ['other', 'buddies', '--group', '1']), ('graph', ['followers', '--group', '1']), ('me', ['groups', '--out', 'g.ndjson']), ('me', ['groups', '--after', '3'])])
+@pytest.mark.parametrize('command,args', [('graph', ['other', 'followers']), ('graph', ['other', 'buddies', '--group', '1']), ('graph', ['followers', '--group', '1']), ('me', ['groups', '--out', 'g.ndjson']), ('me', ['groups', '--after', '3']), ('me', ['groups', '--limit', '3'])])
 def test_buddy_list_kinds_are_one_at_a_time_and_mine_only(naver, command, args):
     code, out, _ = naver.run('naver-blog', command, *args)
     assert code == 2 and naver.fetches() == [] and json.loads(out).get('command') == command

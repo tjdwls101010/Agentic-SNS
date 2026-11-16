@@ -136,7 +136,7 @@ Writing, settings, ads, AI chat and games are not reading surfaces and are not l
 | Neighbor feed (이웃새글) | Blog home | command: `naver-blog feed` |
 | Your neighbor list, a blog's public neighbor list, followers | 이웃 목록 | command: `naver-blog graph [BLOG] buddies\|followers` |
 | Your neighbor groups | 이웃 목록 | command: `naver-blog me groups` |
-| 내 소식 (news from your neighbors' blogs) | Blog home | in recon (R11) |
+| 내 소식 (news from your neighbors' blogs) | Blog home | command: `naver-blog me news` |
 | 내 활동 (traces you left), who liked your posts | Blog home | none — undetermined (reopen with the request those screens send observed; R11) |
 | A blog's card, category tree, notices, popular posts | Blog | command: `naver-blog about BLOG` |
 | A blog's posts: all, one category, notices, popular | Blog | command: `naver-blog profile BLOG --tab … --category …` |

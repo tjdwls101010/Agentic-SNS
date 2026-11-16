@@ -48,8 +48,8 @@ def test_domain_hop(case):
         assert web.frame_blog_id(response) == case['canonical']
 
 
-def test_the_ledger_has_35_rows_and_no_write_api():
-    assert len(web.OPERATIONS) == 35 and sum(len(patterns) for patterns in web.ROUTES.values()) == 35
+def test_the_ledger_has_36_rows_and_no_write_api():
+    assert len(web.OPERATIONS) == 36 and sum(len(patterns) for patterns in web.ROUTES.values()) == 36
     assert set(web.ROUTES) == {'m.blog.naver.com', 'apis.naver.com', 'section.blog.naver.com', 'blog.naver.com',
                                'naver.me', '*.pstatic.net'}
 

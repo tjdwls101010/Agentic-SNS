@@ -62,7 +62,7 @@ def test_every_record_has_the_shared_head_first_and_only_described_keys(name, re
 
 def test_every_object_schema_describes_its_record_and_the_listing_is_complete():
     assert set(PLATFORM.schemas) == {'post', 'post_read', 'comment', 'blog', 'category', 'buddy', 'topic', 'clip',
-                                     'keyword', 'group', 'link', 'image'}
+                                     'keyword', 'group', 'link', 'news', 'image'}
     for name, document in PLATFORM.schemas.items():
         assert document['object'] == name and document['description'] and HEAD <= described(name), name
         assert all(' — ' in text for text in document['fields'].values()), name
@@ -72,7 +72,7 @@ def test_schema_prints_each_object_through_the_cli(naver):
     code, out, _ = naver.run('naver-blog', 'schema')
     assert code == 0 and [r['object'] for r in json.loads(out)['results']] == [
         'result', 'out', 'post', 'post_read', 'comment', 'blog', 'category', 'buddy', 'topic', 'clip', 'keyword', 'group',
-        'link', 'image']
+        'link', 'news', 'image']
     code, out, _ = naver.run('naver-blog', 'schema', 'post_read')
     assert code == 0 and 'viewer_id' not in out and 'coverage' in out
 
@@ -88,7 +88,7 @@ def test_the_platform_adapter_is_the_plans_row():
 def test_the_commands_are_the_plans_twelve_in_its_order_with_their_closed_sets():
     assert list(COMMANDS) == ['search', 'keywords', 'post', 'comments', 'images', 'resolve', 'about', 'profile', 'feed',
                               'graph', 'topic', 'monthly', 'me']   # doctor and schema are the shared ones after them
-    assert CHOICES == {'search.type': ['posts', 'blogs', 'tags', 'clips'], 'search.sort': ['relevance', 'date'], 'profile.tab': ['posts', 'popular', 'notices'], 'graph.relation': ['buddies', 'followers'], 'topic.tab': ['newest', 'featured'], 'me.collection': ['groups']}
+    assert CHOICES == {'search.type': ['posts', 'blogs', 'tags', 'clips'], 'search.sort': ['relevance', 'date'], 'profile.tab': ['posts', 'popular', 'notices'], 'graph.relation': ['buddies', 'followers'], 'topic.tab': ['newest', 'featured'], 'me.collection': ['groups', 'news']}
 
 
 @pytest.mark.parametrize('argv, names', [
